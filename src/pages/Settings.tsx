@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -9,12 +10,13 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { 
   Settings as SettingsIcon, 
@@ -27,28 +29,113 @@ import {
   Save,
   Moon,
   Sun,
-  Monitor
+  Monitor,
+  Key
 } from 'lucide-react';
 
 export default function SettingsPage() {
-  const { profile, isAdmin } = useAuth();
+  const { profile, isAdmin, user } = useAuth();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [saving, setSaving] = useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
   // Profile settings
-  const [fullName, setFullName] = useState(profile?.full_name || '');
+  const [fullName, setFullName] = useState('');
 
-  // Notification settings
+  // Password change
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+
+  // Notification settings (local state for now)
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [taskReminders, setTaskReminders] = useState(true);
   const [projectUpdates, setProjectUpdates] = useState(true);
 
+  useEffect(() => {
+    if (profile?.full_name) {
+      setFullName(profile.full_name);
+    }
+  }, [profile]);
+
   const handleSaveProfile = async () => {
+    if (!user) return;
+    
     setSaving(true);
-    // Simulated save
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setSaving(false);
-    toast.success('Οι ρυθμίσεις αποθηκεύτηκαν!');
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          full_name: fullName,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+      toast.success('Το προφίλ ενημερώθηκε!');
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      toast.error('Σφάλμα κατά την αποθήκευση');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast.error('Οι κωδικοί δεν ταιριάζουν');
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      toast.error('Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες');
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: passwordData.newPassword
+      });
+
+      if (error) throw error;
+
+      toast.success('Ο κωδικός άλλαξε επιτυχώς!');
+      setPasswordDialogOpen(false);
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      });
+    } catch (error: any) {
+      console.error('Error changing password:', error);
+      toast.error(error.message || 'Σφάλμα κατά την αλλαγή κωδικού');
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const getStatusLabel = (status: string | undefined) => {
+    switch (status) {
+      case 'active': return 'Ενεργός';
+      case 'pending': return 'Εκκρεμεί';
+      case 'inactive': return 'Ανενεργός';
+      default: return status;
+    }
+  };
+
+  const getStatusStyle = (status: string | undefined) => {
+    switch (status) {
+      case 'active': return 'bg-success/10 text-success border-success/20';
+      case 'pending': return 'bg-warning/10 text-warning border-warning/20';
+      case 'inactive': return 'bg-muted text-muted-foreground';
+      default: return '';
+    }
   };
 
   return (
@@ -99,8 +186,8 @@ export default function SettingsPage() {
 
           <div className="flex items-center gap-2">
             <Label>Κατάσταση:</Label>
-            <Badge variant="outline" className="bg-success/10 text-success border-success/20">
-              {profile?.status === 'active' ? 'Ενεργός' : profile?.status}
+            <Badge variant="outline" className={getStatusStyle(profile?.status)}>
+              {getStatusLabel(profile?.status)}
             </Badge>
           </div>
 
@@ -251,12 +338,8 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <Button onClick={handleSaveProfile} disabled={saving}>
-              {saving ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <Save className="h-4 w-4 mr-2" />
-              )}
+            <Button disabled={saving}>
+              <Save className="h-4 w-4 mr-2" />
               Αποθήκευση
             </Button>
           </CardContent>
@@ -275,11 +358,59 @@ export default function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button variant="outline">
+          <Button variant="outline" onClick={() => setPasswordDialogOpen(true)}>
+            <Key className="h-4 w-4 mr-2" />
             Αλλαγή Κωδικού
           </Button>
         </CardContent>
       </Card>
+
+      {/* Password Change Dialog */}
+      <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Αλλαγή Κωδικού</DialogTitle>
+            <DialogDescription>
+              Εισάγετε τον νέο σας κωδικό πρόσβασης
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleChangePassword} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="newPassword">Νέος Κωδικός</Label>
+              <Input
+                id="newPassword"
+                type="password"
+                value={passwordData.newPassword}
+                onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                placeholder="••••••••"
+                required
+                minLength={6}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Επιβεβαίωση Κωδικού</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={passwordData.confirmPassword}
+                onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                placeholder="••••••••"
+                required
+                minLength={6}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setPasswordDialogOpen(false)}>
+                Ακύρωση
+              </Button>
+              <Button type="submit" disabled={changingPassword}>
+                {changingPassword && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                Αλλαγή Κωδικού
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

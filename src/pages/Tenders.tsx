@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useTendersRealtime } from '@/hooks/useRealtimeSubscription';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +24,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { ViewToggle, type ViewMode } from '@/components/ui/view-toggle';
 import { toast } from 'sonner';
 import { 
   FileText, 
@@ -91,6 +101,7 @@ export default function TendersPage() {
   const [saving, setSaving] = useState(false);
   const [activeTender, setActiveTender] = useState<Tender | null>(null);
   const [editingTender, setEditingTender] = useState<Tender | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('kanban');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -112,12 +123,7 @@ export default function TendersPage() {
     })
   );
 
-  useEffect(() => {
-    fetchTenders();
-    fetchClients();
-  }, []);
-
-  const fetchTenders = async () => {
+  const fetchTenders = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('tenders')
@@ -135,7 +141,7 @@ export default function TendersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const fetchClients = async () => {
     try {
@@ -150,6 +156,15 @@ export default function TendersPage() {
       console.error('Error fetching clients:', error);
     }
   };
+
+  // Subscribe to realtime updates
+  useTendersRealtime(fetchTenders);
+
+  useEffect(() => {
+    fetchTenders();
+    fetchClients();
+  }, [fetchTenders]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useProjectsRealtime } from '@/hooks/useRealtimeSubscription';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -77,12 +78,7 @@ export default function ProjectsPage() {
     end_date: '',
   });
 
-  useEffect(() => {
-    fetchProjects();
-    fetchClients();
-  }, []);
-
-  const fetchProjects = async () => {
+  const fetchProjects = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('projects')
@@ -97,7 +93,7 @@ export default function ProjectsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const fetchClients = async () => {
     try {
@@ -112,6 +108,15 @@ export default function ProjectsPage() {
       console.error('Error fetching clients:', error);
     }
   };
+
+  // Subscribe to realtime updates
+  useProjectsRealtime(fetchProjects);
+
+  useEffect(() => {
+    fetchProjects();
+    fetchClients();
+  }, [fetchProjects]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

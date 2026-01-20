@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useCalendarRealtime } from '@/hooks/useRealtimeSubscription';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,7 +25,6 @@ import {
   isToday,
   addMonths,
   subMonths,
-  getDay,
   startOfWeek,
   endOfWeek
 } from 'date-fns';
@@ -47,11 +47,7 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
-  useEffect(() => {
-    fetchEvents();
-  }, [currentDate]);
-
-  const fetchEvents = async () => {
+  const fetchEvents = useCallback(async () => {
     setLoading(true);
     try {
       const startDate = format(startOfMonth(currentDate), 'yyyy-MM-dd');
@@ -146,7 +142,15 @@ export default function CalendarPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentDate, isAdmin, isManager]);
+
+  // Subscribe to realtime updates
+  useCalendarRealtime(fetchEvents);
+
+  useEffect(() => {
+    fetchEvents();
+  }, [fetchEvents]);
+
 
   const daysInMonth = useMemo(() => {
     const start = startOfWeek(startOfMonth(currentDate), { weekStartsOn: 1 });

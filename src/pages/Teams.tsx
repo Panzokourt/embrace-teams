@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useTeamsRealtime } from '@/hooks/useRealtimeSubscription';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -78,12 +79,7 @@ export default function TeamsPage() {
     color: TEAM_COLORS[0],
   });
 
-  useEffect(() => {
-    fetchTeams();
-    fetchUsers();
-  }, []);
-
-  const fetchTeams = async () => {
+  const fetchTeams = useCallback(async () => {
     try {
       const { data: teamsData, error: teamsError } = await supabase
         .from('teams')
@@ -125,7 +121,7 @@ export default function TeamsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const fetchUsers = async () => {
     try {
@@ -141,6 +137,15 @@ export default function TeamsPage() {
       console.error('Error fetching users:', error);
     }
   };
+
+  // Subscribe to realtime updates
+  useTeamsRealtime(fetchTeams);
+
+  useEffect(() => {
+    fetchTeams();
+    fetchUsers();
+  }, [fetchTeams]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

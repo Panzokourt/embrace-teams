@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useDashboardRealtime } from '@/hooks/useRealtimeSubscription';
 import StatCard from '@/components/dashboard/StatCard';
 import PipelineCard, { getDefaultPipelineStages } from '@/components/dashboard/PipelineCard';
 import TaskList from '@/components/dashboard/TaskList';
@@ -54,11 +55,7 @@ export default function Dashboard() {
   const [pipelineStages, setPipelineStages] = useState(getDefaultPipelineStages());
   const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([]);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       // Fetch all data in parallel
       const [
@@ -163,7 +160,15 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Subscribe to realtime updates
+  useDashboardRealtime(fetchDashboardData);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
 
   if (loading) {
     return (

@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useTasksRealtime } from '@/hooks/useRealtimeSubscription';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +25,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { ViewToggle, type ViewMode } from '@/components/ui/view-toggle';
 import { toast } from 'sonner';
 import { 
   CheckSquare, 
@@ -91,6 +101,7 @@ export default function TasksPage() {
   const [saving, setSaving] = useState(false);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('kanban');
 
   const [formData, setFormData] = useState({
     title: '',
@@ -112,13 +123,7 @@ export default function TasksPage() {
     })
   );
 
-  useEffect(() => {
-    fetchTasks();
-    fetchProjects();
-    fetchUsers();
-  }, []);
-
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('tasks')
@@ -150,7 +155,7 @@ export default function TasksPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const fetchProjects = async () => {
     try {
@@ -181,6 +186,16 @@ export default function TasksPage() {
       console.error('Error fetching users:', error);
     }
   };
+
+  // Subscribe to realtime updates
+  useTasksRealtime(fetchTasks);
+
+  useEffect(() => {
+    fetchTasks();
+    fetchProjects();
+    fetchUsers();
+  }, [fetchTasks]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

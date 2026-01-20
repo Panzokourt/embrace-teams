@@ -335,7 +335,7 @@ export default function TasksPage() {
                   </Select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="status">Κατάσταση</Label>
                     <Select
@@ -397,7 +397,7 @@ export default function TasksPage() {
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {/* Todo */}
           <div className="space-y-4">
             <div className="flex items-center gap-2">

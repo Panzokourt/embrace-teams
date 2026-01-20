@@ -241,7 +241,7 @@ export default function ProjectsPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="client">Πελάτης</Label>
                     <Select
@@ -280,7 +280,7 @@ export default function ProjectsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="budget">Budget (€)</Label>
                     <Input
@@ -304,7 +304,7 @@ export default function ProjectsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="start_date">Ημ/νία Έναρξης</Label>
                     <Input

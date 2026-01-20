@@ -257,7 +257,7 @@ export default function TendersPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="client">Πελάτης/Φορέας</Label>
                     <Select
@@ -289,7 +289,7 @@ export default function TendersPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="stage">Φάση</Label>
                     <Select
@@ -351,7 +351,7 @@ export default function TendersPage() {
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
+        <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 overflow-x-auto">
           {stages.map(stage => (
             <div key={stage} className="space-y-3">
               <div className="flex items-center justify-between">

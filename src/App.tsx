@@ -13,6 +13,7 @@ import ProjectDetail from "@/pages/ProjectDetail";
 import Tasks from "@/pages/Tasks";
 import Teams from "@/pages/Teams";
 import Tenders from "@/pages/Tenders";
+import TenderDetail from "@/pages/TenderDetail";
 import Financials from "@/pages/Financials";
 import Clients from "@/pages/Clients";
 import Users from "@/pages/Users";
@@ -39,6 +40,7 @@ const App = () => (
                 <Route path="/tasks" element={<Tasks />} />
                 <Route path="/teams" element={<Teams />} />
                 <Route path="/tenders" element={<Tenders />} />
+                <Route path="/tenders/:id" element={<TenderDetail />} />
                 <Route path="/financials" element={<Financials />} />
                 <Route path="/clients" element={<Clients />} />
                 <Route path="/users" element={<Users />} />

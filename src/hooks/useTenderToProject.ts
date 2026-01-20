@@ -52,29 +52,49 @@ export function useTenderToProject() {
     newStage: TenderStage,
     tenderData: TenderData,
     onProjectCreated?: (projectId: string) => void
-  ) => {
-    // Update the tender stage
-    const { error } = await supabase
-      .from('tenders')
-      .update({ stage: newStage })
-      .eq('id', tenderId);
+  ): Promise<boolean> => {
+    try {
+      // Update the tender stage in the database
+      const { error } = await supabase
+        .from('tenders')
+        .update({ stage: newStage })
+        .eq('id', tenderId);
 
-    if (error) {
-      console.error('Error updating tender stage:', error);
+      if (error) {
+        console.error('Error updating tender stage:', error);
+        toast.error('Σφάλμα κατά την ενημέρωση φάσης');
+        return false;
+      }
+
+      toast.success(`Η φάση άλλαξε σε "${getStageLabel(newStage)}"`);
+
+      // If stage is "won", convert to project
+      if (newStage === 'won') {
+        const projectId = await convertTenderToProject(tenderData);
+        if (projectId && onProjectCreated) {
+          onProjectCreated(projectId);
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error in handleStageChange:', error);
       toast.error('Σφάλμα κατά την ενημέρωση');
       return false;
     }
-
-    // If stage is "won", convert to project
-    if (newStage === 'won') {
-      const projectId = await convertTenderToProject(tenderData);
-      if (projectId && onProjectCreated) {
-        onProjectCreated(projectId);
-      }
-    }
-
-    return true;
   };
 
   return { handleStageChange, convertTenderToProject };
+}
+
+function getStageLabel(stage: TenderStage): string {
+  const labels: Record<TenderStage, string> = {
+    identification: 'Εντοπισμός',
+    preparation: 'Προετοιμασία',
+    submitted: 'Υποβλήθηκε',
+    evaluation: 'Αξιολόγηση',
+    won: 'Κερδήθηκε',
+    lost: 'Απορρίφθηκε'
+  };
+  return labels[stage];
 }

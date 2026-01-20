@@ -393,7 +393,7 @@ export default function TendersPage() {
           isDeadlinePassed && tender.stage !== 'won' && tender.stage !== 'lost' && "border-warning/50",
           isDragOverlay && "shadow-xl rotate-2"
         )}
-        onClick={() => !isDragOverlay && handleEdit(tender)}
+        onClick={() => !isDragOverlay && navigate(`/tenders/${tender.id}`)}
       >
         <CardContent className="p-3">
           <div className="flex items-start gap-2">
@@ -446,7 +446,7 @@ export default function TendersPage() {
         <Card 
           key={tender.id} 
           className="hover:shadow-lg transition-shadow cursor-pointer"
-          onClick={() => handleEdit(tender)}
+          onClick={() => navigate(`/tenders/${tender.id}`)}
         >
           <CardContent className="p-4">
             <div className="flex items-start justify-between mb-3">

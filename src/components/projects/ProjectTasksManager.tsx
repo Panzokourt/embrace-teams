@@ -404,14 +404,14 @@ export function ProjectTasksManager({ projectId }: ProjectTasksManagerProps) {
             <div className="space-y-2">
               <Label htmlFor="assigned_to">Υπεύθυνος</Label>
               <Select
-                value={formData.assigned_to}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, assigned_to: value }))}
+                value={formData.assigned_to || 'none'}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, assigned_to: value === 'none' ? '' : value }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Επιλέξτε υπεύθυνο" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Κανένας</SelectItem>
+                  <SelectItem value="none">Κανένας</SelectItem>
                   {profiles.map(profile => (
                     <SelectItem key={profile.id} value={profile.id}>
                       {profile.full_name || profile.email}
@@ -424,14 +424,14 @@ export function ProjectTasksManager({ projectId }: ProjectTasksManagerProps) {
             <div className="space-y-2">
               <Label htmlFor="deliverable_id">Παραδοτέο</Label>
               <Select
-                value={formData.deliverable_id}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, deliverable_id: value }))}
+                value={formData.deliverable_id || 'none'}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, deliverable_id: value === 'none' ? '' : value }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Επιλέξτε παραδοτέο" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Κανένα</SelectItem>
+                  <SelectItem value="none">Κανένα</SelectItem>
                   {deliverables.map(d => (
                     <SelectItem key={d.id} value={d.id}>
                       {d.name}

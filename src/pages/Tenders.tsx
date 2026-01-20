@@ -387,132 +387,133 @@ export default function TendersPage() {
     const isDeadlinePassed = tender.submission_deadline && isPast(new Date(tender.submission_deadline));
     
     return (
-      <Card 
+      <div 
         className={cn(
-          "hover:shadow-md transition-shadow cursor-pointer",
-          isDeadlinePassed && tender.stage !== 'won' && tender.stage !== 'lost' && "border-warning/50",
-          isDragOverlay && "shadow-xl rotate-2"
+          "group bg-card rounded-xl border border-border/50 p-4 transition-all duration-200 ease-apple cursor-pointer",
+          "hover:shadow-soft hover:border-border hover:-translate-y-0.5",
+          isDeadlinePassed && tender.stage !== 'won' && tender.stage !== 'lost' && "border-warning/30 bg-warning/[0.02]",
+          isDragOverlay && "shadow-soft-xl rotate-1 scale-105"
         )}
         onClick={() => !isDragOverlay && navigate(`/tenders/${tender.id}`)}
       >
-        <CardContent className="p-3">
-          <div className="flex items-start gap-2">
-            <GripVertical className="h-4 w-4 text-muted-foreground/50 mt-0.5 flex-shrink-0 cursor-grab" />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-1">
-                <h4 className="font-medium text-sm mb-1 line-clamp-2 flex-1">
-                  {tender.name}
-                </h4>
-                {canManage && !isDragOverlay && (
-                  <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
-                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleEdit(tender)}>
-                      <Pencil className="h-3 w-3" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive" onClick={() => handleDelete(tender.id)}>
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                )}
-              </div>
-              {tender.client && (
-                <p className="text-xs text-muted-foreground mb-2">
-                  {tender.client.name}
-                </p>
+        <div className="flex items-start gap-3">
+          <GripVertical className="h-4 w-4 text-muted-foreground/30 mt-0.5 flex-shrink-0 cursor-grab transition-colors group-hover:text-muted-foreground/50" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <h4 className="font-medium text-sm text-foreground/90 line-clamp-2 flex-1 group-hover:text-foreground transition-colors">
+                {tender.name}
+              </h4>
+              {canManage && !isDragOverlay && (
+                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-secondary" onClick={() => handleEdit(tender)}>
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/70 hover:text-destructive hover:bg-destructive/10" onClick={() => handleDelete(tender.id)}>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
               )}
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-primary font-medium">
-                  €{tender.budget.toLocaleString()}
+            </div>
+            {tender.client && (
+              <p className="text-xs text-muted-foreground/70 mt-1">
+                {tender.client.name}
+              </p>
+            )}
+            <div className="flex items-center justify-between text-xs mt-3 pt-3 border-t border-border/30">
+              <span className="text-primary font-semibold">
+                €{tender.budget.toLocaleString()}
+              </span>
+              {tender.submission_deadline && (
+                <span className={cn(
+                  "flex items-center gap-1",
+                  isDeadlinePassed ? "text-warning" : "text-muted-foreground/60"
+                )}>
+                  <Calendar className="h-3 w-3" />
+                  {format(new Date(tender.submission_deadline), 'd/M', { locale: el })}
                 </span>
-                {tender.submission_deadline && (
-                  <span className={cn(
-                    "flex items-center gap-1",
-                    isDeadlinePassed ? "text-warning" : "text-muted-foreground"
-                  )}>
-                    <Calendar className="h-3 w-3" />
-                    {format(new Date(tender.submission_deadline), 'd/M', { locale: el })}
-                  </span>
-                )}
-              </div>
+              )}
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   };
 
   const renderCardView = () => (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {filteredTenders.map(tender => (
-        <Card 
+      {filteredTenders.map((tender, index) => (
+        <div 
           key={tender.id} 
-          className="hover:shadow-lg transition-shadow cursor-pointer"
+          className="group bg-card rounded-2xl border border-border/50 overflow-hidden transition-all duration-300 ease-apple cursor-pointer hover:shadow-soft hover:border-border hover:-translate-y-0.5 animate-fade-in"
+          style={{ animationDelay: `${index * 30}ms` }}
           onClick={() => navigate(`/tenders/${tender.id}`)}
         >
-          <CardContent className="p-4">
+          <div className="p-5">
             <div className="flex items-start justify-between mb-3">
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold mb-1">{tender.name}</h3>
+                <h3 className="font-semibold text-foreground/90 group-hover:text-foreground transition-colors">{tender.name}</h3>
                 {tender.client && (
-                  <p className="text-sm text-muted-foreground">{tender.client.name}</p>
+                  <p className="text-sm text-muted-foreground/70 mt-1">{tender.client.name}</p>
                 )}
               </div>
               {getStageBadge(tender.stage)}
             </div>
             {tender.description && (
-              <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{tender.description}</p>
+              <p className="text-sm text-muted-foreground/60 line-clamp-2 mb-3">{tender.description}</p>
             )}
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-medium text-primary">€{tender.budget.toLocaleString()}</span>
-              {tender.submission_deadline && (
-                <span className="flex items-center gap-1 text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  {format(new Date(tender.submission_deadline), 'd MMM yyyy', { locale: el })}
-                </span>
-              )}
+          </div>
+          <div className="px-5 py-3 bg-secondary/30 border-t border-border/30 flex items-center justify-between text-sm">
+            <span className="font-semibold text-primary">€{tender.budget.toLocaleString()}</span>
+            {tender.submission_deadline && (
+              <span className="flex items-center gap-1.5 text-muted-foreground/60 text-xs">
+                <Calendar className="h-3.5 w-3.5" />
+                {format(new Date(tender.submission_deadline), 'd MMM yyyy', { locale: el })}
+              </span>
+            )}
+          </div>
+          {canManage && (
+            <div className="px-5 py-3 bg-secondary/20 border-t border-border/20 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+              <Button variant="outline" size="sm" className="flex-1 h-8 text-xs" onClick={() => handleEdit(tender)}>
+                <Pencil className="h-3 w-3 mr-1.5" /> Επεξεργασία
+              </Button>
+              <Button variant="outline" size="sm" className="h-8 text-xs text-destructive hover:bg-destructive/10" onClick={() => handleDelete(tender.id)}>
+                <Trash2 className="h-3 w-3" />
+              </Button>
             </div>
-            {canManage && (
-              <div className="flex gap-2 mt-4 pt-3 border-t" onClick={(e) => e.stopPropagation()}>
-                <Button variant="outline" size="sm" onClick={() => handleEdit(tender)}>
-                  <Pencil className="h-3 w-3 mr-1" /> Επεξεργασία
-                </Button>
-                <Button variant="outline" size="sm" className="text-destructive" onClick={() => handleDelete(tender.id)}>
-                  <Trash2 className="h-3 w-3 mr-1" /> Διαγραφή
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          )}
+        </div>
       ))}
     </div>
   );
 
   const renderTableView = () => (
-    <div className="rounded-md border">
+    <div className="rounded-2xl border border-border/50 overflow-hidden bg-card shadow-soft">
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead>Τίτλος</TableHead>
-            <TableHead>Πελάτης</TableHead>
-            <TableHead>Φάση</TableHead>
-            <TableHead>Budget</TableHead>
-            <TableHead>Deadline</TableHead>
-            {canManage && <TableHead className="w-[100px]">Ενέργειες</TableHead>}
+          <TableRow className="bg-secondary/30 border-b border-border/30 hover:bg-secondary/30">
+            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Τίτλος</TableHead>
+            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Πελάτης</TableHead>
+            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Φάση</TableHead>
+            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Budget</TableHead>
+            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Deadline</TableHead>
+            {canManage && <TableHead className="w-[100px] text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Ενέργειες</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filteredTenders.map(tender => (
+          {filteredTenders.map((tender, index) => (
             <TableRow 
               key={tender.id} 
-              className="cursor-pointer hover:bg-muted/50"
-              onClick={() => handleEdit(tender)}
+              className="cursor-pointer transition-colors duration-150 hover:bg-secondary/40 border-b border-border/20 last:border-0"
+              style={{ animationDelay: `${index * 20}ms` }}
+              onClick={() => navigate(`/tenders/${tender.id}`)}
             >
-              <TableCell onClick={(e) => e.stopPropagation()}>
+              <TableCell className="font-medium" onClick={(e) => e.stopPropagation()}>
                 <InlineEditCell
                   value={tender.name}
                   onSave={(val) => handleInlineUpdate(tender.id, 'name', val)}
                 />
               </TableCell>
-              <TableCell>{tender.client?.name || '-'}</TableCell>
+              <TableCell className="text-muted-foreground">{tender.client?.name || '-'}</TableCell>
               <TableCell>{getStageBadge(tender.stage)}</TableCell>
               <TableCell onClick={(e) => e.stopPropagation()}>
                 <InlineEditCell
@@ -522,7 +523,7 @@ export default function TendersPage() {
                   onSave={(val) => handleInlineUpdate(tender.id, 'budget', val)}
                 />
               </TableCell>
-              <TableCell>
+              <TableCell className="text-muted-foreground text-sm">
                 {tender.submission_deadline 
                   ? format(new Date(tender.submission_deadline), 'd MMM yyyy', { locale: el })
                   : '-'
@@ -531,10 +532,10 @@ export default function TendersPage() {
               {canManage && (
                 <TableCell onClick={(e) => e.stopPropagation()}>
                   <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(tender)}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-secondary" onClick={() => handleEdit(tender)}>
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDelete(tender.id)}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/70 hover:text-destructive hover:bg-destructive/10" onClick={() => handleDelete(tender.id)}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
@@ -556,25 +557,31 @@ export default function TendersPage() {
       onDragEnd={handleDragEnd}
     >
       <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
-        {stages.map(stage => (
-          <div key={stage} className="space-y-3">
-            <div className="flex items-center justify-between">
+        {stages.map((stage, columnIndex) => (
+          <div 
+            key={stage} 
+            className="space-y-3 animate-fade-in"
+            style={{ animationDelay: `${columnIndex * 50}ms` }}
+          >
+            <div className="flex items-center justify-between px-1">
               {getStageBadge(stage)}
-              <Badge variant="secondary">{tendersByStage[stage].length}</Badge>
+              <span className="text-xs font-medium text-muted-foreground/60 bg-secondary/50 px-2 py-0.5 rounded-full">
+                {tendersByStage[stage].length}
+              </span>
             </div>
             <DroppableColumn
               id={stage}
               items={tendersByStage[stage].map(t => t.id)}
             >
-              <div className="space-y-3">
+              <div className="space-y-3 min-h-[200px]">
                 {tendersByStage[stage].map(tender => (
                   <DraggableCard key={tender.id} id={tender.id}>
                     <TenderCard tender={tender} />
                   </DraggableCard>
                 ))}
                 {tendersByStage[stage].length === 0 && (
-                  <div className="border border-dashed rounded-lg p-4 text-center">
-                    <p className="text-xs text-muted-foreground">
+                  <div className="border-2 border-dashed border-border/30 rounded-xl p-6 text-center transition-colors hover:border-border/50 hover:bg-secondary/20">
+                    <p className="text-xs text-muted-foreground/50">
                       Σύρετε εδώ
                     </p>
                   </div>
@@ -592,15 +599,17 @@ export default function TendersPage() {
   );
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
+    <div className="p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-            <FileText className="h-8 w-8" />
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-3">
+            <span className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <FileText className="h-5 w-5 text-primary" />
+            </span>
             Διαγωνισμοί
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-muted-foreground mt-1 text-sm ml-[52px]">
             Παρακολούθηση pipeline διαγωνισμών
           </p>
         </div>
@@ -614,15 +623,15 @@ export default function TendersPage() {
           {canManage && (
             <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
               <DialogTrigger asChild>
-                <Button>
+                <Button className="shadow-soft">
                   <Plus className="h-4 w-4 mr-2" />
                   Νέος Διαγωνισμός
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-w-lg">
                 <DialogHeader>
-                  <DialogTitle>{editingTender ? 'Επεξεργασία Διαγωνισμού' : 'Νέος Διαγωνισμός'}</DialogTitle>
-                  <DialogDescription>
+                  <DialogTitle className="text-lg">{editingTender ? 'Επεξεργασία Διαγωνισμού' : 'Νέος Διαγωνισμός'}</DialogTitle>
+                  <DialogDescription className="text-sm">
                     {editingTender ? 'Ενημερώστε τα στοιχεία του διαγωνισμού' : 'Προσθέστε έναν νέο διαγωνισμό στο pipeline'}
                   </DialogDescription>
                 </DialogHeader>
@@ -727,19 +736,19 @@ export default function TendersPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-3 animate-fade-in" style={{ animationDelay: '50ms' }}>
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
           <Input
             placeholder="Αναζήτηση διαγωνισμών..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-10 bg-card border-border/50 focus:border-primary/30"
           />
         </div>
         {viewMode !== 'kanban' && (
           <Select value={stageFilter} onValueChange={setStageFilter}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-[180px] bg-card border-border/50">
               <SelectValue placeholder="Φάση" />
             </SelectTrigger>
             <SelectContent>
@@ -757,21 +766,24 @@ export default function TendersPage() {
 
       {/* Content */}
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="flex flex-col items-center justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-primary/60" />
+          <p className="text-sm text-muted-foreground mt-3">Φόρτωση...</p>
         </div>
       ) : filteredTenders.length === 0 ? (
-        <Card className="py-12">
-          <CardContent className="text-center">
-            <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Δεν βρέθηκαν διαγωνισμοί</h3>
-            <p className="text-muted-foreground mb-4">
+        <div className="rounded-2xl border border-border/50 bg-card py-16 animate-fade-in shadow-soft">
+          <div className="text-center">
+            <div className="h-16 w-16 rounded-2xl bg-secondary/50 flex items-center justify-center mx-auto mb-4">
+              <FileText className="h-8 w-8 text-muted-foreground/50" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2 text-foreground">Δεν βρέθηκαν διαγωνισμοί</h3>
+            <p className="text-muted-foreground text-sm mb-6 max-w-sm mx-auto">
               {searchQuery || stageFilter !== 'all'
                 ? 'Δοκιμάστε διαφορετικά φίλτρα αναζήτησης'
                 : 'Δημιουργήστε τον πρώτο διαγωνισμό για να ξεκινήσετε'}
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       ) : (
         <>
           {viewMode === 'card' && renderCardView()}

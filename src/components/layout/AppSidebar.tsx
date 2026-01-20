@@ -59,7 +59,7 @@ const adminNavItems: NavItem[] = [
 export default function AppSidebar() {
   const location = useLocation();
   const { profile, roles, signOut, isAdmin, isManager, isClient } = useAuth();
-  const { theme, setTheme, resolvedTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -80,37 +80,45 @@ export default function AppSidebar() {
   const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
     <>
       {/* Logo */}
-      <div className="p-4 flex items-center justify-between border-b border-sidebar-border/50">
+      <div className="p-4 flex items-center justify-between">
         {(!collapsed || isMobile) && (
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-xl bg-primary flex items-center justify-center shadow-soft">
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-soft">
               <Zap className="h-4 w-4 text-primary-foreground" />
             </div>
-            <span className="font-semibold text-sidebar-foreground tracking-tight">
+            <span className="font-semibold text-foreground tracking-tight">
               {isClient && !isAdmin && !isManager ? 'Portal' : 'Agency'}
             </span>
+          </div>
+        )}
+        {collapsed && !isMobile && (
+          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-soft mx-auto">
+            <Zap className="h-4 w-4 text-primary-foreground" />
           </div>
         )}
         {!isMobile && (
           <Button
             variant="ghost"
             size="icon"
-            className="text-sidebar-foreground hover:bg-sidebar-accent hidden md:flex"
+            className={cn(
+              "h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-secondary/80 hidden md:flex transition-all duration-200",
+              collapsed && "absolute right-2 top-4"
+            )}
             onClick={() => setCollapsed(!collapsed)}
           >
-            {collapsed ? <Menu className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
+            {collapsed ? <Menu className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </Button>
         )}
       </div>
 
       {/* Main Navigation */}
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
         {isClient && !isAdmin && !isManager ? (
           // Client navigation
           <>
             <SidebarLink
               to="/"
-              icon={<LayoutDashboard className="h-5 w-5" />}
+              icon={<LayoutDashboard className="h-[18px] w-[18px]" />}
               label="Τα Έργα μου"
               active={location.pathname === '/'}
               collapsed={collapsed && !isMobile}
@@ -118,7 +126,7 @@ export default function AppSidebar() {
             />
             <SidebarLink
               to="/tasks"
-              icon={<CheckSquare className="h-5 w-5" />}
+              icon={<CheckSquare className="h-[18px] w-[18px]" />}
               label="Παραδοτέα"
               active={location.pathname === '/tasks'}
               collapsed={collapsed && !isMobile}
@@ -128,15 +136,16 @@ export default function AppSidebar() {
         ) : (
           // Admin/Manager/Employee navigation
           <>
-            {navItems.filter(canAccess).map((item) => (
+            {navItems.filter(canAccess).map((item, index) => (
               <SidebarLink
                 key={item.href}
                 to={item.href}
-                icon={<item.icon className="h-5 w-5" />}
+                icon={<item.icon className="h-[18px] w-[18px]" />}
                 label={item.title}
                 active={location.pathname === item.href}
                 collapsed={collapsed && !isMobile}
                 onClick={() => isMobile && setMobileOpen(false)}
+                delay={index * 20}
               />
             ))}
 
@@ -144,25 +153,26 @@ export default function AppSidebar() {
             {(isAdmin || isManager) && (
               <>
                 <div className={cn(
-                  "pt-4 pb-2",
+                  "pt-6 pb-2",
                   (collapsed && !isMobile) ? "px-2" : "px-3"
                 )}>
                   {(!collapsed || isMobile) && (
-                    <span className="text-xs font-medium text-sidebar-foreground/50 uppercase tracking-wider">
+                    <span className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-widest">
                       Διαχείριση
                     </span>
                   )}
-                  {(collapsed && !isMobile) && <div className="h-px bg-sidebar-border" />}
+                  {(collapsed && !isMobile) && <div className="h-px bg-border/50 mx-1" />}
                 </div>
-                {adminNavItems.filter(canAccess).map((item) => (
+                {adminNavItems.filter(canAccess).map((item, index) => (
                   <SidebarLink
                     key={item.href}
                     to={item.href}
-                    icon={<item.icon className="h-5 w-5" />}
+                    icon={<item.icon className="h-[18px] w-[18px]" />}
                     label={item.title}
                     active={location.pathname === item.href}
                     collapsed={collapsed && !isMobile}
                     onClick={() => isMobile && setMobileOpen(false)}
+                    delay={(navItems.length + index) * 20}
                   />
                 ))}
               </>
@@ -173,22 +183,22 @@ export default function AppSidebar() {
 
       {/* Theme Toggle */}
       <div className={cn(
-        "p-3 border-t border-sidebar-border",
+        "px-3 py-2",
         (collapsed && !isMobile) && "flex justify-center"
       )}>
         <Button
           variant="ghost"
           size={collapsed && !isMobile ? "icon" : "default"}
           className={cn(
-            "text-sidebar-foreground hover:bg-sidebar-accent",
-            (!collapsed || isMobile) && "w-full justify-start gap-3"
+            "h-10 text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-all duration-200",
+            (!collapsed || isMobile) && "w-full justify-start gap-3 px-3"
           )}
           onClick={toggleTheme}
         >
           {resolvedTheme === 'dark' ? (
-            <Sun className="h-5 w-5" />
+            <Sun className="h-[18px] w-[18px]" />
           ) : (
-            <Moon className="h-5 w-5" />
+            <Moon className="h-[18px] w-[18px]" />
           )}
           {(!collapsed || isMobile) && (
             <span className="text-sm">{resolvedTheme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
@@ -215,11 +225,11 @@ export default function AppSidebar() {
       <div className="fixed top-4 left-4 z-50 md:hidden">
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetTrigger asChild>
-            <Button variant="outline" size="icon" className="bg-background">
+            <Button variant="outline" size="icon" className="bg-card border-border/50 shadow-soft h-10 w-10">
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-72 bg-sidebar border-sidebar-border">
+          <SheetContent side="left" className="p-0 w-72 bg-card border-border/50">
             <div className="h-full flex flex-col">
               <SidebarContent isMobile />
             </div>
@@ -229,8 +239,8 @@ export default function AppSidebar() {
 
       {/* Desktop Sidebar */}
       <aside className={cn(
-        "h-screen bg-sidebar border-r border-sidebar-border flex-col transition-all duration-300 hidden md:flex",
-        collapsed ? "w-[70px]" : "w-64"
+        "h-screen bg-card/50 backdrop-blur-sm border-r border-border/40 flex-col transition-all duration-300 ease-apple hidden md:flex",
+        collapsed ? "w-[72px]" : "w-64"
       )}>
         <SidebarContent />
       </aside>
@@ -245,6 +255,7 @@ function SidebarLink({
   active,
   collapsed,
   onClick,
+  delay = 0,
 }: {
   to: string;
   icon: React.ReactNode;
@@ -252,21 +263,39 @@ function SidebarLink({
   active: boolean;
   collapsed: boolean;
   onClick?: () => void;
+  delay?: number;
 }) {
   return (
     <NavLink
       to={to}
       onClick={onClick}
       className={cn(
-        "flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors",
+        "group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 ease-apple",
         active
-          ? "bg-sidebar-primary text-sidebar-primary-foreground"
-          : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+          ? "bg-primary/10 text-primary"
+          : "text-muted-foreground hover:text-foreground hover:bg-secondary/60",
         collapsed && "justify-center px-2"
       )}
+      style={{ animationDelay: `${delay}ms` }}
     >
-      {icon}
-      {!collapsed && <span className="text-sm font-medium">{label}</span>}
+      <span className={cn(
+        "transition-transform duration-200",
+        active && "scale-105",
+        !active && "group-hover:scale-105"
+      )}>
+        {icon}
+      </span>
+      {!collapsed && (
+        <span className={cn(
+          "text-sm font-medium transition-colors",
+          active && "font-semibold"
+        )}>
+          {label}
+        </span>
+      )}
+      {active && !collapsed && (
+        <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
+      )}
     </NavLink>
   );
 }
@@ -283,45 +312,48 @@ function UserMenu({
   getInitials: (name: string | null) => string;
 }) {
   return (
-    <div className="p-3 border-t border-sidebar-border">
+    <div className="p-3 border-t border-border/40">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
             className={cn(
-              "w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent",
+              "w-full justify-start gap-3 h-12 text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all duration-200",
               collapsed && "justify-center px-2"
             )}
           >
-            <Avatar className="h-8 w-8">
+            <Avatar className="h-8 w-8 ring-2 ring-border/50">
               <AvatarImage src={profile?.avatar_url || undefined} />
-              <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+              <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
                 {getInitials(profile?.full_name)}
               </AvatarFallback>
             </Avatar>
             {!collapsed && (
               <div className="flex-1 text-left min-w-0">
-                <p className="text-sm font-medium truncate">
+                <p className="text-sm font-medium text-foreground truncate">
                   {profile?.full_name || 'User'}
                 </p>
-                <p className="text-xs text-sidebar-foreground/60 truncate">
+                <p className="text-xs text-muted-foreground/70 truncate">
                   {profile?.email}
                 </p>
               </div>
             )}
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuLabel>
-            <div className="flex flex-col">
-              <span>{profile?.full_name || 'User'}</span>
-              <span className="text-xs font-normal text-muted-foreground">
+        <DropdownMenuContent align="end" className="w-56 rounded-xl border-border/50 shadow-soft-lg">
+          <DropdownMenuLabel className="font-normal">
+            <div className="flex flex-col space-y-1">
+              <span className="text-sm font-medium">{profile?.full_name || 'User'}</span>
+              <span className="text-xs text-muted-foreground">
                 {profile?.email}
               </span>
             </div>
           </DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={signOut} className="text-destructive">
+          <DropdownMenuSeparator className="bg-border/50" />
+          <DropdownMenuItem 
+            onClick={signOut} 
+            className="text-destructive focus:text-destructive focus:bg-destructive/10 rounded-lg mx-1 cursor-pointer"
+          >
             <LogOut className="mr-2 h-4 w-4" />
             Αποσύνδεση
           </DropdownMenuItem>

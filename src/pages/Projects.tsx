@@ -211,7 +211,7 @@ export default function ProjectsPage() {
                 Νέο Έργο
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg">
+            <DialogContent>
               <DialogHeader>
                 <DialogTitle>Δημιουργία Νέου Έργου</DialogTitle>
                 <DialogDescription>

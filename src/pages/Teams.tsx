@@ -94,9 +94,18 @@ export default function TeamsPage() {
 
       const { data: membersData, error: membersError } = await supabase
         .from('team_members')
-        .select(`id, team_id, user_id, profile:profiles(id, full_name, email, avatar_url)`);
+        .select('id, team_id, user_id');
 
       if (membersError) throw membersError;
+
+      // Fetch profiles separately for each member
+      const memberUserIds = [...new Set((membersData || []).map(m => m.user_id))];
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, avatar_url')
+        .in('id', memberUserIds.length > 0 ? memberUserIds : ['no-users']);
+
+      const profilesMap = new Map((profilesData || []).map(p => [p.id, p]));
 
       const teamsWithMembers = (teamsData || []).map(team => ({
         ...team,
@@ -105,7 +114,7 @@ export default function TeamsPage() {
           .map(m => ({
             id: m.id,
             user_id: m.user_id,
-            profile: m.profile as any
+            profile: profilesMap.get(m.user_id) as Profile | undefined
           }))
       }));
 

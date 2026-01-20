@@ -1,13 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -24,7 +23,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { 
   CheckSquare, 
@@ -35,11 +33,27 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
-  Calendar
+  Calendar,
+  GripVertical
 } from 'lucide-react';
 import { format, isPast, isToday } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import {
+  DndContext,
+  DragOverlay,
+  closestCorners,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragStartEvent,
+  DragEndEvent,
+  DragOverEvent,
+} from '@dnd-kit/core';
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { DraggableCard } from '@/components/dnd/DraggableCard';
+import { DroppableColumn } from '@/components/dnd/DroppableColumn';
 
 type TaskStatus = 'todo' | 'in_progress' | 'review' | 'completed';
 
@@ -56,13 +70,14 @@ interface Task {
 }
 
 export default function TasksPage() {
-  const { user, isAdmin, isManager } = useAuth();
+  const { isAdmin, isManager } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [activeTask, setActiveTask] = useState<Task | null>(null);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -71,6 +86,17 @@ export default function TasksPage() {
     status: 'todo' as TaskStatus,
     due_date: '',
   });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   useEffect(() => {
     fetchTasks();
@@ -192,70 +218,128 @@ export default function TasksPage() {
     }
   };
 
-  const getStatusLabel = (status: TaskStatus) => {
-    const labels = {
-      todo: 'Προς υλοποίηση',
-      in_progress: 'Σε εξέλιξη',
-      review: 'Προς έλεγχο',
-      completed: 'Ολοκληρώθηκε',
-    };
-    return labels[status];
-  };
-
-  const filteredTasks = tasks.filter(task =>
-    task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    task.project?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredTasks = useMemo(() => 
+    tasks.filter(task =>
+      task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      task.project?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+    ), [tasks, searchQuery]
   );
 
-  const todoTasks = filteredTasks.filter(t => t.status === 'todo');
-  const inProgressTasks = filteredTasks.filter(t => t.status === 'in_progress');
-  const reviewTasks = filteredTasks.filter(t => t.status === 'review');
-  const completedTasks = filteredTasks.filter(t => t.status === 'completed');
+  const tasksByStatus = useMemo(() => ({
+    todo: filteredTasks.filter(t => t.status === 'todo'),
+    in_progress: filteredTasks.filter(t => t.status === 'in_progress'),
+    review: filteredTasks.filter(t => t.status === 'review'),
+    completed: filteredTasks.filter(t => t.status === 'completed'),
+  }), [filteredTasks]);
 
   const canManage = isAdmin || isManager;
 
-  const TaskCard = ({ task }: { task: Task }) => {
+  const handleDragStart = (event: DragStartEvent) => {
+    const task = tasks.find(t => t.id === event.active.id);
+    setActiveTask(task || null);
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+
+    const activeId = active.id as string;
+    const overId = over.id as string;
+
+    const activeTask = tasks.find(t => t.id === activeId);
+    if (!activeTask) return;
+
+    // Check if dropping over a column
+    const statuses: TaskStatus[] = ['todo', 'in_progress', 'review', 'completed'];
+    if (statuses.includes(overId as TaskStatus)) {
+      if (activeTask.status !== overId) {
+        setTasks(prev => prev.map(t =>
+          t.id === activeId ? { ...t, status: overId as TaskStatus } : t
+        ));
+      }
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveTask(null);
+    
+    if (!over) return;
+
+    const activeId = active.id as string;
+    const overId = over.id as string;
+
+    const activeTask = tasks.find(t => t.id === activeId);
+    if (!activeTask) return;
+
+    // Determine the target status
+    const statuses: TaskStatus[] = ['todo', 'in_progress', 'review', 'completed'];
+    let targetStatus: TaskStatus | null = null;
+
+    if (statuses.includes(overId as TaskStatus)) {
+      targetStatus = overId as TaskStatus;
+    } else {
+      // Dropped on another task, find its status
+      const overTask = tasks.find(t => t.id === overId);
+      if (overTask) {
+        targetStatus = overTask.status;
+      }
+    }
+
+    if (targetStatus && activeTask.status !== targetStatus) {
+      // Already updated optimistically in handleDragOver, now persist
+      try {
+        const { error } = await supabase
+          .from('tasks')
+          .update({ status: targetStatus })
+          .eq('id', activeId);
+
+        if (error) throw error;
+        toast.success('Το task μετακινήθηκε!');
+      } catch (error) {
+        console.error('Error updating task:', error);
+        // Revert on error
+        fetchTasks();
+        toast.error('Σφάλμα κατά την ενημέρωση');
+      }
+    }
+  };
+
+  const TaskCard = ({ task, isDragOverlay = false }: { task: Task; isDragOverlay?: boolean }) => {
     const isOverdue = task.due_date && isPast(new Date(task.due_date)) && !isToday(new Date(task.due_date)) && task.status !== 'completed';
 
     return (
       <Card className={cn(
-        "hover:shadow-md transition-shadow",
-        isOverdue && "border-destructive/50 bg-destructive/5"
+        "hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing",
+        isOverdue && "border-destructive/50 bg-destructive/5",
+        isDragOverlay && "shadow-xl rotate-2"
       )}>
         <CardContent className="p-4">
           <div className="flex items-start gap-3">
-            <button
-              onClick={() => {
-                const nextStatus: Record<TaskStatus, TaskStatus> = {
-                  todo: 'in_progress',
-                  in_progress: 'review',
-                  review: 'completed',
-                  completed: 'todo',
-                };
-                updateTaskStatus(task.id, nextStatus[task.status]);
-              }}
-              className="mt-0.5"
-            >
-              {getStatusIcon(task.status)}
-            </button>
+            <GripVertical className="h-5 w-5 text-muted-foreground/50 mt-0.5 flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className={cn(
-                "font-medium",
-                task.status === 'completed' && "line-through text-muted-foreground"
-              )}>
-                {task.title}
-              </p>
-              {task.project && (
-                <p className="text-sm text-muted-foreground">{task.project.name}</p>
-              )}
+              <div className="flex items-start gap-2">
+                {getStatusIcon(task.status)}
+                <div className="flex-1 min-w-0">
+                  <p className={cn(
+                    "font-medium",
+                    task.status === 'completed' && "line-through text-muted-foreground"
+                  )}>
+                    {task.title}
+                  </p>
+                  {task.project && (
+                    <p className="text-sm text-muted-foreground">{task.project.name}</p>
+                  )}
+                </div>
+              </div>
               {task.due_date && (
                 <div className={cn(
-                  "flex items-center gap-1 mt-2 text-xs",
+                  "flex items-center gap-1 mt-2 text-xs ml-7",
                   isOverdue ? "text-destructive" : "text-muted-foreground"
                 )}>
                   <Calendar className="h-3 w-3" />
                   {format(new Date(task.due_date), 'd MMM yyyy', { locale: el })}
-                  {isOverdue && <span className="ml-1">(Overdue)</span>}
+                  {isOverdue && <span className="ml-1">(Εκπρόθεσμο)</span>}
                 </div>
               )}
             </div>
@@ -264,6 +348,13 @@ export default function TasksPage() {
       </Card>
     );
   };
+
+  const columns = [
+    { id: 'todo' as TaskStatus, label: 'Προς Υλοποίηση', icon: <Circle className="h-5 w-5 text-muted-foreground" /> },
+    { id: 'in_progress' as TaskStatus, label: 'Σε Εξέλιξη', icon: <Clock className="h-5 w-5 text-primary" /> },
+    { id: 'review' as TaskStatus, label: 'Προς Έλεγχο', icon: <AlertCircle className="h-5 w-5 text-warning" /> },
+    { id: 'completed' as TaskStatus, label: 'Ολοκληρώθηκε', icon: <CheckCircle2 className="h-5 w-5 text-success" /> },
+  ];
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
@@ -391,69 +482,52 @@ export default function TasksPage() {
         />
       </div>
 
-      {/* Kanban Board */}
+      {/* Kanban Board with DnD */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       ) : (
-        <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Todo */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Circle className="h-5 w-5 text-muted-foreground" />
-              <h3 className="font-semibold">Προς Υλοποίηση</h3>
-              <Badge variant="secondary">{todoTasks.length}</Badge>
-            </div>
-            <div className="space-y-3">
-              {todoTasks.map(task => (
-                <TaskCard key={task.id} task={task} />
-              ))}
-            </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+            {columns.map(column => (
+              <div key={column.id} className="space-y-4">
+                <div className="flex items-center gap-2">
+                  {column.icon}
+                  <h3 className="font-semibold">{column.label}</h3>
+                  <Badge variant="secondary">{tasksByStatus[column.id].length}</Badge>
+                </div>
+                <DroppableColumn
+                  id={column.id}
+                  items={tasksByStatus[column.id].map(t => t.id)}
+                >
+                  <div className="space-y-3">
+                    {tasksByStatus[column.id].map(task => (
+                      <DraggableCard key={task.id} id={task.id}>
+                        <TaskCard task={task} />
+                      </DraggableCard>
+                    ))}
+                    {tasksByStatus[column.id].length === 0 && (
+                      <div className="border border-dashed rounded-lg p-4 text-center text-muted-foreground text-sm">
+                        Σύρετε tasks εδώ
+                      </div>
+                    )}
+                  </div>
+                </DroppableColumn>
+              </div>
+            ))}
           </div>
 
-          {/* In Progress */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-primary" />
-              <h3 className="font-semibold">Σε Εξέλιξη</h3>
-              <Badge variant="secondary">{inProgressTasks.length}</Badge>
-            </div>
-            <div className="space-y-3">
-              {inProgressTasks.map(task => (
-                <TaskCard key={task.id} task={task} />
-              ))}
-            </div>
-          </div>
-
-          {/* Review */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-warning" />
-              <h3 className="font-semibold">Προς Έλεγχο</h3>
-              <Badge variant="secondary">{reviewTasks.length}</Badge>
-            </div>
-            <div className="space-y-3">
-              {reviewTasks.map(task => (
-                <TaskCard key={task.id} task={task} />
-              ))}
-            </div>
-          </div>
-
-          {/* Completed */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-success" />
-              <h3 className="font-semibold">Ολοκληρώθηκε</h3>
-              <Badge variant="secondary">{completedTasks.length}</Badge>
-            </div>
-            <div className="space-y-3">
-              {completedTasks.map(task => (
-                <TaskCard key={task.id} task={task} />
-              ))}
-            </div>
-          </div>
-        </div>
+          <DragOverlay>
+            {activeTask ? <TaskCard task={activeTask} isDragOverlay /> : null}
+          </DragOverlay>
+        </DndContext>
       )}
     </div>
   );

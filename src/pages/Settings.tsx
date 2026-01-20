@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -7,6 +8,13 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
 import { 
   Settings as SettingsIcon, 
@@ -18,11 +26,13 @@ import {
   Loader2,
   Save,
   Moon,
-  Sun
+  Sun,
+  Monitor
 } from 'lucide-react';
 
 export default function SettingsPage() {
   const { profile, isAdmin } = useAuth();
+  const { theme, setTheme, resolvedTheme } = useTheme();
   const [saving, setSaving] = useState(false);
 
   // Profile settings
@@ -32,9 +42,6 @@ export default function SettingsPage() {
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [taskReminders, setTaskReminders] = useState(true);
   const [projectUpdates, setProjectUpdates] = useState(true);
-
-  // Theme settings
-  const [darkMode, setDarkMode] = useState(true);
 
   const handleSaveProfile = async () => {
     setSaving(true);
@@ -108,6 +115,53 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Appearance */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Palette className="h-5 w-5" />
+            <CardTitle>Εμφάνιση</CardTitle>
+          </div>
+          <CardDescription>
+            Προσαρμόστε την εμφάνιση της εφαρμογής
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-3">
+            <Label>Θέμα</Label>
+            <div className="grid grid-cols-3 gap-3">
+              <Button
+                variant={theme === 'light' ? 'default' : 'outline'}
+                className="flex flex-col gap-2 h-auto py-4"
+                onClick={() => setTheme('light')}
+              >
+                <Sun className="h-5 w-5" />
+                <span className="text-xs">Light</span>
+              </Button>
+              <Button
+                variant={theme === 'dark' ? 'default' : 'outline'}
+                className="flex flex-col gap-2 h-auto py-4"
+                onClick={() => setTheme('dark')}
+              >
+                <Moon className="h-5 w-5" />
+                <span className="text-xs">Dark</span>
+              </Button>
+              <Button
+                variant={theme === 'system' ? 'default' : 'outline'}
+                className="flex flex-col gap-2 h-auto py-4"
+                onClick={() => setTheme('system')}
+              >
+                <Monitor className="h-5 w-5" />
+                <span className="text-xs">System</span>
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Τρέχον θέμα: {resolvedTheme === 'dark' ? 'Σκούρο' : 'Φωτεινό'}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Notification Settings */}
       <Card>
         <CardHeader>
@@ -156,36 +210,6 @@ export default function SettingsPage() {
             <Switch
               checked={projectUpdates}
               onCheckedChange={setProjectUpdates}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Appearance */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Palette className="h-5 w-5" />
-            <CardTitle>Εμφάνιση</CardTitle>
-          </div>
-          <CardDescription>
-            Προσαρμόστε την εμφάνιση της εφαρμογής
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className="flex items-center gap-2">
-                {darkMode ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-                Dark Mode
-              </Label>
-              <p className="text-sm text-muted-foreground">
-                Χρήση σκούρου θέματος
-              </p>
-            </div>
-            <Switch
-              checked={darkMode}
-              onCheckedChange={setDarkMode}
             />
           </div>
         </CardContent>

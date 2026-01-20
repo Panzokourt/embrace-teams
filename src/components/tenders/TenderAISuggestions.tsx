@@ -14,7 +14,8 @@ import {
   FileText,
   ChevronDown,
   ChevronUp,
-  Info
+  Info,
+  Save
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -71,6 +72,7 @@ export function TenderAISuggestions({
   onTenderDetailsUpdate
 }: TenderAISuggestionsProps) {
   const [analyzing, setAnalyzing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [suggestions, setSuggestions] = useState<TenderSuggestion | null>(null);
   const [selectedDeliverables, setSelectedDeliverables] = useState<number[]>([]);
   const [selectedTasks, setSelectedTasks] = useState<number[]>([]);
@@ -80,6 +82,25 @@ export function TenderAISuggestions({
     tasks: true,
     invoices: true
   });
+  const [existingSuggestions, setExistingSuggestions] = useState(false);
+
+  // Check if tender already has saved suggestions
+  useEffect(() => {
+    checkExistingSuggestions();
+  }, [tenderId]);
+
+  const checkExistingSuggestions = async () => {
+    try {
+      const { count } = await supabase
+        .from('tender_suggestions')
+        .select('*', { count: 'exact', head: true })
+        .eq('tender_id', tenderId);
+      
+      setExistingSuggestions((count || 0) > 0);
+    } catch (error) {
+      console.error('Error checking existing suggestions:', error);
+    }
+  };
 
   // Notify parent about suggested tender details when suggestions change
   useEffect(() => {
@@ -108,13 +129,11 @@ export function TenderAISuggestions({
 
       if (data.suggestions) {
         setSuggestions(data.suggestions);
-        // Select all by default
         setSelectedDeliverables(data.suggestions.deliverables.map((_: any, i: number) => i));
         setSelectedTasks(data.suggestions.tasks.map((_: any, i: number) => i));
         setSelectedInvoices(data.suggestions.invoices.map((_: any, i: number) => i));
         toast.success('Η ανάλυση ολοκληρώθηκε!');
         
-        // Auto-apply tender details if callback exists
         if (data.suggestions.suggestedProjectDetails && onTenderDetailsUpdate) {
           onTenderDetailsUpdate(data.suggestions.suggestedProjectDetails);
           toast.info('Τα στοιχεία διαγωνισμού ενημερώθηκαν από την AI ανάλυση');
@@ -134,11 +153,70 @@ export function TenderAISuggestions({
     }
   };
 
-  const saveSuggestions = () => {
-    // For now, just store locally - when tender is converted to project, these will be used
-    toast.success('Οι προτάσεις αποθηκεύτηκαν!');
-    toast.info('Θα εφαρμοστούν όταν ο διαγωνισμός κερδηθεί και μετατραπεί σε έργο.');
-    onSuggestionsApplied?.();
+  const saveSuggestions = async () => {
+    if (!suggestions) return;
+
+    setSaving(true);
+    try {
+      // First, delete any existing suggestions for this tender
+      await supabase
+        .from('tender_suggestions')
+        .delete()
+        .eq('tender_id', tenderId);
+
+      const insertData: Array<{
+        tender_id: string;
+        suggestion_type: string;
+        data: any;
+        selected: boolean;
+      }> = [];
+
+      // Add deliverables
+      suggestions.deliverables.forEach((d, idx) => {
+        insertData.push({
+          tender_id: tenderId,
+          suggestion_type: 'deliverable',
+          data: d,
+          selected: selectedDeliverables.includes(idx)
+        });
+      });
+
+      // Add tasks
+      suggestions.tasks.forEach((t, idx) => {
+        insertData.push({
+          tender_id: tenderId,
+          suggestion_type: 'task',
+          data: t,
+          selected: selectedTasks.includes(idx)
+        });
+      });
+
+      // Add invoices
+      suggestions.invoices.forEach((inv, idx) => {
+        insertData.push({
+          tender_id: tenderId,
+          suggestion_type: 'invoice',
+          data: inv,
+          selected: selectedInvoices.includes(idx)
+        });
+      });
+
+      const { error } = await supabase
+        .from('tender_suggestions')
+        .insert(insertData);
+
+      if (error) throw error;
+
+      toast.success('Οι προτάσεις αποθηκεύτηκαν!');
+      toast.info('Θα εφαρμοστούν αυτόματα όταν ο διαγωνισμός κερδηθεί.');
+      setExistingSuggestions(true);
+      onSuggestionsApplied?.();
+    } catch (error) {
+      console.error('Error saving suggestions:', error);
+      toast.error('Σφάλμα κατά την αποθήκευση');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const toggleSection = (section: 'deliverables' | 'tasks' | 'invoices') => {
@@ -155,6 +233,11 @@ export function TenderAISuggestions({
             Ανεβάστε αρχεία (προκηρύξεις, τεχνικές προδιαγραφές) και το AI θα εξάγει 
             παραδοτέα, tasks και πρόγραμμα πληρωμών.
           </p>
+          {existingSuggestions && (
+            <Badge variant="secondary" className="mb-3">
+              ✓ Υπάρχουν αποθηκευμένες προτάσεις
+            </Badge>
+          )}
           <Button 
             onClick={analyzeFiles} 
             disabled={analyzing || files.length === 0}
@@ -342,15 +425,25 @@ export function TenderAISuggestions({
         <div className="flex gap-3 pt-4 border-t">
           <Button
             onClick={saveSuggestions}
-            disabled={selectedDeliverables.length === 0 && selectedTasks.length === 0 && selectedInvoices.length === 0}
+            disabled={saving || (selectedDeliverables.length === 0 && selectedTasks.length === 0 && selectedInvoices.length === 0)}
             className="flex-1"
           >
-            <CheckSquare className="h-4 w-4 mr-2" />
-            Αποθήκευση Προτάσεων
+            {saving ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Αποθήκευση...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Αποθήκευση στη Βάση
+              </>
+            )}
           </Button>
           <Button
             variant="outline"
             onClick={() => setSuggestions(null)}
+            disabled={saving}
           >
             Ακύρωση
           </Button>

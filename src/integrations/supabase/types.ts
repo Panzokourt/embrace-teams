@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_log: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json | null
+          entity_id: string
+          entity_name: string | null
+          entity_type: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json | null
+          entity_id: string
+          entity_name?: string | null
+          entity_type: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string
+          entity_name?: string | null
+          entity_type?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       client_user_access: {
         Row: {
           client_id: string
@@ -75,6 +108,61 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      comments: {
+        Row: {
+          content: string
+          created_at: string
+          deliverable_id: string | null
+          id: string
+          project_id: string | null
+          task_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          deliverable_id?: string | null
+          id?: string
+          project_id?: string | null
+          task_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          deliverable_id?: string | null
+          id?: string
+          project_id?: string | null
+          task_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_deliverable_id_fkey"
+            columns: ["deliverable_id"]
+            isOneToOne: false
+            referencedRelation: "deliverables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       deliverables: {
         Row: {
@@ -157,6 +245,67 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      file_attachments: {
+        Row: {
+          content_type: string | null
+          created_at: string
+          deliverable_id: string | null
+          file_name: string
+          file_path: string
+          file_size: number | null
+          id: string
+          project_id: string | null
+          task_id: string | null
+          uploaded_by: string
+        }
+        Insert: {
+          content_type?: string | null
+          created_at?: string
+          deliverable_id?: string | null
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          id?: string
+          project_id?: string | null
+          task_id?: string | null
+          uploaded_by: string
+        }
+        Update: {
+          content_type?: string | null
+          created_at?: string
+          deliverable_id?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          project_id?: string | null
+          task_id?: string | null
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "file_attachments_deliverable_id_fkey"
+            columns: ["deliverable_id"]
+            isOneToOne: false
+            referencedRelation: "deliverables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "file_attachments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "file_attachments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
         ]

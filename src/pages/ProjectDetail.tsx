@@ -8,6 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ProjectDeliverables } from '@/components/projects/ProjectDeliverables';
+import { ProjectTasksManager } from '@/components/projects/ProjectTasksManager';
+import { ProjectFinancialsManager } from '@/components/projects/ProjectFinancialsManager';
+import { FileAttachments } from '@/components/files/FileAttachments';
 import { toast } from 'sonner';
 import { 
   ArrowLeft,
@@ -23,7 +26,8 @@ import {
   Package,
   CheckSquare,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  Paperclip
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -297,6 +301,7 @@ export default function ProjectDetailPage() {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="deliverables">Παραδοτέα</TabsTrigger>
           <TabsTrigger value="tasks">Tasks</TabsTrigger>
+          <TabsTrigger value="files">Αρχεία</TabsTrigger>
           {(canViewFinancials || isClient) && (
             <TabsTrigger value="financials">Οικονομικά</TabsTrigger>
           )}
@@ -408,144 +413,44 @@ export default function ProjectDetailPage() {
         {/* Tasks Tab */}
         <TabsContent value="tasks">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Tasks</CardTitle>
-                <CardDescription>{tasks.length} tasks συνολικά</CardDescription>
-              </div>
-              <Button onClick={() => navigate('/tasks')}>
-                Διαχείριση Tasks
-              </Button>
+            <CardHeader>
+              <CardTitle>Tasks</CardTitle>
+              <CardDescription>Διαχείριση tasks του έργου</CardDescription>
             </CardHeader>
             <CardContent>
-              {tasks.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">Δεν υπάρχουν tasks</p>
-              ) : (
-                <div className="space-y-2">
-                  {tasks.map(task => (
-                    <div key={task.id} className="flex items-center gap-3 p-3 rounded-lg border">
-                      {getTaskStatusIcon(task.status)}
-                      <span className={cn(
-                        "flex-1 font-medium",
-                        task.status === 'completed' && "line-through text-muted-foreground"
-                      )}>
-                        {task.title}
-                      </span>
-                      {task.due_date && (
-                        <Badge variant="outline">
-                          {format(new Date(task.due_date), 'd MMM yyyy', { locale: el })}
-                        </Badge>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
+              <ProjectTasksManager projectId={project.id} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Files Tab */}
+        <TabsContent value="files">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Paperclip className="h-5 w-5" />
+                Αρχεία
+              </CardTitle>
+              <CardDescription>Διαχείριση αρχείων του έργου</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FileAttachments projectId={project.id} />
             </CardContent>
           </Card>
         </TabsContent>
 
         {/* Financials Tab */}
         {(canViewFinancials || isClient) && (
-          <TabsContent value="financials" className="space-y-6">
-            {/* Financial Summary (only for admin/manager) */}
-            {canViewFinancials && (
-              <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-sm text-muted-foreground">Τιμολογημένα</p>
-                    <p className="text-2xl font-bold">€{totalInvoiced.toLocaleString()}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-sm text-muted-foreground">Εισπραχθέντα</p>
-                    <p className="text-2xl font-bold text-success">€{totalPaid.toLocaleString()}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-sm text-muted-foreground">Έξοδα</p>
-                    <p className="text-2xl font-bold text-destructive">€{totalExpenses.toLocaleString()}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-sm text-muted-foreground">Καθαρό Κέρδος</p>
-                    <div className="flex items-center gap-2">
-                      <p className={cn("text-2xl font-bold", netProfit >= 0 ? "text-success" : "text-destructive")}>
-                        €{netProfit.toLocaleString()}
-                      </p>
-                      {netProfit >= 0 ? (
-                        <TrendingUp className="h-5 w-5 text-success" />
-                      ) : (
-                        <TrendingDown className="h-5 w-5 text-destructive" />
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-
-            {/* Invoices */}
+          <TabsContent value="financials">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Τιμολόγια</CardTitle>
+                <CardTitle>Οικονομικά</CardTitle>
+                <CardDescription>Διαχείριση τιμολογίων και εξόδων</CardDescription>
               </CardHeader>
               <CardContent>
-                {invoices.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-4">Δεν υπάρχουν τιμολόγια</p>
-                ) : (
-                  <div className="space-y-2">
-                    {invoices.map(invoice => (
-                      <div key={invoice.id} className="flex items-center justify-between p-3 rounded-lg border">
-                        <div>
-                          <p className="font-medium">{invoice.invoice_number}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {format(new Date(invoice.issued_date), 'd MMM yyyy', { locale: el })}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-bold">€{invoice.amount.toLocaleString()}</p>
-                          <Badge variant={invoice.paid ? "default" : "outline"} className={invoice.paid ? "bg-success" : ""}>
-                            {invoice.paid ? 'Πληρωμένο' : 'Εκκρεμεί'}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <ProjectFinancialsManager projectId={project.id} clientId={project.client_id} />
               </CardContent>
             </Card>
-
-            {/* Expenses (only for admin/manager) */}
-            {canViewFinancials && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Έξοδα</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {expenses.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-4">Δεν υπάρχουν έξοδα</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {expenses.map(expense => (
-                        <div key={expense.id} className="flex items-center justify-between p-3 rounded-lg border">
-                          <div>
-                            <p className="font-medium">{expense.description}</p>
-                            <div className="flex gap-2 text-sm text-muted-foreground">
-                              <span>{expense.category || 'Χωρίς κατηγορία'}</span>
-                              <span>•</span>
-                              <span>{format(new Date(expense.expense_date), 'd MMM yyyy', { locale: el })}</span>
-                            </div>
-                          </div>
-                          <p className="font-bold text-destructive">-€{expense.amount.toLocaleString()}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
           </TabsContent>
         )}
       </Tabs>

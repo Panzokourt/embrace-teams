@@ -33,32 +33,35 @@ import {
   CalendarDays,
 } from 'lucide-react';
 
+import { PermissionType } from '@/contexts/AuthContext';
+
 interface NavItem {
   title: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  roles?: string[];
+  permission?: PermissionType;
+  adminOnly?: boolean;
 }
 
 const navItems: NavItem[] = [
   { title: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { title: 'Διαγωνισμοί', href: '/tenders', icon: FileText, roles: ['admin', 'manager'] },
-  { title: 'Έργα', href: '/projects', icon: FolderKanban },
-  { title: 'Tasks', href: '/tasks', icon: CheckSquare },
+  { title: 'Διαγωνισμοί', href: '/tenders', icon: FileText, permission: 'tenders.view' },
+  { title: 'Έργα', href: '/projects', icon: FolderKanban, permission: 'projects.view' },
+  { title: 'Tasks', href: '/tasks', icon: CheckSquare, permission: 'tasks.view' },
   { title: 'Ημερολόγιο', href: '/calendar', icon: CalendarDays },
-  { title: 'Ομάδες', href: '/teams', icon: Users, roles: ['admin', 'manager'] },
-  { title: 'P&L', href: '/financials', icon: DollarSign, roles: ['admin', 'manager'] },
+  { title: 'Ομάδες', href: '/teams', icon: Users, adminOnly: true },
+  { title: 'P&L', href: '/financials', icon: DollarSign, permission: 'financials.view' },
 ];
 
 const adminNavItems: NavItem[] = [
-  { title: 'Χρήστες', href: '/users', icon: UserCog, roles: ['admin'] },
-  { title: 'Πελάτες', href: '/clients', icon: Building2, roles: ['admin', 'manager'] },
-  { title: 'Ρυθμίσεις', href: '/settings', icon: Settings },
+  { title: 'Χρήστες', href: '/users', icon: UserCog, permission: 'users.view' },
+  { title: 'Πελάτες', href: '/clients', icon: Building2, permission: 'clients.view' },
+  { title: 'Ρυθμίσεις', href: '/settings', icon: Settings, permission: 'settings.company' },
 ];
 
 export default function AppSidebar() {
   const location = useLocation();
-  const { profile, roles, signOut, isAdmin, isManager, isClient } = useAuth();
+  const { profile, roles, signOut, isAdmin, isManager, isClient, hasPermission, isSuperAdmin, isCompanyAdmin } = useAuth();
   const { resolvedTheme, setTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -69,8 +72,17 @@ export default function AppSidebar() {
   };
 
   const canAccess = (item: NavItem) => {
-    if (!item.roles) return true;
-    return item.roles.some(role => roles.includes(role as any));
+    // Super admins and company admins can access everything
+    if (isSuperAdmin || isCompanyAdmin) return true;
+    
+    // Admin-only items require admin/manager legacy role
+    if (item.adminOnly) return isAdmin || isManager;
+    
+    // Check specific permission
+    if (item.permission) return hasPermission(item.permission);
+    
+    // No permission required
+    return true;
   };
 
   const toggleTheme = () => {
@@ -149,8 +161,8 @@ export default function AppSidebar() {
               />
             ))}
 
-            {/* Admin Section */}
-            {(isAdmin || isManager) && (
+            {/* Admin Section - Show if any admin nav item is accessible */}
+            {adminNavItems.some(canAccess) && (
               <>
                 <div className={cn(
                   "pt-6 pb-2",

@@ -10,6 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ProjectDeliverables } from '@/components/projects/ProjectDeliverables';
 import { ProjectTasksManager } from '@/components/projects/ProjectTasksManager';
 import { ProjectFinancialsManager } from '@/components/projects/ProjectFinancialsManager';
+import { ProjectPLReport } from '@/components/projects/ProjectPLReport';
+import { ProjectMediaPlan } from '@/components/projects/ProjectMediaPlan';
 import { ProjectAISuggestions } from '@/components/projects/ProjectAISuggestions';
 import { FileAttachments } from '@/components/files/FileAttachments';
 import { toast } from 'sonner';
@@ -30,7 +32,9 @@ import {
   TrendingDown,
   Paperclip,
   Sparkles,
-  Upload
+  Upload,
+  BarChart3,
+  Megaphone
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -336,13 +340,23 @@ export default function ProjectDetailPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="deliverables">Παραδοτέα</TabsTrigger>
           <TabsTrigger value="tasks">Tasks</TabsTrigger>
+          <TabsTrigger value="media-plan">
+            <Megaphone className="h-4 w-4 mr-1.5" />
+            Media Plan
+          </TabsTrigger>
           <TabsTrigger value="files">Αρχεία</TabsTrigger>
           {(canViewFinancials || isClient) && (
-            <TabsTrigger value="financials">Οικονομικά</TabsTrigger>
+            <>
+              <TabsTrigger value="pl-report">
+                <BarChart3 className="h-4 w-4 mr-1.5" />
+                P&L
+              </TabsTrigger>
+              <TabsTrigger value="financials">Οικονομικά</TabsTrigger>
+            </>
           )}
         </TabsList>
 
@@ -537,6 +551,38 @@ export default function ProjectDetailPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Media Plan Tab */}
+        <TabsContent value="media-plan">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Megaphone className="h-5 w-5" />
+                Media Plan
+              </CardTitle>
+              <CardDescription>Σχεδιασμός και παρακολούθηση media placements</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ProjectMediaPlan 
+                projectId={project.id} 
+                projectName={project.name}
+                projectBudget={project.budget}
+                deliverables={deliverables.map(d => ({ id: d.id, name: d.name }))}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* P&L Report Tab */}
+        {(canViewFinancials || isClient) && (
+          <TabsContent value="pl-report">
+            <ProjectPLReport 
+              projectId={project.id} 
+              projectBudget={project.budget}
+              agencyFeePercentage={project.agency_fee_percentage}
+            />
+          </TabsContent>
+        )}
 
         {/* Financials Tab */}
         {(canViewFinancials || isClient) && (

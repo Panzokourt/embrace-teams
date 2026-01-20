@@ -33,7 +33,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ViewToggle, type ViewMode } from '@/components/ui/view-toggle';
+import { UnifiedViewToggle, type UnifiedViewMode } from '@/components/ui/unified-view-toggle';
+import { InlineEditCell } from '@/components/shared/InlineEditCell';
 import { toast } from 'sonner';
 import { 
   CheckSquare, 
@@ -89,6 +90,13 @@ interface Task {
   assignee?: { full_name: string | null } | null;
 }
 
+const statusConfig: Record<TaskStatus, { icon: React.ReactNode; label: string; className: string }> = {
+  todo: { icon: <Circle className="h-4 w-4" />, label: 'Προς Υλοποίηση', className: 'bg-muted text-muted-foreground' },
+  in_progress: { icon: <Clock className="h-4 w-4" />, label: 'Σε Εξέλιξη', className: 'bg-primary/10 text-primary border-primary/20' },
+  review: { icon: <AlertCircle className="h-4 w-4" />, label: 'Προς Έλεγχο', className: 'bg-warning/10 text-warning border-warning/20' },
+  completed: { icon: <CheckCircle2 className="h-4 w-4" />, label: 'Ολοκληρώθηκε', className: 'bg-success/10 text-success border-success/20' },
+};
+
 export default function TasksPage() {
   const { isAdmin, isManager } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -97,11 +105,12 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>('kanban');
+  const [viewMode, setViewMode] = useState<UnifiedViewMode>('kanban');
 
   const [formData, setFormData] = useState({
     title: '',
@@ -196,7 +205,6 @@ export default function TasksPage() {
     fetchUsers();
   }, [fetchTasks]);
 
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.project_id) {
@@ -250,26 +258,6 @@ export default function TasksPage() {
     }
   };
 
-  const updateTaskStatus = async (taskId: string, status: TaskStatus) => {
-    try {
-      const { error } = await supabase
-        .from('tasks')
-        .update({ status })
-        .eq('id', taskId);
-
-      if (error) throw error;
-
-      setTasks(prev => prev.map(t => 
-        t.id === taskId ? { ...t, status } : t
-      ));
-
-      toast.success('Το task ενημερώθηκε!');
-    } catch (error) {
-      console.error('Error updating task:', error);
-      toast.error('Σφάλμα κατά την ενημέρωση');
-    }
-  };
-
   const resetForm = () => {
     setEditingTask(null);
     setFormData({
@@ -282,17 +270,13 @@ export default function TasksPage() {
     });
   };
 
-  const getStatusIcon = (status: TaskStatus) => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircle2 className="h-5 w-5 text-success" />;
-      case 'in_progress':
-        return <Clock className="h-5 w-5 text-primary" />;
-      case 'review':
-        return <AlertCircle className="h-5 w-5 text-warning" />;
-      default:
-        return <Circle className="h-5 w-5 text-muted-foreground" />;
-    }
+  const getStatusBadge = (status: TaskStatus) => {
+    const config = statusConfig[status];
+    return (
+      <Badge variant="outline" className={cn("flex items-center gap-1", config.className)}>
+        {config.icon} {config.label}
+      </Badge>
+    );
   };
 
   const filteredTasks = useMemo(() => 
@@ -302,8 +286,9 @@ export default function TasksPage() {
       const matchesAssignee = assigneeFilter === 'all' || 
         (assigneeFilter === 'unassigned' && !task.assigned_to) ||
         task.assigned_to === assigneeFilter;
-      return matchesSearch && matchesAssignee;
-    }), [tasks, searchQuery, assigneeFilter]
+      const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
+      return matchesSearch && matchesAssignee && matchesStatus;
+    }), [tasks, searchQuery, assigneeFilter, statusFilter]
   );
 
   const tasksByStatus = useMemo(() => ({
@@ -330,7 +315,6 @@ export default function TasksPage() {
     const activeTask = tasks.find(t => t.id === activeId);
     if (!activeTask) return;
 
-    // Check if dropping over a column
     const statuses: TaskStatus[] = ['todo', 'in_progress', 'review', 'completed'];
     if (statuses.includes(overId as TaskStatus)) {
       if (activeTask.status !== overId) {
@@ -350,25 +334,22 @@ export default function TasksPage() {
     const activeId = active.id as string;
     const overId = over.id as string;
 
-    const activeTask = tasks.find(t => t.id === activeId);
-    if (!activeTask) return;
+    const draggedTask = tasks.find(t => t.id === activeId);
+    if (!draggedTask) return;
 
-    // Determine the target status
     const statuses: TaskStatus[] = ['todo', 'in_progress', 'review', 'completed'];
     let targetStatus: TaskStatus | null = null;
 
     if (statuses.includes(overId as TaskStatus)) {
       targetStatus = overId as TaskStatus;
     } else {
-      // Dropped on another task, find its status
       const overTask = tasks.find(t => t.id === overId);
       if (overTask) {
         targetStatus = overTask.status;
       }
     }
 
-    if (targetStatus && activeTask.status !== targetStatus) {
-      // Already updated optimistically in handleDragOver, now persist
+    if (targetStatus && draggedTask.status !== targetStatus) {
       try {
         const { error } = await supabase
           .from('tasks')
@@ -379,7 +360,6 @@ export default function TasksPage() {
         toast.success('Το task μετακινήθηκε!');
       } catch (error) {
         console.error('Error updating task:', error);
-        // Revert on error
         fetchTasks();
         toast.error('Σφάλμα κατά την ενημέρωση');
       }
@@ -411,6 +391,26 @@ export default function TasksPage() {
     }
   };
 
+  const handleInlineUpdate = async (taskId: string, field: string, value: string) => {
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ [field]: value || null })
+        .eq('id', taskId);
+
+      if (error) throw error;
+
+      setTasks(prev => prev.map(t => 
+        t.id === taskId ? { ...t, [field]: value || null } : t
+      ));
+      toast.success('Ενημερώθηκε!');
+    } catch (error) {
+      console.error('Error updating task:', error);
+      toast.error('Σφάλμα κατά την ενημέρωση');
+      throw error;
+    }
+  };
+
   const getInitials = (name: string | null) => {
     if (!name) return '?';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -420,17 +420,20 @@ export default function TasksPage() {
     const isOverdue = task.due_date && isPast(new Date(task.due_date)) && !isToday(new Date(task.due_date)) && task.status !== 'completed';
 
     return (
-      <Card className={cn(
-        "hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing",
-        isOverdue && "border-destructive/50 bg-destructive/5",
-        isDragOverlay && "shadow-xl rotate-2"
-      )}>
+      <Card 
+        className={cn(
+          "hover:shadow-md transition-shadow cursor-pointer",
+          isOverdue && "border-destructive/50 bg-destructive/5",
+          isDragOverlay && "shadow-xl rotate-2"
+        )}
+        onClick={() => !isDragOverlay && handleEdit(task)}
+      >
         <CardContent className="p-4">
           <div className="flex items-start gap-3">
-            <GripVertical className="h-5 w-5 text-muted-foreground/50 mt-0.5 flex-shrink-0" />
+            <GripVertical className="h-5 w-5 text-muted-foreground/50 mt-0.5 flex-shrink-0 cursor-grab" />
             <div className="flex-1 min-w-0">
               <div className="flex items-start gap-2">
-                {getStatusIcon(task.status)}
+                {statusConfig[task.status].icon}
                 <div className="flex-1 min-w-0">
                   <p className={cn(
                     "font-medium",
@@ -486,6 +489,176 @@ export default function TasksPage() {
     { id: 'completed' as TaskStatus, label: 'Ολοκληρώθηκε', icon: <CheckCircle2 className="h-5 w-5 text-success" /> },
   ];
 
+  const renderCardView = () => (
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {filteredTasks.map(task => (
+        <Card 
+          key={task.id} 
+          className="hover:shadow-lg transition-shadow cursor-pointer"
+          onClick={() => handleEdit(task)}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex-1 min-w-0">
+                <h3 className={cn(
+                  "font-semibold mb-1",
+                  task.status === 'completed' && "line-through text-muted-foreground"
+                )}>{task.title}</h3>
+                {task.project && (
+                  <p className="text-sm text-muted-foreground">{task.project.name}</p>
+                )}
+              </div>
+              {getStatusBadge(task.status)}
+            </div>
+            {task.description && (
+              <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{task.description}</p>
+            )}
+            <div className="flex items-center justify-between text-sm">
+              {task.assignee ? (
+                <div className="flex items-center gap-2">
+                  <Avatar className="h-6 w-6">
+                    <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                      {getInitials(task.assignee.full_name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-muted-foreground">{task.assignee.full_name}</span>
+                </div>
+              ) : (
+                <span className="text-muted-foreground">Χωρίς ανάθεση</span>
+              )}
+              {task.due_date && (
+                <span className="flex items-center gap-1 text-muted-foreground">
+                  <Calendar className="h-4 w-4" />
+                  {format(new Date(task.due_date), 'd MMM', { locale: el })}
+                </span>
+              )}
+            </div>
+            {canManage && (
+              <div className="flex gap-2 mt-4 pt-3 border-t" onClick={(e) => e.stopPropagation()}>
+                <Button variant="outline" size="sm" onClick={() => handleEdit(task)}>
+                  <Pencil className="h-3 w-3 mr-1" /> Επεξεργασία
+                </Button>
+                <Button variant="outline" size="sm" className="text-destructive" onClick={() => handleDelete(task.id)}>
+                  <Trash2 className="h-3 w-3 mr-1" /> Διαγραφή
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+
+  const renderTableView = () => (
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Τίτλος</TableHead>
+            <TableHead>Έργο</TableHead>
+            <TableHead>Κατάσταση</TableHead>
+            <TableHead>Ανάθεση</TableHead>
+            <TableHead>Deadline</TableHead>
+            {canManage && <TableHead className="w-[100px]">Ενέργειες</TableHead>}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredTasks.map(task => (
+            <TableRow 
+              key={task.id} 
+              className="cursor-pointer hover:bg-muted/50"
+              onClick={() => handleEdit(task)}
+            >
+              <TableCell onClick={(e) => e.stopPropagation()}>
+                <InlineEditCell
+                  value={task.title}
+                  onSave={(val) => handleInlineUpdate(task.id, 'title', val)}
+                />
+              </TableCell>
+              <TableCell>{task.project?.name || '-'}</TableCell>
+              <TableCell>{getStatusBadge(task.status)}</TableCell>
+              <TableCell>
+                {task.assignee ? (
+                  <div className="flex items-center gap-2">
+                    <Avatar className="h-6 w-6">
+                      <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                        {getInitials(task.assignee.full_name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span>{task.assignee.full_name}</span>
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">-</span>
+                )}
+              </TableCell>
+              <TableCell>
+                {task.due_date 
+                  ? format(new Date(task.due_date), 'd MMM yyyy', { locale: el })
+                  : '-'
+                }
+              </TableCell>
+              {canManage && (
+                <TableCell onClick={(e) => e.stopPropagation()}>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(task)}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDelete(task.id)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </TableCell>
+              )}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+
+  const renderKanbanView = () => (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCorners}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        {columns.map(column => (
+          <div key={column.id} className="space-y-4">
+            <div className="flex items-center gap-2">
+              {column.icon}
+              <h3 className="font-semibold">{column.label}</h3>
+              <Badge variant="secondary">{tasksByStatus[column.id].length}</Badge>
+            </div>
+            <DroppableColumn
+              id={column.id}
+              items={tasksByStatus[column.id].map(t => t.id)}
+            >
+              <div className="space-y-3">
+                {tasksByStatus[column.id].map(task => (
+                  <DraggableCard key={task.id} id={task.id}>
+                    <TaskCard task={task} />
+                  </DraggableCard>
+                ))}
+                {tasksByStatus[column.id].length === 0 && (
+                  <div className="border border-dashed rounded-lg p-4 text-center text-muted-foreground text-sm">
+                    Σύρετε tasks εδώ
+                  </div>
+                )}
+              </div>
+            </DroppableColumn>
+          </div>
+        ))}
+      </div>
+
+      <DragOverlay>
+        {activeTask ? <TaskCard task={activeTask} isDragOverlay /> : null}
+      </DragOverlay>
+    </DndContext>
+  );
+
   return (
     <div className="p-6 lg:p-8 space-y-6">
       {/* Header */}
@@ -500,128 +673,135 @@ export default function TasksPage() {
           </p>
         </div>
 
-        {canManage && (
-          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Νέο Task
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>{editingTask ? 'Επεξεργασία Task' : 'Δημιουργία Νέου Task'}</DialogTitle>
-                <DialogDescription>
-                  {editingTask ? 'Ενημερώστε τα στοιχεία του task' : 'Προσθέστε ένα νέο task σε ένα έργο'}
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="title">Τίτλος *</Label>
-                  <Input
-                    id="title"
-                    value={formData.title}
-                    onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                    placeholder="π.χ. Competitor Analysis"
-                    required
-                  />
-                </div>
+        <div className="flex items-center gap-3">
+          <UnifiedViewToggle 
+            viewMode={viewMode} 
+            onViewModeChange={setViewMode}
+          />
 
-                <div className="space-y-2">
-                  <Label htmlFor="description">Περιγραφή</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                    rows={3}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="project">Έργο *</Label>
-                  <Select
-                    value={formData.project_id}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, project_id: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Επιλέξτε έργο" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {projects.map(project => (
-                        <SelectItem key={project.id} value={project.id}>
-                          {project.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="assigned_to">Ανάθεση σε</Label>
-                  <Select
-                    value={formData.assigned_to}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, assigned_to: value === 'none' ? '' : value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Χωρίς ανάθεση" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Χωρίς ανάθεση</SelectItem>
-                      {users.map(user => (
-                        <SelectItem key={user.id} value={user.id}>
-                          <div className="flex items-center gap-2">
-                            <User className="h-4 w-4" />
-                            {user.full_name || user.email}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {canManage && (
+            <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Νέο Task
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>{editingTask ? 'Επεξεργασία Task' : 'Δημιουργία Νέου Task'}</DialogTitle>
+                  <DialogDescription>
+                    {editingTask ? 'Ενημερώστε τα στοιχεία του task' : 'Προσθέστε ένα νέο task σε ένα έργο'}
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="status">Κατάσταση</Label>
+                    <Label htmlFor="title">Τίτλος *</Label>
+                    <Input
+                      id="title"
+                      value={formData.title}
+                      onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                      placeholder="π.χ. Competitor Analysis"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Περιγραφή</Label>
+                    <Textarea
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="project">Έργο *</Label>
                     <Select
-                      value={formData.status}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as TaskStatus }))}
+                      value={formData.project_id}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, project_id: value }))}
                     >
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue placeholder="Επιλέξτε έργο" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="todo">Προς υλοποίηση</SelectItem>
-                        <SelectItem value="in_progress">Σε εξέλιξη</SelectItem>
-                        <SelectItem value="review">Προς έλεγχο</SelectItem>
-                        <SelectItem value="completed">Ολοκληρώθηκε</SelectItem>
+                        {projects.map(project => (
+                          <SelectItem key={project.id} value={project.id}>
+                            {project.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="due_date">Deadline</Label>
-                    <Input
-                      id="due_date"
-                      type="date"
-                      value={formData.due_date}
-                      onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))}
-                    />
+                    <Label htmlFor="assigned_to">Ανάθεση σε</Label>
+                    <Select
+                      value={formData.assigned_to}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, assigned_to: value === 'none' ? '' : value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Χωρίς ανάθεση" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Χωρίς ανάθεση</SelectItem>
+                        {users.map(user => (
+                          <SelectItem key={user.id} value={user.id}>
+                            <div className="flex items-center gap-2">
+                              <User className="h-4 w-4" />
+                              {user.full_name || user.email}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                </div>
 
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
-                    Ακύρωση
-                  </Button>
-                  <Button type="submit" disabled={saving}>
-                    {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                    {editingTask ? 'Αποθήκευση' : 'Δημιουργία'}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-        )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="status">Κατάσταση</Label>
+                      <Select
+                        value={formData.status}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as TaskStatus }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todo">Προς υλοποίηση</SelectItem>
+                          <SelectItem value="in_progress">Σε εξέλιξη</SelectItem>
+                          <SelectItem value="review">Προς έλεγχο</SelectItem>
+                          <SelectItem value="completed">Ολοκληρώθηκε</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="due_date">Deadline</Label>
+                      <Input
+                        id="due_date"
+                        type="date"
+                        value={formData.due_date}
+                        onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
+                      Ακύρωση
+                    </Button>
+                    <Button type="submit" disabled={saving}>
+                      {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                      {editingTask ? 'Αποθήκευση' : 'Δημιουργία'}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -649,54 +829,45 @@ export default function TasksPage() {
             ))}
           </SelectContent>
         </Select>
+        {viewMode !== 'kanban' && (
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Κατάσταση" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Όλες οι καταστάσεις</SelectItem>
+              <SelectItem value="todo">Προς υλοποίηση</SelectItem>
+              <SelectItem value="in_progress">Σε εξέλιξη</SelectItem>
+              <SelectItem value="review">Προς έλεγχο</SelectItem>
+              <SelectItem value="completed">Ολοκληρώθηκε</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
-      {/* Kanban Board with DnD */}
+      {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
+      ) : filteredTasks.length === 0 ? (
+        <Card className="py-12">
+          <CardContent className="text-center">
+            <CheckSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Δεν βρέθηκαν tasks</h3>
+            <p className="text-muted-foreground mb-4">
+              {searchQuery || assigneeFilter !== 'all' || statusFilter !== 'all'
+                ? 'Δοκιμάστε διαφορετικά φίλτρα αναζήτησης'
+                : 'Δημιουργήστε το πρώτο task για να ξεκινήσετε'}
+            </p>
+          </CardContent>
+        </Card>
       ) : (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCorners}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDragEnd={handleDragEnd}
-        >
-          <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-            {columns.map(column => (
-              <div key={column.id} className="space-y-4">
-                <div className="flex items-center gap-2">
-                  {column.icon}
-                  <h3 className="font-semibold">{column.label}</h3>
-                  <Badge variant="secondary">{tasksByStatus[column.id].length}</Badge>
-                </div>
-                <DroppableColumn
-                  id={column.id}
-                  items={tasksByStatus[column.id].map(t => t.id)}
-                >
-                  <div className="space-y-3">
-                    {tasksByStatus[column.id].map(task => (
-                      <DraggableCard key={task.id} id={task.id}>
-                        <TaskCard task={task} />
-                      </DraggableCard>
-                    ))}
-                    {tasksByStatus[column.id].length === 0 && (
-                      <div className="border border-dashed rounded-lg p-4 text-center text-muted-foreground text-sm">
-                        Σύρετε tasks εδώ
-                      </div>
-                    )}
-                  </div>
-                </DroppableColumn>
-              </div>
-            ))}
-          </div>
-
-          <DragOverlay>
-            {activeTask ? <TaskCard task={activeTask} isDragOverlay /> : null}
-          </DragOverlay>
-        </DndContext>
+        <>
+          {viewMode === 'card' && renderCardView()}
+          {viewMode === 'table' && renderTableView()}
+          {viewMode === 'kanban' && renderKanbanView()}
+        </>
       )}
     </div>
   );

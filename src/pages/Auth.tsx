@@ -18,8 +18,7 @@ const authSchema = z.object({
 
 export default function Auth() {
   const navigate = useNavigate();
-  const { user, loading, isApproved } = useAuth();
-  const { signIn, signUp } = useAuth();
+  const { user, loading, isApproved, signIn, signUp, signOut } = useAuth();
 
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
@@ -327,6 +326,3 @@ function Feature({ icon, title, description }: { icon: React.ReactNode; title: s
   );
 }
 
-function signOut() {
-  throw new Error('Function not implemented.');
-}

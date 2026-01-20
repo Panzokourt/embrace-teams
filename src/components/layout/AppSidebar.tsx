@@ -30,6 +30,7 @@ import {
   Menu,
   Moon,
   Sun,
+  CalendarDays,
 } from 'lucide-react';
 
 interface NavItem {
@@ -44,6 +45,7 @@ const navItems: NavItem[] = [
   { title: 'Διαγωνισμοί', href: '/tenders', icon: FileText, roles: ['admin', 'manager'] },
   { title: 'Έργα', href: '/projects', icon: FolderKanban },
   { title: 'Tasks', href: '/tasks', icon: CheckSquare },
+  { title: 'Ημερολόγιο', href: '/calendar', icon: CalendarDays },
   { title: 'Ομάδες', href: '/teams', icon: Users, roles: ['admin', 'manager'] },
   { title: 'P&L', href: '/financials', icon: DollarSign, roles: ['admin', 'manager'] },
 ];

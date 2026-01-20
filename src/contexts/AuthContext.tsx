@@ -3,7 +3,8 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
 type UserRole = 'admin' | 'manager' | 'employee' | 'client';
-type UserStatus = 'pending' | 'active' | 'inactive';
+type CompanyRole = 'super_admin' | 'admin' | 'manager' | 'standard' | 'client';
+type UserStatus = 'invited' | 'pending' | 'active' | 'suspended' | 'deactivated';
 
 interface Profile {
   id: string;

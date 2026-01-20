@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,11 +13,13 @@ import {
   Receipt,
   FileText,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  AlertCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface FileContent {
   fileName: string;
@@ -43,6 +45,12 @@ interface ProjectSuggestion {
     due_date?: string;
   }>;
   projectSummary: string;
+  suggestedProjectDetails?: {
+    description?: string;
+    start_date?: string;
+    end_date?: string;
+    budget?: number;
+  };
 }
 
 interface ProjectAISuggestionsProps {
@@ -51,6 +59,7 @@ interface ProjectAISuggestionsProps {
   projectBudget?: number;
   files: FileContent[];
   onSuggestionsApplied?: () => void;
+  onProjectDetailsUpdate?: (details: { description?: string; start_date?: string; end_date?: string; budget?: number }) => void;
 }
 
 export function ProjectAISuggestions({
@@ -58,7 +67,8 @@ export function ProjectAISuggestions({
   projectName,
   projectBudget,
   files,
-  onSuggestionsApplied
+  onSuggestionsApplied,
+  onProjectDetailsUpdate
 }: ProjectAISuggestionsProps) {
   const [analyzing, setAnalyzing] = useState(false);
   const [suggestions, setSuggestions] = useState<ProjectSuggestion | null>(null);
@@ -71,6 +81,13 @@ export function ProjectAISuggestions({
     tasks: true,
     invoices: true
   });
+
+  // Notify parent about suggested project details when suggestions change
+  useEffect(() => {
+    if (suggestions?.suggestedProjectDetails && onProjectDetailsUpdate) {
+      onProjectDetailsUpdate(suggestions.suggestedProjectDetails);
+    }
+  }, [suggestions, onProjectDetailsUpdate]);
 
   const analyzeFiles = async () => {
     if (files.length === 0) {
@@ -97,6 +114,12 @@ export function ProjectAISuggestions({
         setSelectedTasks(data.suggestions.tasks.map((_: any, i: number) => i));
         setSelectedInvoices(data.suggestions.invoices.map((_: any, i: number) => i));
         toast.success('Η ανάλυση ολοκληρώθηκε!');
+        
+        // Auto-apply project details if callback exists
+        if (data.suggestions.suggestedProjectDetails && onProjectDetailsUpdate) {
+          onProjectDetailsUpdate(data.suggestions.suggestedProjectDetails);
+          toast.info('Τα στοιχεία έργου ενημερώθηκαν από την AI ανάλυση');
+        }
       }
     } catch (error: any) {
       console.error('Error analyzing files:', error);
@@ -114,6 +137,12 @@ export function ProjectAISuggestions({
 
   const applySuggestions = async () => {
     if (!suggestions) return;
+
+    // Check if projectId is valid
+    if (!projectId || projectId.trim() === '') {
+      toast.error('Παρακαλώ αποθηκεύστε πρώτα το έργο πριν εφαρμόσετε τις προτάσεις');
+      return;
+    }
 
     setApplying(true);
     try {
@@ -196,6 +225,8 @@ export function ProjectAISuggestions({
       setApplying(false);
     }
   };
+
+  const hasValidProjectId = projectId && projectId.trim() !== '';
 
   const toggleSection = (section: 'deliverables' | 'tasks' | 'invoices') => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
@@ -365,11 +396,42 @@ export function ProjectAISuggestions({
           </CollapsibleContent>
         </Collapsible>
 
+        {/* Warning if no project ID */}
+        {!hasValidProjectId && (
+          <Alert variant="destructive" className="mt-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Πρέπει πρώτα να αποθηκεύσετε το έργο (tab "Στοιχεία" → "Δημιουργία") πριν εφαρμόσετε τις προτάσεις.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Suggested Project Details */}
+        {suggestions.suggestedProjectDetails && (
+          <div className="p-3 rounded-lg border bg-primary/5 mt-4">
+            <p className="text-sm font-medium mb-2 flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Προτεινόμενα Στοιχεία Έργου (εφαρμόστηκαν στη φόρμα)
+            </p>
+            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+              {suggestions.suggestedProjectDetails.budget && (
+                <span>Budget: €{suggestions.suggestedProjectDetails.budget.toLocaleString()}</span>
+              )}
+              {suggestions.suggestedProjectDetails.start_date && (
+                <span>Έναρξη: {format(new Date(suggestions.suggestedProjectDetails.start_date), 'd MMM yyyy', { locale: el })}</span>
+              )}
+              {suggestions.suggestedProjectDetails.end_date && (
+                <span>Λήξη: {format(new Date(suggestions.suggestedProjectDetails.end_date), 'd MMM yyyy', { locale: el })}</span>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Action buttons */}
         <div className="flex gap-3 pt-4 border-t">
           <Button
             onClick={applySuggestions}
-            disabled={applying || (selectedDeliverables.length === 0 && selectedTasks.length === 0 && selectedInvoices.length === 0)}
+            disabled={applying || !hasValidProjectId || (selectedDeliverables.length === 0 && selectedTasks.length === 0 && selectedInvoices.length === 0)}
             className="flex-1"
           >
             {applying ? (

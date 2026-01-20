@@ -884,6 +884,15 @@ export default function ProjectsPage() {
                           resetForm();
                           fetchProjects();
                         }}
+                        onProjectDetailsUpdate={(details) => {
+                          setFormData(prev => ({
+                            ...prev,
+                            description: details.description || prev.description,
+                            start_date: details.start_date || prev.start_date,
+                            end_date: details.end_date || prev.end_date,
+                            budget: details.budget?.toString() || prev.budget,
+                          }));
+                        }}
                       />
                     </TabsContent>
                   )}

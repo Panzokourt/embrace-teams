@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,14 +13,14 @@ import { ProjectFinancialsManager } from '@/components/projects/ProjectFinancial
 import { ProjectPLReport } from '@/components/projects/ProjectPLReport';
 import { ProjectMediaPlan } from '@/components/projects/ProjectMediaPlan';
 import { ProjectAISuggestions } from '@/components/projects/ProjectAISuggestions';
+import { ProjectInfoEditor } from '@/components/projects/ProjectInfoEditor';
+import { ProjectTeamManager } from '@/components/projects/ProjectTeamManager';
 import { FileAttachments } from '@/components/files/FileAttachments';
 import { toast } from 'sonner';
 import { 
   ArrowLeft,
-  FolderKanban,
   Calendar,
   DollarSign,
-  Users,
   CheckCircle2,
   Clock,
   Circle,
@@ -28,8 +28,6 @@ import {
   Loader2,
   Package,
   CheckSquare,
-  TrendingUp,
-  TrendingDown,
   Paperclip,
   Sparkles,
   Upload,
@@ -94,7 +92,7 @@ interface Expense {
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isAdmin, isManager, isClient } = useAuth();
+  const { user, isAdmin, isManager, isClient, hasPermission } = useAuth();
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
@@ -104,9 +102,11 @@ export default function ProjectDetailPage() {
   
   // AI Analysis state
   const [aiFiles, setAiFiles] = useState<Array<{ fileName: string; content: string }>>([]);
+  const [aiRawFiles, setAiRawFiles] = useState<File[]>([]); // Keep raw files for storage
   const [uploadingForAi, setUploadingForAi] = useState(false);
 
   const canViewFinancials = isAdmin || isManager;
+  const canEdit = isAdmin || isManager || hasPermission('projects.edit');
 
   useEffect(() => {
     if (id) {
@@ -172,20 +172,23 @@ export default function ProjectDetailPage() {
     }
   };
 
-  // Handle AI file uploads
+  // Handle AI file uploads - read content for AI and keep raw files for storage
   const handleAiFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     setUploadingForAi(true);
     const newFiles: Array<{ fileName: string; content: string }> = [];
+    const rawFiles: File[] = [];
 
     try {
       for (const file of Array.from(files)) {
         const text = await file.text();
         newFiles.push({ fileName: file.name, content: text });
+        rawFiles.push(file);
       }
       setAiFiles(prev => [...prev, ...newFiles]);
+      setAiRawFiles(prev => [...prev, ...rawFiles]);
       toast.success(`${newFiles.length} αρχείο(α) έτοιμο για ανάλυση`);
     } catch (error) {
       console.error('Error reading files:', error);
@@ -196,11 +199,47 @@ export default function ProjectDetailPage() {
     }
   };
 
-  // Handle suggestions applied - refresh data
-  const handleSuggestionsApplied = useCallback(() => {
+  // Save AI files to storage when suggestions are applied
+  const saveAiFilesToStorage = async () => {
+    if (!id || !user || aiRawFiles.length === 0) return;
+
+    try {
+      for (const file of aiRawFiles) {
+        const fileName = `${user.id}/${Date.now()}_${file.name}`;
+
+        // Upload to storage
+        const { error: uploadError } = await supabase.storage
+          .from('project-files')
+          .upload(fileName, file);
+
+        if (uploadError) {
+          console.error('Error uploading file to storage:', uploadError);
+          continue;
+        }
+
+        // Save file metadata
+        await supabase.from('file_attachments').insert({
+          file_name: file.name,
+          file_path: fileName,
+          file_size: file.size,
+          content_type: file.type,
+          uploaded_by: user.id,
+          project_id: id,
+        });
+      }
+      toast.success('Τα αρχεία αποθηκεύτηκαν!');
+    } catch (error) {
+      console.error('Error saving files to storage:', error);
+    }
+  };
+
+  // Handle suggestions applied - refresh data and save files
+  const handleSuggestionsApplied = useCallback(async () => {
+    await saveAiFilesToStorage();
     setAiFiles([]);
+    setAiRawFiles([]);
     fetchProjectData();
-  }, [id]);
+  }, [id, user, aiRawFiles]);
 
   if (loading) {
     return (
@@ -362,6 +401,27 @@ export default function ProjectDetailPage() {
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
+          {/* Project Info Editor */}
+          <Card>
+            <CardContent className="pt-6">
+              <ProjectInfoEditor
+                project={project}
+                canEdit={canEdit}
+                onUpdate={fetchProjectData}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Project Team Manager */}
+          <Card>
+            <CardContent className="pt-6">
+              <ProjectTeamManager
+                projectId={project.id}
+                canEdit={canEdit}
+              />
+            </CardContent>
+          </Card>
+
           <div className="grid gap-6 lg:grid-cols-2">
             {/* Progress Card */}
             <Card>
@@ -386,33 +446,25 @@ export default function ProjectDetailPage() {
               </CardContent>
             </Card>
 
-            {/* Timeline Card */}
+            {/* Timeline Card - now shows basic info since detailed is in editor */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Χρονοδιάγραμμα</CardTitle>
+                <CardTitle className="text-lg">Σύνοψη</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex justify-between">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-muted-foreground">Έναρξη</p>
-                    <p className="font-medium">
-                      {project.start_date 
-                        ? format(new Date(project.start_date), 'd MMMM yyyy', { locale: el })
-                        : '-'}
-                    </p>
+                    <p className="text-sm text-muted-foreground">Budget</p>
+                    <p className="font-semibold text-lg">€{project.budget.toLocaleString()}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground">Λήξη</p>
-                    <p className="font-medium">
-                      {project.end_date 
-                        ? format(new Date(project.end_date), 'd MMMM yyyy', { locale: el })
-                        : '-'}
-                    </p>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Agency Fee</p>
+                    <p className="font-semibold text-lg">{project.agency_fee_percentage}%</p>
                   </div>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Agency Fee</p>
-                  <p className="font-medium">{project.agency_fee_percentage}% (€{agencyFee.toLocaleString()})</p>
+                  <p className="text-sm text-muted-foreground">Εκτιμώμενη Αμοιβή</p>
+                  <p className="font-medium text-primary">€{agencyFee.toLocaleString()}</p>
                 </div>
               </CardContent>
             </Card>

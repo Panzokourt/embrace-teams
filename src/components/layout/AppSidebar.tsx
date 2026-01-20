@@ -80,14 +80,14 @@ export default function AppSidebar() {
   const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
     <>
       {/* Logo */}
-      <div className="p-4 flex items-center justify-between border-b border-sidebar-border">
+      <div className="p-4 flex items-center justify-between border-b border-sidebar-border/50">
         {(!collapsed || isMobile) && (
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-lg gradient-primary flex items-center justify-center">
-              <Zap className="h-5 w-5 text-white" />
+            <div className="h-8 w-8 rounded-xl bg-primary flex items-center justify-center shadow-soft">
+              <Zap className="h-4 w-4 text-primary-foreground" />
             </div>
-            <span className="font-bold text-sidebar-foreground">
-              {isClient && !isAdmin && !isManager ? 'Portal' : 'Agency CMD'}
+            <span className="font-semibold text-sidebar-foreground tracking-tight">
+              {isClient && !isAdmin && !isManager ? 'Portal' : 'Agency'}
             </span>
           </div>
         )}

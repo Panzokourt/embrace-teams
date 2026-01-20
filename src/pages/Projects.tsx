@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -52,6 +52,23 @@ import {
   Upload
 } from 'lucide-react';
 import { format } from 'date-fns';
+import {
+  DndContext,
+  DragOverlay,
+  closestCorners,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragStartEvent,
+  DragEndEvent,
+  DragOverEvent,
+} from '@dnd-kit/core';
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { DraggableCard } from '@/components/dnd/DraggableCard';
+import { DroppableColumn } from '@/components/dnd/DroppableColumn';
+import { cn } from '@/lib/utils';
+import { GripVertical, Pencil, Trash2 } from 'lucide-react';
 import { el } from 'date-fns/locale';
 
 type ProjectStatus = 'tender' | 'active' | 'completed' | 'cancelled';
@@ -90,7 +107,21 @@ export default function ProjectsPage() {
   const [dialogTab, setDialogTab] = useState('details');
   const [uploadedFiles, setUploadedFiles] = useState<FileContent[]>([]);
   const [tempProjectId, setTempProjectId] = useState<string | null>(null);
+  const [activeProject, setActiveProject] = useState<Project | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const statuses: ProjectStatus[] = ['tender', 'active', 'completed', 'cancelled'];
 
   const [formData, setFormData] = useState({
     name: '',
@@ -330,7 +361,127 @@ export default function ProjectsPage() {
     return matchesSearch && matchesStatus;
   });
 
+  const projectsByStatus = useMemo(() => 
+    statuses.reduce((acc, status) => {
+      acc[status] = filteredProjects.filter(p => p.status === status);
+      return acc;
+    }, {} as Record<ProjectStatus, Project[]>)
+  , [filteredProjects, statuses]);
+
   const canManage = isAdmin || isManager;
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const project = projects.find(p => p.id === event.active.id);
+    setActiveProject(project || null);
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+
+    const activeId = active.id as string;
+    const overId = over.id as string;
+
+    const draggedProject = projects.find(p => p.id === activeId);
+    if (!draggedProject) return;
+
+    if (statuses.includes(overId as ProjectStatus)) {
+      if (draggedProject.status !== overId) {
+        setProjects(prev => prev.map(p =>
+          p.id === activeId ? { ...p, status: overId as ProjectStatus } : p
+        ));
+      }
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveProject(null);
+    
+    if (!over) return;
+
+    const activeId = active.id as string;
+    const overId = over.id as string;
+
+    const draggedProject = projects.find(p => p.id === activeId);
+    if (!draggedProject) return;
+
+    let targetStatus: ProjectStatus | null = null;
+
+    if (statuses.includes(overId as ProjectStatus)) {
+      targetStatus = overId as ProjectStatus;
+    } else {
+      const overProject = projects.find(p => p.id === overId);
+      if (overProject) {
+        targetStatus = overProject.status;
+      }
+    }
+
+    if (targetStatus && draggedProject.status !== targetStatus) {
+      try {
+        const { error } = await supabase
+          .from('projects')
+          .update({ status: targetStatus })
+          .eq('id', activeId);
+
+        if (error) throw error;
+        toast.success('Η κατάσταση ενημερώθηκε!');
+      } catch (error) {
+        console.error('Error updating project:', error);
+        fetchProjects();
+        toast.error('Σφάλμα κατά την ενημέρωση');
+      }
+    }
+  };
+
+  const ProjectCard = ({ project, isDragOverlay = false }: { project: Project; isDragOverlay?: boolean }) => (
+    <Card 
+      className={cn(
+        "hover:shadow-md transition-shadow cursor-pointer",
+        isDragOverlay && "shadow-xl rotate-2"
+      )}
+      onClick={() => !isDragOverlay && navigate(`/projects/${project.id}`)}
+    >
+      <CardContent className="p-3">
+        <div className="flex items-start gap-2">
+          <GripVertical className="h-4 w-4 text-muted-foreground/50 mt-0.5 flex-shrink-0 cursor-grab" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-1">
+              <h4 className="font-medium text-sm mb-1 line-clamp-2 flex-1">
+                {project.name}
+              </h4>
+              {canManage && !isDragOverlay && (
+                <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
+                  <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleEdit(project)}>
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive" onClick={() => handleDelete(project.id)}>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+            </div>
+            {project.client && (
+              <p className="text-xs text-muted-foreground mb-2">
+                {project.client.name}
+              </p>
+            )}
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-primary font-medium">
+                €{project.budget?.toLocaleString() || 0}
+              </span>
+              {project.end_date && (
+                <span className="flex items-center gap-1 text-muted-foreground">
+                  <Calendar className="h-3 w-3" />
+                  {format(new Date(project.end_date), 'd/M', { locale: el })}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   const renderCardView = () => (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -453,6 +604,57 @@ export default function ProjectsPage() {
     </div>
   );
 
+  const statusLabels: Record<ProjectStatus, string> = {
+    tender: 'Διαγωνισμοί',
+    active: 'Ενεργά',
+    completed: 'Ολοκληρωμένα',
+    cancelled: 'Ακυρωμένα'
+  };
+
+  const renderKanbanView = () => (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCorners}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        {statuses.map(status => (
+          <div key={status} className="space-y-3">
+            <div className="flex items-center justify-between">
+              {getStatusBadge(status)}
+              <Badge variant="secondary">{projectsByStatus[status].length}</Badge>
+            </div>
+            <DroppableColumn
+              id={status}
+              items={projectsByStatus[status].map(p => p.id)}
+            >
+              <div className="space-y-3">
+                {projectsByStatus[status].map(project => (
+                  <DraggableCard key={project.id} id={project.id}>
+                    <ProjectCard project={project} />
+                  </DraggableCard>
+                ))}
+                {projectsByStatus[status].length === 0 && (
+                  <div className="border border-dashed rounded-lg p-4 text-center">
+                    <p className="text-xs text-muted-foreground">
+                      Σύρετε εδώ
+                    </p>
+                  </div>
+                )}
+              </div>
+            </DroppableColumn>
+          </div>
+        ))}
+      </div>
+
+      <DragOverlay>
+        {activeProject ? <ProjectCard project={activeProject} isDragOverlay /> : null}
+      </DragOverlay>
+    </DndContext>
+  );
+
   return (
     <div className="p-6 lg:p-8 space-y-6">
       {/* Header */}
@@ -471,7 +673,6 @@ export default function ProjectsPage() {
           <UnifiedViewToggle 
             viewMode={viewMode} 
             onViewModeChange={setViewMode}
-            showKanban={false}
           />
 
           {canManage && (
@@ -745,6 +946,7 @@ export default function ProjectsPage() {
         <>
           {viewMode === 'card' && renderCardView()}
           {viewMode === 'table' && renderTableView()}
+          {viewMode === 'kanban' && renderKanbanView()}
         </>
       )}
     </div>

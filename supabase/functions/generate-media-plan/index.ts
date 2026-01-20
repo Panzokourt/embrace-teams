@@ -1,0 +1,139 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+interface MediaPlanItem {
+  medium: string;
+  placement?: string;
+  campaign_name?: string;
+  start_date?: string;
+  end_date?: string;
+  budget: number;
+  target_audience?: string;
+  notes?: string;
+  deliverable_id?: string;
+}
+
+interface GenerateRequest {
+  projectName: string;
+  projectBudget: number;
+  deliverables: Array<{ id: string; name: string }>;
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+    if (!lovableApiKey) {
+      throw new Error("LOVABLE_API_KEY not configured");
+    }
+
+    const { projectName, projectBudget, deliverables } = await req.json() as GenerateRequest;
+
+    if (!deliverables || deliverables.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "No deliverables provided" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const systemPrompt = `You are a media planning expert. Based on the project details and deliverables provided, generate a comprehensive media plan with specific placements, budgets, and timelines.
+
+Return ONLY valid JSON in this exact format:
+{
+  "mediaPlanItems": [
+    {
+      "medium": "Facebook|Instagram|Google Ads|LinkedIn|Twitter/X|TikTok|YouTube|TV|Radio|Print|OOH (Out of Home)|Programmatic|Email Marketing|Influencer|Άλλο",
+      "placement": "specific placement like Feed, Stories, Banner 300x250, etc",
+      "campaign_name": "descriptive campaign name",
+      "start_date": "YYYY-MM-DD",
+      "end_date": "YYYY-MM-DD", 
+      "budget": number,
+      "target_audience": "demographic and interest targeting description",
+      "notes": "additional notes or recommendations",
+      "deliverable_id": "UUID of the associated deliverable if applicable"
+    }
+  ]
+}
+
+Guidelines:
+- Distribute the budget intelligently across different media channels
+- Consider the project goals when selecting media types
+- Include a mix of awareness and conversion-focused placements
+- Be realistic with budget allocations
+- Use Greek for campaign names and notes when the project name is in Greek`;
+
+    const userPrompt = `Create a media plan for:
+
+Project: ${projectName}
+Total Budget: €${projectBudget}
+
+Deliverables:
+${deliverables.map(d => `- ${d.name} (ID: ${d.id})`).join('\n')}
+
+Generate appropriate media placements that would help achieve these deliverables. Distribute the budget wisely across channels. Link each media item to relevant deliverables where applicable.`;
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${lovableApiKey}`,
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("AI Gateway error:", errorText);
+      throw new Error(`AI Gateway error: ${response.status}`);
+    }
+
+    const aiResponse = await response.json();
+    const content = aiResponse.choices?.[0]?.message?.content;
+
+    if (!content) {
+      throw new Error("No content in AI response");
+    }
+
+    // Parse JSON from response
+    let result;
+    try {
+      // Try to extract JSON from the response
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        result = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error("No JSON found in response");
+      }
+    } catch (parseError) {
+      console.error("Parse error:", parseError, "Content:", content);
+      throw new Error("Failed to parse AI response as JSON");
+    }
+
+    return new Response(
+      JSON.stringify(result),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+
+  } catch (error: unknown) {
+    console.error("Error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Internal server error";
+    return new Response(
+      JSON.stringify({ error: errorMessage }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+});

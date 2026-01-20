@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ProjectDeliverables } from '@/components/projects/ProjectDeliverables';
 import { ProjectTasksManager } from '@/components/projects/ProjectTasksManager';
 import { ProjectFinancialsManager } from '@/components/projects/ProjectFinancialsManager';
+import { ProjectAISuggestions } from '@/components/projects/ProjectAISuggestions';
 import { FileAttachments } from '@/components/files/FileAttachments';
 import { toast } from 'sonner';
 import { 
@@ -27,11 +28,15 @@ import {
   CheckSquare,
   TrendingUp,
   TrendingDown,
-  Paperclip
+  Paperclip,
+  Sparkles,
+  Upload
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 type ProjectStatus = 'tender' | 'active' | 'completed' | 'cancelled';
 type TaskStatus = 'todo' | 'in_progress' | 'review' | 'completed';
@@ -92,6 +97,10 @@ export default function ProjectDetailPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // AI Analysis state
+  const [aiFiles, setAiFiles] = useState<Array<{ fileName: string; content: string }>>([]);
+  const [uploadingForAi, setUploadingForAi] = useState(false);
 
   const canViewFinancials = isAdmin || isManager;
 
@@ -158,6 +167,36 @@ export default function ProjectDetailPage() {
       setLoading(false);
     }
   };
+
+  // Handle AI file uploads
+  const handleAiFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploadingForAi(true);
+    const newFiles: Array<{ fileName: string; content: string }> = [];
+
+    try {
+      for (const file of Array.from(files)) {
+        const text = await file.text();
+        newFiles.push({ fileName: file.name, content: text });
+      }
+      setAiFiles(prev => [...prev, ...newFiles]);
+      toast.success(`${newFiles.length} αρχείο(α) έτοιμο για ανάλυση`);
+    } catch (error) {
+      console.error('Error reading files:', error);
+      toast.error('Σφάλμα κατά την ανάγνωση αρχείων');
+    } finally {
+      setUploadingForAi(false);
+      e.target.value = '';
+    }
+  };
+
+  // Handle suggestions applied - refresh data
+  const handleSuggestionsApplied = useCallback(() => {
+    setAiFiles([]);
+    fetchProjectData();
+  }, [id]);
 
   if (loading) {
     return (
@@ -364,6 +403,66 @@ export default function ProjectDetailPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* AI Analysis Section */}
+          <Card className="border-primary/20">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                AI Ανάλυση Αρχείων
+              </CardTitle>
+              <CardDescription>
+                Ανεβάστε αρχεία (προκηρύξεις, συμβάσεις, RFPs) και το AI θα προτείνει παραδοτέα, tasks και τιμολόγια
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* File Upload for AI */}
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <Label htmlFor="ai-file-upload" className="sr-only">Ανέβασμα αρχείων για AI</Label>
+                  <Input
+                    id="ai-file-upload"
+                    type="file"
+                    multiple
+                    accept=".txt,.pdf,.doc,.docx,.rtf"
+                    onChange={handleAiFileUpload}
+                    disabled={uploadingForAi}
+                    className="cursor-pointer"
+                  />
+                </div>
+                {uploadingForAi && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
+              </div>
+
+              {/* Show uploaded files */}
+              {aiFiles.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {aiFiles.map((file, idx) => (
+                    <Badge key={idx} variant="secondary" className="flex items-center gap-1">
+                      <Upload className="h-3 w-3" />
+                      {file.fileName}
+                      <button
+                        onClick={() => setAiFiles(prev => prev.filter((_, i) => i !== idx))}
+                        className="ml-1 hover:text-destructive"
+                      >
+                        ×
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
+              {/* AI Suggestions Component */}
+              {aiFiles.length > 0 && (
+                <ProjectAISuggestions
+                  projectId={project.id}
+                  projectName={project.name}
+                  projectBudget={project.budget}
+                  files={aiFiles}
+                  onSuggestionsApplied={handleSuggestionsApplied}
+                />
+              )}
+            </CardContent>
+          </Card>
 
           {/* Recent Tasks */}
           <Card>

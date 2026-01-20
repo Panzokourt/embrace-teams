@@ -367,6 +367,110 @@ export type Database = {
           },
         ]
       }
+      media_plan_items: {
+        Row: {
+          actual_cost: number | null
+          budget: number | null
+          campaign_name: string | null
+          clicks: number | null
+          cpc: number | null
+          cpm: number | null
+          created_at: string
+          ctr: number | null
+          deliverable_id: string | null
+          end_date: string | null
+          id: string
+          impressions: number | null
+          invoice_id: string | null
+          medium: string
+          notes: string | null
+          placement: string | null
+          project_id: string
+          start_date: string | null
+          status: string | null
+          target_audience: string | null
+          task_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          actual_cost?: number | null
+          budget?: number | null
+          campaign_name?: string | null
+          clicks?: number | null
+          cpc?: number | null
+          cpm?: number | null
+          created_at?: string
+          ctr?: number | null
+          deliverable_id?: string | null
+          end_date?: string | null
+          id?: string
+          impressions?: number | null
+          invoice_id?: string | null
+          medium: string
+          notes?: string | null
+          placement?: string | null
+          project_id: string
+          start_date?: string | null
+          status?: string | null
+          target_audience?: string | null
+          task_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          actual_cost?: number | null
+          budget?: number | null
+          campaign_name?: string | null
+          clicks?: number | null
+          cpc?: number | null
+          cpm?: number | null
+          created_at?: string
+          ctr?: number | null
+          deliverable_id?: string | null
+          end_date?: string | null
+          id?: string
+          impressions?: number | null
+          invoice_id?: string | null
+          medium?: string
+          notes?: string | null
+          placement?: string | null
+          project_id?: string
+          start_date?: string | null
+          status?: string | null
+          target_audience?: string | null
+          task_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_plan_items_deliverable_id_fkey"
+            columns: ["deliverable_id"]
+            isOneToOne: false
+            referencedRelation: "deliverables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_plan_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_plan_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_plan_items_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null

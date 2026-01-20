@@ -79,6 +79,7 @@ export type Database = {
       clients: {
         Row: {
           address: string | null
+          company_id: string | null
           contact_email: string | null
           contact_phone: string | null
           created_at: string
@@ -89,6 +90,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          company_id?: string | null
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
@@ -99,6 +101,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          company_id?: string | null
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
@@ -107,7 +110,15 @@ export type Database = {
           notes?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clients_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       comments: {
         Row: {
@@ -163,6 +174,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      companies: {
+        Row: {
+          created_at: string
+          domain: string
+          id: string
+          logo_url: string | null
+          name: string
+          settings: Json | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          domain: string
+          id?: string
+          logo_url?: string | null
+          name: string
+          settings?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          domain?: string
+          id?: string
+          logo_url?: string | null
+          name?: string
+          settings?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       deliverables: {
         Row: {
@@ -306,6 +347,65 @@ export type Database = {
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invitations: {
+        Row: {
+          accepted_at: string | null
+          access_scope: Database["public"]["Enums"]["access_scope"]
+          client_ids: string[] | null
+          company_id: string
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string
+          permissions: Database["public"]["Enums"]["permission_type"][] | null
+          project_ids: string[] | null
+          role: Database["public"]["Enums"]["company_role"]
+          status: Database["public"]["Enums"]["invitation_status"]
+          token: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          access_scope?: Database["public"]["Enums"]["access_scope"]
+          client_ids?: string[] | null
+          company_id: string
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          invited_by: string
+          permissions?: Database["public"]["Enums"]["permission_type"][] | null
+          project_ids?: string[] | null
+          role?: Database["public"]["Enums"]["company_role"]
+          status?: Database["public"]["Enums"]["invitation_status"]
+          token?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          access_scope?: Database["public"]["Enums"]["access_scope"]
+          client_ids?: string[] | null
+          company_id?: string
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string
+          permissions?: Database["public"]["Enums"]["permission_type"][] | null
+          project_ids?: string[] | null
+          role?: Database["public"]["Enums"]["company_role"]
+          status?: Database["public"]["Enums"]["invitation_status"]
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invitations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -571,6 +671,7 @@ export type Database = {
           agency_fee_percentage: number | null
           budget: number | null
           client_id: string | null
+          company_id: string | null
           created_at: string
           description: string | null
           end_date: string | null
@@ -584,6 +685,7 @@ export type Database = {
           agency_fee_percentage?: number | null
           budget?: number | null
           client_id?: string | null
+          company_id?: string | null
           created_at?: string
           description?: string | null
           end_date?: string | null
@@ -597,6 +699,7 @@ export type Database = {
           agency_fee_percentage?: number | null
           budget?: number | null
           client_id?: string | null
+          company_id?: string | null
           created_at?: string
           description?: string | null
           end_date?: string | null
@@ -612,6 +715,63 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rbac_audit_log: {
+        Row: {
+          action: string
+          actor_id: string
+          company_id: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          new_value: Json | null
+          old_value: Json | null
+          target_id: string | null
+          target_type: string
+          target_user_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id: string
+          company_id: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          new_value?: Json | null
+          old_value?: Json | null
+          target_id?: string | null
+          target_type: string
+          target_user_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          new_value?: Json | null
+          old_value?: Json | null
+          target_id?: string | null
+          target_type?: string
+          target_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rbac_audit_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -702,6 +862,7 @@ export type Database = {
       teams: {
         Row: {
           color: string | null
+          company_id: string | null
           created_at: string
           description: string | null
           id: string
@@ -710,6 +871,7 @@ export type Database = {
         }
         Insert: {
           color?: string | null
+          company_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -718,13 +880,22 @@ export type Database = {
         }
         Update: {
           color?: string | null
+          company_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
           name?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "teams_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tender_suggestions: {
         Row: {
@@ -771,6 +942,7 @@ export type Database = {
         Row: {
           budget: number | null
           client_id: string | null
+          company_id: string | null
           created_at: string
           description: string | null
           id: string
@@ -782,6 +954,7 @@ export type Database = {
         Insert: {
           budget?: number | null
           client_id?: string | null
+          company_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -793,6 +966,7 @@ export type Database = {
         Update: {
           budget?: number | null
           client_id?: string | null
+          company_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -807,6 +981,141 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_access_assignments: {
+        Row: {
+          client_id: string | null
+          company_id: string
+          created_at: string
+          id: string
+          project_id: string | null
+          user_id: string
+        }
+        Insert: {
+          client_id?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          project_id?: string | null
+          user_id: string
+        }
+        Update: {
+          client_id?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          project_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_access_assignments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_access_assignments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_access_assignments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_company_roles: {
+        Row: {
+          access_scope: Database["public"]["Enums"]["access_scope"]
+          company_id: string
+          created_at: string
+          id: string
+          last_login_at: string | null
+          role: Database["public"]["Enums"]["company_role"]
+          status: Database["public"]["Enums"]["user_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_scope?: Database["public"]["Enums"]["access_scope"]
+          company_id: string
+          created_at?: string
+          id?: string
+          last_login_at?: string | null
+          role?: Database["public"]["Enums"]["company_role"]
+          status?: Database["public"]["Enums"]["user_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_scope?: Database["public"]["Enums"]["access_scope"]
+          company_id?: string
+          created_at?: string
+          id?: string
+          last_login_at?: string | null
+          role?: Database["public"]["Enums"]["company_role"]
+          status?: Database["public"]["Enums"]["user_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_company_roles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_permissions: {
+        Row: {
+          company_id: string
+          created_at: string
+          granted: boolean
+          id: string
+          permission: Database["public"]["Enums"]["permission_type"]
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          granted?: boolean
+          id?: string
+          permission: Database["public"]["Enums"]["permission_type"]
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          granted?: boolean
+          id?: string
+          permission?: Database["public"]["Enums"]["permission_type"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_permissions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -834,6 +1143,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_invitation: { Args: { _token: string }; Returns: Json }
+      get_user_company_id: { Args: { _user_id: string }; Returns: string }
+      get_user_company_role: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: Database["public"]["Enums"]["company_role"]
+      }
+      has_client_access: {
+        Args: { _client_id: string; _user_id: string }
+        Returns: boolean
+      }
+      has_new_project_access: {
+        Args: { _project_id: string; _user_id: string }
+        Returns: boolean
+      }
+      has_permission: {
+        Args: {
+          _permission: Database["public"]["Enums"]["permission_type"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       has_project_access: {
         Args: { _project_id: string; _user_id: string }
         Returns: boolean
@@ -847,9 +1177,63 @@ export type Database = {
       }
       is_active_user: { Args: { _user_id: string }; Returns: boolean }
       is_admin_or_manager: { Args: { _user_id: string }; Returns: boolean }
+      is_company_admin: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
+      access_scope: "company" | "assigned"
       app_role: "admin" | "manager" | "employee" | "client"
+      company_role: "super_admin" | "admin" | "manager" | "standard" | "client"
+      invitation_status: "pending" | "accepted" | "expired" | "cancelled"
+      permission_type:
+        | "users.view"
+        | "users.invite"
+        | "users.edit"
+        | "users.suspend"
+        | "users.delete"
+        | "clients.view"
+        | "clients.create"
+        | "clients.edit"
+        | "clients.delete"
+        | "projects.view"
+        | "projects.create"
+        | "projects.edit"
+        | "projects.delete"
+        | "tasks.view"
+        | "tasks.create"
+        | "tasks.edit"
+        | "tasks.delete"
+        | "tasks.assign"
+        | "deliverables.view"
+        | "deliverables.create"
+        | "deliverables.edit"
+        | "deliverables.delete"
+        | "deliverables.approve"
+        | "financials.view"
+        | "financials.create"
+        | "financials.edit"
+        | "financials.delete"
+        | "reports.view"
+        | "reports.export"
+        | "tenders.view"
+        | "tenders.create"
+        | "tenders.edit"
+        | "tenders.delete"
+        | "files.view"
+        | "files.upload"
+        | "files.delete"
+        | "comments.view"
+        | "comments.create"
+        | "comments.edit"
+        | "comments.delete"
+        | "settings.company"
+        | "settings.billing"
+        | "settings.security"
+        | "settings.integrations"
+        | "audit.view"
       project_status: "tender" | "active" | "completed" | "cancelled"
       task_status: "todo" | "in_progress" | "review" | "completed"
       tender_stage:
@@ -859,7 +1243,12 @@ export type Database = {
         | "evaluation"
         | "won"
         | "lost"
-      user_status: "pending" | "active" | "inactive"
+      user_status:
+        | "invited"
+        | "pending"
+        | "active"
+        | "suspended"
+        | "deactivated"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -987,7 +1376,57 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      access_scope: ["company", "assigned"],
       app_role: ["admin", "manager", "employee", "client"],
+      company_role: ["super_admin", "admin", "manager", "standard", "client"],
+      invitation_status: ["pending", "accepted", "expired", "cancelled"],
+      permission_type: [
+        "users.view",
+        "users.invite",
+        "users.edit",
+        "users.suspend",
+        "users.delete",
+        "clients.view",
+        "clients.create",
+        "clients.edit",
+        "clients.delete",
+        "projects.view",
+        "projects.create",
+        "projects.edit",
+        "projects.delete",
+        "tasks.view",
+        "tasks.create",
+        "tasks.edit",
+        "tasks.delete",
+        "tasks.assign",
+        "deliverables.view",
+        "deliverables.create",
+        "deliverables.edit",
+        "deliverables.delete",
+        "deliverables.approve",
+        "financials.view",
+        "financials.create",
+        "financials.edit",
+        "financials.delete",
+        "reports.view",
+        "reports.export",
+        "tenders.view",
+        "tenders.create",
+        "tenders.edit",
+        "tenders.delete",
+        "files.view",
+        "files.upload",
+        "files.delete",
+        "comments.view",
+        "comments.create",
+        "comments.edit",
+        "comments.delete",
+        "settings.company",
+        "settings.billing",
+        "settings.security",
+        "settings.integrations",
+        "audit.view",
+      ],
       project_status: ["tender", "active", "completed", "cancelled"],
       task_status: ["todo", "in_progress", "review", "completed"],
       tender_stage: [
@@ -998,7 +1437,7 @@ export const Constants = {
         "won",
         "lost",
       ],
-      user_status: ["pending", "active", "inactive"],
+      user_status: ["invited", "pending", "active", "suspended", "deactivated"],
     },
   },
 } as const

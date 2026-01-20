@@ -42,7 +42,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-type UserStatus = 'pending' | 'active' | 'inactive';
+type UserStatus = 'invited' | 'pending' | 'active' | 'suspended' | 'deactivated';
 type AppRole = 'admin' | 'manager' | 'employee' | 'client';
 
 interface UserProfile {
@@ -97,21 +97,28 @@ export default function UsersPage() {
     }
   };
 
-  const updateUserStatus = async (userId: string, status: UserStatus) => {
+  const updateUserStatus = async (userId: string, newStatus: UserStatus) => {
     setActionLoading(userId);
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ status })
+        .update({ status: newStatus } as any)
         .eq('id', userId);
 
       if (error) throw error;
 
       setUsers(prev => prev.map(u => 
-        u.id === userId ? { ...u, status } : u
+        u.id === userId ? { ...u, status: newStatus } : u
       ));
 
-      toast.success(status === 'active' ? 'Ο χρήστης εγκρίθηκε!' : 'Ο χρήστης απενεργοποιήθηκε');
+      const statusMessages: Record<UserStatus, string> = {
+        active: 'Ο χρήστης ενεργοποιήθηκε!',
+        suspended: 'Ο χρήστης αναστάλθηκε!',
+        deactivated: 'Ο χρήστης απενεργοποιήθηκε!',
+        pending: 'Ο χρήστης σε αναμονή!',
+        invited: 'Ο χρήστης προσκλήθηκε!',
+      };
+      toast.success(statusMessages[newStatus]);
     } catch (error) {
       console.error('Error updating user status:', error);
       toast.error('Σφάλμα κατά την ενημέρωση');
@@ -151,12 +158,16 @@ export default function UsersPage() {
 
   const getStatusBadge = (status: UserStatus) => {
     switch (status) {
+      case 'invited':
+        return <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20"><UserPlus className="h-3 w-3 mr-1" /> Προσκλήθηκε</Badge>;
       case 'pending':
         return <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20"><Clock className="h-3 w-3 mr-1" /> Αναμονή</Badge>;
       case 'active':
         return <Badge variant="outline" className="bg-success/10 text-success border-success/20"><CheckCircle2 className="h-3 w-3 mr-1" /> Ενεργός</Badge>;
-      case 'inactive':
-        return <Badge variant="outline" className="bg-muted text-muted-foreground"><XCircle className="h-3 w-3 mr-1" /> Ανενεργός</Badge>;
+      case 'suspended':
+        return <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20"><XCircle className="h-3 w-3 mr-1" /> Ανεσταλμένος</Badge>;
+      case 'deactivated':
+        return <Badge variant="outline" className="bg-muted text-muted-foreground"><XCircle className="h-3 w-3 mr-1" /> Απενεργοποιημένος</Badge>;
     }
   };
 
@@ -187,9 +198,9 @@ export default function UsersPage() {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  const pendingUsers = users.filter(u => u.status === 'pending');
+  const pendingUsers = users.filter(u => u.status === 'pending' || u.status === 'invited');
   const activeUsers = users.filter(u => u.status === 'active');
-  const inactiveUsers = users.filter(u => u.status === 'inactive');
+  const inactiveUsers = users.filter(u => u.status === 'deactivated' || u.status === 'suspended');
 
   if (!isAdmin) {
     return (
@@ -417,17 +428,19 @@ export default function UsersPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => updateUserStatus(user.id, 'inactive')}
+                            onClick={() => updateUserStatus(user.id, 'suspended')}
                             disabled={actionLoading === user.id}
+                            title="Αναστολή"
                           >
                             <UserX className="h-4 w-4" />
                           </Button>
-                        ) : user.status === 'inactive' ? (
+                        ) : user.status === 'suspended' || user.status === 'deactivated' ? (
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => updateUserStatus(user.id, 'active')}
                             disabled={actionLoading === user.id}
+                            title="Ενεργοποίηση"
                           >
                             <UserCheck className="h-4 w-4" />
                           </Button>

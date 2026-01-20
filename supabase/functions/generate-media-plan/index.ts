@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,6 +19,7 @@ interface MediaPlanItem {
 }
 
 interface GenerateRequest {
+  projectId: string;
   projectName: string;
   projectBudget: number;
   deliverables: Array<{ id: string; name: string }>;
@@ -29,13 +31,77 @@ serve(async (req) => {
   }
 
   try {
+    // ============================================
+    // SECURITY: Authentication Check
+    // ============================================
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      console.error("No authorization header provided");
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }}
+      );
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    // Verify the JWT token
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    
+    if (claimsError || !claimsData?.claims) {
+      console.error("JWT verification failed:", claimsError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid authentication token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }}
+      );
+    }
+
+    const userId = claimsData.claims.sub;
+    console.log("Authenticated user:", userId);
+
+    // ============================================
+    // Get API Key and Request Data
+    // ============================================
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
     if (!lovableApiKey) {
+      console.error("LOVABLE_API_KEY not configured");
       throw new Error("LOVABLE_API_KEY not configured");
     }
 
-    const { projectName, projectBudget, deliverables } = await req.json() as GenerateRequest;
+    const { projectId, projectName, projectBudget, deliverables } = await req.json() as GenerateRequest;
 
+    // ============================================
+    // SECURITY: Authorization Check
+    // ============================================
+    if (!projectId) {
+      return new Response(
+        JSON.stringify({ error: "Project ID is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { data: hasAccess, error: accessError } = await supabase.rpc(
+      'has_new_project_access',
+      { _user_id: userId, _project_id: projectId }
+    );
+
+    if (accessError || !hasAccess) {
+      console.error("User does not have access to project:", projectId);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized access to project' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }}
+      );
+    }
+
+    // ============================================
+    // Input Validation
+    // ============================================
     if (!deliverables || deliverables.length === 0) {
       return new Response(
         JSON.stringify({ error: "No deliverables provided" }),
@@ -43,6 +109,18 @@ serve(async (req) => {
       );
     }
 
+    if (!projectBudget || projectBudget <= 0) {
+      return new Response(
+        JSON.stringify({ error: "Valid project budget is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("Generating media plan for project:", projectName, "Budget:", projectBudget);
+
+    // ============================================
+    // AI Processing
+    // ============================================
     const systemPrompt = `You are a media planning expert. Based on the project details and deliverables provided, generate a comprehensive media plan with specific placements, budgets, and timelines.
 
 Return ONLY valid JSON in this exact format:
@@ -97,7 +175,15 @@ Generate appropriate media placements that would help achieve these deliverables
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("AI Gateway error:", errorText);
+      console.error("AI Gateway error:", response.status, errorText);
+      
+      if (response.status === 429) {
+        return new Response(
+          JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
       throw new Error(`AI Gateway error: ${response.status}`);
     }
 
@@ -105,13 +191,13 @@ Generate appropriate media placements that would help achieve these deliverables
     const content = aiResponse.choices?.[0]?.message?.content;
 
     if (!content) {
+      console.error("No content in AI response");
       throw new Error("No content in AI response");
     }
 
     // Parse JSON from response
     let result;
     try {
-      // Try to extract JSON from the response
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         result = JSON.parse(jsonMatch[0]);
@@ -119,9 +205,11 @@ Generate appropriate media placements that would help achieve these deliverables
         throw new Error("No JSON found in response");
       }
     } catch (parseError) {
-      console.error("Parse error:", parseError, "Content:", content);
+      console.error("Parse error:", parseError, "Content:", content.substring(0, 500));
       throw new Error("Failed to parse AI response as JSON");
     }
+
+    console.log("Successfully generated media plan with", result.mediaPlanItems?.length || 0, "items");
 
     return new Response(
       JSON.stringify(result),
@@ -129,7 +217,7 @@ Generate appropriate media placements that would help achieve these deliverables
     );
 
   } catch (error: unknown) {
-    console.error("Error:", error);
+    console.error("Error in generate-media-plan:", error);
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
     return new Response(
       JSON.stringify({ error: errorMessage }),

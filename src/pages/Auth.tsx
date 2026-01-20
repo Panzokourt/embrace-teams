@@ -129,7 +129,7 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen flex dark">
+    <div className="min-h-screen flex">
       {/* Left Side - Features */}
       <div className="hidden lg:flex lg:w-1/2 bg-sidebar p-12 flex-col justify-between">
         <div>

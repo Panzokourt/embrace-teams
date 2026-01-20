@@ -20,7 +20,7 @@ export default function AppLayout() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background dark">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -31,7 +31,7 @@ export default function AppLayout() {
   }
 
   return (
-    <div className="flex h-screen bg-background dark">
+    <div className="flex h-screen bg-background">
       <AppSidebar />
       <main className="flex-1 overflow-auto">
         <Outlet />

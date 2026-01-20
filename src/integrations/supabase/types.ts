@@ -622,6 +622,47 @@ export type Database = {
         }
         Relationships: []
       }
+      tender_suggestions: {
+        Row: {
+          applied: boolean
+          created_at: string
+          data: Json
+          id: string
+          selected: boolean
+          suggestion_type: string
+          tender_id: string
+          updated_at: string
+        }
+        Insert: {
+          applied?: boolean
+          created_at?: string
+          data: Json
+          id?: string
+          selected?: boolean
+          suggestion_type: string
+          tender_id: string
+          updated_at?: string
+        }
+        Update: {
+          applied?: boolean
+          created_at?: string
+          data?: Json
+          id?: string
+          selected?: boolean
+          suggestion_type?: string
+          tender_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tender_suggestions_tender_id_fkey"
+            columns: ["tender_id"]
+            isOneToOne: false
+            referencedRelation: "tenders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenders: {
         Row: {
           budget: number | null

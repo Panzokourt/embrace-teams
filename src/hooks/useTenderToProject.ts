@@ -10,6 +10,16 @@ interface TenderData {
   submission_deadline: string | null;
 }
 
+interface TenderSuggestionData {
+  name?: string;
+  description?: string;
+  due_date?: string;
+  budget?: number;
+  title?: string;
+  deliverable_index?: number;
+  amount?: number;
+}
+
 export async function convertTenderToProject(tender: TenderData): Promise<string | null> {
   try {
     // Create project from tender data
@@ -21,7 +31,7 @@ export async function convertTenderToProject(tender: TenderData): Promise<string
         client_id: tender.client_id,
         status: 'active',
         budget: tender.budget,
-        agency_fee_percentage: 30, // Default agency fee
+        agency_fee_percentage: 30,
         start_date: new Date().toISOString().split('T')[0],
         end_date: tender.submission_deadline,
       })
@@ -30,11 +40,94 @@ export async function convertTenderToProject(tender: TenderData): Promise<string
 
     if (projectError) throw projectError;
 
-    // Copy any file attachments from tender to the new project
-    // (Note: tenders don't have file_attachments linked directly in the current schema,
-    // but this is placeholder for future enhancement)
+    // Fetch saved AI suggestions for this tender
+    const { data: suggestions, error: suggestionsError } = await supabase
+      .from('tender_suggestions')
+      .select('*')
+      .eq('tender_id', tender.id)
+      .eq('selected', true)
+      .eq('applied', false);
 
-    toast.success(`Ο διαγωνισμός "${tender.name}" μετατράπηκε σε έργο!`);
+    if (suggestionsError) {
+      console.error('Error fetching tender suggestions:', suggestionsError);
+    }
+
+    if (suggestions && suggestions.length > 0) {
+      const deliverables = suggestions.filter(s => s.suggestion_type === 'deliverable');
+      const tasks = suggestions.filter(s => s.suggestion_type === 'task');
+      const invoices = suggestions.filter(s => s.suggestion_type === 'invoice');
+
+      // Create deliverables and map their IDs
+      const deliverableIdMap: Record<number, string> = {};
+      
+      for (let i = 0; i < deliverables.length; i++) {
+        const d = deliverables[i].data as TenderSuggestionData;
+        const { data: newDeliverable, error: delError } = await supabase
+          .from('deliverables')
+          .insert({
+            project_id: project.id,
+            name: d.name || 'Παραδοτέο',
+            description: d.description || null,
+            due_date: d.due_date || null,
+            budget: d.budget || null,
+            completed: false
+          })
+          .select('id')
+          .single();
+
+        if (!delError && newDeliverable) {
+          deliverableIdMap[i] = newDeliverable.id;
+        }
+      }
+
+      // Create tasks
+      for (const taskSuggestion of tasks) {
+        const t = taskSuggestion.data as TenderSuggestionData;
+        const deliverableId = t.deliverable_index !== undefined 
+          ? deliverableIdMap[t.deliverable_index] 
+          : null;
+
+        await supabase
+          .from('tasks')
+          .insert({
+            project_id: project.id,
+            title: t.title || 'Εργασία',
+            description: t.description || null,
+            due_date: t.due_date || null,
+            status: 'todo',
+            deliverable_id: deliverableId
+          });
+      }
+
+      // Create invoices
+      for (const invSuggestion of invoices) {
+        const inv = invSuggestion.data as TenderSuggestionData;
+        const invoiceNumber = `INV-${Date.now().toString().slice(-6)}-${Math.random().toString(36).slice(2, 5)}`;
+        
+        await supabase
+          .from('invoices')
+          .insert({
+            project_id: project.id,
+            client_id: tender.client_id,
+            invoice_number: invoiceNumber,
+            amount: inv.amount || 0,
+            due_date: inv.due_date || null,
+            issued_date: new Date().toISOString().split('T')[0],
+            paid: false
+          });
+      }
+
+      // Mark suggestions as applied
+      await supabase
+        .from('tender_suggestions')
+        .update({ applied: true })
+        .eq('tender_id', tender.id)
+        .eq('selected', true);
+
+      toast.success(`Ο διαγωνισμός "${tender.name}" μετατράπηκε σε έργο με ${deliverables.length} παραδοτέα, ${tasks.length} tasks και ${invoices.length} τιμολόγια!`);
+    } else {
+      toast.success(`Ο διαγωνισμός "${tender.name}" μετατράπηκε σε έργο!`);
+    }
     
     return project.id;
   } catch (error) {

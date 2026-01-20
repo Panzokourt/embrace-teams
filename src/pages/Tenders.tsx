@@ -35,7 +35,9 @@ import {
   Clock,
   Send,
   Edit3,
-  GripVertical
+  GripVertical,
+  Pencil,
+  Trash2
 } from 'lucide-react';
 import { format, isPast } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -88,6 +90,7 @@ export default function TendersPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeTender, setActiveTender] = useState<Tender | null>(null);
+  const [editingTender, setEditingTender] = useState<Tender | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -153,34 +156,75 @@ export default function TendersPage() {
     setSaving(true);
 
     try {
-      const { data, error } = await supabase
-        .from('tenders')
-        .insert({
-          name: formData.name,
-          description: formData.description || null,
-          client_id: formData.client_id || null,
-          stage: formData.stage,
-          budget: parseFloat(formData.budget) || 0,
-          submission_deadline: formData.submission_deadline || null,
-        })
-        .select(`*, client:clients(name)`)
-        .single();
+      const tenderData = {
+        name: formData.name,
+        description: formData.description || null,
+        client_id: formData.client_id || null,
+        stage: formData.stage,
+        budget: parseFloat(formData.budget) || 0,
+        submission_deadline: formData.submission_deadline || null,
+      };
 
-      if (error) throw error;
+      if (editingTender) {
+        const { data, error } = await supabase
+          .from('tenders')
+          .update(tenderData)
+          .eq('id', editingTender.id)
+          .select(`*, client:clients(name)`)
+          .single();
 
-      setTenders(prev => [data, ...prev]);
+        if (error) throw error;
+        setTenders(prev => prev.map(t => t.id === editingTender.id ? data : t));
+        toast.success('Ο διαγωνισμός ενημερώθηκε!');
+      } else {
+        const { data, error } = await supabase
+          .from('tenders')
+          .insert(tenderData)
+          .select(`*, client:clients(name)`)
+          .single();
+
+        if (error) throw error;
+        setTenders(prev => [data, ...prev]);
+        toast.success('Ο διαγωνισμός δημιουργήθηκε!');
+      }
+
       setDialogOpen(false);
       resetForm();
-      toast.success('Ο διαγωνισμός δημιουργήθηκε!');
     } catch (error) {
-      console.error('Error creating tender:', error);
-      toast.error('Σφάλμα κατά τη δημιουργία');
+      console.error('Error saving tender:', error);
+      toast.error('Σφάλμα κατά την αποθήκευση');
     } finally {
       setSaving(false);
     }
   };
 
+  const handleEdit = (tender: Tender) => {
+    setEditingTender(tender);
+    setFormData({
+      name: tender.name,
+      description: tender.description || '',
+      client_id: tender.client_id || '',
+      stage: tender.stage,
+      budget: tender.budget?.toString() || '',
+      submission_deadline: tender.submission_deadline || '',
+    });
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async (tenderId: string) => {
+    try {
+      const { error } = await supabase.from('tenders').delete().eq('id', tenderId);
+      if (error) throw error;
+      setTenders(prev => prev.filter(t => t.id !== tenderId));
+      toast.success('Ο διαγωνισμός διαγράφηκε!');
+    } catch (error) {
+      console.error('Error deleting tender:', error);
+      toast.error('Σφάλμα κατά τη διαγραφή');
+    }
+  };
+
   const resetForm = () => {
+    setEditingTender(null);
     setFormData({
       name: '',
       description: '',
@@ -295,9 +339,21 @@ export default function TendersPage() {
           <div className="flex items-start gap-2">
             <GripVertical className="h-4 w-4 text-muted-foreground/50 mt-0.5 flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <h4 className="font-medium text-sm mb-1 line-clamp-2">
-                {tender.name}
-              </h4>
+              <div className="flex items-start justify-between gap-1">
+                <h4 className="font-medium text-sm mb-1 line-clamp-2 flex-1">
+                  {tender.name}
+                </h4>
+                {canManage && !isDragOverlay && (
+                  <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
+                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleEdit(tender)}>
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive" onClick={() => handleDelete(tender.id)}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+              </div>
               {tender.client && (
                 <p className="text-xs text-muted-foreground mb-2">
                   {tender.client.name}
@@ -339,7 +395,7 @@ export default function TendersPage() {
         </div>
 
         {canManage && (
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
@@ -348,9 +404,9 @@ export default function TendersPage() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Νέος Διαγωνισμός</DialogTitle>
+                <DialogTitle>{editingTender ? 'Επεξεργασία Διαγωνισμού' : 'Νέος Διαγωνισμός'}</DialogTitle>
                 <DialogDescription>
-                  Προσθέστε έναν νέο διαγωνισμό στο pipeline
+                  {editingTender ? 'Ενημερώστε τα στοιχεία του διαγωνισμού' : 'Προσθέστε έναν νέο διαγωνισμό στο pipeline'}
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -438,12 +494,12 @@ export default function TendersPage() {
                 </div>
 
                 <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                  <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
                     Ακύρωση
                   </Button>
                   <Button type="submit" disabled={saving}>
                     {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Δημιουργία
+                    {editingTender ? 'Αποθήκευση' : 'Δημιουργία'}
                   </Button>
                 </DialogFooter>
               </form>

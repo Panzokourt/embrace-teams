@@ -33,7 +33,7 @@ export default function AppLayout() {
   return (
     <div className="flex h-screen bg-background">
       <AppSidebar />
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto pt-16 md:pt-0">
         <Outlet />
       </main>
     </div>

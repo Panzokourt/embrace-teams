@@ -16,7 +16,7 @@ import Tenders from "@/pages/Tenders";
 import TenderDetail from "@/pages/TenderDetail";
 import Financials from "@/pages/Financials";
 import Clients from "@/pages/Clients";
-import Users from "@/pages/Users";
+import UsersAccess from "@/pages/UsersAccess";
 import Settings from "@/pages/Settings";
 import Calendar from "@/pages/Calendar";
 import NotFound from "./pages/NotFound";

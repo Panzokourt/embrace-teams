@@ -34,7 +34,9 @@ import {
   AlertCircle,
   Loader2,
   Calendar,
-  GripVertical
+  GripVertical,
+  Pencil,
+  Trash2
 } from 'lucide-react';
 import { format, isPast, isToday } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -78,6 +80,7 @@ export default function TasksPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -155,21 +158,34 @@ export default function TasksPage() {
         due_date: formData.due_date || null,
       };
 
-      const { data, error } = await supabase
-        .from('tasks')
-        .insert(taskData)
-        .select(`*, project:projects(name)`)
-        .single();
+      if (editingTask) {
+        const { data, error } = await supabase
+          .from('tasks')
+          .update(taskData)
+          .eq('id', editingTask.id)
+          .select(`*, project:projects(name)`)
+          .single();
 
-      if (error) throw error;
+        if (error) throw error;
+        setTasks(prev => prev.map(t => t.id === editingTask.id ? data : t));
+        toast.success('Το task ενημερώθηκε!');
+      } else {
+        const { data, error } = await supabase
+          .from('tasks')
+          .insert(taskData)
+          .select(`*, project:projects(name)`)
+          .single();
 
-      setTasks(prev => [data, ...prev]);
+        if (error) throw error;
+        setTasks(prev => [data, ...prev]);
+        toast.success('Το task δημιουργήθηκε!');
+      }
+
       setDialogOpen(false);
       resetForm();
-      toast.success('Το task δημιουργήθηκε!');
     } catch (error) {
-      console.error('Error creating task:', error);
-      toast.error('Σφάλμα κατά τη δημιουργία');
+      console.error('Error saving task:', error);
+      toast.error('Σφάλμα κατά την αποθήκευση');
     } finally {
       setSaving(false);
     }
@@ -196,6 +212,7 @@ export default function TasksPage() {
   };
 
   const resetForm = () => {
+    setEditingTask(null);
     setFormData({
       title: '',
       description: '',
@@ -305,6 +322,30 @@ export default function TasksPage() {
     }
   };
 
+  const handleEdit = (task: Task) => {
+    setEditingTask(task);
+    setFormData({
+      title: task.title,
+      description: task.description || '',
+      project_id: task.project_id,
+      status: task.status,
+      due_date: task.due_date || '',
+    });
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async (taskId: string) => {
+    try {
+      const { error } = await supabase.from('tasks').delete().eq('id', taskId);
+      if (error) throw error;
+      setTasks(prev => prev.filter(t => t.id !== taskId));
+      toast.success('Το task διαγράφηκε!');
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      toast.error('Σφάλμα κατά τη διαγραφή');
+    }
+  };
+
   const TaskCard = ({ task, isDragOverlay = false }: { task: Task; isDragOverlay?: boolean }) => {
     const isOverdue = task.due_date && isPast(new Date(task.due_date)) && !isToday(new Date(task.due_date)) && task.status !== 'completed';
 
@@ -331,6 +372,16 @@ export default function TasksPage() {
                     <p className="text-sm text-muted-foreground">{task.project.name}</p>
                   )}
                 </div>
+                {canManage && !isDragOverlay && (
+                  <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleEdit(task)}>
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => handleDelete(task.id)}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
               </div>
               {task.due_date && (
                 <div className={cn(

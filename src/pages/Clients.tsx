@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -23,6 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { EditDeleteActions } from '@/components/dialogs/EditDeleteActions';
 import { toast } from 'sonner';
 import { 
   Building2, 
@@ -31,8 +32,7 @@ import {
   Mail,
   Phone,
   MapPin,
-  Loader2,
-  FolderKanban
+  Loader2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -45,7 +45,6 @@ interface Client {
   address: string | null;
   notes: string | null;
   created_at: string;
-  projects_count?: number;
 }
 
 export default function ClientsPage() {
@@ -55,6 +54,7 @@ export default function ClientsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -90,33 +90,80 @@ export default function ClientsPage() {
     setSaving(true);
 
     try {
-      const { data, error } = await supabase
-        .from('clients')
-        .insert({
-          name: formData.name,
-          contact_email: formData.contact_email || null,
-          contact_phone: formData.contact_phone || null,
-          address: formData.address || null,
-          notes: formData.notes || null,
-        })
-        .select()
-        .single();
+      const clientData = {
+        name: formData.name,
+        contact_email: formData.contact_email || null,
+        contact_phone: formData.contact_phone || null,
+        address: formData.address || null,
+        notes: formData.notes || null,
+      };
 
-      if (error) throw error;
+      if (editingClient) {
+        const { data, error } = await supabase
+          .from('clients')
+          .update(clientData)
+          .eq('id', editingClient.id)
+          .select()
+          .single();
 
-      setClients(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+        if (error) throw error;
+
+        setClients(prev => prev.map(c => c.id === editingClient.id ? data : c));
+        toast.success('Ο πελάτης ενημερώθηκε!');
+      } else {
+        const { data, error } = await supabase
+          .from('clients')
+          .insert(clientData)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        setClients(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+        toast.success('Ο πελάτης δημιουργήθηκε!');
+      }
+
       setDialogOpen(false);
       resetForm();
-      toast.success('Ο πελάτης δημιουργήθηκε!');
     } catch (error) {
-      console.error('Error creating client:', error);
-      toast.error('Σφάλμα κατά τη δημιουργία');
+      console.error('Error saving client:', error);
+      toast.error('Σφάλμα κατά την αποθήκευση');
     } finally {
       setSaving(false);
     }
   };
 
+  const handleEdit = (client: Client) => {
+    setEditingClient(client);
+    setFormData({
+      name: client.name,
+      contact_email: client.contact_email || '',
+      contact_phone: client.contact_phone || '',
+      address: client.address || '',
+      notes: client.notes || '',
+    });
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async (clientId: string) => {
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .delete()
+        .eq('id', clientId);
+
+      if (error) throw error;
+
+      setClients(prev => prev.filter(c => c.id !== clientId));
+      toast.success('Ο πελάτης διαγράφηκε!');
+    } catch (error) {
+      console.error('Error deleting client:', error);
+      toast.error('Σφάλμα κατά τη διαγραφή');
+    }
+  };
+
   const resetForm = () => {
+    setEditingClient(null);
     setFormData({
       name: '',
       contact_email: '',
@@ -148,7 +195,7 @@ export default function ClientsPage() {
         </div>
 
         {canManage && (
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
@@ -157,9 +204,9 @@ export default function ClientsPage() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Νέος Πελάτης</DialogTitle>
+                <DialogTitle>{editingClient ? 'Επεξεργασία Πελάτη' : 'Νέος Πελάτης'}</DialogTitle>
                 <DialogDescription>
-                  Προσθέστε έναν νέο πελάτη/οργανισμό
+                  {editingClient ? 'Ενημερώστε τα στοιχεία του πελάτη' : 'Προσθέστε έναν νέο πελάτη/οργανισμό'}
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -218,12 +265,12 @@ export default function ClientsPage() {
                 </div>
 
                 <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                  <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
                     Ακύρωση
                   </Button>
                   <Button type="submit" disabled={saving}>
                     {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Δημιουργία
+                    {editingClient ? 'Αποθήκευση' : 'Δημιουργία'}
                   </Button>
                 </DialogFooter>
               </form>
@@ -275,6 +322,7 @@ export default function ClientsPage() {
                 <TableHead>Επικοινωνία</TableHead>
                 <TableHead>Διεύθυνση</TableHead>
                 <TableHead>Ημ/νία</TableHead>
+                {canManage && <TableHead className="w-[50px]"></TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -327,6 +375,15 @@ export default function ClientsPage() {
                   <TableCell className="text-muted-foreground">
                     {format(new Date(client.created_at), 'd MMM yyyy', { locale: el })}
                   </TableCell>
+                  {canManage && (
+                    <TableCell>
+                      <EditDeleteActions
+                        onEdit={() => handleEdit(client)}
+                        onDelete={() => handleDelete(client.id)}
+                        itemName={`τον πελάτη "${client.name}"`}
+                      />
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>

@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { EditDeleteActions } from '@/components/dialogs/EditDeleteActions';
 import { toast } from 'sonner';
 import { 
   FolderKanban, 
@@ -31,11 +32,6 @@ import {
   Search, 
   Calendar,
   DollarSign,
-  Users,
-  MoreVertical,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
   Loader2
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -55,8 +51,6 @@ interface Project {
   end_date: string | null;
   created_at: string;
   client?: { name: string } | null;
-  deliverables_count?: number;
-  completed_deliverables?: number;
 }
 
 export default function ProjectsPage() {
@@ -68,8 +62,8 @@ export default function ProjectsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
 
-  // Form state
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -90,10 +84,7 @@ export default function ProjectsPage() {
     try {
       const { data, error } = await supabase
         .from('projects')
-        .select(`
-          *,
-          client:clients(name)
-        `)
+        .select(`*, client:clients(name)`)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -136,27 +127,75 @@ export default function ProjectsPage() {
         end_date: formData.end_date || null,
       };
 
-      const { data, error } = await supabase
-        .from('projects')
-        .insert(projectData)
-        .select(`*, client:clients(name)`)
-        .single();
+      if (editingProject) {
+        const { data, error } = await supabase
+          .from('projects')
+          .update(projectData)
+          .eq('id', editingProject.id)
+          .select(`*, client:clients(name)`)
+          .single();
 
-      if (error) throw error;
+        if (error) throw error;
 
-      setProjects(prev => [data, ...prev]);
+        setProjects(prev => prev.map(p => p.id === editingProject.id ? data : p));
+        toast.success('Το έργο ενημερώθηκε!');
+      } else {
+        const { data, error } = await supabase
+          .from('projects')
+          .insert(projectData)
+          .select(`*, client:clients(name)`)
+          .single();
+
+        if (error) throw error;
+
+        setProjects(prev => [data, ...prev]);
+        toast.success('Το έργο δημιουργήθηκε!');
+      }
+
       setDialogOpen(false);
       resetForm();
-      toast.success('Το έργο δημιουργήθηκε!');
     } catch (error) {
-      console.error('Error creating project:', error);
-      toast.error('Σφάλμα κατά τη δημιουργία');
+      console.error('Error saving project:', error);
+      toast.error('Σφάλμα κατά την αποθήκευση');
     } finally {
       setSaving(false);
     }
   };
 
+  const handleEdit = (project: Project) => {
+    setEditingProject(project);
+    setFormData({
+      name: project.name,
+      description: project.description || '',
+      client_id: project.client_id || '',
+      status: project.status,
+      budget: project.budget?.toString() || '',
+      agency_fee_percentage: project.agency_fee_percentage?.toString() || '30',
+      start_date: project.start_date || '',
+      end_date: project.end_date || '',
+    });
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async (projectId: string) => {
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', projectId);
+
+      if (error) throw error;
+
+      setProjects(prev => prev.filter(p => p.id !== projectId));
+      toast.success('Το έργο διαγράφηκε!');
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      toast.error('Σφάλμα κατά τη διαγραφή. Ελέγξτε αν υπάρχουν συνδεδεμένα tasks ή invoices.');
+    }
+  };
+
   const resetForm = () => {
+    setEditingProject(null);
     setFormData({
       name: '',
       description: '',
@@ -171,13 +210,13 @@ export default function ProjectsPage() {
 
   const getStatusBadge = (status: ProjectStatus) => {
     const styles = {
-      tender: { variant: 'outline' as const, className: 'bg-warning/10 text-warning border-warning/20', label: 'Διαγωνισμός' },
-      active: { variant: 'outline' as const, className: 'bg-success/10 text-success border-success/20', label: 'Ενεργό' },
-      completed: { variant: 'outline' as const, className: 'bg-primary/10 text-primary border-primary/20', label: 'Ολοκληρώθηκε' },
-      cancelled: { variant: 'outline' as const, className: 'bg-muted text-muted-foreground', label: 'Ακυρώθηκε' },
+      tender: { className: 'bg-warning/10 text-warning border-warning/20', label: 'Διαγωνισμός' },
+      active: { className: 'bg-success/10 text-success border-success/20', label: 'Ενεργό' },
+      completed: { className: 'bg-primary/10 text-primary border-primary/20', label: 'Ολοκληρώθηκε' },
+      cancelled: { className: 'bg-muted text-muted-foreground', label: 'Ακυρώθηκε' },
     };
     const style = styles[status];
-    return <Badge variant={style.variant} className={style.className}>{style.label}</Badge>;
+    return <Badge variant="outline" className={style.className}>{style.label}</Badge>;
   };
 
   const filteredProjects = projects.filter(project => {
@@ -204,7 +243,7 @@ export default function ProjectsPage() {
         </div>
 
         {canManage && (
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
@@ -213,9 +252,9 @@ export default function ProjectsPage() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Δημιουργία Νέου Έργου</DialogTitle>
+                <DialogTitle>{editingProject ? 'Επεξεργασία Έργου' : 'Δημιουργία Νέου Έργου'}</DialogTitle>
                 <DialogDescription>
-                  Συμπληρώστε τα στοιχεία του νέου έργου
+                  {editingProject ? 'Ενημερώστε τα στοιχεία του έργου' : 'Συμπληρώστε τα στοιχεία του νέου έργου'}
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -327,12 +366,12 @@ export default function ProjectsPage() {
                 </div>
 
                 <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                  <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
                     Ακύρωση
                   </Button>
                   <Button type="submit" disabled={saving}>
                     {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Δημιουργία
+                    {editingProject ? 'Αποθήκευση' : 'Δημιουργία'}
                   </Button>
                 </DialogFooter>
               </form>
@@ -392,16 +431,25 @@ export default function ProjectsPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredProjects.map(project => (
-            <Card key={project.id} className="hover:shadow-lg transition-shadow cursor-pointer">
+            <Card key={project.id} className="hover:shadow-lg transition-shadow">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
-                  <div className="space-y-1">
+                  <div className="space-y-1 flex-1 min-w-0">
                     <CardTitle className="text-lg">{project.name}</CardTitle>
                     {project.client && (
                       <CardDescription>{project.client.name}</CardDescription>
                     )}
                   </div>
-                  {getStatusBadge(project.status)}
+                  <div className="flex items-center gap-2">
+                    {getStatusBadge(project.status)}
+                    {canManage && (
+                      <EditDeleteActions
+                        onEdit={() => handleEdit(project)}
+                        onDelete={() => handleDelete(project.id)}
+                        itemName={`το έργο "${project.name}"`}
+                      />
+                    )}
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -414,7 +462,7 @@ export default function ProjectsPage() {
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div className="flex items-center gap-2">
                     <DollarSign className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">€{project.budget.toLocaleString()}</span>
+                    <span className="font-medium">€{project.budget?.toLocaleString() || 0}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />

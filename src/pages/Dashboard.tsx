@@ -12,9 +12,9 @@ import {
   Trophy,
   FolderKanban,
   AlertTriangle,
-  Activity
+  Activity,
+  Loader2
 } from 'lucide-react';
-import { addDays, subDays } from 'date-fns';
 
 interface DashboardStats {
   totalRevenue: number;
@@ -28,41 +28,150 @@ interface DashboardStats {
   utilization: number;
 }
 
+interface Task {
+  id: string;
+  title: string;
+  project: string;
+  dueDate: Date;
+  status: 'todo' | 'in_progress' | 'review' | 'completed';
+}
+
 export default function Dashboard() {
   const { profile, isAdmin, isManager, isClient } = useAuth();
+  const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats>({
-    totalRevenue: 60000,
-    agencyFee: 14919,
-    netProfit: 30180,
-    pendingInvoices: 3100,
-    activeTenders: 2,
-    activeProjects: 2,
+    totalRevenue: 0,
+    agencyFee: 0,
+    netProfit: 0,
+    pendingInvoices: 0,
+    activeTenders: 0,
+    activeProjects: 0,
     winRate: 0,
-    overdueCount: 1,
-    utilization: 35,
+    overdueCount: 0,
+    utilization: 0,
   });
 
   const [pipelineStages, setPipelineStages] = useState(getDefaultPipelineStages());
+  const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([]);
 
-  // Sample tasks - will be replaced with real data
-  const sampleTasks = [
-    { id: '1', title: 'Competitor Analysis', project: 'Digital Campaign', dueDate: subDays(new Date(), 2), status: 'todo' as const },
-    { id: '2', title: 'Brand Strategy', project: 'Φωτογράφηση', dueDate: addDays(new Date(), 5), status: 'in_progress' as const },
-    { id: '3', title: 'Video editing', project: 'Π1.2 Επικοινωνιακό υλικό', dueDate: addDays(new Date(), 21), status: 'todo' as const },
-    { id: '4', title: 'Visual Identity', project: 'Brand Refresh', dueDate: addDays(new Date(), 54), status: 'todo' as const },
-  ];
-
-  // Sample pipeline data
   useEffect(() => {
-    const stages = getDefaultPipelineStages();
-    stages[1].items = [
-      { id: '1', name: 'Τουριστική Προβολή Ρόδου', client: 'Δήμος Ρόδου', budget: 45000 }
-    ];
-    stages[2].items = [
-      { id: '2', name: 'Digital Campaign', client: 'TechCo', budget: 25000 }
-    ];
-    setPipelineStages(stages);
+    fetchDashboardData();
   }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      // Fetch all data in parallel
+      const [
+        invoicesRes,
+        expensesRes,
+        projectsRes,
+        tendersRes,
+        tasksRes
+      ] = await Promise.all([
+        supabase.from('invoices').select('amount, paid'),
+        supabase.from('expenses').select('amount'),
+        supabase.from('projects').select('budget, agency_fee_percentage, status'),
+        supabase.from('tenders').select('id, name, budget, stage, client:clients(name)'),
+        supabase.from('tasks').select('id, title, due_date, status, project:projects(name)')
+      ]);
+
+      // Calculate financial stats
+      const invoices = invoicesRes.data || [];
+      const expenses = expensesRes.data || [];
+      const projects = projectsRes.data || [];
+      const tenders = tendersRes.data || [];
+      const tasks = tasksRes.data || [];
+
+      const totalRevenue = invoices.reduce((sum, i) => sum + Number(i.amount), 0);
+      const totalPaid = invoices.filter(i => i.paid).reduce((sum, i) => sum + Number(i.amount), 0);
+      const pendingInvoices = totalRevenue - totalPaid;
+      const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+      const netProfit = totalRevenue - totalExpenses;
+
+      // Calculate agency fee from active projects
+      const activeProjects = projects.filter(p => p.status === 'active');
+      const agencyFee = activeProjects.reduce((sum, p) => 
+        sum + (Number(p.budget || 0) * Number(p.agency_fee_percentage || 0) / 100), 0
+      );
+
+      // Calculate tender stats
+      const activeTenders = tenders.filter(t => 
+        !['won', 'lost'].includes(t.stage)
+      ).length;
+
+      const wonTenders = tenders.filter(t => t.stage === 'won').length;
+      const lostTenders = tenders.filter(t => t.stage === 'lost').length;
+      const completedTenders = wonTenders + lostTenders;
+      const winRate = completedTenders > 0 ? Math.round((wonTenders / completedTenders) * 100) : 0;
+
+      // Calculate overdue tasks
+      const now = new Date();
+      const overdueTasks = tasks.filter(t => 
+        t.due_date && 
+        new Date(t.due_date) < now && 
+        t.status !== 'completed'
+      );
+
+      // Calculate utilization (active tasks / total capacity - simplified)
+      const inProgressTasks = tasks.filter(t => t.status === 'in_progress').length;
+      const totalTasks = tasks.filter(t => t.status !== 'completed').length;
+      const utilization = totalTasks > 0 ? Math.round((inProgressTasks / Math.max(totalTasks, 1)) * 100) : 0;
+
+      setStats({
+        totalRevenue,
+        agencyFee,
+        netProfit,
+        pendingInvoices,
+        activeTenders,
+        activeProjects: activeProjects.length,
+        winRate,
+        overdueCount: overdueTasks.length,
+        utilization: Math.min(utilization, 100),
+      });
+
+      // Build pipeline stages
+      const stages = getDefaultPipelineStages();
+      tenders.forEach(tender => {
+        const stageIndex = stages.findIndex(s => s.id === tender.stage);
+        if (stageIndex !== -1) {
+          stages[stageIndex].items.push({
+            id: tender.id,
+            name: tender.name,
+            client: tender.client?.name || 'Άγνωστος',
+            budget: Number(tender.budget) || 0,
+          });
+        }
+      });
+      setPipelineStages(stages);
+
+      // Build upcoming tasks
+      const upcoming = tasks
+        .filter(t => t.due_date && t.status !== 'completed')
+        .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime())
+        .slice(0, 5)
+        .map(t => ({
+          id: t.id,
+          title: t.title,
+          project: t.project?.name || 'Άγνωστο έργο',
+          dueDate: new Date(t.due_date!),
+          status: t.status as Task['status'],
+        }));
+      setUpcomingTasks(upcoming);
+
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   // Client Dashboard
   if (isClient && !isAdmin && !isManager) {
@@ -80,26 +189,26 @@ export default function Dashboard() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <StatCard
             title="Ενεργά Έργα"
-            value={2}
+            value={stats.activeProjects}
             icon={FolderKanban}
             variant="primary"
           />
           <StatCard
             title="Παραδοτέα σε Εξέλιξη"
-            value={5}
+            value={upcomingTasks.length}
             icon={Activity}
             variant="success"
           />
           <StatCard
             title="Εκκρεμή Τιμολόγια"
-            value="€3.100"
+            value={`€${stats.pendingInvoices.toLocaleString()}`}
             icon={FileWarning}
             variant="warning"
           />
         </div>
 
         <TaskList 
-          tasks={sampleTasks} 
+          tasks={upcomingTasks} 
           title="Επερχόμενα Παραδοτέα" 
         />
       </div>
@@ -130,7 +239,7 @@ export default function Dashboard() {
         <StatCard
           title="ΠΡΟΜΗΘΕΙΑ AGENCY"
           value={`€${stats.agencyFee.toLocaleString()}`}
-          subtitle="30% μέσος όρος"
+          subtitle="από ενεργά έργα"
           icon={Percent}
           variant="default"
         />
@@ -138,13 +247,13 @@ export default function Dashboard() {
           title="ΚΑΘΑΡΟ ΚΕΡΔΟΣ"
           value={`€${stats.netProfit.toLocaleString()}`}
           icon={TrendingUp}
-          variant="success"
+          variant={stats.netProfit >= 0 ? 'success' : 'destructive'}
         />
         <StatCard
           title="ΕΚΚΡΕΜΗ ΤΙΜΟΛΟΓΙΑ"
           value={`€${stats.pendingInvoices.toLocaleString()}`}
           icon={FileWarning}
-          variant="warning"
+          variant={stats.pendingInvoices > 0 ? 'warning' : 'default'}
         />
       </div>
 
@@ -164,6 +273,7 @@ export default function Dashboard() {
           title="WIN RATE"
           value={`${stats.winRate}%`}
           icon={Trophy}
+          variant={stats.winRate >= 50 ? 'success' : 'default'}
         />
         <StatCard
           title="OVERDUE"
@@ -190,11 +300,18 @@ export default function Dashboard() {
             <span className="text-xl">⚠️</span> Alerts
           </h3>
           <div className="space-y-2">
-            {stats.overdueCount > 0 && (
+            {stats.overdueCount > 0 ? (
               <div className="flex items-center gap-3 p-3 rounded-lg bg-background/50 border border-destructive/20">
                 <AlertTriangle className="h-5 w-5 text-destructive" />
                 <span className="text-sm">
                   🔴 {stats.overdueCount} task{stats.overdueCount > 1 ? 's' : ''} overdue
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-background/50 border border-success/20">
+                <Activity className="h-5 w-5 text-success" />
+                <span className="text-sm text-success">
+                  ✓ Όλα τα tasks είναι εντός προθεσμίας!
                 </span>
               </div>
             )}
@@ -202,7 +319,7 @@ export default function Dashboard() {
         </div>
 
         <TaskList 
-          tasks={sampleTasks} 
+          tasks={upcomingTasks} 
           title="Deadlines" 
         />
       </div>

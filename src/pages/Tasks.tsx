@@ -420,65 +420,66 @@ export default function TasksPage() {
     const isOverdue = task.due_date && isPast(new Date(task.due_date)) && !isToday(new Date(task.due_date)) && task.status !== 'completed';
 
     return (
-      <Card 
+      <div 
         className={cn(
-          "hover:shadow-md transition-shadow cursor-pointer",
-          isOverdue && "border-destructive/50 bg-destructive/5",
-          isDragOverlay && "shadow-xl rotate-2"
+          "group bg-card rounded-xl border border-border/50 p-4 transition-all duration-200 ease-apple cursor-pointer",
+          "hover:shadow-soft hover:border-border hover:-translate-y-0.5",
+          isOverdue && "border-destructive/30 bg-destructive/[0.02]",
+          isDragOverlay && "shadow-soft-xl rotate-1 scale-105"
         )}
         onClick={() => !isDragOverlay && handleEdit(task)}
       >
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <GripVertical className="h-5 w-5 text-muted-foreground/50 mt-0.5 flex-shrink-0 cursor-grab" />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start gap-2">
+        <div className="flex items-start gap-3">
+          <GripVertical className="h-4 w-4 text-muted-foreground/30 mt-0.5 flex-shrink-0 cursor-grab transition-colors group-hover:text-muted-foreground/50" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start gap-2">
+              <span className="transition-transform duration-200 group-hover:scale-110 mt-0.5">
                 {statusConfig[task.status].icon}
-                <div className="flex-1 min-w-0">
-                  <p className={cn(
-                    "font-medium",
-                    task.status === 'completed' && "line-through text-muted-foreground"
-                  )}>
-                    {task.title}
-                  </p>
-                  {task.project && (
-                    <p className="text-sm text-muted-foreground">{task.project.name}</p>
-                  )}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className={cn(
+                  "font-medium text-sm text-foreground/90 group-hover:text-foreground transition-colors",
+                  task.status === 'completed' && "line-through text-muted-foreground"
+                )}>
+                  {task.title}
+                </p>
+                {task.project && (
+                  <p className="text-xs text-muted-foreground/60 mt-0.5">{task.project.name}</p>
+                )}
+              </div>
+              {canManage && !isDragOverlay && (
+                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-secondary" onClick={() => handleEdit(task)}>
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/70 hover:text-destructive hover:bg-destructive/10" onClick={() => handleDelete(task.id)}>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
                 </div>
-                {canManage && !isDragOverlay && (
-                  <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleEdit(task)}>
-                      <Pencil className="h-3 w-3" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => handleDelete(task.id)}>
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center gap-2 mt-2 ml-7">
-                {task.assignee && (
-                  <Avatar className="h-5 w-5">
-                    <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
-                      {getInitials(task.assignee.full_name)}
-                    </AvatarFallback>
-                  </Avatar>
-                )}
-                {task.due_date && (
-                  <div className={cn(
-                    "flex items-center gap-1 text-xs",
-                    isOverdue ? "text-destructive" : "text-muted-foreground"
-                  )}>
-                    <Calendar className="h-3 w-3" />
-                    {format(new Date(task.due_date), 'd MMM', { locale: el })}
-                    {isOverdue && <span>(Εκπρόθεσμο)</span>}
-                  </div>
-                )}
-              </div>
+              )}
+            </div>
+            <div className="flex items-center gap-2 mt-3 pt-2 border-t border-border/30">
+              {task.assignee && (
+                <Avatar className="h-5 w-5">
+                  <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                    {getInitials(task.assignee.full_name)}
+                  </AvatarFallback>
+                </Avatar>
+              )}
+              {task.due_date && (
+                <div className={cn(
+                  "flex items-center gap-1 text-xs",
+                  isOverdue ? "text-destructive" : "text-muted-foreground/60"
+                )}>
+                  <Calendar className="h-3 w-3" />
+                  {format(new Date(task.due_date), 'd MMM', { locale: el })}
+                  {isOverdue && <span className="font-medium">(Overdue)</span>}
+                </div>
+              )}
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   };
 
@@ -660,15 +661,17 @@ export default function TasksPage() {
   );
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
+    <div className="p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-            <CheckSquare className="h-8 w-8" />
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-3">
+            <span className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <CheckSquare className="h-5 w-5 text-primary" />
+            </span>
             Tasks
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-muted-foreground mt-1 text-sm ml-[52px]">
             Διαχείριση εργασιών και παραδοτέων
           </p>
         </div>

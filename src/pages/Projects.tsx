@@ -435,74 +435,76 @@ export default function ProjectsPage() {
   };
 
   const ProjectCard = ({ project, isDragOverlay = false }: { project: Project; isDragOverlay?: boolean }) => (
-    <Card 
+    <div 
       className={cn(
-        "hover:shadow-md transition-shadow cursor-pointer",
-        isDragOverlay && "shadow-xl rotate-2"
+        "group bg-card rounded-xl border border-border/50 p-4 transition-all duration-200 ease-apple cursor-pointer",
+        "hover:shadow-soft hover:border-border hover:-translate-y-0.5",
+        isDragOverlay && "shadow-soft-xl rotate-1 scale-105"
       )}
       onClick={() => !isDragOverlay && navigate(`/projects/${project.id}`)}
     >
-      <CardContent className="p-3">
-        <div className="flex items-start gap-2">
-          <GripVertical className="h-4 w-4 text-muted-foreground/50 mt-0.5 flex-shrink-0 cursor-grab" />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-1">
-              <h4 className="font-medium text-sm mb-1 line-clamp-2 flex-1">
-                {project.name}
-              </h4>
-              {canManage && !isDragOverlay && (
-                <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
-                  <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleEdit(project)}>
-                    <Pencil className="h-3 w-3" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive" onClick={() => handleDelete(project.id)}>
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              )}
-            </div>
-            {project.client && (
-              <p className="text-xs text-muted-foreground mb-2">
-                {project.client.name}
-              </p>
+      <div className="flex items-start gap-3">
+        <GripVertical className="h-4 w-4 text-muted-foreground/30 mt-0.5 flex-shrink-0 cursor-grab transition-colors group-hover:text-muted-foreground/50" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <h4 className="font-medium text-sm text-foreground/90 line-clamp-2 flex-1 group-hover:text-foreground transition-colors">
+              {project.name}
+            </h4>
+            {canManage && !isDragOverlay && (
+              <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-secondary" onClick={() => handleEdit(project)}>
+                  <Pencil className="h-3 w-3" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/70 hover:text-destructive hover:bg-destructive/10" onClick={() => handleDelete(project.id)}>
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
             )}
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-primary font-medium">
-                €{project.budget?.toLocaleString() || 0}
+          </div>
+          {project.client && (
+            <p className="text-xs text-muted-foreground/70 mt-1">
+              {project.client.name}
+            </p>
+          )}
+          <div className="flex items-center justify-between text-xs mt-3 pt-3 border-t border-border/30">
+            <span className="text-primary font-semibold">
+              €{project.budget?.toLocaleString() || 0}
+            </span>
+            {project.end_date && (
+              <span className="flex items-center gap-1 text-muted-foreground/60">
+                <Calendar className="h-3 w-3" />
+                {format(new Date(project.end_date), 'd/M', { locale: el })}
               </span>
-              {project.end_date && (
-                <span className="flex items-center gap-1 text-muted-foreground">
-                  <Calendar className="h-3 w-3" />
-                  {format(new Date(project.end_date), 'd/M', { locale: el })}
-                </span>
-              )}
-            </div>
+            )}
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 
   const renderCardView = () => (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {filteredProjects.map(project => (
-        <Card 
+      {filteredProjects.map((project, index) => (
+        <div 
           key={project.id} 
-          className="hover:shadow-lg transition-shadow cursor-pointer"
+          className="group bg-card rounded-2xl border border-border/50 overflow-hidden transition-all duration-300 ease-apple cursor-pointer hover:shadow-soft hover:border-border hover:-translate-y-0.5 animate-fade-in"
+          style={{ animationDelay: `${index * 30}ms` }}
           onClick={() => navigate(`/projects/${project.id}`)}
         >
-          <CardHeader className="pb-3">
-            <div className="flex items-start justify-between">
-              <div className="space-y-1 flex-1 min-w-0">
-                <CardTitle className="text-lg">{project.name}</CardTitle>
+          <div className="p-5">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div className="space-y-1.5 flex-1 min-w-0">
+                <h3 className="font-semibold text-foreground/90 group-hover:text-foreground transition-colors line-clamp-1">
+                  {project.name}
+                </h3>
                 {project.client && (
-                  <CardDescription>{project.client.name}</CardDescription>
+                  <p className="text-sm text-muted-foreground/70">{project.client.name}</p>
                 )}
               </div>
               <div className="flex items-center gap-2">
                 {getStatusBadge(project.status)}
                 {canManage && (
-                  <div onClick={(e) => e.stopPropagation()}>
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                     <EditDeleteActions
                       onEdit={() => handleEdit(project)}
                       onDelete={() => handleDelete(project.id)}
@@ -512,59 +514,58 @@ export default function ProjectsPage() {
                 )}
               </div>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
             {project.description && (
-              <p className="text-sm text-muted-foreground line-clamp-2">
+              <p className="text-sm text-muted-foreground/60 line-clamp-2 mb-4">
                 {project.description}
               </p>
             )}
-            <div className="flex items-center justify-between text-sm">
-              <div className="flex items-center gap-1.5 text-muted-foreground">
-                <DollarSign className="h-4 w-4" />
-                <span>€{project.budget?.toLocaleString() || 0}</span>
-              </div>
-              {project.end_date && (
-                <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  <span>{format(new Date(project.end_date), 'd MMM', { locale: el })}</span>
-                </div>
-              )}
+          </div>
+          <div className="px-5 py-3 bg-secondary/30 border-t border-border/30 flex items-center justify-between text-sm">
+            <div className="flex items-center gap-1.5 text-primary font-semibold">
+              <DollarSign className="h-4 w-4 opacity-60" />
+              <span>€{project.budget?.toLocaleString() || 0}</span>
             </div>
-          </CardContent>
-        </Card>
+            {project.end_date && (
+              <div className="flex items-center gap-1.5 text-muted-foreground/60">
+                <Calendar className="h-3.5 w-3.5" />
+                <span className="text-xs">{format(new Date(project.end_date), 'd MMM', { locale: el })}</span>
+              </div>
+            )}
+          </div>
+        </div>
       ))}
     </div>
   );
 
   const renderTableView = () => (
-    <div className="rounded-md border">
+    <div className="rounded-2xl border border-border/50 overflow-hidden bg-card shadow-soft">
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead>Όνομα</TableHead>
-            <TableHead>Πελάτης</TableHead>
-            <TableHead>Κατάσταση</TableHead>
-            <TableHead>Budget</TableHead>
-            <TableHead>Fee %</TableHead>
-            <TableHead>Λήξη</TableHead>
-            {canManage && <TableHead className="w-[100px]">Ενέργειες</TableHead>}
+          <TableRow className="bg-secondary/30 border-b border-border/30 hover:bg-secondary/30">
+            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Όνομα</TableHead>
+            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Πελάτης</TableHead>
+            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Κατάσταση</TableHead>
+            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Budget</TableHead>
+            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Fee %</TableHead>
+            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Λήξη</TableHead>
+            {canManage && <TableHead className="w-[100px] text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Ενέργειες</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filteredProjects.map(project => (
+          {filteredProjects.map((project, index) => (
             <TableRow 
               key={project.id} 
-              className="cursor-pointer hover:bg-muted/50"
+              className="cursor-pointer transition-colors duration-150 hover:bg-secondary/40 border-b border-border/20 last:border-0"
+              style={{ animationDelay: `${index * 20}ms` }}
               onClick={() => navigate(`/projects/${project.id}`)}
             >
-              <TableCell onClick={(e) => e.stopPropagation()}>
+              <TableCell className="font-medium" onClick={(e) => e.stopPropagation()}>
                 <InlineEditCell
                   value={project.name}
                   onSave={(val) => handleInlineUpdate(project.id, 'name', val)}
                 />
               </TableCell>
-              <TableCell>{project.client?.name || '-'}</TableCell>
+              <TableCell className="text-muted-foreground">{project.client?.name || '-'}</TableCell>
               <TableCell>{getStatusBadge(project.status)}</TableCell>
               <TableCell onClick={(e) => e.stopPropagation()}>
                 <InlineEditCell
@@ -582,7 +583,7 @@ export default function ProjectsPage() {
                   onSave={(val) => handleInlineUpdate(project.id, 'agency_fee_percentage', val)}
                 />
               </TableCell>
-              <TableCell>
+              <TableCell className="text-muted-foreground text-sm">
                 {project.end_date 
                   ? format(new Date(project.end_date), 'd MMM yyyy', { locale: el })
                   : '-'
@@ -619,26 +620,32 @@ export default function ProjectsPage() {
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        {statuses.map(status => (
-          <div key={status} className="space-y-3">
-            <div className="flex items-center justify-between">
+      <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        {statuses.map((status, columnIndex) => (
+          <div 
+            key={status} 
+            className="space-y-3 animate-fade-in"
+            style={{ animationDelay: `${columnIndex * 50}ms` }}
+          >
+            <div className="flex items-center justify-between px-1">
               {getStatusBadge(status)}
-              <Badge variant="secondary">{projectsByStatus[status].length}</Badge>
+              <span className="text-xs font-medium text-muted-foreground/60 bg-secondary/50 px-2 py-0.5 rounded-full">
+                {projectsByStatus[status].length}
+              </span>
             </div>
             <DroppableColumn
               id={status}
               items={projectsByStatus[status].map(p => p.id)}
             >
-              <div className="space-y-3">
+              <div className="space-y-3 min-h-[200px]">
                 {projectsByStatus[status].map(project => (
                   <DraggableCard key={project.id} id={project.id}>
                     <ProjectCard project={project} />
                   </DraggableCard>
                 ))}
                 {projectsByStatus[status].length === 0 && (
-                  <div className="border border-dashed rounded-lg p-4 text-center">
-                    <p className="text-xs text-muted-foreground">
+                  <div className="border-2 border-dashed border-border/30 rounded-xl p-6 text-center transition-colors hover:border-border/50 hover:bg-secondary/20">
+                    <p className="text-xs text-muted-foreground/50">
                       Σύρετε εδώ
                     </p>
                   </div>
@@ -656,15 +663,17 @@ export default function ProjectsPage() {
   );
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
+    <div className="p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-            <FolderKanban className="h-8 w-8" />
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-3">
+            <span className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <FolderKanban className="h-5 w-5 text-primary" />
+            </span>
             Έργα
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-muted-foreground mt-1 text-sm ml-[52px]">
             Διαχείριση και παρακολούθηση έργων
           </p>
         </div>
@@ -678,21 +687,21 @@ export default function ProjectsPage() {
           {canManage && (
             <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
               <DialogTrigger asChild>
-                <Button>
+                <Button className="shadow-soft">
                   <Plus className="h-4 w-4 mr-2" />
                   Νέο Έργο
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>{editingProject ? 'Επεξεργασία Έργου' : 'Δημιουργία Νέου Έργου'}</DialogTitle>
-                  <DialogDescription>
+                  <DialogTitle className="text-lg">{editingProject ? 'Επεξεργασία Έργου' : 'Δημιουργία Νέου Έργου'}</DialogTitle>
+                  <DialogDescription className="text-sm">
                     {editingProject ? 'Ενημερώστε τα στοιχεία του έργου' : 'Συμπληρώστε τα στοιχεία και ανεβάστε αρχεία για AI ανάλυση'}
                   </DialogDescription>
                 </DialogHeader>
 
                 <Tabs value={dialogTab} onValueChange={setDialogTab}>
-                  <TabsList className="w-full">
+                  <TabsList className="w-full bg-secondary/50">
                     <TabsTrigger value="details" className="flex-1">Στοιχεία</TabsTrigger>
                     <TabsTrigger value="files" className="flex-1">
                       <Paperclip className="h-4 w-4 mr-1" /> Αρχεία
@@ -904,18 +913,18 @@ export default function ProjectsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <div className="flex flex-col sm:flex-row gap-3 animate-fade-in" style={{ animationDelay: '50ms' }}>
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
           <Input
             placeholder="Αναζήτηση έργων..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-10 bg-card border-border/50 focus:border-primary/30"
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-[180px] bg-card border-border/50">
             <SelectValue placeholder="Κατάσταση" />
           </SelectTrigger>
           <SelectContent>
@@ -930,27 +939,30 @@ export default function ProjectsPage() {
 
       {/* Projects Grid/Table */}
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="flex flex-col items-center justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-primary/60" />
+          <p className="text-sm text-muted-foreground mt-3">Φόρτωση...</p>
         </div>
       ) : filteredProjects.length === 0 ? (
-        <Card className="py-12">
-          <CardContent className="text-center">
-            <FolderKanban className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Δεν βρέθηκαν έργα</h3>
-            <p className="text-muted-foreground mb-4">
+        <div className="rounded-2xl border border-border/50 bg-card py-16 animate-fade-in shadow-soft">
+          <div className="text-center">
+            <div className="h-16 w-16 rounded-2xl bg-secondary/50 flex items-center justify-center mx-auto mb-4">
+              <FolderKanban className="h-8 w-8 text-muted-foreground/50" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2 text-foreground">Δεν βρέθηκαν έργα</h3>
+            <p className="text-muted-foreground text-sm mb-6 max-w-sm mx-auto">
               {searchQuery || statusFilter !== 'all'
                 ? 'Δοκιμάστε διαφορετικά φίλτρα αναζήτησης'
                 : 'Δημιουργήστε το πρώτο σας έργο για να ξεκινήσετε'}
             </p>
             {canManage && !searchQuery && statusFilter === 'all' && (
-              <Button onClick={() => setDialogOpen(true)}>
+              <Button onClick={() => setDialogOpen(true)} className="shadow-soft">
                 <Plus className="h-4 w-4 mr-2" />
                 Νέο Έργο
               </Button>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       ) : (
         <>
           {viewMode === 'card' && renderCardView()}

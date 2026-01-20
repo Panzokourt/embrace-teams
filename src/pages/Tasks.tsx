@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   Dialog,
   DialogContent,
@@ -36,7 +37,8 @@ import {
   Calendar,
   GripVertical,
   Pencil,
-  Trash2
+  Trash2,
+  User
 } from 'lucide-react';
 import { format, isPast, isToday } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -59,6 +61,12 @@ import { DroppableColumn } from '@/components/dnd/DroppableColumn';
 
 type TaskStatus = 'todo' | 'in_progress' | 'review' | 'completed';
 
+interface Profile {
+  id: string;
+  full_name: string | null;
+  email: string;
+}
+
 interface Task {
   id: string;
   title: string;
@@ -75,8 +83,10 @@ export default function TasksPage() {
   const { isAdmin, isManager } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
@@ -88,6 +98,7 @@ export default function TasksPage() {
     project_id: '',
     status: 'todo' as TaskStatus,
     due_date: '',
+    assigned_to: '',
   });
 
   const sensors = useSensors(
@@ -104,6 +115,7 @@ export default function TasksPage() {
   useEffect(() => {
     fetchTasks();
     fetchProjects();
+    fetchUsers();
   }, []);
 
   const fetchTasks = async () => {
@@ -117,7 +129,21 @@ export default function TasksPage() {
         .order('due_date', { ascending: true, nullsFirst: false });
 
       if (error) throw error;
-      setTasks(data || []);
+      
+      // Fetch assignee names separately
+      const tasksWithAssignees = await Promise.all((data || []).map(async (task) => {
+        if (task.assigned_to) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', task.assigned_to)
+            .single();
+          return { ...task, assignee: profile };
+        }
+        return { ...task, assignee: null };
+      }));
+      
+      setTasks(tasksWithAssignees as Task[]);
     } catch (error) {
       console.error('Error fetching tasks:', error);
       toast.error('Σφάλμα κατά τη φόρτωση tasks');
@@ -141,6 +167,21 @@ export default function TasksPage() {
     }
   };
 
+  const fetchUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .eq('status', 'active')
+        .order('full_name');
+
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.project_id) {
@@ -156,6 +197,7 @@ export default function TasksPage() {
         project_id: formData.project_id,
         status: formData.status,
         due_date: formData.due_date || null,
+        assigned_to: formData.assigned_to || null,
       };
 
       if (editingTask) {
@@ -167,7 +209,8 @@ export default function TasksPage() {
           .single();
 
         if (error) throw error;
-        setTasks(prev => prev.map(t => t.id === editingTask.id ? data : t));
+        const assignee = formData.assigned_to ? users.find(u => u.id === formData.assigned_to) : null;
+        setTasks(prev => prev.map(t => t.id === editingTask.id ? { ...data, assignee: assignee ? { full_name: assignee.full_name } : null } as Task : t));
         toast.success('Το task ενημερώθηκε!');
       } else {
         const { data, error } = await supabase
@@ -177,7 +220,8 @@ export default function TasksPage() {
           .single();
 
         if (error) throw error;
-        setTasks(prev => [data, ...prev]);
+        const assignee = formData.assigned_to ? users.find(u => u.id === formData.assigned_to) : null;
+        setTasks(prev => [{ ...data, assignee: assignee ? { full_name: assignee.full_name } : null } as Task, ...prev]);
         toast.success('Το task δημιουργήθηκε!');
       }
 
@@ -219,6 +263,7 @@ export default function TasksPage() {
       project_id: '',
       status: 'todo',
       due_date: '',
+      assigned_to: '',
     });
   };
 
@@ -236,10 +281,14 @@ export default function TasksPage() {
   };
 
   const filteredTasks = useMemo(() => 
-    tasks.filter(task =>
-      task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      task.project?.name?.toLowerCase().includes(searchQuery.toLowerCase())
-    ), [tasks, searchQuery]
+    tasks.filter(task => {
+      const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        task.project?.name?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesAssignee = assigneeFilter === 'all' || 
+        (assigneeFilter === 'unassigned' && !task.assigned_to) ||
+        task.assigned_to === assigneeFilter;
+      return matchesSearch && matchesAssignee;
+    }), [tasks, searchQuery, assigneeFilter]
   );
 
   const tasksByStatus = useMemo(() => ({
@@ -330,6 +379,7 @@ export default function TasksPage() {
       project_id: task.project_id,
       status: task.status,
       due_date: task.due_date || '',
+      assigned_to: task.assigned_to || '',
     });
     setDialogOpen(true);
   };
@@ -344,6 +394,11 @@ export default function TasksPage() {
       console.error('Error deleting task:', error);
       toast.error('Σφάλμα κατά τη διαγραφή');
     }
+  };
+
+  const getInitials = (name: string | null) => {
+    if (!name) return '?';
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
   const TaskCard = ({ task, isDragOverlay = false }: { task: Task; isDragOverlay?: boolean }) => {
@@ -383,16 +438,25 @@ export default function TasksPage() {
                   </div>
                 )}
               </div>
-              {task.due_date && (
-                <div className={cn(
-                  "flex items-center gap-1 mt-2 text-xs ml-7",
-                  isOverdue ? "text-destructive" : "text-muted-foreground"
-                )}>
-                  <Calendar className="h-3 w-3" />
-                  {format(new Date(task.due_date), 'd MMM yyyy', { locale: el })}
-                  {isOverdue && <span className="ml-1">(Εκπρόθεσμο)</span>}
-                </div>
-              )}
+              <div className="flex items-center gap-2 mt-2 ml-7">
+                {task.assignee && (
+                  <Avatar className="h-5 w-5">
+                    <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                      {getInitials(task.assignee.full_name)}
+                    </AvatarFallback>
+                  </Avatar>
+                )}
+                {task.due_date && (
+                  <div className={cn(
+                    "flex items-center gap-1 text-xs",
+                    isOverdue ? "text-destructive" : "text-muted-foreground"
+                  )}>
+                    <Calendar className="h-3 w-3" />
+                    {format(new Date(task.due_date), 'd MMM', { locale: el })}
+                    {isOverdue && <span>(Εκπρόθεσμο)</span>}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>
@@ -422,18 +486,18 @@ export default function TasksPage() {
         </div>
 
         {canManage && (
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
                 Νέο Task
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Δημιουργία Νέου Task</DialogTitle>
+                <DialogTitle>{editingTask ? 'Επεξεργασία Task' : 'Δημιουργία Νέου Task'}</DialogTitle>
                 <DialogDescription>
-                  Προσθέστε ένα νέο task σε ένα έργο
+                  {editingTask ? 'Ενημερώστε τα στοιχεία του task' : 'Προσθέστε ένα νέο task σε ένα έργο'}
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -477,6 +541,29 @@ export default function TasksPage() {
                   </Select>
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="assigned_to">Ανάθεση σε</Label>
+                  <Select
+                    value={formData.assigned_to}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, assigned_to: value === 'none' ? '' : value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Χωρίς ανάθεση" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Χωρίς ανάθεση</SelectItem>
+                      {users.map(user => (
+                        <SelectItem key={user.id} value={user.id}>
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4" />
+                            {user.full_name || user.email}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="status">Κατάσταση</Label>
@@ -508,12 +595,12 @@ export default function TasksPage() {
                 </div>
 
                 <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                  <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
                     Ακύρωση
                   </Button>
                   <Button type="submit" disabled={saving}>
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Δημιουργία
+                    {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                    {editingTask ? 'Αποθήκευση' : 'Δημιουργία'}
                   </Button>
                 </DialogFooter>
               </form>
@@ -522,15 +609,31 @@ export default function TasksPage() {
         )}
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Αναζήτηση tasks..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Αναζήτηση tasks..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Φίλτρο ανάθεσης" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Όλα τα tasks</SelectItem>
+            <SelectItem value="unassigned">Χωρίς ανάθεση</SelectItem>
+            {users.map(user => (
+              <SelectItem key={user.id} value={user.id}>
+                {user.full_name || user.email}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Kanban Board with DnD */}

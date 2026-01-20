@@ -882,12 +882,12 @@ export function ProjectMediaPlan({ projectId, projectName, projectBudget, delive
 
             <div className="space-y-2">
               <Label htmlFor="deliverable_id">Συσχέτιση με Παραδοτέο</Label>
-              <Select value={form.deliverable_id} onValueChange={v => setForm(p => ({ ...p, deliverable_id: v }))}>
+              <Select value={form.deliverable_id || 'none'} onValueChange={v => setForm(p => ({ ...p, deliverable_id: v === 'none' ? '' : v }))}>
                 <SelectTrigger>
                   <SelectValue placeholder="Επιλέξτε παραδοτέο (προαιρετικά)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Κανένα</SelectItem>
+                  <SelectItem value="none">Κανένα</SelectItem>
                   {deliverables.map(d => (
                     <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                   ))}

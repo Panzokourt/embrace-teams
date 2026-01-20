@@ -172,8 +172,11 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary/60" />
+          <p className="text-sm text-muted-foreground">Φόρτωση...</p>
+        </div>
       </div>
     );
   }
@@ -181,12 +184,12 @@ export default function Dashboard() {
   // Client Dashboard
   if (isClient && !isAdmin && !isManager) {
     return (
-      <div className="p-6 lg:p-8 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
+      <div className="p-6 lg:p-8 space-y-8 max-w-7xl mx-auto">
+        <div className="animate-fade-in">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Καλωσήρθατε, {profile?.full_name?.split(' ')[0] || 'Client'}
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-muted-foreground mt-1 text-sm">
             Παρακολουθήστε την πρόοδο των έργων σας
           </p>
         </div>
@@ -222,13 +225,13 @@ export default function Dashboard() {
 
   // Admin/Manager Dashboard
   return (
-    <div className="p-6 lg:p-8 space-y-6">
+    <div className="p-6 lg:p-8 space-y-8 max-w-7xl mx-auto">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          📊 Dashboard
+      <div className="animate-fade-in">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+          Dashboard
         </h1>
-        <p className="text-muted-foreground mt-1">
+        <p className="text-muted-foreground mt-1 text-sm">
           Συνολική εικόνα εταιρίας
         </p>
       </div>
@@ -236,26 +239,26 @@ export default function Dashboard() {
       {/* Financial Stats */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="ΣΥΝΟΛΙΚΑ ΕΣΟΔΑ"
+          title="Συνολικά Έσοδα"
           value={`€${stats.totalRevenue.toLocaleString()}`}
           icon={DollarSign}
           variant="primary"
         />
         <StatCard
-          title="ΠΡΟΜΗΘΕΙΑ AGENCY"
+          title="Προμήθεια Agency"
           value={`€${stats.agencyFee.toLocaleString()}`}
           subtitle="από ενεργά έργα"
           icon={Percent}
           variant="default"
         />
         <StatCard
-          title="ΚΑΘΑΡΟ ΚΕΡΔΟΣ"
+          title="Καθαρό Κέρδος"
           value={`€${stats.netProfit.toLocaleString()}`}
           icon={TrendingUp}
           variant={stats.netProfit >= 0 ? 'success' : 'destructive'}
         />
         <StatCard
-          title="ΕΚΚΡΕΜΗ ΤΙΜΟΛΟΓΙΑ"
+          title="Εκκρεμή Τιμολόγια"
           value={`€${stats.pendingInvoices.toLocaleString()}`}
           icon={FileWarning}
           variant={stats.pendingInvoices > 0 ? 'warning' : 'default'}
@@ -265,29 +268,29 @@ export default function Dashboard() {
       {/* Project Stats */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <StatCard
-          title="ΔΙΑΓΩΝΙΣΜΟΙ"
+          title="Διαγωνισμοί"
           value={stats.activeTenders}
           icon={FileWarning}
         />
         <StatCard
-          title="ΕΝΕΡΓΑ ΕΡΓΑ"
+          title="Ενεργά Έργα"
           value={stats.activeProjects}
           icon={FolderKanban}
         />
         <StatCard
-          title="WIN RATE"
+          title="Win Rate"
           value={`${stats.winRate}%`}
           icon={Trophy}
           variant={stats.winRate >= 50 ? 'success' : 'default'}
         />
         <StatCard
-          title="OVERDUE"
+          title="Overdue"
           value={stats.overdueCount}
           icon={AlertTriangle}
           variant={stats.overdueCount > 0 ? 'destructive' : 'default'}
         />
         <StatCard
-          title="UTILIZATION"
+          title="Utilization"
           value={`${stats.utilization}%`}
           icon={Activity}
         />
@@ -300,23 +303,26 @@ export default function Dashboard() {
 
       {/* Alerts and Deadlines */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-6 animate-fade-in">
-          <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
-            <span className="text-xl">⚠️</span> Alerts
+        <div className="rounded-2xl border border-destructive/10 bg-destructive/[0.02] p-6 animate-fade-in shadow-soft">
+          <h3 className="text-base font-semibold flex items-center gap-2 mb-4 text-foreground">
+            <span className="h-8 w-8 rounded-lg bg-destructive/10 flex items-center justify-center">
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+            </span>
+            Alerts
           </h3>
           <div className="space-y-2">
             {stats.overdueCount > 0 ? (
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-background/50 border border-destructive/20">
-                <AlertTriangle className="h-5 w-5 text-destructive" />
-                <span className="text-sm">
-                  🔴 {stats.overdueCount} task{stats.overdueCount > 1 ? 's' : ''} overdue
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-background/60 border border-destructive/10">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+                <span className="text-sm text-foreground/80">
+                  {stats.overdueCount} task{stats.overdueCount > 1 ? 's' : ''} overdue
                 </span>
               </div>
             ) : (
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-background/50 border border-success/20">
-                <Activity className="h-5 w-5 text-success" />
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-success/[0.03] border border-success/10">
+                <Activity className="h-4 w-4 text-success" />
                 <span className="text-sm text-success">
-                  ✓ Όλα τα tasks είναι εντός προθεσμίας!
+                  Όλα τα tasks είναι εντός προθεσμίας
                 </span>
               </div>
             )}

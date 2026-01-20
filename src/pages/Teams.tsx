@@ -3,7 +3,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -17,14 +16,29 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { EditDeleteActions } from '@/components/dialogs/EditDeleteActions';
 import { toast } from 'sonner';
 import { 
   Users, 
   Plus, 
   UserPlus,
   Loader2,
-  Palette
+  X
 } from 'lucide-react';
+
+interface Profile {
+  id: string;
+  full_name: string | null;
+  email: string;
+  avatar_url: string | null;
+}
 
 interface Team {
   id: string;
@@ -38,30 +52,25 @@ interface Team {
 interface TeamMember {
   id: string;
   user_id: string;
-  profile?: {
-    full_name: string | null;
-    email: string;
-    avatar_url: string | null;
-  };
+  profile?: Profile;
 }
 
 const TEAM_COLORS = [
-  '#3B82F6', // Blue
-  '#8B5CF6', // Purple
-  '#10B981', // Green
-  '#F59E0B', // Amber
-  '#EF4444', // Red
-  '#EC4899', // Pink
-  '#06B6D4', // Cyan
-  '#84CC16', // Lime
+  '#3B82F6', '#8B5CF6', '#10B981', '#F59E0B',
+  '#EF4444', '#EC4899', '#06B6D4', '#84CC16',
 ];
 
 export default function TeamsPage() {
   const { isAdmin, isManager } = useAuth();
   const [teams, setTeams] = useState<Team[]>([]);
+  const [availableUsers, setAvailableUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [memberDialogOpen, setMemberDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editingTeam, setEditingTeam] = useState<Team | null>(null);
+  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState('');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -71,6 +80,7 @@ export default function TeamsPage() {
 
   useEffect(() => {
     fetchTeams();
+    fetchUsers();
   }, []);
 
   const fetchTeams = async () => {
@@ -82,15 +92,9 @@ export default function TeamsPage() {
 
       if (teamsError) throw teamsError;
 
-      // Fetch team members
       const { data: membersData, error: membersError } = await supabase
         .from('team_members')
-        .select(`
-          id,
-          team_id,
-          user_id,
-          profile:profiles(full_name, email, avatar_url)
-        `);
+        .select(`id, team_id, user_id, profile:profiles(id, full_name, email, avatar_url)`);
 
       if (membersError) throw membersError;
 
@@ -114,46 +118,161 @@ export default function TeamsPage() {
     }
   };
 
+  const fetchUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, avatar_url')
+        .eq('status', 'active')
+        .order('full_name');
+
+      if (error) throw error;
+      setAvailableUsers(data || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
 
     try {
-      const { data, error } = await supabase
-        .from('teams')
-        .insert({
-          name: formData.name,
-          description: formData.description || null,
-          color: formData.color,
-        })
-        .select()
-        .single();
+      const teamData = {
+        name: formData.name,
+        description: formData.description || null,
+        color: formData.color,
+      };
 
-      if (error) throw error;
+      if (editingTeam) {
+        const { data, error } = await supabase
+          .from('teams')
+          .update(teamData)
+          .eq('id', editingTeam.id)
+          .select()
+          .single();
 
-      setTeams(prev => [...prev, { ...data, members: [] }]);
+        if (error) throw error;
+        setTeams(prev => prev.map(t => t.id === editingTeam.id ? { ...data, members: editingTeam.members } : t));
+        toast.success('Η ομάδα ενημερώθηκε!');
+      } else {
+        const { data, error } = await supabase
+          .from('teams')
+          .insert(teamData)
+          .select()
+          .single();
+
+        if (error) throw error;
+        setTeams(prev => [...prev, { ...data, members: [] }]);
+        toast.success('Η ομάδα δημιουργήθηκε!');
+      }
+
       setDialogOpen(false);
       resetForm();
-      toast.success('Η ομάδα δημιουργήθηκε!');
     } catch (error) {
-      console.error('Error creating team:', error);
-      toast.error('Σφάλμα κατά τη δημιουργία');
+      console.error('Error saving team:', error);
+      toast.error('Σφάλμα κατά την αποθήκευση');
     } finally {
       setSaving(false);
     }
   };
 
-  const resetForm = () => {
+  const handleEdit = (team: Team) => {
+    setEditingTeam(team);
     setFormData({
-      name: '',
-      description: '',
-      color: TEAM_COLORS[0],
+      name: team.name,
+      description: team.description || '',
+      color: team.color,
     });
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async (teamId: string) => {
+    try {
+      const { error } = await supabase.from('teams').delete().eq('id', teamId);
+      if (error) throw error;
+      setTeams(prev => prev.filter(t => t.id !== teamId));
+      toast.success('Η ομάδα διαγράφηκε!');
+    } catch (error) {
+      console.error('Error deleting team:', error);
+      toast.error('Σφάλμα κατά τη διαγραφή');
+    }
+  };
+
+  const handleAddMember = async () => {
+    if (!selectedTeam || !selectedUserId) return;
+    setSaving(true);
+
+    try {
+      const { data, error } = await supabase
+        .from('team_members')
+        .insert({ team_id: selectedTeam.id, user_id: selectedUserId })
+        .select(`id, team_id, user_id, profile:profiles(id, full_name, email, avatar_url)`)
+        .single();
+
+      if (error) throw error;
+
+      const newMember: TeamMember = {
+        id: data.id,
+        user_id: data.user_id,
+        profile: data.profile as any
+      };
+
+      setTeams(prev => prev.map(t => 
+        t.id === selectedTeam.id 
+          ? { ...t, members: [...(t.members || []), newMember] }
+          : t
+      ));
+
+      setMemberDialogOpen(false);
+      setSelectedUserId('');
+      toast.success('Το μέλος προστέθηκε!');
+    } catch (error: any) {
+      console.error('Error adding member:', error);
+      if (error.code === '23505') {
+        toast.error('Το μέλος υπάρχει ήδη στην ομάδα');
+      } else {
+        toast.error('Σφάλμα κατά την προσθήκη');
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveMember = async (teamId: string, memberId: string) => {
+    try {
+      const { error } = await supabase
+        .from('team_members')
+        .delete()
+        .eq('id', memberId);
+
+      if (error) throw error;
+
+      setTeams(prev => prev.map(t => 
+        t.id === teamId 
+          ? { ...t, members: (t.members || []).filter(m => m.id !== memberId) }
+          : t
+      ));
+      toast.success('Το μέλος αφαιρέθηκε!');
+    } catch (error) {
+      console.error('Error removing member:', error);
+      toast.error('Σφάλμα κατά την αφαίρεση');
+    }
+  };
+
+  const resetForm = () => {
+    setEditingTeam(null);
+    setFormData({ name: '', description: '', color: TEAM_COLORS[0] });
   };
 
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  const getAvailableUsersForTeam = (team: Team) => {
+    const memberIds = (team.members || []).map(m => m.user_id);
+    return availableUsers.filter(u => !memberIds.includes(u.id));
   };
 
   const canManage = isAdmin || isManager;
@@ -173,7 +292,7 @@ export default function TeamsPage() {
         </div>
 
         {canManage && (
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
@@ -182,9 +301,9 @@ export default function TeamsPage() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Δημιουργία Νέας Ομάδας</DialogTitle>
+                <DialogTitle>{editingTeam ? 'Επεξεργασία Ομάδας' : 'Δημιουργία Νέας Ομάδας'}</DialogTitle>
                 <DialogDescription>
-                  Δημιουργήστε μια νέα ομάδα για να οργανώσετε τα μέλη σας
+                  {editingTeam ? 'Ενημερώστε τα στοιχεία της ομάδας' : 'Δημιουργήστε μια νέα ομάδα'}
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -227,12 +346,12 @@ export default function TeamsPage() {
                 </div>
 
                 <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                  <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
                     Ακύρωση
                   </Button>
                   <Button type="submit" disabled={saving}>
                     {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Δημιουργία
+                    {editingTeam ? 'Αποθήκευση' : 'Δημιουργία'}
                   </Button>
                 </DialogFooter>
               </form>
@@ -240,6 +359,44 @@ export default function TeamsPage() {
           </Dialog>
         )}
       </div>
+
+      {/* Add Member Dialog */}
+      <Dialog open={memberDialogOpen} onOpenChange={setMemberDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Προσθήκη Μέλους</DialogTitle>
+            <DialogDescription>
+              Προσθέστε ένα μέλος στην ομάδα "{selectedTeam?.name}"
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Επιλέξτε χρήστη</Label>
+              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Επιλέξτε χρήστη" />
+                </SelectTrigger>
+                <SelectContent>
+                  {selectedTeam && getAvailableUsersForTeam(selectedTeam).map(user => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.full_name || user.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMemberDialogOpen(false)}>
+              Ακύρωση
+            </Button>
+            <Button onClick={handleAddMember} disabled={!selectedUserId || saving}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Προσθήκη
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Teams Grid */}
       {loading ? (
@@ -267,19 +424,28 @@ export default function TeamsPage() {
           {teams.map(team => (
             <Card key={team.id} className="hover:shadow-lg transition-shadow">
               <CardHeader className="pb-3">
-                <div className="flex items-center gap-3">
-                  <div
-                    className="h-10 w-10 rounded-lg flex items-center justify-center text-white font-bold"
-                    style={{ backgroundColor: team.color }}
-                  >
-                    {team.name.charAt(0)}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="h-10 w-10 rounded-lg flex items-center justify-center text-white font-bold"
+                      style={{ backgroundColor: team.color }}
+                    >
+                      {team.name.charAt(0)}
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">{team.name}</CardTitle>
+                      <CardDescription>
+                        {team.members?.length || 0} μέλη
+                      </CardDescription>
+                    </div>
                   </div>
-                  <div>
-                    <CardTitle className="text-lg">{team.name}</CardTitle>
-                    <CardDescription>
-                      {team.members?.length || 0} μέλη
-                    </CardDescription>
-                  </div>
+                  {canManage && (
+                    <EditDeleteActions
+                      onEdit={() => handleEdit(team)}
+                      onDelete={() => handleDelete(team.id)}
+                      itemName={`την ομάδα "${team.name}"`}
+                    />
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
@@ -290,9 +456,9 @@ export default function TeamsPage() {
                 )}
 
                 {/* Members */}
-                <div className="space-y-3">
-                  {(team.members || []).slice(0, 4).map(member => (
-                    <div key={member.id} className="flex items-center gap-3">
+                <div className="space-y-2">
+                  {(team.members || []).map(member => (
+                    <div key={member.id} className="flex items-center gap-3 group">
                       <Avatar className="h-8 w-8">
                         <AvatarImage src={member.profile?.avatar_url || undefined} />
                         <AvatarFallback className="text-xs">
@@ -307,27 +473,29 @@ export default function TeamsPage() {
                           {member.profile?.email}
                         </p>
                       </div>
-                    </div>
-                  ))}
-
-                  {(team.members?.length || 0) > 4 && (
-                    <p className="text-sm text-muted-foreground">
-                      +{(team.members?.length || 0) - 4} ακόμα μέλη
-                    </p>
-                  )}
-
-                  {team.members?.length === 0 && (
-                    <div className="text-center py-4">
-                      <p className="text-sm text-muted-foreground mb-2">
-                        Δεν υπάρχουν μέλη
-                      </p>
                       {canManage && (
-                        <Button variant="outline" size="sm">
-                          <UserPlus className="h-4 w-4 mr-1" />
-                          Προσθήκη
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => handleRemoveMember(team.id, member.id)}
+                        >
+                          <X className="h-3 w-3" />
                         </Button>
                       )}
                     </div>
+                  ))}
+
+                  {canManage && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full mt-2"
+                      onClick={() => { setSelectedTeam(team); setMemberDialogOpen(true); }}
+                    >
+                      <UserPlus className="h-4 w-4 mr-1" />
+                      Προσθήκη Μέλους
+                    </Button>
                   )}
                 </div>
               </CardContent>

@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,17 +29,32 @@ import {
   Plus, 
   Search,
   Calendar,
-  DollarSign,
   Loader2,
   Trophy,
   X,
   Clock,
   Send,
-  Edit3
+  Edit3,
+  GripVertical
 } from 'lucide-react';
 import { format, isPast } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import {
+  DndContext,
+  DragOverlay,
+  closestCorners,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragStartEvent,
+  DragEndEvent,
+  DragOverEvent,
+} from '@dnd-kit/core';
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { DraggableCard } from '@/components/dnd/DraggableCard';
+import { DroppableColumn } from '@/components/dnd/DroppableColumn';
 
 type TenderStage = 'identification' | 'preparation' | 'submitted' | 'evaluation' | 'won' | 'lost';
 
@@ -55,6 +70,15 @@ interface Tender {
   client?: { name: string } | null;
 }
 
+const stageConfig: Record<TenderStage, { icon: React.ReactNode; label: string; className: string }> = {
+  identification: { icon: <Search className="h-3 w-3" />, label: 'Εντοπισμός', className: 'bg-muted text-muted-foreground' },
+  preparation: { icon: <Edit3 className="h-3 w-3" />, label: 'Προετοιμασία', className: 'bg-primary/10 text-primary border-primary/20' },
+  submitted: { icon: <Send className="h-3 w-3" />, label: 'Υποβλήθηκε', className: 'bg-accent/10 text-accent border-accent/20' },
+  evaluation: { icon: <Clock className="h-3 w-3" />, label: 'Αξιολόγηση', className: 'bg-warning/10 text-warning border-warning/20' },
+  won: { icon: <Trophy className="h-3 w-3" />, label: 'Κερδήθηκε', className: 'bg-success/10 text-success border-success/20' },
+  lost: { icon: <X className="h-3 w-3" />, label: 'Απορρίφθηκε', className: 'bg-destructive/10 text-destructive border-destructive/20' },
+};
+
 export default function TendersPage() {
   const { isAdmin, isManager } = useAuth();
   const [tenders, setTenders] = useState<Tender[]>([]);
@@ -63,6 +87,7 @@ export default function TendersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [activeTender, setActiveTender] = useState<Tender | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -72,6 +97,17 @@ export default function TendersPage() {
     budget: '',
     submission_deadline: '',
   });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   useEffect(() => {
     fetchTenders();
@@ -144,26 +180,6 @@ export default function TendersPage() {
     }
   };
 
-  const updateTenderStage = async (tenderId: string, stage: TenderStage) => {
-    try {
-      const { error } = await supabase
-        .from('tenders')
-        .update({ stage })
-        .eq('id', tenderId);
-
-      if (error) throw error;
-
-      setTenders(prev => prev.map(t => 
-        t.id === tenderId ? { ...t, stage } : t
-      ));
-
-      toast.success('Η φάση ενημερώθηκε!');
-    } catch (error) {
-      console.error('Error updating tender:', error);
-      toast.error('Σφάλμα κατά την ενημέρωση');
-    }
-  };
-
   const resetForm = () => {
     setFormData({
       name: '',
@@ -176,35 +192,137 @@ export default function TendersPage() {
   };
 
   const getStageBadge = (stage: TenderStage) => {
-    const config = {
-      identification: { icon: <Search className="h-3 w-3" />, label: 'Εντοπισμός', className: 'bg-muted text-muted-foreground' },
-      preparation: { icon: <Edit3 className="h-3 w-3" />, label: 'Προετοιμασία', className: 'bg-primary/10 text-primary border-primary/20' },
-      submitted: { icon: <Send className="h-3 w-3" />, label: 'Υποβλήθηκε', className: 'bg-accent/10 text-accent border-accent/20' },
-      evaluation: { icon: <Clock className="h-3 w-3" />, label: 'Αξιολόγηση', className: 'bg-warning/10 text-warning border-warning/20' },
-      won: { icon: <Trophy className="h-3 w-3" />, label: 'Κερδήθηκε', className: 'bg-success/10 text-success border-success/20' },
-      lost: { icon: <X className="h-3 w-3" />, label: 'Απορρίφθηκε', className: 'bg-destructive/10 text-destructive border-destructive/20' },
-    };
-    const { icon, label, className } = config[stage];
+    const config = stageConfig[stage];
     return (
-      <Badge variant="outline" className={cn("flex items-center gap-1", className)}>
-        {icon} {label}
+      <Badge variant="outline" className={cn("flex items-center gap-1", config.className)}>
+        {config.icon} {config.label}
       </Badge>
     );
   };
 
-  const filteredTenders = tenders.filter(tender =>
-    tender.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    tender.client?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredTenders = useMemo(() => 
+    tenders.filter(tender =>
+      tender.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      tender.client?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+    ), [tenders, searchQuery]
   );
 
-  // Group by stage
   const stages: TenderStage[] = ['identification', 'preparation', 'submitted', 'evaluation', 'won', 'lost'];
-  const groupedTenders = stages.reduce((acc, stage) => {
-    acc[stage] = filteredTenders.filter(t => t.stage === stage);
-    return acc;
-  }, {} as Record<TenderStage, Tender[]>);
+  
+  const tendersByStage = useMemo(() => 
+    stages.reduce((acc, stage) => {
+      acc[stage] = filteredTenders.filter(t => t.stage === stage);
+      return acc;
+    }, {} as Record<TenderStage, Tender[]>)
+  , [filteredTenders]);
 
   const canManage = isAdmin || isManager;
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const tender = tenders.find(t => t.id === event.active.id);
+    setActiveTender(tender || null);
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+
+    const activeId = active.id as string;
+    const overId = over.id as string;
+
+    const activeTender = tenders.find(t => t.id === activeId);
+    if (!activeTender) return;
+
+    if (stages.includes(overId as TenderStage)) {
+      if (activeTender.stage !== overId) {
+        setTenders(prev => prev.map(t =>
+          t.id === activeId ? { ...t, stage: overId as TenderStage } : t
+        ));
+      }
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveTender(null);
+    
+    if (!over) return;
+
+    const activeId = active.id as string;
+    const overId = over.id as string;
+
+    const activeTender = tenders.find(t => t.id === activeId);
+    if (!activeTender) return;
+
+    let targetStage: TenderStage | null = null;
+
+    if (stages.includes(overId as TenderStage)) {
+      targetStage = overId as TenderStage;
+    } else {
+      const overTender = tenders.find(t => t.id === overId);
+      if (overTender) {
+        targetStage = overTender.stage;
+      }
+    }
+
+    if (targetStage && activeTender.stage !== targetStage) {
+      try {
+        const { error } = await supabase
+          .from('tenders')
+          .update({ stage: targetStage })
+          .eq('id', activeId);
+
+        if (error) throw error;
+        toast.success('Η φάση ενημερώθηκε!');
+      } catch (error) {
+        console.error('Error updating tender:', error);
+        fetchTenders();
+        toast.error('Σφάλμα κατά την ενημέρωση');
+      }
+    }
+  };
+
+  const TenderCard = ({ tender, isDragOverlay = false }: { tender: Tender; isDragOverlay?: boolean }) => {
+    const isDeadlinePassed = tender.submission_deadline && isPast(new Date(tender.submission_deadline));
+    
+    return (
+      <Card className={cn(
+        "hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing",
+        isDeadlinePassed && tender.stage !== 'won' && tender.stage !== 'lost' && "border-warning/50",
+        isDragOverlay && "shadow-xl rotate-2"
+      )}>
+        <CardContent className="p-3">
+          <div className="flex items-start gap-2">
+            <GripVertical className="h-4 w-4 text-muted-foreground/50 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <h4 className="font-medium text-sm mb-1 line-clamp-2">
+                {tender.name}
+              </h4>
+              {tender.client && (
+                <p className="text-xs text-muted-foreground mb-2">
+                  {tender.client.name}
+                </p>
+              )}
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-primary font-medium">
+                  €{tender.budget.toLocaleString()}
+                </span>
+                {tender.submission_deadline && (
+                  <span className={cn(
+                    "flex items-center gap-1",
+                    isDeadlinePassed ? "text-warning" : "text-muted-foreground"
+                  )}>
+                    <Calendar className="h-3 w-3" />
+                    {format(new Date(tender.submission_deadline), 'd/M', { locale: el })}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
@@ -345,67 +463,53 @@ export default function TendersPage() {
         />
       </div>
 
-      {/* Pipeline Board */}
+      {/* Pipeline Board with DnD */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       ) : (
-        <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 overflow-x-auto">
-          {stages.map(stage => (
-            <div key={stage} className="space-y-3">
-              <div className="flex items-center justify-between">
-                {getStageBadge(stage)}
-                <Badge variant="secondary">{groupedTenders[stage].length}</Badge>
-              </div>
-              <div className="space-y-3">
-                {groupedTenders[stage].map(tender => {
-                  const isDeadlinePassed = tender.submission_deadline && isPast(new Date(tender.submission_deadline));
-                  
-                  return (
-                    <Card key={tender.id} className={cn(
-                      "hover:shadow-md transition-shadow",
-                      isDeadlinePassed && stage !== 'won' && stage !== 'lost' && "border-warning/50"
-                    )}>
-                      <CardContent className="p-3">
-                        <h4 className="font-medium text-sm mb-1 line-clamp-2">
-                          {tender.name}
-                        </h4>
-                        {tender.client && (
-                          <p className="text-xs text-muted-foreground mb-2">
-                            {tender.client.name}
-                          </p>
-                        )}
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-primary font-medium">
-                            €{tender.budget.toLocaleString()}
-                          </span>
-                          {tender.submission_deadline && (
-                            <span className={cn(
-                              "flex items-center gap-1",
-                              isDeadlinePassed ? "text-warning" : "text-muted-foreground"
-                            )}>
-                              <Calendar className="h-3 w-3" />
-                              {format(new Date(tender.submission_deadline), 'd/M', { locale: el })}
-                            </span>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-
-                {groupedTenders[stage].length === 0 && (
-                  <div className="border border-dashed rounded-lg p-4 text-center">
-                    <p className="text-xs text-muted-foreground">
-                      Κανένας διαγωνισμός
-                    </p>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+            {stages.map(stage => (
+              <div key={stage} className="space-y-3">
+                <div className="flex items-center justify-between">
+                  {getStageBadge(stage)}
+                  <Badge variant="secondary">{tendersByStage[stage].length}</Badge>
+                </div>
+                <DroppableColumn
+                  id={stage}
+                  items={tendersByStage[stage].map(t => t.id)}
+                >
+                  <div className="space-y-3">
+                    {tendersByStage[stage].map(tender => (
+                      <DraggableCard key={tender.id} id={tender.id}>
+                        <TenderCard tender={tender} />
+                      </DraggableCard>
+                    ))}
+                    {tendersByStage[stage].length === 0 && (
+                      <div className="border border-dashed rounded-lg p-4 text-center">
+                        <p className="text-xs text-muted-foreground">
+                          Σύρετε εδώ
+                        </p>
+                      </div>
+                    )}
                   </div>
-                )}
+                </DroppableColumn>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+
+          <DragOverlay>
+            {activeTender ? <TenderCard tender={activeTender} isDragOverlay /> : null}
+          </DragOverlay>
+        </DndContext>
       )}
     </div>
   );

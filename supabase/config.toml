@@ -2,3 +2,6 @@ project_id = "qsykyiqplslvmxdfudxq"
 
 [functions.analyze-project-files]
 verify_jwt = false
+
+[functions.generate-media-plan]
+verify_jwt = false

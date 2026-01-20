@@ -40,20 +40,84 @@ serve(async (req) => {
   }
 
   try {
+    // ============================================
+    // SECURITY: Authentication Check
+    // ============================================
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      console.error("No authorization header provided");
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }}
+      );
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    // Verify the JWT token
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    
+    if (claimsError || !claimsData?.claims) {
+      console.error("JWT verification failed:", claimsError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid authentication token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }}
+      );
+    }
+
+    const userId = claimsData.claims.sub;
+    console.log("Authenticated user:", userId);
+
+    // ============================================
+    // Get API Key and Request Data
+    // ============================================
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const { fileContents, projectName, projectBudget, projectId } = await req.json();
 
-    const { fileContents, projectName, projectBudget } = await req.json();
+    // ============================================
+    // SECURITY: Authorization Check (if projectId provided)
+    // ============================================
+    if (projectId) {
+      const { data: hasAccess, error: accessError } = await supabase.rpc(
+        'has_new_project_access',
+        { _user_id: userId, _project_id: projectId }
+      );
 
+      if (accessError || !hasAccess) {
+        console.error("User does not have access to project:", projectId);
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized access to project' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }}
+        );
+      }
+    }
+
+    // ============================================
+    // Input Validation
+    // ============================================
     if (!fileContents || fileContents.length === 0) {
       return new Response(
         JSON.stringify({ error: "No file contents provided" }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Limit file content size to prevent abuse (500KB total)
+    const maxContentLength = 500000;
+    const totalContentLength = fileContents.reduce((acc: number, f: any) => acc + (f.content?.length || 0), 0);
+    if (totalContentLength > maxContentLength) {
+      return new Response(
+        JSON.stringify({ error: "File content too large. Maximum 500KB allowed." }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

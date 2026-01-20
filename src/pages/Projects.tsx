@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
@@ -26,6 +26,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { UnifiedViewToggle, type UnifiedViewMode } from '@/components/ui/unified-view-toggle';
+import { InlineEditCell } from '@/components/shared/InlineEditCell';
+import { FileAttachments } from '@/components/files/FileAttachments';
+import { ProjectAISuggestions } from '@/components/projects/ProjectAISuggestions';
 import { EditDeleteActions } from '@/components/dialogs/EditDeleteActions';
 import { toast } from 'sonner';
 import { 
@@ -34,7 +46,10 @@ import {
   Search, 
   Calendar,
   DollarSign,
-  Loader2
+  Loader2,
+  Paperclip,
+  Sparkles,
+  Upload
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -55,6 +70,11 @@ interface Project {
   client?: { name: string } | null;
 }
 
+interface FileContent {
+  fileName: string;
+  content: string;
+}
+
 export default function ProjectsPage() {
   const navigate = useNavigate();
   const { isAdmin, isManager } = useAuth();
@@ -66,6 +86,11 @@ export default function ProjectsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [viewMode, setViewMode] = useState<UnifiedViewMode>('card');
+  const [dialogTab, setDialogTab] = useState('details');
+  const [uploadedFiles, setUploadedFiles] = useState<FileContent[]>([]);
+  const [tempProjectId, setTempProjectId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -117,6 +142,38 @@ export default function ProjectsPage() {
     fetchClients();
   }, [fetchProjects]);
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files) return;
+
+    const newFiles: FileContent[] = [];
+    
+    for (const file of Array.from(files)) {
+      // Only process text-based files for AI analysis
+      if (file.type.includes('text') || 
+          file.name.endsWith('.txt') || 
+          file.name.endsWith('.md') ||
+          file.name.endsWith('.csv')) {
+        const content = await file.text();
+        newFiles.push({ fileName: file.name, content });
+      } else if (file.type === 'application/pdf') {
+        // For PDFs, we'll pass a placeholder - the AI edge function could be extended to parse PDFs
+        newFiles.push({ 
+          fileName: file.name, 
+          content: `[PDF Document: ${file.name} - ${(file.size / 1024).toFixed(1)}KB]` 
+        });
+      } else {
+        // Store other files as metadata only
+        newFiles.push({ 
+          fileName: file.name, 
+          content: `[File: ${file.name} - ${file.type} - ${(file.size / 1024).toFixed(1)}KB]` 
+        });
+      }
+    }
+
+    setUploadedFiles(prev => [...prev, ...newFiles]);
+    toast.success(`${files.length} αρχείο(α) προστέθηκαν`);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,6 +203,8 @@ export default function ProjectsPage() {
 
         setProjects(prev => prev.map(p => p.id === editingProject.id ? data : p));
         toast.success('Το έργο ενημερώθηκε!');
+        setDialogOpen(false);
+        resetForm();
       } else {
         const { data, error } = await supabase
           .from('projects')
@@ -157,10 +216,16 @@ export default function ProjectsPage() {
 
         setProjects(prev => [data, ...prev]);
         toast.success('Το έργο δημιουργήθηκε!');
+        
+        // If we have uploaded files, set temp project ID for AI analysis
+        if (uploadedFiles.length > 0) {
+          setTempProjectId(data.id);
+          setDialogTab('ai');
+        } else {
+          setDialogOpen(false);
+          resetForm();
+        }
       }
-
-      setDialogOpen(false);
-      resetForm();
     } catch (error) {
       console.error('Error saving project:', error);
       toast.error('Σφάλμα κατά την αποθήκευση');
@@ -182,6 +247,7 @@ export default function ProjectsPage() {
       end_date: project.end_date || '',
     });
     setDialogOpen(true);
+    setDialogTab('details');
   };
 
   const handleDelete = async (projectId: string) => {
@@ -201,6 +267,34 @@ export default function ProjectsPage() {
     }
   };
 
+  const handleInlineUpdate = async (projectId: string, field: string, value: string) => {
+    try {
+      let updateData: Record<string, unknown> = {};
+      
+      if (field === 'budget' || field === 'agency_fee_percentage') {
+        updateData[field] = parseFloat(value) || 0;
+      } else {
+        updateData[field] = value || null;
+      }
+
+      const { error } = await supabase
+        .from('projects')
+        .update(updateData)
+        .eq('id', projectId);
+
+      if (error) throw error;
+
+      setProjects(prev => prev.map(p => 
+        p.id === projectId ? { ...p, ...updateData } : p
+      ));
+      toast.success('Ενημερώθηκε!');
+    } catch (error) {
+      console.error('Error updating project:', error);
+      toast.error('Σφάλμα κατά την ενημέρωση');
+      throw error;
+    }
+  };
+
   const resetForm = () => {
     setEditingProject(null);
     setFormData({
@@ -213,6 +307,9 @@ export default function ProjectsPage() {
       start_date: '',
       end_date: '',
     });
+    setUploadedFiles([]);
+    setTempProjectId(null);
+    setDialogTab('details');
   };
 
   const getStatusBadge = (status: ProjectStatus) => {
@@ -235,6 +332,127 @@ export default function ProjectsPage() {
 
   const canManage = isAdmin || isManager;
 
+  const renderCardView = () => (
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {filteredProjects.map(project => (
+        <Card 
+          key={project.id} 
+          className="hover:shadow-lg transition-shadow cursor-pointer"
+          onClick={() => navigate(`/projects/${project.id}`)}
+        >
+          <CardHeader className="pb-3">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1 flex-1 min-w-0">
+                <CardTitle className="text-lg">{project.name}</CardTitle>
+                {project.client && (
+                  <CardDescription>{project.client.name}</CardDescription>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {getStatusBadge(project.status)}
+                {canManage && (
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <EditDeleteActions
+                      onEdit={() => handleEdit(project)}
+                      onDelete={() => handleDelete(project.id)}
+                      itemName={`το έργο "${project.name}"`}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {project.description && (
+              <p className="text-sm text-muted-foreground line-clamp-2">
+                {project.description}
+              </p>
+            )}
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <DollarSign className="h-4 w-4" />
+                <span>€{project.budget?.toLocaleString() || 0}</span>
+              </div>
+              {project.end_date && (
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <Calendar className="h-4 w-4" />
+                  <span>{format(new Date(project.end_date), 'd MMM', { locale: el })}</span>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+
+  const renderTableView = () => (
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Όνομα</TableHead>
+            <TableHead>Πελάτης</TableHead>
+            <TableHead>Κατάσταση</TableHead>
+            <TableHead>Budget</TableHead>
+            <TableHead>Fee %</TableHead>
+            <TableHead>Λήξη</TableHead>
+            {canManage && <TableHead className="w-[100px]">Ενέργειες</TableHead>}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredProjects.map(project => (
+            <TableRow 
+              key={project.id} 
+              className="cursor-pointer hover:bg-muted/50"
+              onClick={() => navigate(`/projects/${project.id}`)}
+            >
+              <TableCell onClick={(e) => e.stopPropagation()}>
+                <InlineEditCell
+                  value={project.name}
+                  onSave={(val) => handleInlineUpdate(project.id, 'name', val)}
+                />
+              </TableCell>
+              <TableCell>{project.client?.name || '-'}</TableCell>
+              <TableCell>{getStatusBadge(project.status)}</TableCell>
+              <TableCell onClick={(e) => e.stopPropagation()}>
+                <InlineEditCell
+                  value={project.budget}
+                  type="number"
+                  displayValue={`€${project.budget?.toLocaleString() || 0}`}
+                  onSave={(val) => handleInlineUpdate(project.id, 'budget', val)}
+                />
+              </TableCell>
+              <TableCell onClick={(e) => e.stopPropagation()}>
+                <InlineEditCell
+                  value={project.agency_fee_percentage}
+                  type="number"
+                  displayValue={`${project.agency_fee_percentage || 0}%`}
+                  onSave={(val) => handleInlineUpdate(project.id, 'agency_fee_percentage', val)}
+                />
+              </TableCell>
+              <TableCell>
+                {project.end_date 
+                  ? format(new Date(project.end_date), 'd MMM yyyy', { locale: el })
+                  : '-'
+                }
+              </TableCell>
+              {canManage && (
+                <TableCell onClick={(e) => e.stopPropagation()}>
+                  <EditDeleteActions
+                    onEdit={() => handleEdit(project)}
+                    onDelete={() => handleDelete(project.id)}
+                    itemName={`το έργο "${project.name}"`}
+                  />
+                </TableCell>
+              )}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+
   return (
     <div className="p-6 lg:p-8 space-y-6">
       {/* Header */}
@@ -249,142 +467,230 @@ export default function ProjectsPage() {
           </p>
         </div>
 
-        {canManage && (
-          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Νέο Έργο
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{editingProject ? 'Επεξεργασία Έργου' : 'Δημιουργία Νέου Έργου'}</DialogTitle>
-                <DialogDescription>
-                  {editingProject ? 'Ενημερώστε τα στοιχεία του έργου' : 'Συμπληρώστε τα στοιχεία του νέου έργου'}
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Όνομα Έργου *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="π.χ. Digital Campaign 2026"
-                    required
-                  />
-                </div>
+        <div className="flex items-center gap-3">
+          <UnifiedViewToggle 
+            viewMode={viewMode} 
+            onViewModeChange={setViewMode}
+            showKanban={false}
+          />
 
-                <div className="space-y-2">
-                  <Label htmlFor="description">Περιγραφή</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Σύντομη περιγραφή του έργου..."
-                    rows={3}
-                  />
-                </div>
+          {canManage && (
+            <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Νέο Έργο
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>{editingProject ? 'Επεξεργασία Έργου' : 'Δημιουργία Νέου Έργου'}</DialogTitle>
+                  <DialogDescription>
+                    {editingProject ? 'Ενημερώστε τα στοιχεία του έργου' : 'Συμπληρώστε τα στοιχεία και ανεβάστε αρχεία για AI ανάλυση'}
+                  </DialogDescription>
+                </DialogHeader>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="client">Πελάτης</Label>
-                    <Select
-                      value={formData.client_id}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, client_id: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Επιλέξτε πελάτη" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clients.map(client => (
-                          <SelectItem key={client.id} value={client.id}>
-                            {client.name}
-                          </SelectItem>
+                <Tabs value={dialogTab} onValueChange={setDialogTab}>
+                  <TabsList className="w-full">
+                    <TabsTrigger value="details" className="flex-1">Στοιχεία</TabsTrigger>
+                    <TabsTrigger value="files" className="flex-1">
+                      <Paperclip className="h-4 w-4 mr-1" /> Αρχεία
+                    </TabsTrigger>
+                    {(uploadedFiles.length > 0 || tempProjectId) && (
+                      <TabsTrigger value="ai" className="flex-1">
+                        <Sparkles className="h-4 w-4 mr-1" /> AI
+                      </TabsTrigger>
+                    )}
+                  </TabsList>
+
+                  <TabsContent value="details" className="mt-4">
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="name">Όνομα Έργου *</Label>
+                        <Input
+                          id="name"
+                          value={formData.name}
+                          onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                          placeholder="π.χ. Digital Campaign 2026"
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="description">Περιγραφή</Label>
+                        <Textarea
+                          id="description"
+                          value={formData.description}
+                          onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                          placeholder="Σύντομη περιγραφή του έργου..."
+                          rows={3}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="client">Πελάτης</Label>
+                          <Select
+                            value={formData.client_id}
+                            onValueChange={(value) => setFormData(prev => ({ ...prev, client_id: value }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Επιλέξτε πελάτη" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {clients.map(client => (
+                                <SelectItem key={client.id} value={client.id}>
+                                  {client.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="status">Κατάσταση</Label>
+                          <Select
+                            value={formData.status}
+                            onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as ProjectStatus }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="active">Ενεργό</SelectItem>
+                              <SelectItem value="tender">Διαγωνισμός</SelectItem>
+                              <SelectItem value="completed">Ολοκληρώθηκε</SelectItem>
+                              <SelectItem value="cancelled">Ακυρώθηκε</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="budget">Budget (€)</Label>
+                          <Input
+                            id="budget"
+                            type="number"
+                            value={formData.budget}
+                            onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
+                            placeholder="0"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="fee">Agency Fee (%)</Label>
+                          <Input
+                            id="fee"
+                            type="number"
+                            value={formData.agency_fee_percentage}
+                            onChange={(e) => setFormData(prev => ({ ...prev, agency_fee_percentage: e.target.value }))}
+                            placeholder="30"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="start_date">Ημ/νία Έναρξης</Label>
+                          <Input
+                            id="start_date"
+                            type="date"
+                            value={formData.start_date}
+                            onChange={(e) => setFormData(prev => ({ ...prev, start_date: e.target.value }))}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="end_date">Ημ/νία Λήξης</Label>
+                          <Input
+                            id="end_date"
+                            type="date"
+                            value={formData.end_date}
+                            onChange={(e) => setFormData(prev => ({ ...prev, end_date: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+
+                      <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
+                          Ακύρωση
+                        </Button>
+                        <Button type="submit" disabled={saving}>
+                          {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                          {editingProject ? 'Αποθήκευση' : 'Δημιουργία'}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </TabsContent>
+
+                  <TabsContent value="files" className="mt-4 space-y-4">
+                    <div className="border-2 border-dashed rounded-lg p-6 text-center">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        multiple
+                        onChange={handleFileUpload}
+                        className="hidden"
+                        accept=".txt,.md,.csv,.pdf,.doc,.docx"
+                      />
+                      <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+                      <h3 className="font-medium mb-1">Ανέβασμα αρχείων για AI ανάλυση</h3>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Υποστηρίζονται: TXT, MD, CSV, PDF
+                      </p>
+                      <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+                        <Paperclip className="h-4 w-4 mr-2" />
+                        Επιλογή αρχείων
+                      </Button>
+                    </div>
+
+                    {uploadedFiles.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Αρχεία για ανάλυση ({uploadedFiles.length})</p>
+                        {uploadedFiles.map((file, idx) => (
+                          <div key={idx} className="flex items-center justify-between p-2 bg-muted rounded-lg">
+                            <span className="text-sm truncate">{file.fileName}</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setUploadedFiles(prev => prev.filter((_, i) => i !== idx))}
+                            >
+                              ✕
+                            </Button>
+                          </div>
                         ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      </div>
+                    )}
 
-                  <div className="space-y-2">
-                    <Label htmlFor="status">Κατάσταση</Label>
-                    <Select
-                      value={formData.status}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as ProjectStatus }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">Ενεργό</SelectItem>
-                        <SelectItem value="tender">Διαγωνισμός</SelectItem>
-                        <SelectItem value="completed">Ολοκληρώθηκε</SelectItem>
-                        <SelectItem value="cancelled">Ακυρώθηκε</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+                    {editingProject && (
+                      <div className="pt-4 border-t">
+                        <h3 className="font-medium mb-3">Αρχεία Έργου</h3>
+                        <FileAttachments projectId={editingProject.id} />
+                      </div>
+                    )}
+                  </TabsContent>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="budget">Budget (€)</Label>
-                    <Input
-                      id="budget"
-                      type="number"
-                      value={formData.budget}
-                      onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="fee">Agency Fee (%)</Label>
-                    <Input
-                      id="fee"
-                      type="number"
-                      value={formData.agency_fee_percentage}
-                      onChange={(e) => setFormData(prev => ({ ...prev, agency_fee_percentage: e.target.value }))}
-                      placeholder="30"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="start_date">Ημ/νία Έναρξης</Label>
-                    <Input
-                      id="start_date"
-                      type="date"
-                      value={formData.start_date}
-                      onChange={(e) => setFormData(prev => ({ ...prev, start_date: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="end_date">Ημ/νία Λήξης</Label>
-                    <Input
-                      id="end_date"
-                      type="date"
-                      value={formData.end_date}
-                      onChange={(e) => setFormData(prev => ({ ...prev, end_date: e.target.value }))}
-                    />
-                  </div>
-                </div>
-
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
-                    Ακύρωση
-                  </Button>
-                  <Button type="submit" disabled={saving}>
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    {editingProject ? 'Αποθήκευση' : 'Δημιουργία'}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-        )}
+                  {(uploadedFiles.length > 0 || tempProjectId) && (
+                    <TabsContent value="ai" className="mt-4">
+                      <ProjectAISuggestions
+                        projectId={tempProjectId || editingProject?.id || ''}
+                        projectName={formData.name}
+                        projectBudget={parseFloat(formData.budget) || undefined}
+                        files={uploadedFiles}
+                        onSuggestionsApplied={() => {
+                          setDialogOpen(false);
+                          resetForm();
+                          fetchProjects();
+                        }}
+                      />
+                    </TabsContent>
+                  )}
+                </Tabs>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -412,7 +718,7 @@ export default function ProjectsPage() {
         </Select>
       </div>
 
-      {/* Projects Grid */}
+      {/* Projects Grid/Table */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -436,67 +742,10 @@ export default function ProjectsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredProjects.map(project => (
-            <Card 
-              key={project.id} 
-              className="hover:shadow-lg transition-shadow cursor-pointer"
-              onClick={() => navigate(`/projects/${project.id}`)}
-            >
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1 flex-1 min-w-0">
-                    <CardTitle className="text-lg">{project.name}</CardTitle>
-                    {project.client && (
-                      <CardDescription>{project.client.name}</CardDescription>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {getStatusBadge(project.status)}
-                    {canManage && (
-                      <EditDeleteActions
-                        onEdit={() => handleEdit(project)}
-                        onDelete={() => handleDelete(project.id)}
-                        itemName={`το έργο "${project.name}"`}
-                      />
-                    )}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {project.description && (
-                  <p className="text-sm text-muted-foreground line-clamp-2">
-                    {project.description}
-                  </p>
-                )}
-
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">€{project.budget?.toLocaleString() || 0}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span>
-                      {project.end_date 
-                        ? format(new Date(project.end_date), 'd MMM yy', { locale: el })
-                        : '-'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Progress bar placeholder */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Πρόοδος</span>
-                    <span className="font-medium">0%</span>
-                  </div>
-                  <Progress value={0} className="h-2" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <>
+          {viewMode === 'card' && renderCardView()}
+          {viewMode === 'table' && renderTableView()}
+        </>
       )}
     </div>
   );

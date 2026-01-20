@@ -17,6 +17,7 @@ interface ProjectSuggestion {
     title: string;
     description: string;
     due_date?: string;
+    deliverable_index?: number;
   }>;
   invoices: Array<{
     description: string;
@@ -24,6 +25,12 @@ interface ProjectSuggestion {
     due_date?: string;
   }>;
   projectSummary: string;
+  suggestedProjectDetails?: {
+    description?: string;
+    start_date?: string;
+    end_date?: string;
+    budget?: number;
+  };
 }
 
 serve(async (req) => {
@@ -53,23 +60,52 @@ serve(async (req) => {
 
     console.log(`Analyzing ${fileContents.length} files for project: ${projectName}`);
 
-    const systemPrompt = `Είσαι ειδικός αναλυτής έργων για ένα agency. Αναλύεις αρχεία (προκηρύξεις, συμβάσεις, RFPs, κλπ) και προτείνεις δομημένα δεδομένα για τη διαχείριση του έργου.
+    const systemPrompt = `Είσαι ειδικός αναλυτής έργων για ένα agency που διαχειρίζεται διαγωνισμούς, συμβάσεις και έργα. Αναλύεις αρχεία (προκηρύξεις, συμβάσεις, RFPs, τεχνικές προδιαγραφές κλπ) και εξάγεις δομημένα δεδομένα.
 
-Με βάση τα αρχεία που θα λάβεις, πρέπει να εξάγεις:
-1. Παραδοτέα (deliverables) - τι πρέπει να παραδοθεί
-2. Tasks - συγκεκριμένες εργασίες για κάθε παραδοτέο
-3. Προτεινόμενα τιμολόγια - πότε και πόσο να τιμολογηθεί
-4. Σύντομη περίληψη του έργου
+ΟΔΗΓΙΕΣ ΑΝΑΛΥΣΗΣ:
 
-Βασίσου στο περιεχόμενο των αρχείων για ημερομηνίες και ποσά. Αν δεν υπάρχουν συγκεκριμένες ημερομηνίες, πρότεινε λογικές προθεσμίες.`;
+1. ΠΑΡΑΔΟΤΕΑ (Deliverables):
+   - Αναζήτησε ενότητες με τίτλους όπως: "Παραδοτέα", "Deliverables", "Φάσεις", "Work Packages", "Πακέτα Εργασίας"
+   - Κάθε παραδοτέο πρέπει να έχει σαφή περιγραφή
+   - Αν υπάρχουν προθεσμίες ανά παραδοτέο, εξάγε τις
+   - Αν υπάρχουν κόστη/budgets ανά παραδοτέο, εξάγε τα
+   - Τυπικά παραδοτέα: Μελέτες, Εκθέσεις, Λογισμικό, Εκπαίδευση, Πιλοτικές Εφαρμογές
+
+2. ΕΡΓΑΣΙΕΣ (Tasks):
+   - Εξάγε συγκεκριμένες εργασίες από κάθε παραδοτέο
+   - Σύνδεσε κάθε task με το αντίστοιχο παραδοτέο (deliverable_index)
+   - Πρότεινε λογικές ημερομηνίες αν δεν υπάρχουν
+
+3. ΤΙΜΟΛΟΓΙΑ (Invoices):
+   - Αναζήτησε ενότητες για πληρωμές, τιμολόγηση, δόσεις
+   - Συνήθεις δομές: Προκαταβολή, Ενδιάμεσες πληρωμές, Τελική πληρωμή
+   - Αν δεν υπάρχουν συγκεκριμένες πληρωμές, πρότεινε: 30% προκαταβολή, 40% ενδιάμεσα, 30% τέλος
+
+4. ΣΤΟΙΧΕΙΑ ΕΡΓΟΥ (Project Details):
+   - ΠΡΟΫΠΟΛΟΓΙΣΜΟΣ: Ψάξε για ποσά, budget, τιμή, κόστος, αμοιβή
+   - ΗΜΕΡΟΜΗΝΙΕΣ: Ψάξε για ημερομηνία έναρξης, λήξης, διάρκεια, χρονοδιάγραμμα
+   - ΠΕΡΙΓΡΑΦΗ: Σύνοψη του αντικειμένου του έργου
+
+ΜΟΡΦΗ ΗΜΕΡΟΜΗΝΙΩΝ: YYYY-MM-DD (π.χ. 2026-06-30)
+ΜΟΡΦΗ ΠΟΣΩΝ: Αριθμός χωρίς σύμβολα (π.χ. 50000)
+
+Αν κάποια πληροφορία δεν υπάρχει στα αρχεία, ΜΗΝ την συμπεριλάβεις - άφησε το πεδίο κενό.`;
 
     const userPrompt = `Έργο: ${projectName}
-Προϋπολογισμός: €${projectBudget || 'Μη καθορισμένο'}
+${projectBudget ? `Γνωστός Προϋπολογισμός: €${projectBudget}` : 'Προϋπολογισμός: Να εξαχθεί από τα αρχεία'}
 
-Περιεχόμενα αρχείων:
-${fileContents.map((f: any, i: number) => `--- Αρχείο ${i + 1}: ${f.fileName} ---\n${f.content}\n`).join('\n')}
+=== ΠΕΡΙΕΧΟΜΕΝΑ ΑΡΧΕΙΩΝ ===
+${fileContents.map((f: any, i: number) => `
+--- Αρχείο ${i + 1}: ${f.fileName} ---
+${f.content}
+`).join('\n')}
+=== ΤΕΛΟΣ ΑΡΧΕΙΩΝ ===
 
-Ανάλυσε τα παραπάνω και δώσε προτάσεις.`;
+Ανάλυσε προσεκτικά τα παραπάνω αρχεία και εξάγε:
+1. Όλα τα παραδοτέα με τις προθεσμίες και τα budgets τους
+2. Tasks για κάθε παραδοτέο
+3. Πρόγραμμα πληρωμών/τιμολογίων
+4. Γενικά στοιχεία του έργου (budget, ημερομηνίες, περιγραφή)`;
 
     // Use tool calling for structured output
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -89,46 +125,59 @@ ${fileContents.map((f: any, i: number) => `--- Αρχείο ${i + 1}: ${f.fileNa
             type: "function",
             function: {
               name: "suggest_project_structure",
-              description: "Επιστρέφει δομημένες προτάσεις για παραδοτέα, tasks και τιμολόγια.",
+              description: "Επιστρέφει δομημένες προτάσεις για παραδοτέα, tasks, τιμολόγια και στοιχεία έργου.",
               parameters: {
                 type: "object",
                 properties: {
                   deliverables: {
                     type: "array",
+                    description: "Λίστα παραδοτέων του έργου",
                     items: {
                       type: "object",
                       properties: {
-                        name: { type: "string", description: "Όνομα παραδοτέου" },
-                        description: { type: "string", description: "Περιγραφή" },
-                        due_date: { type: "string", description: "Προθεσμία (YYYY-MM-DD)" },
-                        budget: { type: "number", description: "Εκτιμώμενο κόστος" }
+                        name: { type: "string", description: "Όνομα/τίτλος παραδοτέου (π.χ. 'Π1 - Μελέτη Εφαρμογής')" },
+                        description: { type: "string", description: "Αναλυτική περιγραφή του παραδοτέου" },
+                        due_date: { type: "string", description: "Προθεσμία παράδοσης (YYYY-MM-DD)" },
+                        budget: { type: "number", description: "Εκτιμώμενο κόστος σε ευρώ" }
                       },
                       required: ["name", "description"]
                     }
                   },
                   tasks: {
                     type: "array",
+                    description: "Λίστα εργασιών για την υλοποίηση",
                     items: {
                       type: "object",
                       properties: {
-                        title: { type: "string", description: "Τίτλος task" },
-                        description: { type: "string", description: "Περιγραφή" },
+                        title: { type: "string", description: "Τίτλος εργασίας" },
+                        description: { type: "string", description: "Περιγραφή της εργασίας" },
                         due_date: { type: "string", description: "Προθεσμία (YYYY-MM-DD)" },
-                        deliverable_index: { type: "number", description: "Index παραδοτέου (0-based)" }
+                        deliverable_index: { type: "number", description: "Index του σχετικού παραδοτέου (0-based), αν υπάρχει" }
                       },
                       required: ["title", "description"]
                     }
                   },
                   invoices: {
                     type: "array",
+                    description: "Πρόγραμμα πληρωμών/τιμολογίων",
                     items: {
                       type: "object",
                       properties: {
-                        description: { type: "string", description: "Περιγραφή τιμολογίου" },
-                        amount: { type: "number", description: "Ποσό" },
-                        due_date: { type: "string", description: "Ημ/νία λήξης (YYYY-MM-DD)" }
+                        description: { type: "string", description: "Περιγραφή τιμολογίου (π.χ. 'Προκαταβολή 30%')" },
+                        amount: { type: "number", description: "Ποσό σε ευρώ" },
+                        due_date: { type: "string", description: "Ημ/νία λήξης πληρωμής (YYYY-MM-DD)" }
                       },
                       required: ["description", "amount"]
+                    }
+                  },
+                  suggestedProjectDetails: {
+                    type: "object",
+                    description: "Προτεινόμενα στοιχεία για τη φόρμα του έργου",
+                    properties: {
+                      description: { type: "string", description: "Σύντομη περιγραφή του έργου (2-3 προτάσεις)" },
+                      start_date: { type: "string", description: "Ημ/νία έναρξης (YYYY-MM-DD)" },
+                      end_date: { type: "string", description: "Ημ/νία λήξης (YYYY-MM-DD)" },
+                      budget: { type: "number", description: "Συνολικός προϋπολογισμός σε ευρώ" }
                     }
                   },
                   projectSummary: { 

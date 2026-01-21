@@ -112,17 +112,32 @@ serve(async (req) => {
       );
     }
 
-    // Limit file content size to prevent abuse (500KB total)
-    const maxContentLength = 500000;
-    const totalContentLength = fileContents.reduce((acc: number, f: any) => acc + (f.content?.length || 0), 0);
-    if (totalContentLength > maxContentLength) {
+    // Limit file content size (2MB total for all files)
+    const maxTotalContentLength = 2000000; // 2MB
+    const maxSingleFileLength = 500000; // 500KB per file - will truncate if larger
+    
+    // Truncate large files and calculate total size
+    const processedFiles = fileContents.map((f: any) => {
+      let content = f.content || '';
+      if (content.length > maxSingleFileLength) {
+        console.log(`Truncating large file: ${f.fileName} (${content.length} -> ${maxSingleFileLength} chars)`);
+        content = content.substring(0, maxSingleFileLength) + '\n\n[... Truncated - file too large ...]';
+      }
+      return { ...f, content };
+    });
+    
+    const totalContentLength = processedFiles.reduce((acc: number, f: any) => acc + (f.content?.length || 0), 0);
+    if (totalContentLength > maxTotalContentLength) {
       return new Response(
-        JSON.stringify({ error: "File content too large. Maximum 500KB allowed." }),
+        JSON.stringify({ error: "Total file content too large. Maximum 2MB allowed across all files." }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`Analyzing ${fileContents.length} files for project: ${projectName}`);
+    // Use processed files from here on
+    const filesToAnalyze = processedFiles;
+
+    console.log(`Analyzing ${filesToAnalyze.length} files for project: ${projectName}, total size: ${totalContentLength} chars`);
 
     const systemPrompt = `Είσαι ειδικός αναλυτής έργων για ένα agency που διαχειρίζεται διαγωνισμούς, συμβάσεις και έργα. Αναλύεις αρχεία (προκηρύξεις, συμβάσεις, RFPs, τεχνικές προδιαγραφές κλπ) και εξάγεις δομημένα δεδομένα.
 
@@ -159,7 +174,7 @@ serve(async (req) => {
 ${projectBudget ? `Γνωστός Προϋπολογισμός: €${projectBudget}` : 'Προϋπολογισμός: Να εξαχθεί από τα αρχεία'}
 
 === ΠΕΡΙΕΧΟΜΕΝΑ ΑΡΧΕΙΩΝ ===
-${fileContents.map((f: any, i: number) => `
+${filesToAnalyze.map((f: any, i: number) => `
 --- Αρχείο ${i + 1}: ${f.fileName} ---
 ${f.content}
 `).join('\n')}

@@ -169,14 +169,34 @@ export default function TendersPage() {
 
   const fetchProfiles = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, email')
-        .eq('status', 'active')
-        .order('full_name');
+      // Get active users from user_company_roles and join with profiles
+      const { data: activeUsers, error: rolesError } = await supabase
+        .from('user_company_roles')
+        .select('user_id')
+        .eq('status', 'active');
 
-      if (error) throw error;
-      setProfiles(data || []);
+      if (rolesError) throw rolesError;
+
+      if (activeUsers && activeUsers.length > 0) {
+        const userIds = activeUsers.map(u => u.user_id);
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', userIds)
+          .order('full_name');
+
+        if (profilesError) throw profilesError;
+        setProfiles(profilesData || []);
+      } else {
+        // Fallback: get all profiles
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .order('full_name');
+
+        if (error) throw error;
+        setProfiles(data || []);
+      }
     } catch (error) {
       console.error('Error fetching profiles:', error);
     }

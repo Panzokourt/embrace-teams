@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
+import { DndContext, closestCenter, DragEndEvent, DragOverlay, DragStartEvent } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -33,8 +35,9 @@ import { toast } from 'sonner';
 import { 
   Network, Plus, Pencil, Trash2, ChevronDown, ChevronRight,
   Building2, Users, Loader2, MoreVertical, ZoomIn, ZoomOut, 
-  Download, Wand2, Shield
+  Download, Wand2, Shield, GripVertical, Database
 } from 'lucide-react';
+import { OrgChartWizard } from '@/components/org-chart/OrgChartWizard';
 
 interface OrgPosition {
   id: string;
@@ -72,6 +75,8 @@ export default function OrgChartPage() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [editingPosition, setEditingPosition] = useState<OrgPosition | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [loadingDummyData, setLoadingDummyData] = useState(false);
 
   // Form state
   const [positionTitle, setPositionTitle] = useState('');
@@ -244,6 +249,99 @@ export default function OrgChartPage() {
     setExpandedNodes(newExpanded);
   };
 
+  // Dummy names for demo
+  const DUMMY_NAMES = [
+    'Αλέξανδρος Παπαδόπουλος', 'Μαρία Γεωργίου', 'Νίκος Κωνσταντίνου',
+    'Ελένη Αντωνίου', 'Γιώργος Δημητρίου', 'Κατερίνα Νικολάου',
+    'Δημήτρης Βασιλείου', 'Σοφία Παναγιώτου', 'Χρήστος Ιωάννου',
+    'Αναστασία Χριστοδούλου', 'Θάνος Μιχαήλ', 'Εύα Σταματίου'
+  ];
+
+  const addDummyUsers = async () => {
+    if (!company || positions.length === 0) {
+      toast.error('Δεν υπάρχουν θέσεις για να προστεθούν dummy χρήστες');
+      return;
+    }
+    
+    setLoadingDummyData(true);
+    
+    try {
+      // Create dummy profiles and assign to positions
+      for (let i = 0; i < positions.length; i++) {
+        const pos = positions[i];
+        const dummyName = DUMMY_NAMES[i % DUMMY_NAMES.length];
+        const dummyEmail = `dummy${i + 1}@${company.name.toLowerCase().replace(/\s+/g, '')}.com`;
+        
+        // Insert dummy profile
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .upsert({
+            id: crypto.randomUUID(),
+            email: dummyEmail,
+            full_name: dummyName,
+            status: 'active'
+          }, { onConflict: 'email' })
+          .select('id')
+          .single();
+        
+        if (profileError) {
+          console.log('Profile might exist:', profileError);
+          // Try to find existing
+          const { data: existingProfile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('email', dummyEmail)
+            .single();
+          
+          if (existingProfile) {
+            await supabase
+              .from('org_chart_positions')
+              .update({ user_id: existingProfile.id })
+              .eq('id', pos.id);
+          }
+        } else if (profile) {
+          await supabase
+            .from('org_chart_positions')
+            .update({ user_id: profile.id })
+            .eq('id', pos.id);
+        }
+      }
+      
+      toast.success('Οι dummy χρήστες προστέθηκαν!');
+      fetchData();
+    } catch (error) {
+      console.error('Error adding dummy users:', error);
+      toast.error('Σφάλμα κατά την προσθήκη dummy χρηστών');
+    } finally {
+      setLoadingDummyData(false);
+    }
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (!over || active.id === over.id) return;
+
+    try {
+      // Update parent_position_id when dropped on another node
+      const { error } = await supabase
+        .from('org_chart_positions')
+        .update({ parent_position_id: over.id as string })
+        .eq('id', active.id as string);
+      
+      if (error) throw error;
+      toast.success('Η θέση μετακινήθηκε');
+      fetchData();
+    } catch (error: any) {
+      toast.error('Σφάλμα κατά τη μετακίνηση');
+    }
+  };
+
   const getInitials = (name: string | null | undefined, email?: string) => {
     if (name) {
       return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -400,6 +498,18 @@ export default function OrgChartPage() {
           </Button>
           {canEdit && (
             <>
+              <Button 
+                variant="outline" 
+                onClick={addDummyUsers}
+                disabled={loadingDummyData || positions.length === 0}
+              >
+                {loadingDummyData ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Database className="h-4 w-4 mr-2" />
+                )}
+                Demo Data
+              </Button>
               <Button variant="outline" onClick={() => setWizardOpen(true)}>
                 <Wand2 className="h-4 w-4 mr-2" />
                 Wizard
@@ -536,25 +646,29 @@ export default function OrgChartPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Wizard Dialog (simplified for now) */}
+      {/* Wizard Dialog */}
       <Dialog open={wizardOpen} onOpenChange={setWizardOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Wand2 className="h-5 w-5" />
-              Οδηγός Δημιουργίας
+              Οδηγός Δημιουργίας Οργανογράμματος
             </DialogTitle>
             <DialogDescription>
-              Δημιουργήστε γρήγορα τη δομή της εταιρείας σας
+              Δημιουργήστε γρήγορα τη δομή της εταιρείας σας με έτοιμα templates
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4 text-center text-muted-foreground">
-            <p>Ο οδηγός θα είναι διαθέσιμος σύντομα.</p>
-            <p className="text-sm mt-2">Προς το παρόν, χρησιμοποιήστε το κουμπί "Νέα Θέση" για να προσθέσετε θέσεις.</p>
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setWizardOpen(false)}>Κλείσιμο</Button>
-          </DialogFooter>
+          {company && (
+            <OrgChartWizard 
+              companyId={company.id}
+              onComplete={() => {
+                setWizardOpen(false);
+                fetchData();
+                toast.success('Το οργανόγραμμα δημιουργήθηκε!');
+              }}
+              onCancel={() => setWizardOpen(false)}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>

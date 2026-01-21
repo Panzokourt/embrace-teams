@@ -415,6 +415,58 @@ export default function TasksPage() {
     }
   };
 
+  // Bulk update multiple tasks
+  const handleBulkUpdate = async (taskIds: string[], field: string, value: string | null) => {
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ [field]: value })
+        .in('id', taskIds);
+
+      if (error) throw error;
+
+      // Update local state
+      if (field === 'assigned_to') {
+        const assignee = value ? users.find(u => u.id === value) : null;
+        setTasks(prev => prev.map(t => 
+          taskIds.includes(t.id) ? { ...t, [field]: value, assignee: assignee ? { full_name: assignee.full_name, avatar_url: assignee.avatar_url } : null } : t
+        ));
+      } else {
+        setTasks(prev => prev.map(t => 
+          taskIds.includes(t.id) ? { ...t, [field]: value } : t
+        ));
+      }
+      toast.success(`${taskIds.length} tasks ενημερώθηκαν!`);
+    } catch (error) {
+      console.error('Error bulk updating tasks:', error);
+      toast.error('Σφάλμα κατά την ενημέρωση');
+      throw error;
+    }
+  };
+
+  // Create subtask
+  const handleCreateSubtask = (parentTaskId: string) => {
+    const parentTask = tasks.find(t => t.id === parentTaskId);
+    if (!parentTask) return;
+    
+    setEditingTask(null);
+    setFormData({
+      title: '',
+      description: '',
+      project_id: parentTask.project_id,
+      status: 'todo',
+      priority: 'medium',
+      due_date: '',
+      start_date: '',
+      assigned_to: '',
+      estimated_hours: '',
+      task_type: 'task',
+      task_category: '',
+    });
+    // Store parent task id for subtask creation - we'll add this to the dialog
+    setDialogOpen(true);
+  };
+
   const handleInlineUpdate = async (taskId: string, field: string, value: string | number | null) => {
     try {
       const { error } = await supabase
@@ -595,6 +647,8 @@ export default function TasksPage() {
       onEdit={handleEdit}
       onDelete={handleDelete}
       onInlineUpdate={handleInlineUpdate}
+      onCreateSubtask={handleCreateSubtask}
+      onBulkUpdate={handleBulkUpdate}
       canManage={canManage}
       showProject={true}
     />

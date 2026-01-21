@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { 
   Table, 
   TableBody, 
@@ -8,11 +8,15 @@ import {
   TableRow 
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { EnhancedInlineEditCell } from '@/components/shared/EnhancedInlineEditCell';
-import { ColumnVisibilityToggle, ColumnConfig } from '@/components/shared/ColumnVisibilityToggle';
+import { TableToolbar } from '@/components/shared/TableToolbar';
+import { BulkActionsDialog } from '@/components/shared/BulkActionsDialog';
 import { EditDeleteActions } from '@/components/dialogs/EditDeleteActions';
+import { useTableViews } from '@/hooks/useTableViews';
+import { exportToCSV, exportToExcel, formatters } from '@/utils/exportUtils';
 import { 
   ChevronDown, 
   ChevronRight, 
@@ -21,11 +25,15 @@ import {
   Sparkles,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  CheckSquare,
+  User,
+  Flag
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, isPast, isToday, isTomorrow, parseISO } from 'date-fns';
 import { el } from 'date-fns/locale';
+import { toast } from 'sonner';
 
 type TaskStatus = 'todo' | 'in_progress' | 'review' | 'completed';
 
@@ -51,7 +59,6 @@ interface Task {
   created_by: string | null;
   assignee?: { full_name: string | null; avatar_url?: string | null } | null;
   project?: { name: string } | null;
-  creator?: { full_name: string | null; avatar_url?: string | null } | null;
 }
 
 interface Profile {
@@ -73,6 +80,8 @@ interface TasksTableViewProps {
   onEdit: (task: Task) => void;
   onDelete: (taskId: string) => void;
   onInlineUpdate: (taskId: string, field: string, value: string | number | null) => Promise<void>;
+  onCreateSubtask?: (parentTaskId: string) => void;
+  onBulkUpdate?: (taskIds: string[], field: string, value: string | null) => Promise<void>;
   canManage: boolean;
   showProject?: boolean;
 }
@@ -106,7 +115,8 @@ const CATEGORY_OPTIONS = [
   { value: 'admin', label: 'Διοικητικά' },
 ];
 
-const DEFAULT_COLUMNS: ColumnConfig[] = [
+const DEFAULT_COLUMNS = [
+  { id: 'select', label: 'Επιλογή', visible: true, locked: true },
   { id: 'title', label: 'Τίτλος', visible: true, locked: true },
   { id: 'assignee', label: 'Υπεύθυνος', visible: true },
   { id: 'project', label: 'Έργο', visible: true },
@@ -125,6 +135,12 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
 type SortDirection = 'asc' | 'desc' | null;
 type SortField = 'title' | 'due_date' | 'status' | 'priority' | 'progress';
 
+const BULK_ACTIONS = [
+  { id: 'status', label: 'Αλλαγή Κατάστασης', icon: <CheckSquare className="h-4 w-4" /> },
+  { id: 'assignee', label: 'Αλλαγή Υπευθύνου', icon: <User className="h-4 w-4" /> },
+  { id: 'priority', label: 'Αλλαγή Προτεραιότητας', icon: <Flag className="h-4 w-4" /> },
+];
+
 export function TasksTableView({
   tasks,
   projects,
@@ -132,13 +148,29 @@ export function TasksTableView({
   onEdit,
   onDelete,
   onInlineUpdate,
+  onCreateSubtask,
+  onBulkUpdate,
   canManage,
   showProject = true
 }: TasksTableViewProps) {
-  const [columns, setColumns] = useState<ColumnConfig[]>(DEFAULT_COLUMNS);
+  const {
+    columns,
+    setColumns,
+    savedViews,
+    currentViewId,
+    saveView,
+    loadView,
+    deleteView,
+    resetToDefault,
+  } = useTableViews({ storageKey: 'tasks_table', defaultColumns: DEFAULT_COLUMNS });
+
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
+  const [bulkActionType, setBulkActionType] = useState<'status' | 'assignee' | 'priority' | null>(null);
+  const [addingSubtaskTo, setAddingSubtaskTo] = useState<string | null>(null);
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
 
   // Build tasks hierarchy
   const { parentTasks, childTasksMap, dependencyCountMap } = useMemo(() => {
@@ -224,6 +256,21 @@ export function TasksTableView({
     setExpandedTasks(newExpanded);
   };
 
+  const toggleSelectTask = (taskId: string) => {
+    const newSelected = new Set(selectedTasks);
+    if (newSelected.has(taskId)) newSelected.delete(taskId);
+    else newSelected.add(taskId);
+    setSelectedTasks(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedTasks.size === tasks.length) {
+      setSelectedTasks(new Set());
+    } else {
+      setSelectedTasks(new Set(tasks.map(t => t.id)));
+    }
+  };
+
   const isColumnVisible = (columnId: string) => 
     columns.find(c => c.id === columnId)?.visible ?? true;
 
@@ -250,28 +297,96 @@ export function TasksTableView({
     return { label, isOverdue };
   };
 
+  // Export functions
+  const handleExportCSV = useCallback(() => {
+    const exportColumns = [
+      { key: 'title', label: 'Τίτλος' },
+      { key: 'status', label: 'Κατάσταση', format: (v: string) => STATUS_OPTIONS.find(o => o.value === v)?.label || v },
+      { key: 'priority', label: 'Προτεραιότητα', format: (v: string) => PRIORITY_OPTIONS.find(o => o.value === v)?.label || v || '-' },
+      { key: 'project', label: 'Έργο', format: (_: any, row: Task) => row.project?.name || '-' },
+      { key: 'assignee', label: 'Υπεύθυνος', format: (_: any, row: Task) => row.assignee?.full_name || '-' },
+      { key: 'due_date', label: 'Προθεσμία', format: formatters.date },
+      { key: 'progress', label: 'Πρόοδος', format: formatters.percentage },
+      { key: 'estimated_hours', label: 'Εκτίμηση (ώρες)', format: (v: number | null) => v != null ? String(v) : '-' },
+    ];
+    exportToCSV(tasks, exportColumns, `tasks_${format(new Date(), 'yyyy-MM-dd')}`);
+    toast.success('Εξαγωγή CSV ολοκληρώθηκε!');
+  }, [tasks]);
+
+  const handleExportExcel = useCallback(() => {
+    const exportColumns = [
+      { key: 'title', label: 'Τίτλος' },
+      { key: 'status', label: 'Κατάσταση', format: (v: string) => STATUS_OPTIONS.find(o => o.value === v)?.label || v },
+      { key: 'priority', label: 'Προτεραιότητα', format: (v: string) => PRIORITY_OPTIONS.find(o => o.value === v)?.label || v || '-' },
+      { key: 'project', label: 'Έργο', format: (_: any, row: Task) => row.project?.name || '-' },
+      { key: 'assignee', label: 'Υπεύθυνος', format: (_: any, row: Task) => row.assignee?.full_name || '-' },
+      { key: 'due_date', label: 'Προθεσμία', format: formatters.date },
+      { key: 'progress', label: 'Πρόοδος', format: formatters.percentage },
+      { key: 'estimated_hours', label: 'Εκτίμηση (ώρες)', format: (v: number | null) => v != null ? String(v) : '-' },
+    ];
+    exportToExcel(tasks, exportColumns, `tasks_${format(new Date(), 'yyyy-MM-dd')}`);
+    toast.success('Εξαγωγή Excel ολοκληρώθηκε!');
+  }, [tasks]);
+
+  const handleBulkAction = (action: string) => {
+    if (action === 'status' || action === 'assignee' || action === 'priority') {
+      setBulkActionType(action);
+    }
+  };
+
+  const handleBulkConfirm = async (value: string) => {
+    if (!onBulkUpdate || !bulkActionType) return;
+    const field = bulkActionType === 'assignee' ? 'assigned_to' : bulkActionType;
+    const finalValue = value === 'none' ? null : value;
+    await onBulkUpdate(Array.from(selectedTasks), field, finalValue);
+    setSelectedTasks(new Set());
+    setBulkActionType(null);
+  };
+
+  const handleAddSubtask = async (parentId: string) => {
+    if (!newSubtaskTitle.trim() || !onCreateSubtask) return;
+    onCreateSubtask(parentId);
+    setAddingSubtaskTo(null);
+    setNewSubtaskTitle('');
+  };
+
   const renderTaskRow = (task: Task, level = 0) => {
     const children = childTasksMap.get(task.id) || [];
     const hasChildren = children.length > 0;
     const isExpanded = expandedTasks.has(task.id);
     const depCount = dependencyCountMap.get(task.id) || 0;
     const dueDateInfo = formatDueDate(task.due_date);
+    const isSelected = selectedTasks.has(task.id);
 
     return (
       <>
-        <TableRow key={task.id} className="group hover:bg-muted/50">
+        <TableRow key={task.id} className={cn("group hover:bg-muted/50", isSelected && "bg-primary/5")}>
+          {/* Checkbox */}
+          {isColumnVisible('select') && (
+            <TableCell className="w-[40px]">
+              <Checkbox
+                checked={isSelected}
+                onCheckedChange={() => toggleSelectTask(task.id)}
+              />
+            </TableCell>
+          )}
+
           {/* Title with expand/collapse */}
           <TableCell className="font-medium">
             <div className="flex items-center gap-2" style={{ paddingLeft: `${level * 20}px` }}>
-              {hasChildren ? (
+              {hasChildren || level === 0 ? (
                 <button 
-                  onClick={() => toggleExpand(task.id)}
-                  className="p-0.5 hover:bg-muted rounded"
+                  onClick={() => hasChildren ? toggleExpand(task.id) : canManage && onCreateSubtask && setAddingSubtaskTo(task.id)}
+                  className={cn(
+                    "p-0.5 rounded transition-colors",
+                    hasChildren ? "hover:bg-muted" : "opacity-0 group-hover:opacity-100 hover:bg-muted text-muted-foreground"
+                  )}
+                  title={hasChildren ? undefined : "Προσθήκη subtask"}
                 >
-                  {isExpanded ? (
-                    <ChevronDown className="h-4 w-4" />
+                  {hasChildren ? (
+                    isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
                   ) : (
-                    <ChevronRight className="h-4 w-4" />
+                    <Plus className="h-4 w-4" />
                   )}
                 </button>
               ) : (
@@ -439,15 +554,13 @@ export function TasksTableView({
           {/* Category */}
           {isColumnVisible('category') && (
             <TableCell>
-              <div className="flex items-center gap-1">
-                <EnhancedInlineEditCell
-                  value={task.task_category}
-                  onSave={(val) => onInlineUpdate(task.id, 'task_category', val)}
-                  type="select"
-                  options={CATEGORY_OPTIONS}
-                  disabled={!canManage}
-                />
-              </div>
+              <EnhancedInlineEditCell
+                value={task.task_category}
+                onSave={(val) => onInlineUpdate(task.id, 'task_category', val)}
+                type="select"
+                options={CATEGORY_OPTIONS}
+                disabled={!canManage}
+              />
             </TableCell>
           )}
 
@@ -463,27 +576,79 @@ export function TasksTableView({
           </TableCell>
         </TableRow>
 
+        {/* Inline subtask creation */}
+        {addingSubtaskTo === task.id && (
+          <TableRow>
+            <TableCell colSpan={columns.filter(c => c.visible).length}>
+              <div className="flex items-center gap-2 pl-8">
+                <Input
+                  placeholder="Τίτλος νέου subtask..."
+                  value={newSubtaskTitle}
+                  onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleAddSubtask(task.id);
+                    if (e.key === 'Escape') { setAddingSubtaskTo(null); setNewSubtaskTitle(''); }
+                  }}
+                  className="max-w-md"
+                  autoFocus
+                />
+                <Button size="sm" onClick={() => handleAddSubtask(task.id)}>Προσθήκη</Button>
+                <Button size="sm" variant="ghost" onClick={() => { setAddingSubtaskTo(null); setNewSubtaskTitle(''); }}>Ακύρωση</Button>
+              </div>
+            </TableCell>
+          </TableRow>
+        )}
+
         {/* Render children if expanded */}
         {isExpanded && children.map(child => renderTaskRow(child, level + 1))}
       </>
     );
   };
 
+  const allSelected = tasks.length > 0 && selectedTasks.size === tasks.length;
+  const someSelected = selectedTasks.size > 0 && selectedTasks.size < tasks.length;
+
   return (
     <div className="space-y-4">
-      {/* Column visibility toggle */}
-      <div className="flex justify-end">
-        <ColumnVisibilityToggle
-          columns={columns}
-          onColumnsChange={setColumns}
-        />
-      </div>
+      {/* Toolbar with saved views, columns, export, bulk actions */}
+      <TableToolbar
+        columns={columns}
+        onColumnsChange={setColumns}
+        savedViews={savedViews}
+        currentViewId={currentViewId}
+        onSaveView={(name) => saveView(name, sortField, sortDirection)}
+        onLoadView={(id) => {
+          const view = loadView(id);
+          if (view) {
+            setSortField(view.sortField as SortField | null);
+            setSortDirection(view.sortDirection);
+          }
+        }}
+        onDeleteView={deleteView}
+        onResetToDefault={resetToDefault}
+        onExportCSV={handleExportCSV}
+        onExportExcel={handleExportExcel}
+        selectedCount={selectedTasks.size}
+        onBulkAction={canManage ? handleBulkAction : undefined}
+        bulkActions={BULK_ACTIONS}
+      />
 
       {/* Table */}
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
+              {isColumnVisible('select') && (
+                <TableHead className="w-[40px]">
+                  <Checkbox
+                    checked={allSelected}
+                    // @ts-ignore - indeterminate is valid but not in types
+                    indeterminate={someSelected}
+                    onCheckedChange={toggleSelectAll}
+                  />
+                </TableHead>
+              )}
+              
               <TableHead 
                 className="cursor-pointer select-none"
                 onClick={() => toggleSort('title')}
@@ -561,6 +726,16 @@ export function TasksTableView({
           </TableBody>
         </Table>
       </div>
+
+      {/* Bulk Actions Dialog */}
+      <BulkActionsDialog
+        open={bulkActionType !== null}
+        onOpenChange={(open) => !open && setBulkActionType(null)}
+        actionType={bulkActionType}
+        selectedCount={selectedTasks.size}
+        users={users}
+        onConfirm={handleBulkConfirm}
+      />
     </div>
   );
 }

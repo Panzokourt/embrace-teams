@@ -478,13 +478,13 @@ export default function OrgChartPage() {
 
             <div className="space-y-2">
               <Label>Υπάλληλος</Label>
-              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+              <Select value={selectedUserId || "none"} onValueChange={(val) => setSelectedUserId(val === "none" ? "" : val)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Επιλέξτε χρήστη (προαιρετικό)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Κενή θέση</SelectItem>
-                  {profiles.map(p => (
+                  <SelectItem value="none">Κενή θέση</SelectItem>
+                  {profiles.filter(p => p.id).map(p => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.full_name || p.email}
                     </SelectItem>
@@ -495,14 +495,14 @@ export default function OrgChartPage() {
 
             <div className="space-y-2">
               <Label>Αναφέρεται σε</Label>
-              <Select value={parentPositionId} onValueChange={setParentPositionId}>
+              <Select value={parentPositionId || "none"} onValueChange={(val) => setParentPositionId(val === "none" ? "" : val)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Επιλέξτε ανώτερη θέση" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Καμία (top-level)</SelectItem>
+                  <SelectItem value="none">Καμία (top-level)</SelectItem>
                   {positions
-                    .filter(p => p.id !== editingPosition?.id)
+                    .filter(p => p.id && p.id !== editingPosition?.id)
                     .map(p => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.position_title} {p.user?.full_name ? `(${p.user.full_name})` : ''}

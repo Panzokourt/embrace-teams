@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ClientSelector } from '@/components/shared/ClientSelector';
 
 type TenderType = 'public' | 'eu' | 'private';
 type TenderStage = 'identification' | 'preparation' | 'submitted' | 'evaluation' | 'won' | 'lost';
@@ -450,21 +451,15 @@ export function TenderCreationWizard({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="client">Πελάτης/Φορέας</Label>
-                  <Select
+                  <ClientSelector
                     value={formData.client_id}
                     onValueChange={(value) => setFormData(prev => ({ ...prev, client_id: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Επιλέξτε" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clients.map(client => (
-                        <SelectItem key={client.id} value={client.id}>
-                          {client.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    clients={clients}
+                    onClientCreated={(newClient) => {
+                      // Parent will refresh clients list
+                    }}
+                    placeholder="Επιλέξτε"
+                  />
                 </div>
 
                 <div className="space-y-2">

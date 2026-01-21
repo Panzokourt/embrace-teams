@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/table';
 import { UnifiedViewToggle, type UnifiedViewMode } from '@/components/ui/unified-view-toggle';
 import { InlineEditCell } from '@/components/shared/InlineEditCell';
+import { ClientSelector } from '@/components/shared/ClientSelector';
 import { FileAttachments } from '@/components/files/FileAttachments';
 import { ProjectAISuggestions } from '@/components/projects/ProjectAISuggestions';
 import { EditDeleteActions } from '@/components/dialogs/EditDeleteActions';
@@ -740,21 +741,15 @@ export default function ProjectsPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="client">Πελάτης</Label>
-                          <Select
+                          <ClientSelector
                             value={formData.client_id}
                             onValueChange={(value) => setFormData(prev => ({ ...prev, client_id: value }))}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Επιλέξτε πελάτη" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {clients.map(client => (
-                                <SelectItem key={client.id} value={client.id}>
-                                  {client.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            clients={clients}
+                            onClientCreated={(newClient) => {
+                              setClients(prev => [...prev, newClient].sort((a, b) => a.name.localeCompare(b.name)));
+                            }}
+                            placeholder="Επιλέξτε πελάτη"
+                          />
                         </div>
 
                         <div className="space-y-2">

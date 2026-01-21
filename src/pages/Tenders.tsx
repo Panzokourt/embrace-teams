@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/table';
 import { UnifiedViewToggle, type UnifiedViewMode } from '@/components/ui/unified-view-toggle';
 import { InlineEditCell } from '@/components/shared/InlineEditCell';
+import { ClientSelector } from '@/components/shared/ClientSelector';
 import { toast } from 'sonner';
 import { 
   FileText, 
@@ -702,21 +703,15 @@ export default function TendersPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="client">Πελάτης/Φορέας</Label>
-                        <Select
+                        <ClientSelector
                           value={formData.client_id}
                           onValueChange={(value) => setFormData(prev => ({ ...prev, client_id: value }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Επιλέξτε" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {clients.map(client => (
-                              <SelectItem key={client.id} value={client.id}>
-                                {client.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          clients={clients}
+                          onClientCreated={(newClient) => {
+                            setClients(prev => [...prev, newClient].sort((a, b) => a.name.localeCompare(b.name)));
+                          }}
+                          placeholder="Επιλέξτε"
+                        />
                       </div>
 
                       <div className="space-y-2">

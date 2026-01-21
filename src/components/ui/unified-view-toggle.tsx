@@ -1,3 +1,4 @@
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { LayoutGrid, List, Columns } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -5,25 +6,68 @@ import { cn } from '@/lib/utils';
 export type UnifiedViewMode = 'card' | 'table' | 'kanban';
 
 interface UnifiedViewToggleProps {
-  viewMode: UnifiedViewMode;
-  onViewModeChange: (mode: UnifiedViewMode) => void;
+  viewMode?: UnifiedViewMode;
+  onViewModeChange?: (mode: UnifiedViewMode) => void;
   showKanban?: boolean;
   className?: string;
+  storageKey?: string;
+  defaultMode?: UnifiedViewMode;
+}
+
+export function usePersistedViewMode(
+  storageKey: string,
+  defaultMode: UnifiedViewMode = 'card'
+): [UnifiedViewMode, (mode: UnifiedViewMode) => void] {
+  const [viewMode, setViewMode] = useState<UnifiedViewMode>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(`viewMode_${storageKey}`);
+      if (saved && ['card', 'table', 'kanban'].includes(saved)) {
+        return saved as UnifiedViewMode;
+      }
+    }
+    return defaultMode;
+  });
+
+  const handleViewModeChange = useCallback((mode: UnifiedViewMode) => {
+    setViewMode(mode);
+    localStorage.setItem(`viewMode_${storageKey}`, mode);
+  }, [storageKey]);
+
+  return [viewMode, handleViewModeChange];
 }
 
 export function UnifiedViewToggle({ 
-  viewMode, 
+  viewMode: controlledViewMode, 
   onViewModeChange, 
   showKanban = true,
-  className 
+  className,
+  storageKey,
+  defaultMode = 'card'
 }: UnifiedViewToggleProps) {
+  const [internalViewMode, setInternalViewMode] = usePersistedViewMode(
+    storageKey || 'default',
+    defaultMode
+  );
+
+  // Use controlled mode if provided, otherwise use internal state
+  const viewMode = controlledViewMode !== undefined ? controlledViewMode : internalViewMode;
+
+  const handleChange = (mode: UnifiedViewMode) => {
+    if (onViewModeChange) {
+      onViewModeChange(mode);
+    }
+    if (storageKey) {
+      setInternalViewMode(mode);
+    }
+  };
+
   return (
     <div className={cn("flex items-center gap-1 p-1 bg-muted rounded-lg", className)}>
       <Button
         variant={viewMode === 'card' ? 'default' : 'ghost'}
         size="sm"
         className="h-8 px-3"
-        onClick={() => onViewModeChange('card')}
+        onClick={() => handleChange('card')}
         title="Προβολή καρτών"
       >
         <LayoutGrid className="h-4 w-4 mr-1.5" />
@@ -33,7 +77,7 @@ export function UnifiedViewToggle({
         variant={viewMode === 'table' ? 'default' : 'ghost'}
         size="sm"
         className="h-8 px-3"
-        onClick={() => onViewModeChange('table')}
+        onClick={() => handleChange('table')}
         title="Προβολή πίνακα"
       >
         <List className="h-4 w-4 mr-1.5" />
@@ -44,7 +88,7 @@ export function UnifiedViewToggle({
           variant={viewMode === 'kanban' ? 'default' : 'ghost'}
           size="sm"
           className="h-8 px-3"
-          onClick={() => onViewModeChange('kanban')}
+          onClick={() => handleChange('kanban')}
           title="Προβολή Kanban"
         >
           <Columns className="h-4 w-4 mr-1.5" />

@@ -35,7 +35,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { UnifiedViewToggle, type UnifiedViewMode } from '@/components/ui/unified-view-toggle';
+import { UnifiedViewToggle, usePersistedViewMode, type UnifiedViewMode } from '@/components/ui/unified-view-toggle';
 import { ClientSelector } from '@/components/shared/ClientSelector';
 import { TendersTableView } from '@/components/tenders/TendersTableView';
 import { toast } from 'sonner';
@@ -112,7 +112,7 @@ export default function TendersPage() {
   const [saving, setSaving] = useState(false);
   const [activeTender, setActiveTender] = useState<Tender | null>(null);
   const [editingTender, setEditingTender] = useState<Tender | null>(null);
-  const [viewMode, setViewMode] = useState<UnifiedViewMode>('kanban');
+  const [viewMode, setViewMode] = usePersistedViewMode('tenders', 'kanban');
 
   const [formData, setFormData] = useState({
     name: '',

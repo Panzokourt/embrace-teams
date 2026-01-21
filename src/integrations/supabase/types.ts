@@ -842,6 +842,7 @@ export type Database = {
           end_date: string | null
           id: string
           name: string
+          progress: number | null
           start_date: string | null
           status: Database["public"]["Enums"]["project_status"]
           updated_at: string
@@ -856,6 +857,7 @@ export type Database = {
           end_date?: string | null
           id?: string
           name: string
+          progress?: number | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["project_status"]
           updated_at?: string
@@ -870,6 +872,7 @@ export type Database = {
           end_date?: string | null
           id?: string
           name?: string
+          progress?: number | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["project_status"]
           updated_at?: string
@@ -1005,19 +1008,25 @@ export type Database = {
           actual_hours: number | null
           assigned_to: string | null
           created_at: string
+          created_by: string | null
           deliverable_id: string | null
           depends_on: string | null
           description: string | null
           due_date: string | null
           estimated_hours: number | null
           id: string
+          is_ai_generated: boolean | null
           is_recurring: boolean | null
           parent_task_id: string | null
           priority: string | null
+          progress: number | null
           project_id: string
           recurrence_end_date: string | null
           recurrence_pattern: string | null
+          start_date: string | null
           status: Database["public"]["Enums"]["task_status"]
+          task_category: string | null
+          task_type: string | null
           title: string
           updated_at: string
         }
@@ -1025,19 +1034,25 @@ export type Database = {
           actual_hours?: number | null
           assigned_to?: string | null
           created_at?: string
+          created_by?: string | null
           deliverable_id?: string | null
           depends_on?: string | null
           description?: string | null
           due_date?: string | null
           estimated_hours?: number | null
           id?: string
+          is_ai_generated?: boolean | null
           is_recurring?: boolean | null
           parent_task_id?: string | null
           priority?: string | null
+          progress?: number | null
           project_id: string
           recurrence_end_date?: string | null
           recurrence_pattern?: string | null
+          start_date?: string | null
           status?: Database["public"]["Enums"]["task_status"]
+          task_category?: string | null
+          task_type?: string | null
           title: string
           updated_at?: string
         }
@@ -1045,19 +1060,25 @@ export type Database = {
           actual_hours?: number | null
           assigned_to?: string | null
           created_at?: string
+          created_by?: string | null
           deliverable_id?: string | null
           depends_on?: string | null
           description?: string | null
           due_date?: string | null
           estimated_hours?: number | null
           id?: string
+          is_ai_generated?: boolean | null
           is_recurring?: boolean | null
           parent_task_id?: string | null
           priority?: string | null
+          progress?: number | null
           project_id?: string
           recurrence_end_date?: string | null
           recurrence_pattern?: string | null
+          start_date?: string | null
           status?: Database["public"]["Enums"]["task_status"]
+          task_category?: string | null
+          task_type?: string | null
           title?: string
           updated_at?: string
         }
@@ -1296,6 +1317,7 @@ export type Database = {
           id: string
           name: string
           probability: number | null
+          progress: number | null
           source_email: string | null
           stage: Database["public"]["Enums"]["tender_stage"]
           submission_deadline: string | null
@@ -1311,6 +1333,7 @@ export type Database = {
           id?: string
           name: string
           probability?: number | null
+          progress?: number | null
           source_email?: string | null
           stage?: Database["public"]["Enums"]["tender_stage"]
           submission_deadline?: string | null
@@ -1326,6 +1349,7 @@ export type Database = {
           id?: string
           name?: string
           probability?: number | null
+          progress?: number | null
           source_email?: string | null
           stage?: Database["public"]["Enums"]["tender_stage"]
           submission_deadline?: string | null

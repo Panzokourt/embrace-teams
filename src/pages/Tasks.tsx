@@ -25,16 +25,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { UnifiedViewToggle, type UnifiedViewMode } from '@/components/ui/unified-view-toggle';
-import { InlineEditCell } from '@/components/shared/InlineEditCell';
+import { TasksTableView } from '@/components/tasks/TasksTableView';
 import { toast } from 'sonner';
 import { 
   CheckSquare, 
@@ -49,7 +41,6 @@ import {
   GripVertical,
   Pencil,
   Trash2,
-  User
 } from 'lucide-react';
 import { format, isPast, isToday } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -76,6 +67,7 @@ interface Profile {
   id: string;
   full_name: string | null;
   email: string;
+  avatar_url?: string | null;
 }
 
 interface Task {
@@ -83,11 +75,23 @@ interface Task {
   title: string;
   description: string | null;
   status: TaskStatus;
+  priority: string | null;
   due_date: string | null;
+  start_date: string | null;
   project_id: string;
   assigned_to: string | null;
+  deliverable_id: string | null;
+  parent_task_id: string | null;
+  depends_on: string | null;
+  estimated_hours: number | null;
+  actual_hours: number | null;
+  progress: number | null;
+  task_type: string | null;
+  task_category: string | null;
+  is_ai_generated: boolean | null;
+  created_by: string | null;
   project?: { name: string } | null;
-  assignee?: { full_name: string | null } | null;
+  assignee?: { full_name: string | null; avatar_url?: string | null } | null;
 }
 
 const statusConfig: Record<TaskStatus, { icon: React.ReactNode; label: string; className: string }> = {
@@ -117,8 +121,13 @@ export default function TasksPage() {
     description: '',
     project_id: '',
     status: 'todo' as TaskStatus,
+    priority: 'medium',
     due_date: '',
+    start_date: '',
     assigned_to: '',
+    estimated_hours: '',
+    task_type: 'task',
+    task_category: '',
   });
 
   const sensors = useSensors(
@@ -185,7 +194,7 @@ export default function TasksPage() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, email')
+        .select('id, full_name, email, avatar_url')
         .eq('status', 'active')
         .order('full_name');
 
@@ -219,8 +228,13 @@ export default function TasksPage() {
         description: formData.description || null,
         project_id: formData.project_id,
         status: formData.status,
+        priority: formData.priority || 'medium',
         due_date: formData.due_date || null,
+        start_date: formData.start_date || null,
         assigned_to: formData.assigned_to || null,
+        estimated_hours: formData.estimated_hours ? parseFloat(formData.estimated_hours) : null,
+        task_type: formData.task_type || 'task',
+        task_category: formData.task_category || null,
       };
 
       if (editingTask) {
@@ -265,8 +279,13 @@ export default function TasksPage() {
       description: '',
       project_id: '',
       status: 'todo',
+      priority: 'medium',
       due_date: '',
+      start_date: '',
       assigned_to: '',
+      estimated_hours: '',
+      task_type: 'task',
+      task_category: '',
     });
   };
 
@@ -373,8 +392,13 @@ export default function TasksPage() {
       description: task.description || '',
       project_id: task.project_id,
       status: task.status,
+      priority: task.priority || 'medium',
       due_date: task.due_date || '',
+      start_date: task.start_date || '',
       assigned_to: task.assigned_to || '',
+      estimated_hours: task.estimated_hours?.toString() || '',
+      task_type: task.task_type || 'task',
+      task_category: task.task_category || '',
     });
     setDialogOpen(true);
   };
@@ -391,18 +415,31 @@ export default function TasksPage() {
     }
   };
 
-  const handleInlineUpdate = async (taskId: string, field: string, value: string) => {
+  const handleInlineUpdate = async (taskId: string, field: string, value: string | number | null) => {
     try {
       const { error } = await supabase
         .from('tasks')
-        .update({ [field]: value || null })
+        .update({ [field]: value })
         .eq('id', taskId);
 
       if (error) throw error;
 
-      setTasks(prev => prev.map(t => 
-        t.id === taskId ? { ...t, [field]: value || null } : t
-      ));
+      // If assignee changed, update the assignee object too
+      if (field === 'assigned_to') {
+        const assignee = value ? users.find(u => u.id === value) : null;
+        setTasks(prev => prev.map(t => 
+          t.id === taskId ? { ...t, [field]: value as string | null, assignee: assignee ? { full_name: assignee.full_name, avatar_url: assignee.avatar_url } : null } : t
+        ));
+      } else if (field === 'project_id') {
+        const project = value ? projects.find(p => p.id === value) : null;
+        setTasks(prev => prev.map(t => 
+          t.id === taskId ? { ...t, [field]: value as string, project: project ? { name: project.name } : null } : t
+        ));
+      } else {
+        setTasks(prev => prev.map(t => 
+          t.id === taskId ? { ...t, [field]: value } : t
+        ));
+      }
       toast.success('Ενημερώθηκε!');
     } catch (error) {
       console.error('Error updating task:', error);
@@ -551,70 +588,16 @@ export default function TasksPage() {
   );
 
   const renderTableView = () => (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Τίτλος</TableHead>
-            <TableHead>Έργο</TableHead>
-            <TableHead>Κατάσταση</TableHead>
-            <TableHead>Ανάθεση</TableHead>
-            <TableHead>Deadline</TableHead>
-            {canManage && <TableHead className="w-[100px]">Ενέργειες</TableHead>}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {filteredTasks.map(task => (
-            <TableRow 
-              key={task.id} 
-              className="cursor-pointer hover:bg-muted/50"
-              onClick={() => handleEdit(task)}
-            >
-              <TableCell onClick={(e) => e.stopPropagation()}>
-                <InlineEditCell
-                  value={task.title}
-                  onSave={(val) => handleInlineUpdate(task.id, 'title', val)}
-                />
-              </TableCell>
-              <TableCell>{task.project?.name || '-'}</TableCell>
-              <TableCell>{getStatusBadge(task.status)}</TableCell>
-              <TableCell>
-                {task.assignee ? (
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-6 w-6">
-                      <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                        {getInitials(task.assignee.full_name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span>{task.assignee.full_name}</span>
-                  </div>
-                ) : (
-                  <span className="text-muted-foreground">-</span>
-                )}
-              </TableCell>
-              <TableCell>
-                {task.due_date 
-                  ? format(new Date(task.due_date), 'd MMM yyyy', { locale: el })
-                  : '-'
-                }
-              </TableCell>
-              {canManage && (
-                <TableCell onClick={(e) => e.stopPropagation()}>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(task)}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDelete(task.id)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </TableCell>
-              )}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+    <TasksTableView
+      tasks={filteredTasks}
+      projects={projects}
+      users={users}
+      onEdit={handleEdit}
+      onDelete={handleDelete}
+      onInlineUpdate={handleInlineUpdate}
+      canManage={canManage}
+      showProject={true}
+    />
   );
 
   const renderKanbanView = () => (
@@ -749,11 +732,13 @@ export default function TasksPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">Χωρίς ανάθεση</SelectItem>
-                        {users.map(user => (
-                          <SelectItem key={user.id} value={user.id}>
+                        {users.map(u => (
+                          <SelectItem key={u.id} value={u.id}>
                             <div className="flex items-center gap-2">
-                              <User className="h-4 w-4" />
-                              {user.full_name || user.email}
+                              <Avatar className="h-4 w-4">
+                                <AvatarFallback className="text-[8px]">{getInitials(u.full_name)}</AvatarFallback>
+                              </Avatar>
+                              {u.full_name || u.email}
                             </div>
                           </SelectItem>
                         ))}
@@ -781,12 +766,94 @@ export default function TasksPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="due_date">Deadline</Label>
+                      <Label htmlFor="priority">Προτεραιότητα</Label>
+                      <Select
+                        value={formData.priority}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, priority: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Χαμηλή</SelectItem>
+                          <SelectItem value="medium">Μεσαία</SelectItem>
+                          <SelectItem value="high">Υψηλή</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="start_date">Έναρξη</Label>
+                      <Input
+                        id="start_date"
+                        type="date"
+                        value={formData.start_date}
+                        onChange={(e) => setFormData(prev => ({ ...prev, start_date: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="due_date">Προθεσμία</Label>
                       <Input
                         id="due_date"
                         type="date"
                         value={formData.due_date}
                         onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="task_type">Τύπος</Label>
+                      <Select
+                        value={formData.task_type}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, task_type: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="task">Task</SelectItem>
+                          <SelectItem value="milestone">Milestone</SelectItem>
+                          <SelectItem value="bug">Bug</SelectItem>
+                          <SelectItem value="feature">Feature</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="task_category">Κατηγορία</Label>
+                      <Select
+                        value={formData.task_category || 'none'}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, task_category: value === 'none' ? '' : value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Επιλέξτε" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Καμία</SelectItem>
+                          <SelectItem value="research">Έρευνα</SelectItem>
+                          <SelectItem value="design">Σχεδιασμός</SelectItem>
+                          <SelectItem value="development">Ανάπτυξη</SelectItem>
+                          <SelectItem value="content">Περιεχόμενο</SelectItem>
+                          <SelectItem value="marketing">Marketing</SelectItem>
+                          <SelectItem value="admin">Διοικητικά</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="estimated_hours">Εκτίμηση (ώρες)</Label>
+                      <Input
+                        id="estimated_hours"
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={formData.estimated_hours}
+                        onChange={(e) => setFormData(prev => ({ ...prev, estimated_hours: e.target.value }))}
+                        placeholder="π.χ. 4"
                       />
                     </div>
                   </div>

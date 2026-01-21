@@ -17,10 +17,22 @@ import {
   Info,
   Save
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isValid, parseISO } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+
+// Helper to safely format dates
+const safeFormatDate = (dateStr: string | undefined): string | null => {
+  if (!dateStr) return null;
+  try {
+    const date = parseISO(dateStr);
+    if (!isValid(date)) return null;
+    return format(date, 'd MMM yyyy', { locale: el });
+  } catch {
+    return null;
+  }
+};
 
 interface FileContent {
   fileName: string;
@@ -309,7 +321,7 @@ export function TenderAISuggestions({
                   <p className="font-medium">{d.name}</p>
                   <p className="text-sm text-muted-foreground">{d.description}</p>
                   <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
-                    {d.due_date && <span>Προθεσμία: {format(new Date(d.due_date), 'd MMM yyyy', { locale: el })}</span>}
+                    {safeFormatDate(d.due_date) && <span>Προθεσμία: {safeFormatDate(d.due_date)}</span>}
                     {d.budget && <span>Budget: €{d.budget.toLocaleString()}</span>}
                   </div>
                 </div>
@@ -347,9 +359,9 @@ export function TenderAISuggestions({
                 <div className="flex-1">
                   <p className="font-medium">{t.title}</p>
                   <p className="text-sm text-muted-foreground">{t.description}</p>
-                  {t.due_date && (
+                  {safeFormatDate(t.due_date) && (
                     <span className="text-xs text-muted-foreground">
-                      Προθεσμία: {format(new Date(t.due_date), 'd MMM yyyy', { locale: el })}
+                      Προθεσμία: {safeFormatDate(t.due_date)}
                     </span>
                   )}
                 </div>
@@ -388,9 +400,9 @@ export function TenderAISuggestions({
                   <p className="font-medium">{inv.description}</p>
                   <div className="flex gap-4 mt-1 text-sm">
                     <span className="text-primary font-medium">€{inv.amount.toLocaleString()}</span>
-                    {inv.due_date && (
+                    {safeFormatDate(inv.due_date) && (
                       <span className="text-muted-foreground">
-                        Λήξη: {format(new Date(inv.due_date), 'd MMM yyyy', { locale: el })}
+                        Λήξη: {safeFormatDate(inv.due_date)}
                       </span>
                     )}
                   </div>
@@ -411,11 +423,11 @@ export function TenderAISuggestions({
               {suggestions.suggestedProjectDetails.budget && (
                 <span>Budget: €{suggestions.suggestedProjectDetails.budget.toLocaleString()}</span>
               )}
-              {suggestions.suggestedProjectDetails.start_date && (
-                <span>Έναρξη: {format(new Date(suggestions.suggestedProjectDetails.start_date), 'd MMM yyyy', { locale: el })}</span>
+              {safeFormatDate(suggestions.suggestedProjectDetails.start_date) && (
+                <span>Έναρξη: {safeFormatDate(suggestions.suggestedProjectDetails.start_date)}</span>
               )}
-              {suggestions.suggestedProjectDetails.end_date && (
-                <span>Λήξη: {format(new Date(suggestions.suggestedProjectDetails.end_date), 'd MMM yyyy', { locale: el })}</span>
+              {safeFormatDate(suggestions.suggestedProjectDetails.end_date) && (
+                <span>Λήξη: {safeFormatDate(suggestions.suggestedProjectDetails.end_date)}</span>
               )}
             </div>
           </div>

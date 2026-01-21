@@ -234,18 +234,26 @@ export default function TeamsPage() {
     setSaving(true);
 
     try {
-      const { data, error } = await supabase
+      // Insert the team member first
+      const { data: insertData, error: insertError } = await supabase
         .from('team_members')
         .insert({ team_id: selectedTeam.id, user_id: selectedUserId })
-        .select(`id, team_id, user_id, profile:profiles(id, full_name, email, avatar_url)`)
+        .select('id, team_id, user_id')
         .single();
 
-      if (error) throw error;
+      if (insertError) throw insertError;
+
+      // Then fetch the profile separately
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, avatar_url')
+        .eq('id', selectedUserId)
+        .single();
 
       const newMember: TeamMember = {
-        id: data.id,
-        user_id: data.user_id,
-        profile: data.profile as any
+        id: insertData.id,
+        user_id: insertData.user_id,
+        profile: profileData || undefined
       };
 
       setTeams(prev => prev.map(t => 

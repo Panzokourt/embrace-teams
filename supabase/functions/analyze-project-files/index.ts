@@ -82,7 +82,17 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const { fileContents, projectName, projectBudget, projectId } = await req.json();
+    const { 
+      fileContents, 
+      projectName, 
+      projectBudget, 
+      projectId,
+      additionalContext,
+      focusArea,
+      focusInstructions,
+      isReanalysis,
+      requestQuestions
+    } = await req.json();
 
     // ============================================
     // SECURITY: Authorization Check (if projectId provided)
@@ -137,14 +147,37 @@ serve(async (req) => {
     // Use processed files from here on
     const filesToAnalyze = processedFiles;
 
-    console.log(`Analyzing ${filesToAnalyze.length} files for project: ${projectName}, total size: ${totalContentLength} chars`);
+    console.log(`Analyzing ${filesToAnalyze.length} files for project: ${projectName}, total size: ${totalContentLength} chars, focus: ${focusArea || 'all'}, reanalysis: ${isReanalysis || false}`);
+
+    // Build dynamic system prompt based on focus area and reanalysis mode
+    let focusPromptSection = '';
+    if (focusInstructions) {
+      focusPromptSection = `\n\nΕΙΔΙΚΗ ΕΣΤΙΑΣΗ: ${focusInstructions}`;
+    }
+
+    let reanalysisSection = '';
+    if (isReanalysis && additionalContext) {
+      reanalysisSection = `\n\nΠΡΟΣΟΧΗ - ΕΠΑΝΑΝAΛΥΣΗ:\n${additionalContext}`;
+    }
+
+    let questionsSection = '';
+    if (requestQuestions) {
+      questionsSection = `\n\nΕΡΩΤΗΣΕΙΣ ΕΠΙΒΕΒΑΙΩΣΗΣ:
+Μετά την ανάλυση, δημιούργησε ερωτήσεις για τον χρήστη:
+- Ρώτα αν τα αποτελέσματα είναι σωστά
+- Αν λείπουν σημαντικές πληροφορίες (budget, ημερομηνίες), ρώτα
+- Πρότεινε βελτιώσεις αν χρειάζεται (π.χ. περισσότερα tasks)`;
+    }
 
     const systemPrompt = `Είσαι ειδικός αναλυτής έργων για ένα agency που διαχειρίζεται διαγωνισμούς, συμβάσεις και έργα. Αναλύεις αρχεία (προκηρύξεις, συμβάσεις, RFPs, τεχνικές προδιαγραφές κλπ) και εξάγεις δομημένα δεδομένα.
+
+ΣΗΜΑΝΤΙΚΟ: Διάβασε ΠΟΛΥ ΠΡΟΣΕΚΤΙΚΑ κάθε αρχείο. Μην παραλείψεις τίποτα σημαντικό.
 
 ΟΔΗΓΙΕΣ ΑΝΑΛΥΣΗΣ:
 
 1. ΠΑΡΑΔΟΤΕΑ (Deliverables):
-   - Αναζήτησε ενότητες με τίτλους όπως: "Παραδοτέα", "Deliverables", "Φάσεις", "Work Packages", "Πακέτα Εργασίας"
+   - Αναζήτησε ενότητες με τίτλους όπως: "Παραδοτέα", "Deliverables", "Φάσεις", "Work Packages", "Πακέτα Εργασίας", "Αντικείμενο", "Scope"
+   - Ψάξε και στο σώμα του κειμένου, όχι μόνο στους τίτλους
    - Κάθε παραδοτέο πρέπει να έχει σαφή περιγραφή
    - Αν υπάρχουν προθεσμίες ανά παραδοτέο, εξάγε τις
    - Αν υπάρχουν κόστη/budgets ανά παραδοτέο, εξάγε τα
@@ -152,23 +185,31 @@ serve(async (req) => {
 
 2. ΕΡΓΑΣΙΕΣ (Tasks):
    - Εξάγε συγκεκριμένες εργασίες από κάθε παραδοτέο
+   - Ψάξε για λέξεις όπως: "ενέργειες", "δράσεις", "εργασίες", "βήματα", "activities", "tasks"
    - Σύνδεσε κάθε task με το αντίστοιχο παραδοτέο (deliverable_index)
    - Πρότεινε λογικές ημερομηνίες αν δεν υπάρχουν
 
 3. ΤΙΜΟΛΟΓΙΑ (Invoices):
    - Αναζήτησε ενότητες για πληρωμές, τιμολόγηση, δόσεις
+   - Ψάξε για: "τρόπος πληρωμής", "πληρωμές", "τιμολόγηση", "δόσεις", "payment terms"
    - Συνήθεις δομές: Προκαταβολή, Ενδιάμεσες πληρωμές, Τελική πληρωμή
    - Αν δεν υπάρχουν συγκεκριμένες πληρωμές, πρότεινε: 30% προκαταβολή, 40% ενδιάμεσα, 30% τέλος
 
 4. ΣΤΟΙΧΕΙΑ ΕΡΓΟΥ (Project Details):
-   - ΠΡΟΫΠΟΛΟΓΙΣΜΟΣ: Ψάξε για ποσά, budget, τιμή, κόστος, αμοιβή
-   - ΗΜΕΡΟΜΗΝΙΕΣ: Ψάξε για ημερομηνία έναρξης, λήξης, διάρκεια, χρονοδιάγραμμα
+   - ΠΡΟΫΠΟΛΟΓΙΣΜΟΣ: Ψάξε για ποσά, budget, τιμή, κόστος, αμοιβή, "€", "ευρώ"
+   - ΗΜΕΡΟΜΗΝΙΕΣ: Ψάξε για ημερομηνία έναρξης, λήξης, διάρκεια, χρονοδιάγραμμα, "έως", "μέχρι"
    - ΠΕΡΙΓΡΑΦΗ: Σύνοψη του αντικειμένου του έργου
+
+5. ΑΞΙΟΛΟΓΗΣΗ ΒΕΒΑΙΟΤΗΤΑΣ:
+   - Για κάθε κατηγορία (deliverables, tasks, invoices, dates), δώσε βαθμό βεβαιότητας: high/medium/low
+   - high = τα βρήκα ρητά στο κείμενο
+   - medium = τα συμπέρανα από το context
+   - low = τα προτείνω χωρίς σαφή αναφορά
 
 ΜΟΡΦΗ ΗΜΕΡΟΜΗΝΙΩΝ: YYYY-MM-DD (π.χ. 2026-06-30)
 ΜΟΡΦΗ ΠΟΣΩΝ: Αριθμός χωρίς σύμβολα (π.χ. 50000)
 
-Αν κάποια πληροφορία δεν υπάρχει στα αρχεία, ΜΗΝ την συμπεριλάβεις - άφησε το πεδίο κενό.`;
+Αν κάποια πληροφορία δεν υπάρχει στα αρχεία, ΜΗΝ την συμπεριλάβεις - άφησε το πεδίο κενό.${focusPromptSection}${reanalysisSection}${questionsSection}`;
 
     const userPrompt = `Έργο: ${projectName}
 ${projectBudget ? `Γνωστός Προϋπολογισμός: €${projectBudget}` : 'Προϋπολογισμός: Να εξαχθεί από τα αρχεία'}
@@ -180,11 +221,13 @@ ${f.content}
 `).join('\n')}
 === ΤΕΛΟΣ ΑΡΧΕΙΩΝ ===
 
-Ανάλυσε προσεκτικά τα παραπάνω αρχεία και εξάγε:
+Ανάλυσε ΠΟΛΥ ΠΡΟΣΕΚΤΙΚΑ τα παραπάνω αρχεία και εξάγε:
 1. Όλα τα παραδοτέα με τις προθεσμίες και τα budgets τους
 2. Tasks για κάθε παραδοτέο
 3. Πρόγραμμα πληρωμών/τιμολογίων
-4. Γενικά στοιχεία του έργου (budget, ημερομηνίες, περιγραφή)`;
+4. Γενικά στοιχεία του έργου (budget, ημερομηνίες, περιγραφή)
+5. Βαθμό βεβαιότητας ανά κατηγορία
+${requestQuestions ? '6. Ερωτήσεις επιβεβαίωσης για τον χρήστη' : ''}`;
 
     // Use tool calling for structured output
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -262,6 +305,34 @@ ${f.content}
                   projectSummary: { 
                     type: "string", 
                     description: "Σύντομη περίληψη του έργου (2-3 προτάσεις)" 
+                  },
+                  analysisConfidence: {
+                    type: "object",
+                    description: "Βαθμός βεβαιότητας ανά κατηγορία",
+                    properties: {
+                      deliverables: { type: "string", enum: ["high", "medium", "low"], description: "Βεβαιότητα για παραδοτέα" },
+                      tasks: { type: "string", enum: ["high", "medium", "low"], description: "Βεβαιότητα για tasks" },
+                      invoices: { type: "string", enum: ["high", "medium", "low"], description: "Βεβαιότητα για τιμολόγια" },
+                      dates: { type: "string", enum: ["high", "medium", "low"], description: "Βεβαιότητα για ημερομηνίες" }
+                    }
+                  },
+                  aiQuestions: {
+                    type: "array",
+                    description: "Ερωτήσεις προς τον χρήστη για επιβεβαίωση/διευκρίνιση",
+                    items: {
+                      type: "object",
+                      properties: {
+                        type: { type: "string", enum: ["confirmation", "clarification", "suggestion"], description: "Τύπος ερώτησης" },
+                        question: { type: "string", description: "Η ερώτηση προς τον χρήστη" },
+                        context: { type: "string", description: "Επιπλέον context για την ερώτηση" }
+                      },
+                      required: ["type", "question"]
+                    }
+                  },
+                  missingInfo: {
+                    type: "array",
+                    description: "Λίστα πληροφοριών που δεν βρέθηκαν στα αρχεία",
+                    items: { type: "string" }
                   }
                 },
                 required: ["deliverables", "tasks", "invoices", "projectSummary"]

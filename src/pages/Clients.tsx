@@ -14,27 +14,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { EditDeleteActions } from '@/components/dialogs/EditDeleteActions';
+import { ClientsTableView } from '@/components/clients/ClientsTableView';
 import { toast } from 'sonner';
 import { 
   Building2, 
   Plus, 
   Search,
-  Mail,
-  Phone,
-  MapPin,
   Loader2
 } from 'lucide-react';
-import { format } from 'date-fns';
-import { el } from 'date-fns/locale';
 
 interface Client {
   id: string;
@@ -44,6 +31,7 @@ interface Client {
   address: string | null;
   notes: string | null;
   created_at: string;
+  projectCount?: number;
 }
 
 export default function ClientsPage() {
@@ -69,13 +57,32 @@ export default function ClientsPage() {
 
   const fetchClients = async () => {
     try {
-      const { data, error } = await supabase
+      // Fetch clients with project count
+      const { data: clientsData, error } = await supabase
         .from('clients')
         .select('*')
         .order('name');
 
       if (error) throw error;
-      setClients(data || []);
+
+      // Get project counts
+      const { data: projectCounts } = await supabase
+        .from('projects')
+        .select('client_id');
+
+      const countMap = new Map<string, number>();
+      projectCounts?.forEach(p => {
+        if (p.client_id) {
+          countMap.set(p.client_id, (countMap.get(p.client_id) || 0) + 1);
+        }
+      });
+
+      const clientsWithCounts = (clientsData || []).map(c => ({
+        ...c,
+        projectCount: countMap.get(c.id) || 0
+      }));
+
+      setClients(clientsWithCounts);
     } catch (error) {
       console.error('Error fetching clients:', error);
       toast.error('Σφάλμα κατά τη φόρτωση πελατών');
@@ -107,7 +114,7 @@ export default function ClientsPage() {
 
         if (error) throw error;
 
-        setClients(prev => prev.map(c => c.id === editingClient.id ? data : c));
+        setClients(prev => prev.map(c => c.id === editingClient.id ? { ...data, projectCount: c.projectCount } : c));
         toast.success('Ο πελάτης ενημερώθηκε!');
       } else {
         const { data, error } = await supabase
@@ -118,7 +125,7 @@ export default function ClientsPage() {
 
         if (error) throw error;
 
-        setClients(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+        setClients(prev => [...prev, { ...data, projectCount: 0 }].sort((a, b) => a.name.localeCompare(b.name)));
         toast.success('Ο πελάτης δημιουργήθηκε!');
       }
 
@@ -145,6 +152,8 @@ export default function ClientsPage() {
   };
 
   const handleDelete = async (clientId: string) => {
+    if (!confirm('Είστε σίγουροι ότι θέλετε να διαγράψετε αυτόν τον πελάτη;')) return;
+    
     try {
       const { error } = await supabase
         .from('clients')
@@ -191,109 +200,106 @@ export default function ClientsPage() {
             Πελάτες
           </h1>
           <p className="text-muted-foreground mt-1 text-sm ml-[52px]">
-            Διαχείριση πελατών και οργανισμών
+            Διαχείριση πελατών και οργανισμών • {clients.length} συνολικά
           </p>
         </div>
 
-        {canManage && (
-          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
-            <DialogTrigger asChild>
-              <Button className="shadow-soft">
-                <Plus className="h-4 w-4 mr-2" />
-                Νέος Πελάτης
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg">
-              <DialogHeader>
-                <DialogTitle className="text-lg">{editingClient ? 'Επεξεργασία Πελάτη' : 'Νέος Πελάτης'}</DialogTitle>
-                <DialogDescription className="text-sm">
-                  {editingClient ? 'Ενημερώστε τα στοιχεία του πελάτη' : 'Προσθέστε έναν νέο πελάτη/οργανισμό'}
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name" className="text-sm font-medium">Επωνυμία *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="π.χ. ABC Company"
-                    className="bg-card border-border/50"
-                    required
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="flex items-center gap-3">
+          <div className="relative w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
+            <Input
+              placeholder="Αναζήτηση πελατών..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 bg-card border-border/50"
+            />
+          </div>
+          
+          {canManage && (
+            <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
+              <DialogTrigger asChild>
+                <Button className="shadow-soft">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Νέος Πελάτης
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle className="text-lg">{editingClient ? 'Επεξεργασία Πελάτη' : 'Νέος Πελάτης'}</DialogTitle>
+                  <DialogDescription className="text-sm">
+                    {editingClient ? 'Ενημερώστε τα στοιχεία του πελάτη' : 'Προσθέστε έναν νέο πελάτη/οργανισμό'}
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+                    <Label htmlFor="name" className="text-sm font-medium">Επωνυμία *</Label>
                     <Input
-                      id="email"
-                      type="email"
-                      value={formData.contact_email}
-                      onChange={(e) => setFormData(prev => ({ ...prev, contact_email: e.target.value }))}
-                      placeholder="info@example.com"
-                      className="bg-card border-border/50"
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="π.χ. ABC Company"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={formData.contact_email}
+                        onChange={(e) => setFormData(prev => ({ ...prev, contact_email: e.target.value }))}
+                        placeholder="info@example.com"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="phone" className="text-sm font-medium">Τηλέφωνο</Label>
+                      <Input
+                        id="phone"
+                        value={formData.contact_phone}
+                        onChange={(e) => setFormData(prev => ({ ...prev, contact_phone: e.target.value }))}
+                        placeholder="+30 210 1234567"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="address" className="text-sm font-medium">Διεύθυνση</Label>
+                    <Input
+                      id="address"
+                      value={formData.address}
+                      onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+                      placeholder="Οδός, Αριθμός, Πόλη"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="phone" className="text-sm font-medium">Τηλέφωνο</Label>
-                    <Input
-                      id="phone"
-                      value={formData.contact_phone}
-                      onChange={(e) => setFormData(prev => ({ ...prev, contact_phone: e.target.value }))}
-                      placeholder="+30 210 1234567"
-                      className="bg-card border-border/50"
+                    <Label htmlFor="notes" className="text-sm font-medium">Σημειώσεις</Label>
+                    <Textarea
+                      id="notes"
+                      value={formData.notes}
+                      onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                      rows={3}
+                      className="resize-none"
                     />
                   </div>
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="address" className="text-sm font-medium">Διεύθυνση</Label>
-                  <Input
-                    id="address"
-                    value={formData.address}
-                    onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                    placeholder="Οδός, Αριθμός, Πόλη"
-                    className="bg-card border-border/50"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="notes" className="text-sm font-medium">Σημειώσεις</Label>
-                  <Textarea
-                    id="notes"
-                    value={formData.notes}
-                    onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                    rows={3}
-                    className="bg-card border-border/50 resize-none"
-                  />
-                </div>
-
-                <DialogFooter className="gap-2">
-                  <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
-                    Ακύρωση
-                  </Button>
-                  <Button type="submit" disabled={saving} className="shadow-soft">
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    {editingClient ? 'Αποθήκευση' : 'Δημιουργία'}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-        )}
-      </div>
-
-      {/* Search */}
-      <div className="relative max-w-md animate-fade-in" style={{ animationDelay: '50ms' }}>
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
-        <Input
-          placeholder="Αναζήτηση πελατών..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10 bg-card border-border/50 focus:border-primary/30"
-        />
+                  <DialogFooter className="gap-2">
+                    <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
+                      Ακύρωση
+                    </Button>
+                    <Button type="submit" disabled={saving}>
+                      {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      {editingClient ? 'Αποθήκευση' : 'Δημιουργία'}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
       </div>
 
       {/* Clients Table */}
@@ -302,19 +308,17 @@ export default function ClientsPage() {
           <Loader2 className="h-8 w-8 animate-spin text-primary/60" />
           <p className="text-sm text-muted-foreground mt-3">Φόρτωση...</p>
         </div>
-      ) : filteredClients.length === 0 ? (
+      ) : filteredClients.length === 0 && !searchQuery ? (
         <div className="rounded-2xl border border-border/50 bg-card py-16 animate-fade-in shadow-soft">
           <div className="text-center">
             <div className="h-16 w-16 rounded-2xl bg-secondary/50 flex items-center justify-center mx-auto mb-4">
               <Building2 className="h-8 w-8 text-muted-foreground/50" />
             </div>
-            <h3 className="text-lg font-semibold mb-2 text-foreground">Δεν βρέθηκαν πελάτες</h3>
+            <h3 className="text-lg font-semibold mb-2 text-foreground">Δεν υπάρχουν πελάτες</h3>
             <p className="text-muted-foreground text-sm mb-6 max-w-sm mx-auto">
-              {searchQuery
-                ? 'Δοκιμάστε διαφορετικό όρο αναζήτησης'
-                : 'Προσθέστε τον πρώτο σας πελάτη'}
+              Προσθέστε τον πρώτο σας πελάτη
             </p>
-            {canManage && !searchQuery && (
+            {canManage && (
               <Button onClick={() => setDialogOpen(true)} className="shadow-soft">
                 <Plus className="h-4 w-4 mr-2" />
                 Νέος Πελάτης
@@ -323,85 +327,12 @@ export default function ClientsPage() {
           </div>
         </div>
       ) : (
-        <div className="rounded-2xl border border-border/50 overflow-hidden bg-card shadow-soft animate-fade-in">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-secondary/30 border-b border-border/30 hover:bg-secondary/30">
-                <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Επωνυμία</TableHead>
-                <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Επικοινωνία</TableHead>
-                <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Διεύθυνση</TableHead>
-                <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Ημ/νία</TableHead>
-                {canManage && <TableHead className="w-[50px]"></TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredClients.map((client, index) => (
-                <TableRow 
-                  key={client.id} 
-                  className="transition-colors duration-150 hover:bg-secondary/40 border-b border-border/20 last:border-0"
-                  style={{ animationDelay: `${index * 20}ms` }}
-                >
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center transition-transform duration-200 hover:scale-105">
-                        <Building2 className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">{client.name}</p>
-                        {client.notes && (
-                          <p className="text-xs text-muted-foreground/70 truncate max-w-[200px]">
-                            {client.notes}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1.5">
-                      {client.contact_email && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Mail className="h-3.5 w-3.5 opacity-50" />
-                          {client.contact_email}
-                        </div>
-                      )}
-                      {client.contact_phone && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Phone className="h-3.5 w-3.5 opacity-50" />
-                          {client.contact_phone}
-                        </div>
-                      )}
-                      {!client.contact_email && !client.contact_phone && (
-                        <span className="text-muted-foreground/50 text-sm">-</span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {client.address ? (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <MapPin className="h-3.5 w-3.5 opacity-50" />
-                        <span className="truncate max-w-[200px]">{client.address}</span>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground/50">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {format(new Date(client.created_at), 'd MMM yyyy', { locale: el })}
-                  </TableCell>
-                  {canManage && (
-                    <TableCell>
-                      <EditDeleteActions
-                        onEdit={() => handleEdit(client)}
-                        onDelete={() => handleDelete(client.id)}
-                        itemName={`τον πελάτη "${client.name}"`}
-                      />
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <ClientsTableView
+          clients={filteredClients}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          canManage={canManage}
+        />
       )}
     </div>
   );

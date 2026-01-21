@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { 
@@ -18,7 +19,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { 
   MoreHorizontal, Pencil, Trash2, UserCog, Ban, UserCheck, 
-  CheckCircle2
+  CheckCircle2, ExternalLink, ArrowUpDown, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CompanyUser } from '@/hooks/useRBAC';
@@ -68,6 +69,8 @@ const statusColors: Record<UserStatus, string> = {
   deactivated: 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'
 };
 
+type SortField = 'user' | 'role' | 'status' | 'last_login_at';
+
 export function UsersTableView({
   users,
   currentUserId,
@@ -78,19 +81,21 @@ export function UsersTableView({
   onChangeStatus,
   canManage
 }: UsersTableViewProps) {
+  const navigate = useNavigate();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   const sortedUsers = useMemo(() => {
     let sorted = [...users];
-    if (sortColumn) {
+    if (sortField) {
       sorted.sort((a, b) => {
         let valA: any, valB: any;
-        switch (sortColumn) {
+        switch (sortField) {
           case 'user': valA = a.full_name || a.email; valB = b.full_name || b.email; break;
           case 'role': valA = a.role; valB = b.role; break;
           case 'status': valA = a.status; valB = b.status; break;
+          case 'last_login_at': valA = a.last_login_at || ''; valB = b.last_login_at || ''; break;
           default: return 0;
         }
         if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
@@ -99,7 +104,16 @@ export function UsersTableView({
       });
     }
     return sorted;
-  }, [users, sortColumn, sortDirection]);
+  }, [users, sortField, sortDirection]);
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
 
   const toggleSelectAll = () => {
     if (selectedIds.size === users.length) {
@@ -130,6 +144,11 @@ export function UsersTableView({
     ];
     exportToCSV(users, exportColumns, 'users');
     toast.success('Εξαγωγή ολοκληρώθηκε');
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="h-4 w-4 opacity-50" />;
+    return sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />;
   };
 
   return (
@@ -163,8 +182,16 @@ export function UsersTableView({
               sortedUsers.map(user => {
                 const isCurrentUser = user.user_id === currentUserId;
                 return (
-                  <TableRow key={user.id} className="group">
-                    <TableCell>
+                  <TableRow 
+                    key={user.id} 
+                    className="group cursor-pointer hover:bg-secondary/50 transition-colors"
+                    onClick={(e) => {
+                      if (!(e.target as HTMLElement).closest('button, input, [role="menuitem"]')) {
+                        navigate(`/users/${user.user_id}`);
+                      }
+                    }}
+                  >
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <Checkbox 
                         checked={selectedIds.has(user.user_id)} 
                         onCheckedChange={() => toggleSelect(user.user_id)} 
@@ -183,6 +210,7 @@ export function UsersTableView({
                           <div className="flex items-center gap-2">
                             <span className="font-medium">{user.full_name || 'Χωρίς όνομα'}</span>
                             {isCurrentUser && <Badge variant="secondary" className="text-xs">Εσείς</Badge>}
+                            <ExternalLink className="h-3.5 w-3.5 opacity-0 group-hover:opacity-50 transition-opacity" />
                           </div>
                           <span className="text-sm text-muted-foreground">{user.email}</span>
                         </div>

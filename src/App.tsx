@@ -16,7 +16,9 @@ import Tenders from "@/pages/Tenders";
 import TenderDetail from "@/pages/TenderDetail";
 import Financials from "@/pages/Financials";
 import Clients from "@/pages/Clients";
+import ClientDetail from "@/pages/ClientDetail";
 import UsersAccess from "@/pages/UsersAccess";
+import UserDetail from "@/pages/UserDetail";
 import Settings from "@/pages/Settings";
 import Calendar from "@/pages/Calendar";
 import OrgChart from "@/pages/OrgChart";
@@ -44,7 +46,9 @@ const App = () => (
                 <Route path="/tenders/:id" element={<TenderDetail />} />
                 <Route path="/financials" element={<Financials />} />
                 <Route path="/clients" element={<Clients />} />
+                <Route path="/clients/:id" element={<ClientDetail />} />
                 <Route path="/users" element={<UsersAccess />} />
+                <Route path="/users/:id" element={<UserDetail />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/calendar" element={<Calendar />} />
                 <Route path="/org-chart" element={<OrgChart />} />

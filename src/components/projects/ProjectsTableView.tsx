@@ -10,23 +10,21 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Checkbox } from '@/components/ui/checkbox';
 import { EnhancedInlineEditCell } from '@/components/shared/EnhancedInlineEditCell';
 import { TableToolbar } from '@/components/shared/TableToolbar';
 import { EditDeleteActions } from '@/components/dialogs/EditDeleteActions';
-import { useTableViews } from '@/hooks/useTableViews';
+import { ResizableTableHeader } from '@/components/shared/ResizableTableHeader';
+import { GroupedTableSection } from '@/components/shared/GroupedTableSection';
+import { useTableViews, GroupByField } from '@/hooks/useTableViews';
 import { exportToCSV, exportToExcel, formatters } from '@/utils/exportUtils';
 import { 
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  Users,
-  CheckCircle2,
-  ListTodo
+  CheckCircle2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format, parseISO } from 'date-fns';
-import { el } from 'date-fns/locale';
+import { format } from 'date-fns';
 import { toast } from 'sonner';
 
 type ProjectStatus = 'tender' | 'active' | 'completed' | 'cancelled';
@@ -81,6 +79,11 @@ const DEFAULT_COLUMNS = [
   { id: 'actions', label: 'Ενέργειες', visible: true, locked: true },
 ];
 
+const GROUP_OPTIONS = [
+  { value: 'none' as GroupByField, label: 'Χωρίς ομαδοποίηση' },
+  { value: 'status' as GroupByField, label: 'Κατάσταση' },
+];
+
 type SortDirection = 'asc' | 'desc' | null;
 type SortField = 'name' | 'status' | 'budget' | 'start_date' | 'progress';
 
@@ -96,6 +99,10 @@ export function ProjectsTableView({
   const {
     columns,
     setColumns,
+    columnWidths,
+    setColumnWidth,
+    groupBy,
+    setGroupBy,
     savedViews,
     currentViewId,
     saveView,
@@ -146,6 +153,51 @@ export function ProjectsTableView({
     });
   }, [projects, sortField, sortDirection]);
 
+  // Group projects
+  const groupedProjects = useMemo(() => {
+    if (groupBy === 'none') {
+      return [{ key: 'all', label: 'Όλα τα Έργα', projects: sortedProjects }];
+    }
+
+    const groups: Map<string, { label: string; projects: Project[]; badge?: React.ReactNode }> = new Map();
+
+    sortedProjects.forEach(project => {
+      let groupKey: string;
+      let groupLabel: string;
+      let badge: React.ReactNode = null;
+
+      if (groupBy === 'status') {
+        groupKey = project.status;
+        const statusOption = STATUS_OPTIONS.find(s => s.value === project.status);
+        groupLabel = statusOption?.label || project.status;
+        badge = (
+          <Badge 
+            variant="outline" 
+            className="text-xs"
+            style={{ borderColor: statusOption?.color, color: statusOption?.color }}
+          >
+            {statusOption?.label}
+          </Badge>
+        );
+      } else {
+        groupKey = 'all';
+        groupLabel = 'Όλα';
+      }
+
+      if (!groups.has(groupKey)) {
+        groups.set(groupKey, { label: groupLabel, projects: [], badge });
+      }
+      groups.get(groupKey)!.projects.push(project);
+    });
+
+    return Array.from(groups.entries()).map(([key, value]) => ({
+      key,
+      label: value.label,
+      projects: value.projects,
+      badge: value.badge,
+    }));
+  }, [sortedProjects, groupBy]);
+
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
       if (sortDirection === 'asc') setSortDirection('desc');
@@ -166,10 +218,14 @@ export function ProjectsTableView({
   const isColumnVisible = (columnId: string) => 
     columns.find(c => c.id === columnId)?.visible ?? true;
 
+  const getColumnWidth = (columnId: string) => columnWidths[columnId];
+
   const clientOptions = clients.map(c => ({
     value: c.id,
     label: c.name
   }));
+
+  const visibleColumnCount = columns.filter(c => c.visible).length;
 
   // Export functions
   const handleExportCSV = useCallback(() => {
@@ -202,6 +258,137 @@ export function ProjectsTableView({
     toast.success('Εξαγωγή Excel ολοκληρώθηκε!');
   }, [projects]);
 
+  const renderProjectRow = (project: Project) => (
+    <TableRow 
+      key={project.id} 
+      className="group hover:bg-muted/50 cursor-pointer"
+      onClick={() => navigate(`/projects/${project.id}`)}
+    >
+      {/* Name */}
+      <TableCell className="font-medium" style={{ width: getColumnWidth('name') }} onClick={(e) => e.stopPropagation()}>
+        <EnhancedInlineEditCell
+          value={project.name}
+          onSave={(val) => onInlineUpdate(project.id, 'name', val)}
+          type="text"
+          disabled={!canManage}
+        />
+      </TableCell>
+
+      {/* Client */}
+      {isColumnVisible('client') && (
+        <TableCell style={{ width: getColumnWidth('client') }} onClick={(e) => e.stopPropagation()}>
+          <EnhancedInlineEditCell
+            value={project.client_id}
+            onSave={(val) => onInlineUpdate(project.id, 'client_id', val)}
+            type="select"
+            options={clientOptions}
+            displayValue={project.client?.name}
+            placeholder="Κανένας"
+            disabled={!canManage}
+          />
+        </TableCell>
+      )}
+
+      {/* Status */}
+      {isColumnVisible('status') && (
+        <TableCell style={{ width: getColumnWidth('status') }} onClick={(e) => e.stopPropagation()}>
+          <EnhancedInlineEditCell
+            value={project.status}
+            onSave={(val) => onInlineUpdate(project.id, 'status', val)}
+            type="select"
+            options={STATUS_OPTIONS}
+            disabled={!canManage}
+          />
+        </TableCell>
+      )}
+
+      {/* Progress */}
+      {isColumnVisible('progress') && (
+        <TableCell style={{ width: getColumnWidth('progress') }} onClick={(e) => e.stopPropagation()}>
+          <EnhancedInlineEditCell
+            value={project.progress ?? 0}
+            onSave={(val) => onInlineUpdate(project.id, 'progress', val)}
+            type="progress"
+            disabled={!canManage}
+          />
+        </TableCell>
+      )}
+
+      {/* Budget */}
+      {isColumnVisible('budget') && (
+        <TableCell style={{ width: getColumnWidth('budget') }} onClick={(e) => e.stopPropagation()}>
+          <EnhancedInlineEditCell
+            value={project.budget}
+            onSave={(val) => onInlineUpdate(project.id, 'budget', val)}
+            type="number"
+            displayValue={`€${project.budget?.toLocaleString('el-GR') || 0}`}
+            disabled={!canManage}
+          />
+        </TableCell>
+      )}
+
+      {/* Agency Fee */}
+      {isColumnVisible('agency_fee') && (
+        <TableCell style={{ width: getColumnWidth('agency_fee') }} onClick={(e) => e.stopPropagation()}>
+          <EnhancedInlineEditCell
+            value={project.agency_fee_percentage}
+            onSave={(val) => onInlineUpdate(project.id, 'agency_fee_percentage', val)}
+            type="number"
+            displayValue={`${project.agency_fee_percentage}%`}
+            disabled={!canManage}
+          />
+        </TableCell>
+      )}
+
+      {/* Start Date */}
+      {isColumnVisible('start_date') && (
+        <TableCell style={{ width: getColumnWidth('start_date') }} onClick={(e) => e.stopPropagation()}>
+          <EnhancedInlineEditCell
+            value={project.start_date}
+            onSave={(val) => onInlineUpdate(project.id, 'start_date', val)}
+            type="date"
+            disabled={!canManage}
+          />
+        </TableCell>
+      )}
+
+      {/* End Date */}
+      {isColumnVisible('end_date') && (
+        <TableCell style={{ width: getColumnWidth('end_date') }} onClick={(e) => e.stopPropagation()}>
+          <EnhancedInlineEditCell
+            value={project.end_date}
+            onSave={(val) => onInlineUpdate(project.id, 'end_date', val)}
+            type="date"
+            disabled={!canManage}
+          />
+        </TableCell>
+      )}
+
+      {/* Tasks */}
+      {isColumnVisible('tasks') && (
+        <TableCell style={{ width: getColumnWidth('tasks') }}>
+          {project.taskStats && (
+            <div className="flex items-center gap-2 text-sm">
+              <CheckCircle2 className="h-3 w-3 text-success" />
+              <span>{project.taskStats.completed}/{project.taskStats.total}</span>
+            </div>
+          )}
+        </TableCell>
+      )}
+
+      {/* Actions */}
+      <TableCell onClick={(e) => e.stopPropagation()}>
+        {canManage && (
+          <EditDeleteActions
+            onEdit={() => onEdit(project)}
+            onDelete={() => onDelete(project.id)}
+            itemName={project.name}
+          />
+        )}
+      </TableCell>
+    </TableRow>
+  );
+
   return (
     <div className="space-y-4">
       {/* Toolbar */}
@@ -222,6 +409,9 @@ export function ProjectsTableView({
         onResetToDefault={resetToDefault}
         onExportCSV={handleExportCSV}
         onExportExcel={handleExportExcel}
+        groupBy={groupBy}
+        onGroupByChange={setGroupBy}
+        groupOptions={GROUP_OPTIONS}
       />
 
       {/* Table */}
@@ -229,205 +419,138 @@ export function ProjectsTableView({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead 
+              <ResizableTableHeader 
+                width={getColumnWidth('name')}
+                onWidthChange={(w) => setColumnWidth('name', w)}
+                minWidth={150}
                 className="cursor-pointer select-none"
                 onClick={() => toggleSort('name')}
               >
                 <div className="flex items-center gap-1">
                   Όνομα {getSortIcon('name')}
                 </div>
-              </TableHead>
+              </ResizableTableHeader>
               
-              {isColumnVisible('client') && <TableHead>Πελάτης</TableHead>}
+              {isColumnVisible('client') && (
+                <ResizableTableHeader 
+                  width={getColumnWidth('client')}
+                  onWidthChange={(w) => setColumnWidth('client', w)}
+                  minWidth={100}
+                >
+                  Πελάτης
+                </ResizableTableHeader>
+              )}
               
               {isColumnVisible('status') && (
-                <TableHead 
+                <ResizableTableHeader 
+                  width={getColumnWidth('status')}
+                  onWidthChange={(w) => setColumnWidth('status', w)}
+                  minWidth={100}
                   className="cursor-pointer select-none"
                   onClick={() => toggleSort('status')}
                 >
                   <div className="flex items-center gap-1">
                     Κατάσταση {getSortIcon('status')}
                   </div>
-                </TableHead>
+                </ResizableTableHeader>
               )}
               
               {isColumnVisible('progress') && (
-                <TableHead 
+                <ResizableTableHeader 
+                  width={getColumnWidth('progress')}
+                  onWidthChange={(w) => setColumnWidth('progress', w)}
+                  minWidth={80}
                   className="cursor-pointer select-none"
                   onClick={() => toggleSort('progress')}
                 >
                   <div className="flex items-center gap-1">
                     Πρόοδος {getSortIcon('progress')}
                   </div>
-                </TableHead>
+                </ResizableTableHeader>
               )}
               
               {isColumnVisible('budget') && (
-                <TableHead 
+                <ResizableTableHeader 
+                  width={getColumnWidth('budget')}
+                  onWidthChange={(w) => setColumnWidth('budget', w)}
+                  minWidth={100}
                   className="cursor-pointer select-none"
                   onClick={() => toggleSort('budget')}
                 >
                   <div className="flex items-center gap-1">
                     Προϋπολογισμός {getSortIcon('budget')}
                   </div>
-                </TableHead>
+                </ResizableTableHeader>
               )}
               
-              {isColumnVisible('agency_fee') && <TableHead>Agency Fee</TableHead>}
+              {isColumnVisible('agency_fee') && (
+                <ResizableTableHeader 
+                  width={getColumnWidth('agency_fee')}
+                  onWidthChange={(w) => setColumnWidth('agency_fee', w)}
+                  minWidth={80}
+                >
+                  Agency Fee
+                </ResizableTableHeader>
+              )}
               
               {isColumnVisible('start_date') && (
-                <TableHead 
+                <ResizableTableHeader 
+                  width={getColumnWidth('start_date')}
+                  onWidthChange={(w) => setColumnWidth('start_date', w)}
+                  minWidth={90}
                   className="cursor-pointer select-none"
                   onClick={() => toggleSort('start_date')}
                 >
                   <div className="flex items-center gap-1">
                     Έναρξη {getSortIcon('start_date')}
                   </div>
-                </TableHead>
+                </ResizableTableHeader>
               )}
               
-              {isColumnVisible('end_date') && <TableHead>Λήξη</TableHead>}
-              {isColumnVisible('tasks') && <TableHead>Tasks</TableHead>}
+              {isColumnVisible('end_date') && (
+                <ResizableTableHeader 
+                  width={getColumnWidth('end_date')}
+                  onWidthChange={(w) => setColumnWidth('end_date', w)}
+                  minWidth={90}
+                >
+                  Λήξη
+                </ResizableTableHeader>
+              )}
+              
+              {isColumnVisible('tasks') && (
+                <ResizableTableHeader 
+                  width={getColumnWidth('tasks')}
+                  onWidthChange={(w) => setColumnWidth('tasks', w)}
+                  minWidth={80}
+                >
+                  Tasks
+                </ResizableTableHeader>
+              )}
+              
               <TableHead className="w-[80px]">Ενέργειες</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {sortedProjects.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.filter(c => c.visible).length} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={visibleColumnCount} className="text-center py-8 text-muted-foreground">
                   Δεν υπάρχουν έργα
                 </TableCell>
               </TableRow>
+            ) : groupBy === 'none' ? (
+              sortedProjects.map(project => renderProjectRow(project))
             ) : (
-              sortedProjects.map(project => (
-                <TableRow 
-                  key={project.id} 
-                  className="group hover:bg-muted/50 cursor-pointer"
-                  onClick={() => navigate(`/projects/${project.id}`)}
+              groupedProjects.map(group => (
+                <GroupedTableSection
+                  key={group.key}
+                  groupKey={group.key}
+                  groupLabel={group.label}
+                  itemCount={group.projects.length}
+                  colSpan={visibleColumnCount}
+                  badge={group.badge}
                 >
-                  {/* Name */}
-                  <TableCell className="font-medium" onClick={(e) => e.stopPropagation()}>
-                    <EnhancedInlineEditCell
-                      value={project.name}
-                      onSave={(val) => onInlineUpdate(project.id, 'name', val)}
-                      type="text"
-                      disabled={!canManage}
-                    />
-                  </TableCell>
-
-                  {/* Client */}
-                  {isColumnVisible('client') && (
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <EnhancedInlineEditCell
-                        value={project.client_id}
-                        onSave={(val) => onInlineUpdate(project.id, 'client_id', val)}
-                        type="select"
-                        options={clientOptions}
-                        displayValue={project.client?.name}
-                        placeholder="Κανένας"
-                        disabled={!canManage}
-                      />
-                    </TableCell>
-                  )}
-
-                  {/* Status */}
-                  {isColumnVisible('status') && (
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <EnhancedInlineEditCell
-                        value={project.status}
-                        onSave={(val) => onInlineUpdate(project.id, 'status', val)}
-                        type="select"
-                        options={STATUS_OPTIONS}
-                        disabled={!canManage}
-                      />
-                    </TableCell>
-                  )}
-
-                  {/* Progress */}
-                  {isColumnVisible('progress') && (
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <EnhancedInlineEditCell
-                        value={project.progress ?? 0}
-                        onSave={(val) => onInlineUpdate(project.id, 'progress', val)}
-                        type="progress"
-                        disabled={!canManage}
-                      />
-                    </TableCell>
-                  )}
-
-                  {/* Budget */}
-                  {isColumnVisible('budget') && (
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <EnhancedInlineEditCell
-                        value={project.budget}
-                        onSave={(val) => onInlineUpdate(project.id, 'budget', val)}
-                        type="number"
-                        displayValue={`€${project.budget?.toLocaleString('el-GR') || 0}`}
-                        disabled={!canManage}
-                      />
-                    </TableCell>
-                  )}
-
-                  {/* Agency Fee */}
-                  {isColumnVisible('agency_fee') && (
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <EnhancedInlineEditCell
-                        value={project.agency_fee_percentage}
-                        onSave={(val) => onInlineUpdate(project.id, 'agency_fee_percentage', val)}
-                        type="number"
-                        displayValue={`${project.agency_fee_percentage}%`}
-                        disabled={!canManage}
-                      />
-                    </TableCell>
-                  )}
-
-                  {/* Start Date */}
-                  {isColumnVisible('start_date') && (
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <EnhancedInlineEditCell
-                        value={project.start_date}
-                        onSave={(val) => onInlineUpdate(project.id, 'start_date', val)}
-                        type="date"
-                        disabled={!canManage}
-                      />
-                    </TableCell>
-                  )}
-
-                  {/* End Date */}
-                  {isColumnVisible('end_date') && (
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <EnhancedInlineEditCell
-                        value={project.end_date}
-                        onSave={(val) => onInlineUpdate(project.id, 'end_date', val)}
-                        type="date"
-                        disabled={!canManage}
-                      />
-                    </TableCell>
-                  )}
-
-                  {/* Tasks */}
-                  {isColumnVisible('tasks') && (
-                    <TableCell>
-                      {project.taskStats && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <CheckCircle2 className="h-3 w-3 text-success" />
-                          <span>{project.taskStats.completed}/{project.taskStats.total}</span>
-                        </div>
-                      )}
-                    </TableCell>
-                  )}
-
-                  {/* Actions */}
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    {canManage && (
-                      <EditDeleteActions
-                        onEdit={() => onEdit(project)}
-                        onDelete={() => onDelete(project.id)}
-                        itemName={project.name}
-                      />
-                    )}
-                  </TableCell>
-                </TableRow>
+                  {group.projects.map(project => renderProjectRow(project))}
+                </GroupedTableSection>
               ))
             )}
           </TableBody>

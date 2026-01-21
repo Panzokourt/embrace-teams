@@ -7,6 +7,9 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import {
   Dialog,
@@ -17,7 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ColumnVisibilityToggle, ColumnConfig } from './ColumnVisibilityToggle';
-import { SavedView } from '@/hooks/useTableViews';
+import { SavedView, GroupByField } from '@/hooks/useTableViews';
 import { 
   Download, 
   Save, 
@@ -26,9 +29,24 @@ import {
   Bookmark,
   Trash2,
   FileSpreadsheet,
-  FileText
+  FileText,
+  Layers,
+  Check
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+interface GroupOption {
+  value: GroupByField;
+  label: string;
+}
+
+const DEFAULT_GROUP_OPTIONS: GroupOption[] = [
+  { value: 'none', label: 'Χωρίς ομαδοποίηση' },
+  { value: 'status', label: 'Κατάσταση' },
+  { value: 'assignee', label: 'Υπεύθυνος' },
+  { value: 'project', label: 'Έργο' },
+  { value: 'priority', label: 'Προτεραιότητα' },
+];
 
 interface TableToolbarProps {
   columns: ColumnConfig[];
@@ -44,6 +62,10 @@ interface TableToolbarProps {
   selectedCount?: number;
   onBulkAction?: (action: string, value?: any) => void;
   bulkActions?: { id: string; label: string; icon?: React.ReactNode }[];
+  // Grouping props
+  groupBy?: GroupByField;
+  onGroupByChange?: (groupBy: GroupByField) => void;
+  groupOptions?: GroupOption[];
 }
 
 export function TableToolbar({
@@ -60,6 +82,9 @@ export function TableToolbar({
   selectedCount = 0,
   onBulkAction,
   bulkActions = [],
+  groupBy = 'none',
+  onGroupByChange,
+  groupOptions = DEFAULT_GROUP_OPTIONS,
 }: TableToolbarProps) {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [viewName, setViewName] = useState('');
@@ -76,6 +101,7 @@ export function TableToolbar({
   };
 
   const currentView = savedViews.find(v => v.id === currentViewId);
+  const currentGroupOption = groupOptions.find(g => g.value === groupBy);
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
@@ -124,6 +150,36 @@ export function TableToolbar({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* Grouping Dropdown */}
+      {onGroupByChange && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2">
+              <Layers className="h-4 w-4" />
+              {currentGroupOption?.label || 'Ομαδοποίηση'}
+              <ChevronDown className="h-3 w-3" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-48">
+            <DropdownMenuLabel className="text-xs text-muted-foreground">
+              Ομαδοποίηση κατά
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuRadioGroup value={groupBy} onValueChange={(v) => onGroupByChange(v as GroupByField)}>
+              {groupOptions.map(option => (
+                <DropdownMenuRadioItem 
+                  key={option.value} 
+                  value={option.value}
+                  className="gap-2"
+                >
+                  {option.label}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
 
       {/* Column Visibility */}
       <ColumnVisibilityToggle
@@ -185,7 +241,7 @@ export function TableToolbar({
           <DialogHeader>
             <DialogTitle>Αποθήκευση Προβολής</DialogTitle>
             <DialogDescription>
-              Αποθηκεύστε τη τρέχουσα διάταξη στηλών
+              Αποθηκεύστε τη τρέχουσα διάταξη στηλών και ομαδοποίηση
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">

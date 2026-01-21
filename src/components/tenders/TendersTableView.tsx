@@ -21,8 +21,10 @@ import {
   ArrowUp,
   ArrowDown,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  ExternalLink
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { format, parseISO, differenceInDays, isPast } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -275,17 +277,29 @@ export function TendersTableView({
     return (
       <TableRow 
         key={tender.id} 
-        className="group hover:bg-muted/50 cursor-pointer"
-        onClick={() => navigate(`/tenders/${tender.id}`)}
+        className="group hover:bg-muted/50"
       >
         {/* Name */}
-        <TableCell className="font-medium" style={{ width: getColumnWidth('name') }} onClick={(e) => e.stopPropagation()}>
-          <EnhancedInlineEditCell
-            value={tender.name}
-            onSave={(val) => onInlineUpdate(tender.id, 'name', val)}
-            type="text"
-            disabled={!canManage}
-          />
+        <TableCell className="font-medium" style={{ width: getColumnWidth('name') }}>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 shrink-0 text-muted-foreground hover:text-primary"
+              onClick={() => navigate(`/tenders/${tender.id}`)}
+              title="Άνοιγμα διαγωνισμού"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Button>
+            <div onClick={(e) => e.stopPropagation()} className="flex-1 min-w-0">
+              <EnhancedInlineEditCell
+                value={tender.name}
+                onSave={(val) => onInlineUpdate(tender.id, 'name', val)}
+                type="text"
+                disabled={!canManage}
+              />
+            </div>
+          </div>
         </TableCell>
 
         {/* Client */}

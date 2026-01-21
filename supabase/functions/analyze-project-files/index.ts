@@ -75,12 +75,20 @@ serve(async (req) => {
     console.log("Authenticated user:", userId);
 
     // ============================================
-    // Get API Key and Request Data
+    // Get API Keys and Request Data
     // ============================================
+    const PERPLEXITY_API_KEY = Deno.env.get("PERPLEXITY_API_KEY");
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    
+    // Prefer Perplexity for better document analysis, fallback to Lovable AI
+    const usePerplexity = !!PERPLEXITY_API_KEY;
+    
+    if (!PERPLEXITY_API_KEY && !LOVABLE_API_KEY) {
+      throw new Error("No AI API key is configured (PERPLEXITY_API_KEY or LOVABLE_API_KEY)");
     }
+    
+    console.log(`Using AI provider: ${usePerplexity ? 'Perplexity' : 'Lovable AI'}`);
+
 
     const { 
       fileContents, 
@@ -296,120 +304,142 @@ ${f.content}
 5. Βαθμό βεβαιότητας ανά κατηγορία
 ${requestQuestions ? '6. Ερωτήσεις επιβεβαίωσης για τον χρήστη' : ''}`;
 
-    // Use tool calling for structured output
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
+    // Define the JSON schema for structured output
+    const jsonSchema = {
+      type: "object",
+      properties: {
+        deliverables: {
+          type: "array",
+          description: "Λίστα παραδοτέων επικοινωνίας/marketing",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string", description: "Όνομα/τίτλος παραδοτέου (π.χ. 'Π1 - Στρατηγική Επικοινωνίας')" },
+              description: { type: "string", description: "Αναλυτική περιγραφή του παραδοτέου" },
+              due_date: { type: "string", description: "Προθεσμία παράδοσης (YYYY-MM-DD)" },
+              budget: { type: "number", description: "Εκτιμώμενο κόστος σε ευρώ" }
+            },
+            required: ["name", "description"]
+          }
+        },
+        tasks: {
+          type: "array",
+          description: "Λίστα εργασιών για την υλοποίηση",
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string", description: "Τίτλος εργασίας" },
+              description: { type: "string", description: "Περιγραφή της εργασίας" },
+              due_date: { type: "string", description: "Προθεσμία (YYYY-MM-DD)" },
+              deliverable_index: { type: "number", description: "Index του σχετικού παραδοτέου (0-based)" }
+            },
+            required: ["title", "description"]
+          }
+        },
+        invoices: {
+          type: "array",
+          description: "Πρόγραμμα πληρωμών/τιμολογίων",
+          items: {
+            type: "object",
+            properties: {
+              description: { type: "string", description: "Περιγραφή τιμολογίου" },
+              amount: { type: "number", description: "Ποσό σε ευρώ" },
+              due_date: { type: "string", description: "Ημ/νία λήξης πληρωμής (YYYY-MM-DD)" }
+            },
+            required: ["description", "amount"]
+          }
+        },
+        suggestedProjectDetails: {
+          type: "object",
+          properties: {
+            description: { type: "string", description: "Σύντομη περιγραφή του έργου" },
+            start_date: { type: "string", description: "Ημ/νία έναρξης (YYYY-MM-DD)" },
+            end_date: { type: "string", description: "Ημ/νία λήξης (YYYY-MM-DD)" },
+            budget: { type: "number", description: "Συνολικός προϋπολογισμός" }
+          }
+        },
+        projectSummary: { type: "string", description: "Σύντομη περίληψη" },
+        analysisConfidence: {
+          type: "object",
+          properties: {
+            deliverables: { type: "string", enum: ["high", "medium", "low"] },
+            tasks: { type: "string", enum: ["high", "medium", "low"] },
+            invoices: { type: "string", enum: ["high", "medium", "low"] },
+            dates: { type: "string", enum: ["high", "medium", "low"] }
+          }
+        },
+        aiQuestions: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              type: { type: "string", enum: ["confirmation", "clarification", "suggestion"] },
+              question: { type: "string" },
+              context: { type: "string" }
+            },
+            required: ["type", "question"]
+          }
+        },
+        missingInfo: { type: "array", items: { type: "string" } }
       },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "suggest_project_structure",
-              description: "Επιστρέφει δομημένες προτάσεις για παραδοτέα, tasks, τιμολόγια και στοιχεία έργου.",
-              parameters: {
-                type: "object",
-                properties: {
-                  deliverables: {
-                    type: "array",
-                    description: "Λίστα παραδοτέων του έργου",
-                    items: {
-                      type: "object",
-                      properties: {
-                        name: { type: "string", description: "Όνομα/τίτλος παραδοτέου (π.χ. 'Π1 - Μελέτη Εφαρμογής')" },
-                        description: { type: "string", description: "Αναλυτική περιγραφή του παραδοτέου" },
-                        due_date: { type: "string", description: "Προθεσμία παράδοσης (YYYY-MM-DD)" },
-                        budget: { type: "number", description: "Εκτιμώμενο κόστος σε ευρώ" }
-                      },
-                      required: ["name", "description"]
-                    }
-                  },
-                  tasks: {
-                    type: "array",
-                    description: "Λίστα εργασιών για την υλοποίηση",
-                    items: {
-                      type: "object",
-                      properties: {
-                        title: { type: "string", description: "Τίτλος εργασίας" },
-                        description: { type: "string", description: "Περιγραφή της εργασίας" },
-                        due_date: { type: "string", description: "Προθεσμία (YYYY-MM-DD)" },
-                        deliverable_index: { type: "number", description: "Index του σχετικού παραδοτέου (0-based), αν υπάρχει" }
-                      },
-                      required: ["title", "description"]
-                    }
-                  },
-                  invoices: {
-                    type: "array",
-                    description: "Πρόγραμμα πληρωμών/τιμολογίων",
-                    items: {
-                      type: "object",
-                      properties: {
-                        description: { type: "string", description: "Περιγραφή τιμολογίου (π.χ. 'Προκαταβολή 30%')" },
-                        amount: { type: "number", description: "Ποσό σε ευρώ" },
-                        due_date: { type: "string", description: "Ημ/νία λήξης πληρωμής (YYYY-MM-DD)" }
-                      },
-                      required: ["description", "amount"]
-                    }
-                  },
-                  suggestedProjectDetails: {
-                    type: "object",
-                    description: "Προτεινόμενα στοιχεία για τη φόρμα του έργου",
-                    properties: {
-                      description: { type: "string", description: "Σύντομη περιγραφή του έργου (2-3 προτάσεις)" },
-                      start_date: { type: "string", description: "Ημ/νία έναρξης (YYYY-MM-DD)" },
-                      end_date: { type: "string", description: "Ημ/νία λήξης (YYYY-MM-DD)" },
-                      budget: { type: "number", description: "Συνολικός προϋπολογισμός σε ευρώ" }
-                    }
-                  },
-                  projectSummary: { 
-                    type: "string", 
-                    description: "Σύντομη περίληψη του έργου (2-3 προτάσεις)" 
-                  },
-                  analysisConfidence: {
-                    type: "object",
-                    description: "Βαθμός βεβαιότητας ανά κατηγορία",
-                    properties: {
-                      deliverables: { type: "string", enum: ["high", "medium", "low"], description: "Βεβαιότητα για παραδοτέα" },
-                      tasks: { type: "string", enum: ["high", "medium", "low"], description: "Βεβαιότητα για tasks" },
-                      invoices: { type: "string", enum: ["high", "medium", "low"], description: "Βεβαιότητα για τιμολόγια" },
-                      dates: { type: "string", enum: ["high", "medium", "low"], description: "Βεβαιότητα για ημερομηνίες" }
-                    }
-                  },
-                  aiQuestions: {
-                    type: "array",
-                    description: "Ερωτήσεις προς τον χρήστη για επιβεβαίωση/διευκρίνιση",
-                    items: {
-                      type: "object",
-                      properties: {
-                        type: { type: "string", enum: ["confirmation", "clarification", "suggestion"], description: "Τύπος ερώτησης" },
-                        question: { type: "string", description: "Η ερώτηση προς τον χρήστη" },
-                        context: { type: "string", description: "Επιπλέον context για την ερώτηση" }
-                      },
-                      required: ["type", "question"]
-                    }
-                  },
-                  missingInfo: {
-                    type: "array",
-                    description: "Λίστα πληροφοριών που δεν βρέθηκαν στα αρχεία",
-                    items: { type: "string" }
-                  }
-                },
-                required: ["deliverables", "tasks", "invoices", "projectSummary"]
-              }
+      required: ["deliverables", "tasks", "invoices", "projectSummary"]
+    };
+
+    let response: Response;
+
+    if (usePerplexity) {
+      // Use Perplexity API with structured output
+      console.log("Calling Perplexity API (sonar-pro)...");
+      response = await fetch("https://api.perplexity.ai/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${PERPLEXITY_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "sonar-pro",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+          ],
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: "project_analysis",
+              schema: jsonSchema
             }
           }
-        ],
-        tool_choice: { type: "function", function: { name: "suggest_project_structure" } }
-      }),
-    });
+        }),
+      });
+    } else {
+      // Fallback to Lovable AI Gateway with tool calling
+      console.log("Calling Lovable AI Gateway (Gemini)...");
+      response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+          ],
+          tools: [
+            {
+              type: "function",
+              function: {
+                name: "suggest_project_structure",
+                description: "Επιστρέφει δομημένες προτάσεις για παραδοτέα, tasks, τιμολόγια και στοιχεία έργου.",
+                parameters: jsonSchema
+              }
+            }
+          ],
+          tool_choice: { type: "function", function: { name: "suggest_project_structure" } }
+        }),
+      });
+    }
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -455,31 +485,56 @@ ${requestQuestions ? '6. Ερωτήσεις επιβεβαίωσης για το
       );
     }
 
-    // Extract the tool call result
+    // Extract structured data from the response
+    let suggestions: ProjectSuggestion;
+    
+    const messageContent = aiResponse.choices?.[0]?.message?.content;
     const toolCall = aiResponse.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall) {
-      // Try to extract from regular message content as fallback
-      const messageContent = aiResponse.choices?.[0]?.message?.content;
-      if (messageContent) {
-        console.log("No tool call, trying to parse message content as JSON");
-        try {
-          // Try to extract JSON from the message
-          const jsonMatch = messageContent.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            const suggestions: ProjectSuggestion = JSON.parse(jsonMatch[0]);
-            return new Response(
-              JSON.stringify({ success: true, suggestions }),
-              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-          }
-        } catch (parseError) {
-          console.error("Failed to parse message content as JSON:", parseError);
+    
+    if (usePerplexity && messageContent) {
+      // Perplexity returns structured JSON directly in content
+      console.log("Parsing Perplexity structured JSON response...");
+      try {
+        // Try to parse directly
+        suggestions = JSON.parse(messageContent);
+      } catch {
+        // Try to extract JSON from the message if wrapped in markdown
+        const jsonMatch = messageContent.match(/```json\s*([\s\S]*?)\s*```/) || 
+                          messageContent.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const jsonStr = jsonMatch[1] || jsonMatch[0];
+          suggestions = JSON.parse(jsonStr);
+        } else {
+          throw new Error("Perplexity δεν επέστρεψε έγκυρο JSON.");
         }
       }
+    } else if (toolCall) {
+      // Lovable AI returns via tool call
+      console.log("Parsing Lovable AI tool call response...");
+      suggestions = JSON.parse(toolCall.function.arguments);
+    } else if (messageContent) {
+      // Fallback: try to extract JSON from message content
+      console.log("No tool call, trying to parse message content as JSON");
+      try {
+        const jsonMatch = messageContent.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          suggestions = JSON.parse(jsonMatch[0]);
+        } else {
+          throw new Error("No JSON found in response");
+        }
+      } catch (parseError) {
+        console.error("Failed to parse message content as JSON:", parseError);
+        throw new Error("Η AI δεν επέστρεψε δομημένα δεδομένα. Δοκιμάστε ξανά.");
+      }
+    } else {
       throw new Error("Η AI δεν επέστρεψε δομημένα δεδομένα. Δοκιμάστε ξανά.");
     }
-
-    const suggestions: ProjectSuggestion = JSON.parse(toolCall.function.arguments);
+    
+    // Add citations from Perplexity if available
+    if (usePerplexity && aiResponse.citations) {
+      console.log("Perplexity citations:", aiResponse.citations);
+      // Could add citations to the response if needed
+    }
 
     return new Response(
       JSON.stringify({ success: true, suggestions }),

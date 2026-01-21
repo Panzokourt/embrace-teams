@@ -18,6 +18,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { TenderAISuggestions } from '@/components/tenders/TenderAISuggestions';
+import { TenderEvaluationCriteria } from '@/components/tenders/TenderEvaluationCriteria';
+import { TenderTeamManager } from '@/components/tenders/TenderTeamManager';
 import { toast } from 'sonner';
 import { 
   ArrowLeft,
@@ -34,7 +36,10 @@ import {
   Search,
   Edit3,
   Send,
-  X
+  X,
+  Users,
+  Target,
+  TrendingUp
 } from 'lucide-react';
 import { format, isPast } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -404,7 +409,18 @@ export default function TenderDetailPage() {
       <Tabs defaultValue="details" className="space-y-6">
         <TabsList>
           <TabsTrigger value="details">Στοιχεία</TabsTrigger>
-          <TabsTrigger value="ai-analysis">AI Ανάλυση</TabsTrigger>
+          <TabsTrigger value="team">
+            <Users className="h-4 w-4 mr-1.5" />
+            Ομάδα
+          </TabsTrigger>
+          <TabsTrigger value="evaluation">
+            <Target className="h-4 w-4 mr-1.5" />
+            Αξιολόγηση
+          </TabsTrigger>
+          <TabsTrigger value="ai-analysis">
+            <Sparkles className="h-4 w-4 mr-1.5" />
+            AI Ανάλυση
+          </TabsTrigger>
         </TabsList>
 
         {/* Details Tab */}
@@ -524,6 +540,16 @@ export default function TenderDetailPage() {
               </form>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Team Tab */}
+        <TabsContent value="team">
+          <TenderTeamManager tenderId={tender.id} />
+        </TabsContent>
+
+        {/* Evaluation Tab */}
+        <TabsContent value="evaluation">
+          <TenderEvaluationCriteria tenderId={tender.id} />
         </TabsContent>
 
         {/* AI Analysis Tab */}

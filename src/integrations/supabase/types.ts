@@ -47,6 +47,96 @@ export type Database = {
         }
         Relationships: []
       }
+      billing_notifications: {
+        Row: {
+          amount: number
+          client_id: string | null
+          company_id: string | null
+          contract_id: string | null
+          created_at: string
+          deliverable_id: string | null
+          description: string | null
+          id: string
+          invoice_id: string | null
+          notification_type: string
+          period_end: string | null
+          period_start: string | null
+          processed_at: string | null
+          project_id: string | null
+          status: string | null
+        }
+        Insert: {
+          amount?: number
+          client_id?: string | null
+          company_id?: string | null
+          contract_id?: string | null
+          created_at?: string
+          deliverable_id?: string | null
+          description?: string | null
+          id?: string
+          invoice_id?: string | null
+          notification_type: string
+          period_end?: string | null
+          period_start?: string | null
+          processed_at?: string | null
+          project_id?: string | null
+          status?: string | null
+        }
+        Update: {
+          amount?: number
+          client_id?: string | null
+          company_id?: string | null
+          contract_id?: string | null
+          created_at?: string
+          deliverable_id?: string | null
+          description?: string | null
+          id?: string
+          invoice_id?: string | null
+          notification_type?: string
+          period_end?: string | null
+          period_start?: string | null
+          processed_at?: string | null
+          project_id?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_notifications_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_notifications_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_notifications_deliverable_id_fkey"
+            columns: ["deliverable_id"]
+            isOneToOne: false
+            referencedRelation: "deliverables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_notifications_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_notifications_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_user_access: {
         Row: {
           client_id: string
@@ -204,6 +294,81 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      contracts: {
+        Row: {
+          billing_frequency: string | null
+          company_id: string | null
+          contract_number: string | null
+          contract_type: string | null
+          created_at: string
+          end_date: string | null
+          file_path: string | null
+          id: string
+          payment_terms: string | null
+          project_id: string
+          signed_date: string | null
+          start_date: string | null
+          status: string | null
+          tender_id: string | null
+          terms: string | null
+          total_amount: number | null
+          updated_at: string
+        }
+        Insert: {
+          billing_frequency?: string | null
+          company_id?: string | null
+          contract_number?: string | null
+          contract_type?: string | null
+          created_at?: string
+          end_date?: string | null
+          file_path?: string | null
+          id?: string
+          payment_terms?: string | null
+          project_id: string
+          signed_date?: string | null
+          start_date?: string | null
+          status?: string | null
+          tender_id?: string | null
+          terms?: string | null
+          total_amount?: number | null
+          updated_at?: string
+        }
+        Update: {
+          billing_frequency?: string | null
+          company_id?: string | null
+          contract_number?: string | null
+          contract_type?: string | null
+          created_at?: string
+          end_date?: string | null
+          file_path?: string | null
+          id?: string
+          payment_terms?: string | null
+          project_id?: string
+          signed_date?: string | null
+          start_date?: string | null
+          status?: string | null
+          tender_id?: string | null
+          terms?: string | null
+          total_amount?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contracts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_tender_id_fkey"
+            columns: ["tender_id"]
+            isOneToOne: false
+            referencedRelation: "tenders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       deliverables: {
         Row: {
@@ -776,39 +941,122 @@ export type Database = {
           },
         ]
       }
+      task_templates: {
+        Row: {
+          assigned_role: string | null
+          company_id: string | null
+          created_at: string
+          default_priority: string | null
+          depends_on_template_id: string | null
+          description: string | null
+          estimated_hours: number | null
+          id: string
+          is_active: boolean | null
+          name: string
+          phase: string | null
+          sort_order: number | null
+          template_type: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_role?: string | null
+          company_id?: string | null
+          created_at?: string
+          default_priority?: string | null
+          depends_on_template_id?: string | null
+          description?: string | null
+          estimated_hours?: number | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          phase?: string | null
+          sort_order?: number | null
+          template_type: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_role?: string | null
+          company_id?: string | null
+          created_at?: string
+          default_priority?: string | null
+          depends_on_template_id?: string | null
+          description?: string | null
+          estimated_hours?: number | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          phase?: string | null
+          sort_order?: number | null
+          template_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_templates_depends_on_template_id_fkey"
+            columns: ["depends_on_template_id"]
+            isOneToOne: false
+            referencedRelation: "task_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
+          actual_hours: number | null
           assigned_to: string | null
           created_at: string
           deliverable_id: string | null
+          depends_on: string | null
           description: string | null
           due_date: string | null
+          estimated_hours: number | null
           id: string
+          is_recurring: boolean | null
+          parent_task_id: string | null
+          priority: string | null
           project_id: string
+          recurrence_end_date: string | null
+          recurrence_pattern: string | null
           status: Database["public"]["Enums"]["task_status"]
           title: string
           updated_at: string
         }
         Insert: {
+          actual_hours?: number | null
           assigned_to?: string | null
           created_at?: string
           deliverable_id?: string | null
+          depends_on?: string | null
           description?: string | null
           due_date?: string | null
+          estimated_hours?: number | null
           id?: string
+          is_recurring?: boolean | null
+          parent_task_id?: string | null
+          priority?: string | null
           project_id: string
+          recurrence_end_date?: string | null
+          recurrence_pattern?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           title: string
           updated_at?: string
         }
         Update: {
+          actual_hours?: number | null
           assigned_to?: string | null
           created_at?: string
           deliverable_id?: string | null
+          depends_on?: string | null
           description?: string | null
           due_date?: string | null
+          estimated_hours?: number | null
           id?: string
+          is_recurring?: boolean | null
+          parent_task_id?: string | null
+          priority?: string | null
           project_id?: string
+          recurrence_end_date?: string | null
+          recurrence_pattern?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           title?: string
           updated_at?: string
@@ -819,6 +1067,20 @@ export type Database = {
             columns: ["deliverable_id"]
             isOneToOne: false
             referencedRelation: "deliverables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_depends_on_fkey"
+            columns: ["depends_on"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_parent_task_id_fkey"
+            columns: ["parent_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
           {
@@ -904,6 +1166,53 @@ export type Database = {
           },
         ]
       }
+      tender_evaluation_criteria: {
+        Row: {
+          created_at: string
+          criterion: string
+          id: string
+          max_score: number
+          notes: string | null
+          our_score: number | null
+          sort_order: number | null
+          tender_id: string
+          updated_at: string
+          weight: number | null
+        }
+        Insert: {
+          created_at?: string
+          criterion: string
+          id?: string
+          max_score?: number
+          notes?: string | null
+          our_score?: number | null
+          sort_order?: number | null
+          tender_id: string
+          updated_at?: string
+          weight?: number | null
+        }
+        Update: {
+          created_at?: string
+          criterion?: string
+          id?: string
+          max_score?: number
+          notes?: string | null
+          our_score?: number | null
+          sort_order?: number | null
+          tender_id?: string
+          updated_at?: string
+          weight?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tender_evaluation_criteria_tender_id_fkey"
+            columns: ["tender_id"]
+            isOneToOne: false
+            referencedRelation: "tenders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tender_suggestions: {
         Row: {
           applied: boolean
@@ -945,6 +1254,38 @@ export type Database = {
           },
         ]
       }
+      tender_team_access: {
+        Row: {
+          created_at: string
+          id: string
+          role: string | null
+          tender_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: string | null
+          tender_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: string | null
+          tender_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tender_team_access_tender_id_fkey"
+            columns: ["tender_id"]
+            isOneToOne: false
+            referencedRelation: "tenders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenders: {
         Row: {
           budget: number | null
@@ -954,8 +1295,11 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          probability: number | null
+          source_email: string | null
           stage: Database["public"]["Enums"]["tender_stage"]
           submission_deadline: string | null
+          tender_type: string | null
           updated_at: string
         }
         Insert: {
@@ -966,8 +1310,11 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          probability?: number | null
+          source_email?: string | null
           stage?: Database["public"]["Enums"]["tender_stage"]
           submission_deadline?: string | null
+          tender_type?: string | null
           updated_at?: string
         }
         Update: {
@@ -978,8 +1325,11 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          probability?: number | null
+          source_email?: string | null
           stage?: Database["public"]["Enums"]["tender_stage"]
           submission_deadline?: string | null
+          tender_type?: string | null
           updated_at?: string
         }
         Relationships: [

@@ -15,10 +15,14 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  Folder
+  Folder,
+  Search,
+  X,
+  GripVertical
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -36,6 +40,7 @@ import { GroupedTableSection } from '@/components/shared/GroupedTableSection';
 import { useTableViews, type GroupByField } from '@/hooks/useTableViews';
 import { type ColumnConfig } from '@/components/shared/ColumnVisibilityToggle';
 import { exportToCSV, exportToExcel, formatters } from '@/utils/exportUtils';
+import { cn } from '@/lib/utils';
 import type { FileFolder } from './FolderTree';
 
 export interface FileAttachment {
@@ -72,6 +77,7 @@ interface FilesTableViewProps {
   onUpload: (files: FileList, folderId: string | null) => Promise<void>;
   onDelete: (file: FileAttachment) => Promise<void>;
   onUpdateFile: (fileId: string, field: string, value: string | null) => Promise<void>;
+  onMoveFile?: (fileId: string, folderId: string | null) => Promise<void>;
   canManage: boolean;
   loading?: boolean;
   uploading?: boolean;
@@ -106,6 +112,7 @@ export function FilesTableView({
   onUpload,
   onDelete,
   onUpdateFile,
+  onMoveFile,
   canManage,
   loading = false,
   uploading = false
@@ -116,6 +123,8 @@ export function FilesTableView({
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [draggedFileId, setDraggedFileId] = useState<string | null>(null);
 
   const {
     columns,
@@ -134,11 +143,26 @@ export function FilesTableView({
     defaultColumns: DEFAULT_COLUMNS,
   });
 
-  // Filter files by selected folder
+  // Filter files by selected folder and search query
   const filteredFiles = useMemo(() => {
-    if (selectedFolderId === null) return files;
-    return files.filter(f => f.folder_id === selectedFolderId);
-  }, [files, selectedFolderId]);
+    let result = files;
+    
+    // Filter by folder
+    if (selectedFolderId !== null) {
+      result = result.filter(f => f.folder_id === selectedFolderId);
+    }
+    
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(f => 
+        f.file_name.toLowerCase().includes(query) ||
+        (f.content_type && f.content_type.toLowerCase().includes(query))
+      );
+    }
+    
+    return result;
+  }, [files, selectedFolderId, searchQuery]);
 
   // Sort files
   const sortedFiles = useMemo(() => {
@@ -317,6 +341,17 @@ export function FilesTableView({
     toast.success(`Διαγράφηκαν ${selectedFiles.size} αρχεία`);
   };
 
+  // Drag & Drop handlers
+  const handleDragStart = (e: React.DragEvent, fileId: string) => {
+    setDraggedFileId(fileId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', fileId);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedFileId(null);
+  };
+
   const getFileIcon = (contentType: string | null) => {
     if (!contentType) return <File className="h-5 w-5 text-muted-foreground" />;
     if (contentType.startsWith('image/')) return <Image className="h-5 w-5 text-primary" />;
@@ -375,13 +410,27 @@ export function FilesTableView({
     columns.find(c => c.id === columnId)?.visible ?? true;
 
   const renderFileRow = (file: FileAttachment) => (
-    <TableRow key={file.id} className="group">
+    <TableRow 
+      key={file.id} 
+      className={cn(
+        "group",
+        draggedFileId === file.id && "opacity-50 bg-muted"
+      )}
+      draggable={canManage && !!onMoveFile}
+      onDragStart={(e) => handleDragStart(e, file.id)}
+      onDragEnd={handleDragEnd}
+    >
       {isColumnVisible('select') && (
         <TableCell className="w-10">
-          <Checkbox
-            checked={selectedFiles.has(file.id)}
-            onCheckedChange={(checked) => handleSelectFile(file.id, !!checked)}
-          />
+          <div className="flex items-center gap-1">
+            {canManage && onMoveFile && (
+              <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab opacity-0 group-hover:opacity-100 transition-opacity" />
+            )}
+            <Checkbox
+              checked={selectedFiles.has(file.id)}
+              onCheckedChange={(checked) => handleSelectFile(file.id, !!checked)}
+            />
+          </div>
         </TableCell>
       )}
       
@@ -496,8 +545,26 @@ export function FilesTableView({
 
   return (
     <div className="space-y-4">
-      {/* Upload button */}
-      <div className="flex items-center gap-2">
+      {/* Search and Upload bar */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Αναζήτηση με όνομα ή τύπο..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 pr-9"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        
         <input
           ref={fileInputRef}
           type="file"
@@ -523,6 +590,12 @@ export function FilesTableView({
           <Badge variant="secondary">
             <Folder className="h-3 w-3 mr-1" />
             {folders.find(f => f.id === selectedFolderId)?.name}
+          </Badge>
+        )}
+        
+        {searchQuery && (
+          <Badge variant="outline">
+            {sortedFiles.length} αποτέλεσμα{sortedFiles.length !== 1 ? 'τα' : ''}
           </Badge>
         )}
       </div>

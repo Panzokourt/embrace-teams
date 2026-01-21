@@ -16,7 +16,7 @@ import { ProjectMediaPlan } from '@/components/projects/ProjectMediaPlan';
 import { ProjectAISuggestions } from '@/components/projects/ProjectAISuggestions';
 import { ProjectInfoEditor } from '@/components/projects/ProjectInfoEditor';
 import { ProjectTeamManager } from '@/components/projects/ProjectTeamManager';
-import { FileAttachments } from '@/components/files/FileAttachments';
+import { FileExplorer } from '@/components/files/FileExplorer';
 import { toast } from 'sonner';
 import { 
   ArrowLeft,
@@ -592,18 +592,7 @@ export default function ProjectDetailPage() {
 
         {/* Files Tab */}
         <TabsContent value="files">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Paperclip className="h-5 w-5" />
-                Αρχεία
-              </CardTitle>
-              <CardDescription>Διαχείριση αρχείων του έργου</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <FileAttachments projectId={project.id} />
-            </CardContent>
-          </Card>
+          <FileExplorer projectId={project.id} />
         </TabsContent>
 
         {/* Media Plan Tab */}

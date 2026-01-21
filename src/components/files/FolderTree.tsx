@@ -44,6 +44,7 @@ interface FolderTreeProps {
   onCreateFolder: (name: string, parentId: string | null) => Promise<void>;
   onRenameFolder: (folderId: string, newName: string) => Promise<void>;
   onDeleteFolder: (folderId: string) => Promise<void>;
+  onDropFile?: (fileId: string, folderId: string | null) => Promise<void>;
   canManage: boolean;
 }
 

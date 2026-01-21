@@ -279,6 +279,27 @@ export function FileExplorer({ tenderId, projectId }: FileExplorerProps) {
     }
   };
 
+  const handleMoveFile = async (fileId: string, folderId: string | null) => {
+    try {
+      const { error } = await supabase
+        .from('file_attachments')
+        .update({ folder_id: folderId })
+        .eq('id', fileId);
+
+      if (error) throw error;
+
+      setFiles(prev => prev.map(f => 
+        f.id === fileId ? { ...f, folder_id: folderId } : f
+      ));
+      
+      const folderName = folderId ? folders.find(f => f.id === folderId)?.name : 'Χωρίς φάκελο';
+      toast.success(`Μετακινήθηκε στο "${folderName}"`);
+    } catch (error) {
+      console.error('Error moving file:', error);
+      toast.error('Σφάλμα κατά τη μετακίνηση');
+    }
+  };
+
   return (
     <div className="flex gap-6">
       {/* Folder sidebar */}
@@ -290,6 +311,7 @@ export function FileExplorer({ tenderId, projectId }: FileExplorerProps) {
           onCreateFolder={handleCreateFolder}
           onRenameFolder={handleRenameFolder}
           onDeleteFolder={handleDeleteFolder}
+          onDropFile={handleMoveFile}
           canManage={canManage}
         />
       </div>
@@ -305,6 +327,7 @@ export function FileExplorer({ tenderId, projectId }: FileExplorerProps) {
           onUpload={handleUpload}
           onDelete={handleDeleteFile}
           onUpdateFile={handleUpdateFile}
+          onMoveFile={handleMoveFile}
           canManage={canManage}
           loading={loading}
           uploading={uploading}

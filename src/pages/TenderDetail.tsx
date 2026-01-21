@@ -19,10 +19,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { TenderAISuggestions } from '@/components/tenders/TenderAISuggestions';
-import { TenderEvaluationCriteria } from '@/components/tenders/TenderEvaluationCriteria';
 import { TenderTeamManager } from '@/components/tenders/TenderTeamManager';
-import { TenderDeliverables } from '@/components/tenders/TenderDeliverables';
-import { TenderTasksManager } from '@/components/tenders/TenderTasksManager';
+import { TenderDeliverablesTable } from '@/components/tenders/TenderDeliverablesTable';
+import { TenderTasksTable } from '@/components/tenders/TenderTasksTable';
 import { FileExplorer } from '@/components/files/FileExplorer';
 import { ClientSelector } from '@/components/shared/ClientSelector';
 import { toast } from 'sonner';
@@ -43,7 +42,6 @@ import {
   Send,
   X,
   Users,
-  Target,
   TrendingUp,
   Package,
   ListTodo,
@@ -440,10 +438,6 @@ export default function TenderDetailPage() {
             <Users className="h-4 w-4 mr-1.5" />
             Ομάδα
           </TabsTrigger>
-          <TabsTrigger value="evaluation">
-            <Target className="h-4 w-4 mr-1.5" />
-            Αξιολόγηση
-          </TabsTrigger>
           <TabsTrigger value="ai-analysis">
             <Sparkles className="h-4 w-4 mr-1.5" />
             AI Ανάλυση
@@ -565,12 +559,12 @@ export default function TenderDetailPage() {
 
         {/* Deliverables Tab */}
         <TabsContent value="deliverables">
-          <TenderDeliverables key={deliverablesKey} tenderId={tender.id} tenderName={tender.name} />
+          <TenderDeliverablesTable key={deliverablesKey} tenderId={tender.id} tenderName={tender.name} />
         </TabsContent>
 
         {/* Tasks Tab */}
         <TabsContent value="tasks">
-          <TenderTasksManager key={tasksKey} tenderId={tender.id} />
+          <TenderTasksTable key={tasksKey} tenderId={tender.id} />
         </TabsContent>
 
         {/* Files Tab */}
@@ -581,11 +575,6 @@ export default function TenderDetailPage() {
         {/* Team Tab */}
         <TabsContent value="team">
           <TenderTeamManager tenderId={tender.id} />
-        </TabsContent>
-
-        {/* Evaluation Tab */}
-        <TabsContent value="evaluation">
-          <TenderEvaluationCriteria tenderId={tender.id} />
         </TabsContent>
 
         {/* AI Analysis Tab */}

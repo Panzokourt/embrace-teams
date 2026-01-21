@@ -47,7 +47,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { title: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { title: 'Διαγωνισμοί', href: '/tenders', icon: FileText, permission: 'tenders.view' },
+  { title: 'New Business', href: '/tenders', icon: FileText, permission: 'tenders.view' },
   { title: 'Έργα', href: '/projects', icon: FolderKanban, permission: 'projects.view' },
   { title: 'Tasks', href: '/tasks', icon: CheckSquare, permission: 'tasks.view' },
   { title: 'Ημερολόγιο', href: '/calendar', icon: CalendarDays },

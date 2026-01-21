@@ -21,8 +21,10 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  CheckCircle2
+  CheckCircle2,
+  ExternalLink
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -261,17 +263,29 @@ export function ProjectsTableView({
   const renderProjectRow = (project: Project) => (
     <TableRow 
       key={project.id} 
-      className="group hover:bg-muted/50 cursor-pointer"
-      onClick={() => navigate(`/projects/${project.id}`)}
+      className="group hover:bg-muted/50"
     >
       {/* Name */}
-      <TableCell className="font-medium" style={{ width: getColumnWidth('name') }} onClick={(e) => e.stopPropagation()}>
-        <EnhancedInlineEditCell
-          value={project.name}
-          onSave={(val) => onInlineUpdate(project.id, 'name', val)}
-          type="text"
-          disabled={!canManage}
-        />
+      <TableCell className="font-medium" style={{ width: getColumnWidth('name') }}>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 shrink-0 text-muted-foreground hover:text-primary"
+            onClick={() => navigate(`/projects/${project.id}`)}
+            title="Άνοιγμα έργου"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+          </Button>
+          <div onClick={(e) => e.stopPropagation()} className="flex-1 min-w-0">
+            <EnhancedInlineEditCell
+              value={project.name}
+              onSave={(val) => onInlineUpdate(project.id, 'name', val)}
+              type="text"
+              disabled={!canManage}
+            />
+          </div>
+        </div>
       </TableCell>
 
       {/* Client */}

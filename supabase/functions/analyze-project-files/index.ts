@@ -75,20 +75,16 @@ serve(async (req) => {
     console.log("Authenticated user:", userId);
 
     // ============================================
-    // Get API Keys and Request Data
+    // Get API Key - USE ONLY GEMINI (no Perplexity for document analysis)
+    // Perplexity does web search instead of analyzing documents
     // ============================================
-    const PERPLEXITY_API_KEY = Deno.env.get("PERPLEXITY_API_KEY");
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
-    // Prefer Perplexity for better document analysis, fallback to Lovable AI
-    const usePerplexity = !!PERPLEXITY_API_KEY;
-    
-    if (!PERPLEXITY_API_KEY && !LOVABLE_API_KEY) {
-      throw new Error("No AI API key is configured (PERPLEXITY_API_KEY or LOVABLE_API_KEY)");
+    if (!LOVABLE_API_KEY) {
+      throw new Error("LOVABLE_API_KEY is not configured");
     }
     
-    console.log(`Using AI provider: ${usePerplexity ? 'Perplexity' : 'Lovable AI'}`);
-
+    console.log("Using AI provider: Gemini (google/gemini-2.5-flash) for document analysis");
 
     const { 
       fileContents, 
@@ -130,10 +126,9 @@ serve(async (req) => {
       );
     }
 
-    // Limit file content size - Perplexity has 200K token limit (~150K chars safe)
-    // Using conservative limits to account for system prompt + response
-    const maxTotalContentLength = usePerplexity ? 120000 : 500000; // 120KB for Perplexity, 500KB for Gemini
-    const maxSingleFileLength = usePerplexity ? 100000 : 250000; // 100KB per file for Perplexity
+    // Gemini has much larger context - allow up to 500KB
+    const maxTotalContentLength = 500000;
+    const maxSingleFileLength = 250000;
     
     // Truncate large files and calculate total size
     const processedFiles = fileContents.map((f: any) => {
@@ -148,7 +143,7 @@ serve(async (req) => {
     const totalContentLength = processedFiles.reduce((acc: number, f: any) => acc + (f.content?.length || 0), 0);
     if (totalContentLength > maxTotalContentLength) {
       return new Response(
-        JSON.stringify({ error: "Total file content too large. Maximum 2MB allowed across all files." }),
+        JSON.stringify({ error: "Total file content too large. Maximum 500KB allowed across all files." }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -178,26 +173,26 @@ serve(async (req) => {
 - Πρότεινε βελτιώσεις αν χρειάζεται (π.χ. περισσότερα tasks)`;
     }
 
-    const systemPrompt = `Είσαι ειδικός αναλυτής εγγράφων έργων. Σκανάρεις έγγραφα (διακηρύξεις, συμβάσεις, briefs, RFPs) και εξάγεις τα βασικά στοιχεία τους.
+    const systemPrompt = `Είσαι ειδικός αναλυτής εγγράφων για δημόσιους διαγωνισμούς και έργα επικοινωνίας/marketing. 
 
-ΣΤΟΧΟΣ: Εξάγε ΟΛΑ τα παραδοτέα, προθεσμίες, ποσά και βασικές πληροφορίες που αναφέρονται στο έγγραφο.
+ΣΤΟΧΟΣ: Ανάλυσε το έγγραφο και εξάγε ΟΛΑ τα παραδοτέα, προθεσμίες, ποσά και τεχνικές απαιτήσεις.
 
 ═══════════════════════════════════════════════════════════════════
 ΠΑΡΑΔΟΤΕΑ (DELIVERABLES)
 ═══════════════════════════════════════════════════════════════════
 
 Ψάξε για ΟΤΙΔΗΠΟΤΕ μοιάζει με παραδοτέο ή φάση εργασίας:
-- Αριθμημένα στοιχεία: "Π1", "Π2", "Π.1", "P1", "D1", "WP1", "Φάση 1"
-- Λίστες μετά από: "Παραδοτέα:", "Αντικείμενο:", "Υπηρεσίες:", "Φάσεις:"
-- Πίνακες με στήλες όπως: Περιγραφή, Προθεσμία, Κόστος
+- Αριθμημένα: "Π1", "Π2", "Π.1", "P1", "D1", "WP1", "Φάση 1"
+- Ενότητες: "Ενότητα 1", "Πακέτο Εργασίας", "Work Package"
+- Τίτλοι σε πίνακες με στήλες: Περιγραφή, Προθεσμία, Κόστος, Βαρύτητα
 - Οτιδήποτε έχει deadline ή budget
 
 ΕΞΑΓΩΓΗ:
-- Αντέγραψε τον τίτλο ΑΚΡΙΒΩΣ όπως γράφεται
-- Κράτα την αρίθμηση (Π1, WP2, Φάση 3 κλπ)
-- Πρόσθεσε περιγραφή από το κείμενο
-- Πρόσθεσε due_date αν υπάρχει (μορφή YYYY-MM-DD)
-- Πρόσθεσε budget αν αναφέρεται (αριθμός χωρίς €)
+- Αντέγραψε τον τίτλο ΑΚΡΙΒΩΣ όπως γράφεται στο έγγραφο
+- Κράτα την αρίθμηση (Π1, WP2, κλπ)
+- Πρόσθεσε αναλυτική περιγραφή
+- due_date σε μορφή YYYY-MM-DD
+- budget σε αριθμό χωρίς €
 
 ═══════════════════════════════════════════════════════════════════
 ΗΜΕΡΟΜΗΝΙΕΣ
@@ -206,28 +201,39 @@ serve(async (req) => {
 Μετατροπή σε YYYY-MM-DD:
 - "30/06/2026" → "2026-06-30"
 - "Ιούνιος 2026" → "2026-06-30"
-- "εντός 6 μηνών" → υπολόγισε από σήμερα
+- "30.06.2026" → "2026-06-30"
+- "20 Μαΐου 2026" → "2026-05-20"
 
 Ψάξε για:
-- Διάρκεια έργου, ημερομηνία έναρξης/λήξης
-- Προθεσμίες παραδοτέων
-- Χρονοδιάγραμμα πληρωμών
+- Καταληκτική ημερομηνία υποβολής προσφορών
+- Διάρκεια σύμβασης
+- Χρονοδιάγραμμα παραδοτέων
 
 ═══════════════════════════════════════════════════════════════════
 ΠΟΣΑ / BUDGET
 ═══════════════════════════════════════════════════════════════════
 
-- Συνολικός προϋπολογισμός έργου
-- Ποσά ανά παραδοτέο/φάση
-- Δόσεις πληρωμών
-- Χρησιμοποίησε καθαρά ποσά (χωρίς ΦΠΑ) αν διευκρινίζεται
+ΚΡΙΣΙΜΟ: Εντόπισε τον ΣΥΝΟΛΙΚΟ ΠΡΟΫΠΟΛΟΓΙΣΜΟ του έργου.
+- Συνήθως αναφέρεται σε: "Εκτιμώμενη αξία", "Προϋπολογισμός", "Budget"
+- Χρησιμοποίησε ποσά ΧΩΡΙΣ ΦΠΑ αν διευκρινίζεται
+- Αναγνώρισε και αριθμούς με λέξεις: "εκατόν είκοσι τέσσερις χιλιάδες" = 124000
+
+═══════════════════════════════════════════════════════════════════
+ΚΡΙΤΗΡΙΑ ΑΞΙΟΛΟΓΗΣΗΣ
+═══════════════════════════════════════════════════════════════════
+
+Ψάξε για πίνακα κριτηρίων με:
+- Κωδικό (Κ1, Κ2, Κ3)
+- Περιγραφή κριτηρίου
+- Βαρύτητα/Συντελεστή (%)
+- Μέγιστη βαθμολογία
 
 ═══════════════════════════════════════════════════════════════════
 TASKS
 ═══════════════════════════════════════════════════════════════════
 
-Για κάθε παραδοτέο, πρότεινε 2-4 εργασίες υλοποίησης.
-Αν το έγγραφο αναφέρει συγκεκριμένες ενέργειες, χρησιμοποίησέ τες.
+Για κάθε παραδοτέο, πρότεινε 2-4 συγκεκριμένες εργασίες υλοποίησης.
+Αν το έγγραφο αναφέρει ενέργειες, χρησιμοποίησέ τες ακριβώς.
 
 ═══════════════════════════════════════════════════════════════════
 ΤΙΜΟΛΟΓΙΑ / ΠΛΗΡΩΜΕΣ
@@ -236,33 +242,43 @@ TASKS
 Ψάξε για:
 - "Τρόπος πληρωμής", "Δόσεις", "Προκαταβολή"
 - Πληρωμές συνδεδεμένες με παραδοτέα
-- Αν δεν αναφέρεται, πρότεινε: 30% προκαταβολή, 40% ενδιάμεσα, 30% τελική
+- Αν δεν αναφέρεται: 30% προκαταβολή, 40% ενδιάμεσα, 30% τελική
 
 ═══════════════════════════════════════════════════════════════════
-CONFIDENCE
+CONFIDENCE & QUALITY
 ═══════════════════════════════════════════════════════════════════
 
-- HIGH: Βρήκα ακριβώς αυτή την πληροφορία στο κείμενο
-- MEDIUM: Το συμπέρανα λογικά από το context
-- LOW: Υπόθεση χωρίς σαφή αναφορά
+ΒΑΘΜΟΣ ΒΕΒΑΙΟΤΗΤΑΣ:
+- HIGH: Βρέθηκε ακριβώς στο κείμενο
+- MEDIUM: Συμπέρασμα από το context
+- LOW: Υπόθεση
 
-ΣΗΜΑΝΤΙΚΟ: Επέστρεψε ό,τι βρίσκεις. Αν δεν βρεις κάτι, άφησε κενή λίστα και ρώτα τον χρήστη.${focusPromptSection}${reanalysisSection}${questionsSection}`;
+ΣΗΜΑΝΤΙΚΟ: 
+- Επέστρεψε ΜΟΝΟ ό,τι υπάρχει στο έγγραφο
+- ΜΗΝ φαντάζεσαι παραδοτέα ή ποσά
+- Αν δεν βρεις κάτι, άφησε κενή λίστα${focusPromptSection}${reanalysisSection}${questionsSection}`;
 
     const userPrompt = `Έργο: ${projectName}
 ${projectBudget ? `Γνωστός Προϋπολογισμός: €${projectBudget}` : 'Προϋπολογισμός: Να εξαχθεί από τα αρχεία'}
 
-=== ΠΕΡΙΕΧΟΜΕΝΑ ΑΡΧΕΙΩΝ ===
+═══════════════════════════════════════════════════════════════════
+ΠΕΡΙΕΧΟΜΕΝΑ ΑΡΧΕΙΩΝ ΓΙΑ ΑΝΑΛΥΣΗ
+═══════════════════════════════════════════════════════════════════
 ${filesToAnalyze.map((f: any, i: number) => `
---- Αρχείο ${i + 1}: ${f.fileName} ---
+╔══════════════════════════════════════════════════════════════════╗
+║ Αρχείο ${i + 1}: ${f.fileName}
+╚══════════════════════════════════════════════════════════════════╝
 ${f.content}
 `).join('\n')}
-=== ΤΕΛΟΣ ΑΡΧΕΙΩΝ ===
+═══════════════════════════════════════════════════════════════════
+ΤΕΛΟΣ ΑΡΧΕΙΩΝ
+═══════════════════════════════════════════════════════════════════
 
-Ανάλυσε ΠΟΛΥ ΠΡΟΣΕΚΤΙΚΑ τα παραπάνω αρχεία και εξάγε:
-1. Όλα τα παραδοτέα με τις προθεσμίες και τα budgets τους
+ΑΝΑΛΥΣΕ ΠΟΛΥ ΠΡΟΣΕΚΤΙΚΑ τα παραπάνω και εξάγε:
+1. ΟΛΑ τα παραδοτέα με τίτλους, περιγραφές, προθεσμίες, budgets
 2. Tasks για κάθε παραδοτέο
-3. Πρόγραμμα πληρωμών/τιμολογίων
-4. Γενικά στοιχεία του έργου (budget, ημερομηνίες, περιγραφή)
+3. Πρόγραμμα πληρωμών (invoices)
+4. Στοιχεία έργου: συνολικό budget, ημερομηνίες, περιγραφή
 5. Βαθμό βεβαιότητας ανά κατηγορία
 ${requestQuestions ? '6. Ερωτήσεις επιβεβαίωσης για τον χρήστη' : ''}`;
 
@@ -272,41 +288,41 @@ ${requestQuestions ? '6. Ερωτήσεις επιβεβαίωσης για το
       properties: {
         deliverables: {
           type: "array",
-          description: "Λίστα παραδοτέων επικοινωνίας/marketing",
+          description: "Λίστα παραδοτέων",
           items: {
             type: "object",
             properties: {
-              name: { type: "string", description: "Όνομα/τίτλος παραδοτέου (π.χ. 'Π1 - Στρατηγική Επικοινωνίας')" },
-              description: { type: "string", description: "Αναλυτική περιγραφή του παραδοτέου" },
-              due_date: { type: "string", description: "Προθεσμία παράδοσης (YYYY-MM-DD)" },
-              budget: { type: "number", description: "Εκτιμώμενο κόστος σε ευρώ" }
+              name: { type: "string", description: "Ακριβής τίτλος παραδοτέου (π.χ. 'Π1 - Branding')" },
+              description: { type: "string", description: "Αναλυτική περιγραφή" },
+              due_date: { type: "string", description: "Προθεσμία (YYYY-MM-DD)" },
+              budget: { type: "number", description: "Κόστος σε ευρώ" }
             },
             required: ["name", "description"]
           }
         },
         tasks: {
           type: "array",
-          description: "Λίστα εργασιών για την υλοποίηση",
+          description: "Λίστα εργασιών",
           items: {
             type: "object",
             properties: {
               title: { type: "string", description: "Τίτλος εργασίας" },
-              description: { type: "string", description: "Περιγραφή της εργασίας" },
+              description: { type: "string", description: "Περιγραφή" },
               due_date: { type: "string", description: "Προθεσμία (YYYY-MM-DD)" },
-              deliverable_index: { type: "number", description: "Index του σχετικού παραδοτέου (0-based)" }
+              deliverable_index: { type: "number", description: "Index σχετικού παραδοτέου (0-based)" }
             },
             required: ["title", "description"]
           }
         },
         invoices: {
           type: "array",
-          description: "Πρόγραμμα πληρωμών/τιμολογίων",
+          description: "Πρόγραμμα πληρωμών",
           items: {
             type: "object",
             properties: {
-              description: { type: "string", description: "Περιγραφή τιμολογίου" },
+              description: { type: "string", description: "Περιγραφή πληρωμής" },
               amount: { type: "number", description: "Ποσό σε ευρώ" },
-              due_date: { type: "string", description: "Ημ/νία λήξης πληρωμής (YYYY-MM-DD)" }
+              due_date: { type: "string", description: "Ημ/νία (YYYY-MM-DD)" }
             },
             required: ["description", "amount"]
           }
@@ -314,7 +330,7 @@ ${requestQuestions ? '6. Ερωτήσεις επιβεβαίωσης για το
         suggestedProjectDetails: {
           type: "object",
           properties: {
-            description: { type: "string", description: "Σύντομη περιγραφή του έργου" },
+            description: { type: "string", description: "Σύντομη περιγραφή έργου" },
             start_date: { type: "string", description: "Ημ/νία έναρξης (YYYY-MM-DD)" },
             end_date: { type: "string", description: "Ημ/νία λήξης (YYYY-MM-DD)" },
             budget: { type: "number", description: "Συνολικός προϋπολογισμός" }
@@ -347,61 +363,35 @@ ${requestQuestions ? '6. Ερωτήσεις επιβεβαίωσης για το
       required: ["deliverables", "tasks", "invoices", "projectSummary"]
     };
 
-    let response: Response;
-
-    if (usePerplexity) {
-      // Use Perplexity API with structured output
-      console.log("Calling Perplexity API (sonar-pro)...");
-      response = await fetch("https://api.perplexity.ai/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${PERPLEXITY_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "sonar-pro",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt }
-          ],
-          response_format: {
-            type: "json_schema",
-            json_schema: {
-              name: "project_analysis",
-              schema: jsonSchema
+    // Use Gemini exclusively for document analysis
+    console.log("Calling Lovable AI Gateway (Gemini 2.5 Flash)...");
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "suggest_project_structure",
+              description: "Επιστρέφει δομημένες προτάσεις για παραδοτέα, tasks, τιμολόγια και στοιχεία έργου.",
+              parameters: jsonSchema
             }
           }
-        }),
-      });
-    } else {
-      // Fallback to Lovable AI Gateway with tool calling
-      console.log("Calling Lovable AI Gateway (Gemini)...");
-      response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt }
-          ],
-          tools: [
-            {
-              type: "function",
-              function: {
-                name: "suggest_project_structure",
-                description: "Επιστρέφει δομημένες προτάσεις για παραδοτέα, tasks, τιμολόγια και στοιχεία έργου.",
-                parameters: jsonSchema
-              }
-            }
-          ],
-          tool_choice: { type: "function", function: { name: "suggest_project_structure" } }
-        }),
-      });
-    }
+        ],
+        tool_choice: { type: "function", function: { name: "suggest_project_structure" } },
+        temperature: 0.1,
+        max_tokens: 16384
+      }),
+    });
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -422,7 +412,7 @@ ${requestQuestions ? '6. Ερωτήσεις επιβεβαίωσης για το
     }
 
     const aiResponse = await response.json();
-    console.log("AI Response:", JSON.stringify(aiResponse, null, 2));
+    console.log("AI Response received, parsing...");
 
     // Check if the AI provider returned an error in the response body
     if (aiResponse.error) {
@@ -453,49 +443,44 @@ ${requestQuestions ? '6. Ερωτήσεις επιβεβαίωσης για το
     const messageContent = aiResponse.choices?.[0]?.message?.content;
     const toolCall = aiResponse.choices?.[0]?.message?.tool_calls?.[0];
     
-    if (usePerplexity && messageContent) {
-      // Perplexity returns structured JSON directly in content
-      console.log("Parsing Perplexity structured JSON response...");
+    if (toolCall) {
+      // Gemini returns via tool call
+      console.log("Parsing Gemini tool call response...");
       try {
-        // Try to parse directly
+        suggestions = JSON.parse(toolCall.function.arguments);
+      } catch (parseError) {
+        console.error("Failed to parse tool call arguments:", parseError);
+        console.log("Raw arguments:", toolCall.function.arguments);
+        throw new Error("Αποτυχία ανάλυσης απόκρισης AI. Δοκιμάστε ξανά.");
+      }
+    } else if (messageContent) {
+      // Fallback: try to extract JSON from message content
+      console.log("No tool call, trying to parse message content as JSON");
+      try {
+        // Try direct parse first
         suggestions = JSON.parse(messageContent);
       } catch {
-        // Try to extract JSON from the message if wrapped in markdown
+        // Try to extract JSON from markdown code block
         const jsonMatch = messageContent.match(/```json\s*([\s\S]*?)\s*```/) || 
                           messageContent.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           const jsonStr = jsonMatch[1] || jsonMatch[0];
           suggestions = JSON.parse(jsonStr);
         } else {
-          throw new Error("Perplexity δεν επέστρεψε έγκυρο JSON.");
+          console.error("No JSON found in response:", messageContent.substring(0, 500));
+          throw new Error("Η AI δεν επέστρεψε δομημένα δεδομένα. Δοκιμάστε ξανά.");
         }
-      }
-    } else if (toolCall) {
-      // Lovable AI returns via tool call
-      console.log("Parsing Lovable AI tool call response...");
-      suggestions = JSON.parse(toolCall.function.arguments);
-    } else if (messageContent) {
-      // Fallback: try to extract JSON from message content
-      console.log("No tool call, trying to parse message content as JSON");
-      try {
-        const jsonMatch = messageContent.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          suggestions = JSON.parse(jsonMatch[0]);
-        } else {
-          throw new Error("No JSON found in response");
-        }
-      } catch (parseError) {
-        console.error("Failed to parse message content as JSON:", parseError);
-        throw new Error("Η AI δεν επέστρεψε δομημένα δεδομένα. Δοκιμάστε ξανά.");
       }
     } else {
+      console.error("No content in AI response:", JSON.stringify(aiResponse, null, 2));
       throw new Error("Η AI δεν επέστρεψε δομημένα δεδομένα. Δοκιμάστε ξανά.");
     }
     
-    // Add citations from Perplexity if available
-    if (usePerplexity && aiResponse.citations) {
-      console.log("Perplexity citations:", aiResponse.citations);
-      // Could add citations to the response if needed
+    // Log summary of what was found
+    console.log(`Analysis complete: ${suggestions.deliverables?.length || 0} deliverables, ${suggestions.tasks?.length || 0} tasks, ${suggestions.invoices?.length || 0} invoices`);
+    
+    if (suggestions.suggestedProjectDetails) {
+      console.log(`Project details: budget=${suggestions.suggestedProjectDetails.budget}, end_date=${suggestions.suggestedProjectDetails.end_date}`);
     }
 
     return new Response(

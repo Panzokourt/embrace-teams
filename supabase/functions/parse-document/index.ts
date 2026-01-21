@@ -11,8 +11,14 @@ const corsHeaders = {
 // Minimum text length to consider PDF as text-based (not scanned)
 const MIN_TEXT_LENGTH_FOR_VALID_PDF = 500;
 
-// Max file size for processing (5MB)
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
+// Max file size for single AI call (5MB)
+const MAX_CHUNK_SIZE = 5 * 1024 * 1024;
+
+// Max total file size (20MB)
+const MAX_FILE_SIZE = 20 * 1024 * 1024;
+
+// Chunk size for page-by-page processing (2MB to stay well under limits)
+const PAGE_CHUNK_SIZE = 2 * 1024 * 1024;
 
 interface ParseResult {
   text: string;
@@ -22,11 +28,18 @@ interface ParseResult {
     wordCount: number;
     characterCount: number;
     usedOcr?: boolean;
+    pagesProcessed?: number;
   };
 }
 
 // OCR/Document parsing using Gemini Vision via Lovable AI Gateway
-async function parseDocumentWithGemini(base64Data: string, mimeType: string, fileName: string): Promise<string> {
+// Supports chunked processing for large documents
+async function parseDocumentWithGemini(
+  base64Data: string, 
+  mimeType: string, 
+  fileName: string,
+  pageInfo?: string
+): Promise<string> {
   const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
   
   if (!lovableApiKey) {
@@ -35,7 +48,8 @@ async function parseDocumentWithGemini(base64Data: string, mimeType: string, fil
   }
   
   try {
-    console.log(`Parsing document ${fileName} with Gemini Vision...`);
+    const pageNote = pageInfo ? ` (${pageInfo})` : '';
+    console.log(`Parsing ${fileName}${pageNote} with Gemini Vision...`);
     
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -57,28 +71,35 @@ async function parseDocumentWithGemini(base64Data: string, mimeType: string, fil
               },
               {
                 type: "text",
-                text: `Εξάγαγε ΟΛΟΚΛΗΡΟ το κείμενο από αυτό το έγγραφο PDF. Αυτό είναι ελληνικό δημόσιο έγγραφο (διακήρυξη, προκήρυξη, σύμβαση).
+                text: `Εξάγαγε ΟΛΟΚΛΗΡΟ το κείμενο από αυτό το έγγραφο. Αυτό είναι ελληνικό δημόσιο έγγραφο (διακήρυξη, προκήρυξη, σύμβαση).
 
-ΟΔΗΓΙΕΣ:
-1. Διάβασε ΚΑΘΕ ΣΕΛΙΔΑ προσεκτικά
-2. Διατήρησε τη δομή: τίτλους, παραγράφους, αρίθμηση (1.1, 1.2, κλπ)
+ΟΔΗΓΙΕΣ ΕΞΑΓΩΓΗΣ:
+1. Διάβασε ΚΑΘΕ ΣΕΛΙΔΑ προσεκτικά - μην παραλείψεις τίποτα
+2. Διατήρησε τη δομή: τίτλους, παραγράφους, αρίθμηση (1.1, 1.2, Άρθρο 1, κλπ)
 3. Για ΠΙΝΑΚΕΣ: χρησιμοποίησε format με | για διαχωρισμό στηλών
-4. ΚΡΙΣΙΜΑ ΣΤΟΙΧΕΙΑ που πρέπει να εντοπίσεις:
-   - Προϋπολογισμός/Budget (π.χ. "124.000,00€")
-   - Προθεσμίες (ημερομηνίες υποβολής, διάρκεια)
-   - Παραδοτέα (deliverables, πακέτα εργασίας)
-   - Κριτήρια αξιολόγησης
-   - Τεχνικές προδιαγραφές
-5. ΜΗΝ παραλείψεις αριθμούς, ποσά, ημερομηνίες
-6. Αν κάτι είναι δυσανάγνωστο, σημείωσε [δυσανάγνωστο]
-7. Επέστρεψε ΜΟΝΟ το κείμενο χωρίς σχόλια
+4. Για ΛΙΣΤΕΣ: διατήρησε bullets ή αρίθμηση
+
+ΚΡΙΣΙΜΑ ΣΤΟΙΧΕΙΑ ΠΟΥ ΠΡΕΠΕΙ ΝΑ ΕΝΤΟΠΙΣΕΙΣ:
+- Προϋπολογισμός/Budget (π.χ. "124.000,00€", "εκατόν είκοσι τέσσερις χιλιάδες")
+- Προθεσμίες (ημερομηνίες υποβολής, διάρκεια σύμβασης)
+- Παραδοτέα (deliverables, Π1, Π2, πακέτα εργασίας, WP)
+- Κριτήρια αξιολόγησης με βαρύτητες
+- Τεχνικές προδιαγραφές και απαιτήσεις
+- CPV κωδικοί
+- Στοιχεία αναθέτουσας αρχής
+
+ΚΑΝΟΝΕΣ:
+- ΜΗΝ παραλείψεις αριθμούς, ποσά, ημερομηνίες, ποσοστά
+- ΜΗΝ μεταφράζεις - κράτα το πρωτότυπο κείμενο
+- Αν κάτι είναι δυσανάγνωστο, σημείωσε [δυσανάγνωστο]
+- Επέστρεψε ΜΟΝΟ το κείμενο χωρίς δικά σου σχόλια
 
 ΕΞΑΓΩΓΗ ΚΕΙΜΕΝΟΥ:`
               }
             ]
           }
         ],
-        max_tokens: 16384,
+        max_tokens: 32768,
         temperature: 0.1
       })
     });
@@ -101,13 +122,36 @@ async function parseDocumentWithGemini(base64Data: string, mimeType: string, fil
     const data = await response.json();
     const extractedText = data.choices?.[0]?.message?.content || "";
     
-    console.log(`Gemini extracted ${extractedText.length} characters from ${fileName}`);
+    console.log(`Gemini extracted ${extractedText.length} characters from ${fileName}${pageNote}`);
     return extractedText.trim();
     
   } catch (error) {
     console.error("Gemini parsing error:", error);
     throw error;
   }
+}
+
+// Split large PDF into chunks for processing
+function splitPdfIntoChunks(arrayBuffer: ArrayBuffer): Uint8Array[] {
+  const bytes = new Uint8Array(arrayBuffer);
+  const chunks: Uint8Array[] = [];
+  
+  // For very large files, split into chunks
+  if (bytes.length <= PAGE_CHUNK_SIZE) {
+    chunks.push(bytes);
+  } else {
+    // Split into roughly equal chunks
+    const numChunks = Math.ceil(bytes.length / PAGE_CHUNK_SIZE);
+    const chunkSize = Math.ceil(bytes.length / numChunks);
+    
+    for (let i = 0; i < numChunks; i++) {
+      const start = i * chunkSize;
+      const end = Math.min(start + chunkSize, bytes.length);
+      chunks.push(bytes.slice(start, end));
+    }
+  }
+  
+  return chunks;
 }
 
 // Extract text from DOCX file
@@ -219,8 +263,8 @@ function isReadableText(text: string): boolean {
   return letterRatio > 0.3 && garbageRatio < 0.3;
 }
 
-// Main PDF parsing function with AI fallback
-async function parsePdf(arrayBuffer: ArrayBuffer, fileName: string): Promise<{ text: string; usedOcr: boolean }> {
+// Main PDF parsing function with chunked AI processing
+async function parsePdf(arrayBuffer: ArrayBuffer, fileName: string): Promise<{ text: string; usedOcr: boolean; pagesProcessed: number }> {
   try {
     // First, try standard text extraction
     const textFromStreams = parsePdfTextStreams(arrayBuffer);
@@ -233,32 +277,55 @@ async function parsePdf(arrayBuffer: ArrayBuffer, fileName: string): Promise<{ t
     
     if (hasSufficientText && isReadable) {
       console.log("PDF has readable text content, using standard parsing");
-      return { text: textFromStreams, usedOcr: false };
+      return { text: textFromStreams, usedOcr: false, pagesProcessed: 1 };
     }
     
-    // Text is garbled or insufficient - use Gemini Vision
+    // Text is garbled or insufficient - use Gemini Vision with chunked processing
     console.log("PDF text is garbled or insufficient, using Gemini Vision for parsing...");
     
     // Check file size
     if (arrayBuffer.byteLength > MAX_FILE_SIZE) {
-      console.warn(`File too large (${arrayBuffer.byteLength} bytes), truncating for AI processing`);
+      console.warn(`File too large (${arrayBuffer.byteLength} bytes), will process in chunks`);
     }
     
-    // Convert PDF to base64
-    const bytes = new Uint8Array(arrayBuffer.slice(0, MAX_FILE_SIZE));
-    const base64 = btoa(String.fromCharCode.apply(null, Array.from(bytes)));
+    // Split into chunks for processing
+    const chunks = splitPdfIntoChunks(arrayBuffer);
+    console.log(`Split PDF into ${chunks.length} chunks for processing`);
     
-    // Use Gemini Vision to parse the PDF
-    const aiText = await parseDocumentWithGemini(base64, 'application/pdf', fileName);
+    const extractedTexts: string[] = [];
     
-    if (aiText.length > 0) {
-      console.log(`AI parsing successful: extracted ${aiText.length} characters`);
-      return { text: aiText, usedOcr: true };
+    // Process each chunk
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      const base64 = btoa(String.fromCharCode.apply(null, Array.from(chunk)));
+      
+      const pageInfo = chunks.length > 1 ? `chunk ${i + 1}/${chunks.length}` : undefined;
+      
+      try {
+        const chunkText = await parseDocumentWithGemini(base64, 'application/pdf', fileName, pageInfo);
+        if (chunkText.length > 0) {
+          extractedTexts.push(chunkText);
+        }
+      } catch (error) {
+        console.error(`Error processing chunk ${i + 1}:`, error);
+        // Continue with other chunks
+      }
+      
+      // Small delay between chunks to avoid rate limiting
+      if (i < chunks.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+    
+    if (extractedTexts.length > 0) {
+      const combinedText = extractedTexts.join('\n\n--- ΣΥΝΕΧΕΙΑ ΕΓΓΡΑΦΟΥ ---\n\n');
+      console.log(`AI parsing successful: extracted ${combinedText.length} characters from ${extractedTexts.length} chunks`);
+      return { text: combinedText, usedOcr: true, pagesProcessed: chunks.length };
     }
     
     // Fallback to whatever we have
     console.log("AI parsing failed, returning basic extraction");
-    return { text: textFromStreams, usedOcr: false };
+    return { text: textFromStreams, usedOcr: false, pagesProcessed: 1 };
     
   } catch (error: unknown) {
     console.error("Error parsing PDF:", error);
@@ -282,6 +349,7 @@ async function parseDocument(
   let text = "";
   let fileType = "unknown";
   let usedOcr = false;
+  let pagesProcessed = 1;
   
   const lowerFileName = fileName.toLowerCase();
   const lowerContentType = contentType.toLowerCase();
@@ -299,7 +367,7 @@ async function parseDocument(
     // If DOCX text is garbled, try AI
     if (!isReadableText(text) && text.length < 500) {
       console.log("DOCX text seems garbled, trying AI parsing...");
-      const bytes = new Uint8Array(arrayBuffer.slice(0, MAX_FILE_SIZE));
+      const bytes = new Uint8Array(arrayBuffer.slice(0, MAX_CHUNK_SIZE));
       const base64 = btoa(String.fromCharCode.apply(null, Array.from(bytes)));
       const aiText = await parseDocumentWithGemini(base64, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', fileName);
       if (aiText.length > text.length) {
@@ -315,6 +383,7 @@ async function parseDocument(
     const pdfResult = await parsePdf(arrayBuffer, fileName);
     text = pdfResult.text;
     usedOcr = pdfResult.usedOcr;
+    pagesProcessed = pdfResult.pagesProcessed;
   } else if (
     lowerFileName.endsWith('.txt') || 
     lowerFileName.endsWith('.md') ||
@@ -326,7 +395,7 @@ async function parseDocument(
   } else if (lowerFileName.endsWith('.doc')) {
     // Old .doc format - try AI parsing
     fileType = "doc";
-    const bytes = new Uint8Array(arrayBuffer.slice(0, MAX_FILE_SIZE));
+    const bytes = new Uint8Array(arrayBuffer.slice(0, MAX_CHUNK_SIZE));
     const base64 = btoa(String.fromCharCode.apply(null, Array.from(bytes)));
     try {
       text = await parseDocumentWithGemini(base64, 'application/msword', fileName);
@@ -367,7 +436,8 @@ async function parseDocument(
       fileType,
       wordCount,
       characterCount,
-      usedOcr
+      usedOcr,
+      pagesProcessed
     }
   };
 }
@@ -467,11 +537,12 @@ serve(async (req) => {
     
     const totalWordCount = results.reduce((sum, r) => sum + r.metadata.wordCount, 0);
     const totalCharCount = results.reduce((sum, r) => sum + r.metadata.characterCount, 0);
+    const totalPages = results.reduce((sum, r) => sum + (r.metadata.pagesProcessed || 1), 0);
     
     // Check if any file used OCR/AI
     const usedOcr = results.some(r => r.metadata.usedOcr);
     
-    console.log(`Successfully parsed ${results.length} files, total ${totalWordCount} words, usedAI: ${usedOcr}`);
+    console.log(`Successfully parsed ${results.length} files, total ${totalWordCount} words, ${totalPages} pages, usedAI: ${usedOcr}`);
     
     return new Response(
       JSON.stringify({
@@ -482,6 +553,7 @@ serve(async (req) => {
           fileCount: results.length,
           totalWordCount,
           totalCharacterCount: totalCharCount,
+          totalPagesProcessed: totalPages,
           usedOcr
         }
       }),
@@ -499,8 +571,9 @@ serve(async (req) => {
     
     return new Response(
       JSON.stringify({ 
+        success: false, 
         error: message,
-        details: details
+        details 
       }),
       { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

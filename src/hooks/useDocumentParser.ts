@@ -63,15 +63,20 @@ export function useDocumentParser(options: UseDocumentParserOptions = {}) {
     return { text: combined.trim(), pages: pdf.numPages };
   }, []);
 
-  const renderPdfToImages = useCallback(async (file: File) => {
+  const ocrPdfClientSide = useCallback(async (file: File) => {
     const arrayBuffer = await file.arrayBuffer();
     const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
     const pdf = await loadingTask.promise;
 
-    const pages: Array<{ fileName: string; contentType: string; data: string }> = [];
+    // Render and OCR sequentially so we don't keep all pages in memory
+    const BATCH = 2;
+    const SCALE = 2;
+    const combinedParts: string[] = [];
+    let batch: Array<{ fileName: string; contentType: string; data: string }> = [];
+
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
-      const viewport = page.getViewport({ scale: 2 });
+      const viewport = page.getViewport({ scale: SCALE });
       const canvas = document.createElement('canvas');
       canvas.width = Math.ceil(viewport.width);
       canvas.height = Math.ceil(viewport.height);
@@ -82,14 +87,33 @@ export function useDocumentParser(options: UseDocumentParserOptions = {}) {
       const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
       const base64 = dataUrl.split(',')[1];
 
-      pages.push({
+      batch.push({
         data: base64,
         fileName: `${file.name.replace(/\.pdf$/i, '')}_page_${pageNum}.jpg`,
         contentType: 'image/jpeg',
       });
+
+      if (batch.length >= BATCH || pageNum === pdf.numPages) {
+        const { data, error } = await supabase.functions.invoke('parse-document', {
+          body: { base64Files: batch },
+        });
+        if (error) throw new Error(error.message || 'Failed OCR batch');
+
+        if (data?.success && data?.files) {
+          for (const f of data.files) {
+            combinedParts.push(`\n\n=== ${f.metadata.fileName} ===\n${f.text}`);
+          }
+        }
+
+        batch = [];
+
+        // small backoff to reduce 429s on big PDFs
+        await new Promise((r) => setTimeout(r, 250));
+      }
     }
 
-    return { pages, numPages: pdf.numPages };
+    const finalText = combinedParts.join('').trim();
+    return { text: finalText, pages: pdf.numPages };
   }, []);
 
   const parseFiles = useCallback(async (files: FileList | File[]) => {
@@ -128,24 +152,7 @@ export function useDocumentParser(options: UseDocumentParserOptions = {}) {
             toast.dismiss(loadingToast);
             const ocrToast = toast.loading(`OCR PDF (σελίδες): ${file.name}`);
 
-            const { pages: images, numPages } = await renderPdfToImages(file);
-            const BATCH = 3;
-            let combined = '';
-            for (let i = 0; i < images.length; i += BATCH) {
-              const batch = images.slice(i, i + BATCH);
-              const { data, error } = await supabase.functions.invoke('parse-document', {
-                body: { base64Files: batch },
-              });
-              if (error) throw new Error(error.message || 'Failed OCR batch');
-
-              if (data?.success && data?.files) {
-                for (const f of data.files) {
-                  combined += `\n\n=== ${f.metadata.fileName} ===\n${f.text}`;
-                }
-              }
-            }
-
-            const finalText = combined.trim();
+            const { text: finalText, pages: numPages } = await ocrPdfClientSide(file);
             results.push({
               fileName: file.name,
               content: finalText,
@@ -264,7 +271,7 @@ export function useDocumentParser(options: UseDocumentParserOptions = {}) {
     } finally {
       setParsing(false);
     }
-  }, [options, extractPdfTextClientSide, isReadableText, renderPdfToImages]);
+  }, [options, extractPdfTextClientSide, isReadableText, ocrPdfClientSide]);
 
   const clearParsedFiles = useCallback(() => {
     setParsedFiles([]);

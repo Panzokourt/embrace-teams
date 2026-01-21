@@ -21,7 +21,9 @@ import {
   Lightbulb,
   Target,
   AlertCircle,
-  Check
+  Check,
+  Trash2,
+  Play
 } from 'lucide-react';
 import { format, isValid, parseISO } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -99,6 +101,8 @@ interface TenderAISuggestionsProps {
   files: FileContent[];
   onSuggestionsApplied?: () => void;
   onTenderDetailsUpdate?: (details: { description?: string; start_date?: string; end_date?: string; budget?: number }) => void;
+  onDeliverablesCreated?: () => void;
+  onTasksCreated?: () => void;
 }
 
 export function TenderAISuggestions({
@@ -107,10 +111,14 @@ export function TenderAISuggestions({
   tenderBudget,
   files,
   onSuggestionsApplied,
-  onTenderDetailsUpdate
+  onTenderDetailsUpdate,
+  onDeliverablesCreated,
+  onTasksCreated
 }: TenderAISuggestionsProps) {
   const [analyzing, setAnalyzing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [suggestions, setSuggestions] = useState<TenderSuggestion | null>(null);
   const [selectedDeliverables, setSelectedDeliverables] = useState<number[]>([]);
   const [selectedTasks, setSelectedTasks] = useState<number[]>([]);
@@ -421,6 +429,111 @@ ${userContext ? `\nΠρόσθετες οδηγίες χρήστη: ${userContext
     }
   };
 
+  // Apply suggestions directly to tender_deliverables and tender_tasks
+  const applyToTender = async () => {
+    if (!suggestions) return;
+
+    setApplying(true);
+    try {
+      // Create a map to track deliverable names to IDs
+      const deliverableIdMap = new Map<number, string>();
+
+      // Insert selected deliverables
+      if (selectedDeliverables.length > 0) {
+        const deliverablesData = selectedDeliverables.map(idx => ({
+          tender_id: tenderId,
+          name: suggestions.deliverables[idx].name,
+          description: suggestions.deliverables[idx].description || null,
+          due_date: suggestions.deliverables[idx].due_date || null,
+          budget: suggestions.deliverables[idx].budget || null,
+          completed: false
+        }));
+
+        const { data: insertedDeliverables, error: delError } = await supabase
+          .from('tender_deliverables')
+          .insert(deliverablesData)
+          .select('id');
+
+        if (delError) throw delError;
+
+        // Map deliverable indices to their new IDs
+        if (insertedDeliverables) {
+          selectedDeliverables.forEach((origIdx, insertIdx) => {
+            if (insertedDeliverables[insertIdx]) {
+              deliverableIdMap.set(origIdx, insertedDeliverables[insertIdx].id);
+            }
+          });
+        }
+      }
+
+      // Insert selected tasks
+      if (selectedTasks.length > 0) {
+        const tasksData = selectedTasks.map(idx => {
+          const task = suggestions.tasks[idx];
+          let deliverableId: string | null = null;
+
+          // Try to link task to deliverable if deliverable_index is specified
+          if (task.deliverable_index !== undefined && deliverableIdMap.has(task.deliverable_index)) {
+            deliverableId = deliverableIdMap.get(task.deliverable_index) || null;
+          }
+
+          return {
+            tender_id: tenderId,
+            title: task.title,
+            description: task.description || null,
+            due_date: task.due_date || null,
+            status: 'todo',
+            tender_deliverable_id: deliverableId
+          };
+        });
+
+        const { error: taskError } = await supabase
+          .from('tender_tasks')
+          .insert(tasksData);
+
+        if (taskError) throw taskError;
+      }
+
+      toast.success('Τα αποτελέσματα εφαρμόστηκαν στα tabs!');
+      
+      // Notify parent to refresh
+      onDeliverablesCreated?.();
+      onTasksCreated?.();
+      
+      // Save suggestions as well
+      await saveSuggestions();
+      
+      setSuggestions(null);
+    } catch (error) {
+      console.error('Error applying to tender:', error);
+      toast.error('Σφάλμα κατά την εφαρμογή');
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  // Delete existing suggestions
+  const deleteExistingSuggestions = async () => {
+    setDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('tender_suggestions')
+        .delete()
+        .eq('tender_id', tenderId);
+
+      if (error) throw error;
+
+      toast.success('Οι αποθηκευμένες προτάσεις διαγράφηκαν!');
+      setExistingSuggestions(false);
+      setSuggestions(null);
+    } catch (error) {
+      console.error('Error deleting suggestions:', error);
+      toast.error('Σφάλμα κατά τη διαγραφή');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const toggleSection = (section: 'deliverables' | 'tasks' | 'invoices' | 'questions') => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
@@ -484,9 +597,25 @@ ${userContext ? `\nΠρόσθετες οδηγίες χρήστη: ${userContext
           </div>
           
           {existingSuggestions && (
-            <Badge variant="secondary" className="mb-3">
-              ✓ Υπάρχουν αποθηκευμένες προτάσεις
-            </Badge>
+            <div className="flex flex-col items-center gap-2 mb-3">
+              <Badge variant="secondary">
+                ✓ Υπάρχουν αποθηκευμένες προτάσεις
+              </Badge>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={deleteExistingSuggestions}
+                disabled={deleting}
+                className="text-destructive hover:text-destructive"
+              >
+                {deleting ? (
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3 w-3 mr-1" />
+                )}
+                Διαγραφή αποθηκευμένων
+              </Button>
+            </div>
           )}
           <Button 
             onClick={() => analyzeFiles(false, analysisFocus)} 
@@ -833,40 +962,69 @@ ${userContext ? `\nΠρόσθετες οδηγίες χρήστη: ${userContext
         )}
 
         {/* Action buttons */}
-        <div className="flex gap-3 pt-4 border-t">
+        <div className="flex flex-col gap-3 pt-4 border-t">
+          {/* Primary action - Apply to tabs */}
           <Button
-            onClick={saveSuggestions}
-            disabled={saving || (selectedDeliverables.length === 0 && selectedTasks.length === 0 && selectedInvoices.length === 0)}
-            className="flex-1"
+            onClick={applyToTender}
+            disabled={applying || saving || (selectedDeliverables.length === 0 && selectedTasks.length === 0)}
+            className="w-full"
+            size="lg"
           >
-            {saving ? (
+            {applying ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Αποθήκευση...
+                Εφαρμογή...
               </>
             ) : (
               <>
-                <Save className="h-4 w-4 mr-2" />
-                Αποθήκευση στη Βάση
+                <Play className="h-4 w-4 mr-2" />
+                Εφαρμογή στα Tabs ({selectedDeliverables.length} παραδοτέα, {selectedTasks.length} tasks)
               </>
             )}
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => setShowReanalysisOptions(true)}
-            disabled={saving || analyzing}
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Επανανάλυση
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() => setSuggestions(null)}
-            disabled={saving}
-          >
-            Ακύρωση
-          </Button>
+          
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={saveSuggestions}
+              disabled={saving || applying || (selectedDeliverables.length === 0 && selectedTasks.length === 0 && selectedInvoices.length === 0)}
+              className="flex-1"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Αποθήκευση...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Μόνο Αποθήκευση
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowReanalysisOptions(true)}
+              disabled={saving || analyzing || applying}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Επανανάλυση
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setSuggestions(null)}
+              disabled={saving || applying}
+            >
+              Ακύρωση
+            </Button>
+          </div>
         </div>
+
+        {/* Info about difference */}
+        <p className="text-xs text-muted-foreground mt-2">
+          💡 <strong>Εφαρμογή:</strong> Δημιουργεί αμέσως παραδοτέα/tasks στα αντίστοιχα tabs. 
+          <strong> Αποθήκευση:</strong> Κρατάει τις προτάσεις για μετατροπή σε έργο.
+        </p>
       </CardContent>
     </Card>
   );

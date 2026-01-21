@@ -106,6 +106,8 @@ export default function TenderDetailPage() {
   // AI Analysis state - now uses document parser hook
   const [aiFiles, setAiFiles] = useState<Array<{ fileName: string; content: string }>>([]);
   const [rawFiles, setRawFiles] = useState<File[]>([]);
+  const [deliverablesKey, setDeliverablesKey] = useState(0);
+  const [tasksKey, setTasksKey] = useState(0);
   
   const { parsing: uploadingForAi, parseFiles } = useDocumentParser({
     saveToStorage: true,
@@ -563,12 +565,12 @@ export default function TenderDetailPage() {
 
         {/* Deliverables Tab */}
         <TabsContent value="deliverables">
-          <TenderDeliverables tenderId={tender.id} tenderName={tender.name} />
+          <TenderDeliverables key={deliverablesKey} tenderId={tender.id} tenderName={tender.name} />
         </TabsContent>
 
         {/* Tasks Tab */}
         <TabsContent value="tasks">
-          <TenderTasksManager tenderId={tender.id} />
+          <TenderTasksManager key={tasksKey} tenderId={tender.id} />
         </TabsContent>
 
         {/* Files Tab */}
@@ -645,6 +647,8 @@ export default function TenderDetailPage() {
                   files={aiFiles}
                   onSuggestionsApplied={handleSuggestionsApplied}
                   onTenderDetailsUpdate={handleProjectDetailsUpdate}
+                  onDeliverablesCreated={() => setDeliverablesKey(k => k + 1)}
+                  onTasksCreated={() => setTasksKey(k => k + 1)}
                 />
               )}
             </CardContent>
@@ -661,7 +665,8 @@ export default function TenderDetailPage() {
                 <li>Ανεβάστε τα αρχεία του διαγωνισμού (προκήρυξη, τεχνικές προδιαγραφές)</li>
                 <li>Πατήστε "Ανάλυση με AI" για να εξαχθούν τα παραδοτέα και οι εργασίες</li>
                 <li>Επιλέξτε ποιες προτάσεις θέλετε να κρατήσετε</li>
-                <li>Όταν ο διαγωνισμός κερδηθεί, οι προτάσεις θα εφαρμοστούν στο νέο έργο</li>
+                <li><strong>Εφαρμογή στα Tabs:</strong> Δημιουργεί αμέσως παραδοτέα/tasks στον διαγωνισμό</li>
+                <li><strong>Μόνο Αποθήκευση:</strong> Κρατάει τις προτάσεις για μετατροπή σε έργο όταν κερδηθεί</li>
               </ol>
             </CardContent>
           </Card>

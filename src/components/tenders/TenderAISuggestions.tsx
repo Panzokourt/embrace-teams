@@ -15,12 +15,20 @@ import {
   ChevronDown,
   ChevronUp,
   Info,
-  Save
+  Save,
+  RefreshCw,
+  MessageCircleQuestion,
+  Lightbulb,
+  Target,
+  AlertCircle,
+  Check
 } from 'lucide-react';
 import { format, isValid, parseISO } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 
 // Helper to safely format dates
 const safeFormatDate = (dateStr: string | undefined): string | null => {
@@ -37,6 +45,14 @@ const safeFormatDate = (dateStr: string | undefined): string | null => {
 interface FileContent {
   fileName: string;
   content: string;
+}
+
+interface AIQuestion {
+  type: 'confirmation' | 'clarification' | 'suggestion';
+  question: string;
+  context?: string;
+  answered?: boolean;
+  answer?: string;
 }
 
 interface TenderSuggestion {
@@ -64,7 +80,17 @@ interface TenderSuggestion {
     end_date?: string;
     budget?: number;
   };
+  aiQuestions?: AIQuestion[];
+  analysisConfidence?: {
+    deliverables: 'high' | 'medium' | 'low';
+    tasks: 'high' | 'medium' | 'low';
+    invoices: 'high' | 'medium' | 'low';
+    dates: 'high' | 'medium' | 'low';
+  };
+  missingInfo?: string[];
 }
+
+type AnalysisFocus = 'all' | 'deliverables' | 'tasks' | 'invoices' | 'dates' | 'budget';
 
 interface TenderAISuggestionsProps {
   tenderId: string;
@@ -92,9 +118,16 @@ export function TenderAISuggestions({
   const [expandedSections, setExpandedSections] = useState({
     deliverables: true,
     tasks: true,
-    invoices: true
+    invoices: true,
+    questions: true
   });
   const [existingSuggestions, setExistingSuggestions] = useState(false);
+  
+  // New states for enhanced analysis
+  const [analysisFocus, setAnalysisFocus] = useState<AnalysisFocus>('all');
+  const [userContext, setUserContext] = useState('');
+  const [aiQuestions, setAiQuestions] = useState<AIQuestion[]>([]);
+  const [showReanalysisOptions, setShowReanalysisOptions] = useState(false);
 
   // Check if tender already has saved suggestions
   useEffect(() => {
@@ -121,7 +154,7 @@ export function TenderAISuggestions({
     }
   }, [suggestions, onTenderDetailsUpdate]);
 
-  const analyzeFiles = async () => {
+  const analyzeFiles = async (isReanalysis = false, focusArea: AnalysisFocus = 'all') => {
     if (files.length === 0) {
       toast.error('Παρακαλώ ανεβάστε τουλάχιστον ένα αρχείο');
       return;
@@ -129,27 +162,98 @@ export function TenderAISuggestions({
 
     setAnalyzing(true);
     try {
+      // Build context for reanalysis
+      let additionalContext = userContext;
+      if (isReanalysis && suggestions) {
+        // Include currently selected items as context
+        const selectedDeliverablesData = selectedDeliverables.map(i => suggestions.deliverables[i]);
+        const selectedTasksData = selectedTasks.map(i => suggestions.tasks[i]);
+        const selectedInvoicesData = selectedInvoices.map(i => suggestions.invoices[i]);
+        
+        additionalContext = `
+ΣΗΜΑΝΤΙΚΟ - ΥΠΑΡΧΟΝΤΑ ΕΠΙΛΕΓΜΕΝΑ ΣΤΟΙΧΕΙΑ (ΝΑ ΔΙΑΤΗΡΗΘΟΥΝ):
+${selectedDeliverablesData.length > 0 ? `Παραδοτέα: ${selectedDeliverablesData.map(d => d.name).join(', ')}` : ''}
+${selectedTasksData.length > 0 ? `Tasks: ${selectedTasksData.map(t => t.title).join(', ')}` : ''}
+${selectedInvoicesData.length > 0 ? `Τιμολόγια: ${selectedInvoicesData.map(i => i.description).join(', ')}` : ''}
+
+Ψάξε για ΕΠΙΠΛΕΟΝ στοιχεία που μπορεί να έχασες στην πρώτη ανάλυση.
+${userContext ? `\nΠρόσθετες οδηγίες χρήστη: ${userContext}` : ''}
+`;
+      }
+
+      // Focus area instructions
+      let focusInstructions = '';
+      if (focusArea !== 'all') {
+        const focusMap: Record<AnalysisFocus, string> = {
+          all: '',
+          deliverables: 'Εστίασε ΜΟΝΟ στην εύρεση παραδοτέων/φάσεων/πακέτων εργασίας.',
+          tasks: 'Εστίασε ΜΟΝΟ στην εύρεση εργασιών/tasks/ενεργειών.',
+          invoices: 'Εστίασε ΜΟΝΟ στην εύρεση πληρωμών/τιμολογίων/δόσεων.',
+          dates: 'Εστίασε ΜΟΝΟ στην εύρεση ημερομηνιών/προθεσμιών/χρονοδιαγραμμάτων.',
+          budget: 'Εστίασε ΜΟΝΟ στην εύρεση οικονομικών στοιχείων/budget/κόστους.'
+        };
+        focusInstructions = focusMap[focusArea];
+      }
+
       const { data, error } = await supabase.functions.invoke('analyze-project-files', {
         body: {
           fileContents: files,
           projectName: tenderName,
-          projectBudget: tenderBudget
+          projectBudget: tenderBudget,
+          additionalContext: additionalContext,
+          focusArea: focusArea,
+          focusInstructions: focusInstructions,
+          isReanalysis: isReanalysis,
+          requestQuestions: true // Request AI to ask questions
         }
       });
 
       if (error) throw error;
 
       if (data.suggestions) {
-        setSuggestions(data.suggestions);
-        setSelectedDeliverables(data.suggestions.deliverables.map((_: any, i: number) => i));
-        setSelectedTasks(data.suggestions.tasks.map((_: any, i: number) => i));
-        setSelectedInvoices(data.suggestions.invoices.map((_: any, i: number) => i));
-        toast.success('Η ανάλυση ολοκληρώθηκε!');
+        if (isReanalysis && suggestions) {
+          // Merge new suggestions with existing selected ones
+          const mergedSuggestions = mergeSuggestions(suggestions, data.suggestions, {
+            selectedDeliverables,
+            selectedTasks,
+            selectedInvoices
+          });
+          setSuggestions(mergedSuggestions);
+          
+          // Calculate new items
+          const newDeliverables = mergedSuggestions.deliverables.length - suggestions.deliverables.length;
+          const newTasks = mergedSuggestions.tasks.length - suggestions.tasks.length;
+          const newInvoices = mergedSuggestions.invoices.length - suggestions.invoices.length;
+          
+          if (newDeliverables > 0 || newTasks > 0 || newInvoices > 0) {
+            toast.success(`Βρέθηκαν νέα στοιχεία: ${newDeliverables > 0 ? `${newDeliverables} παραδοτέα, ` : ''}${newTasks > 0 ? `${newTasks} tasks, ` : ''}${newInvoices > 0 ? `${newInvoices} τιμολόγια` : ''}`);
+          } else {
+            toast.info('Δεν βρέθηκαν επιπλέον στοιχεία');
+          }
+        } else {
+          setSuggestions(data.suggestions);
+          setSelectedDeliverables(data.suggestions.deliverables.map((_: any, i: number) => i));
+          setSelectedTasks(data.suggestions.tasks.map((_: any, i: number) => i));
+          setSelectedInvoices(data.suggestions.invoices.map((_: any, i: number) => i));
+          toast.success('Η ανάλυση ολοκληρώθηκε!');
+        }
+        
+        // Handle AI questions
+        if (data.suggestions.aiQuestions && data.suggestions.aiQuestions.length > 0) {
+          setAiQuestions(data.suggestions.aiQuestions);
+        } else {
+          // Generate default questions based on analysis
+          generateDefaultQuestions(data.suggestions);
+        }
         
         if (data.suggestions.suggestedProjectDetails && onTenderDetailsUpdate) {
           onTenderDetailsUpdate(data.suggestions.suggestedProjectDetails);
-          toast.info('Τα στοιχεία διαγωνισμού ενημερώθηκαν από την AI ανάλυση');
+          if (!isReanalysis) {
+            toast.info('Τα στοιχεία διαγωνισμού ενημερώθηκαν από την AI ανάλυση');
+          }
         }
+        
+        setShowReanalysisOptions(false);
       }
     } catch (error: any) {
       console.error('Error analyzing files:', error);
@@ -163,6 +267,92 @@ export function TenderAISuggestions({
     } finally {
       setAnalyzing(false);
     }
+  };
+
+  const generateDefaultQuestions = (sugg: TenderSuggestion) => {
+    const questions: AIQuestion[] = [];
+    
+    // Confirmation question
+    questions.push({
+      type: 'confirmation',
+      question: `Βρήκα ${sugg.deliverables.length} παραδοτέα, ${sugg.tasks.length} tasks και ${sugg.invoices.length} τιμολόγια. Είναι σωστά αυτά τα αποτελέσματα;`,
+      context: 'Επιβεβαίωση αποτελεσμάτων ανάλυσης'
+    });
+    
+    // Check for missing info
+    if (!sugg.suggestedProjectDetails?.budget) {
+      questions.push({
+        type: 'clarification',
+        question: 'Δεν βρήκα συγκεκριμένο budget στα αρχεία. Μπορείς να μου πεις τον προϋπολογισμό;',
+        context: 'Ελλιπής πληροφορία: Προϋπολογισμός'
+      });
+    }
+    
+    if (!sugg.suggestedProjectDetails?.start_date || !sugg.suggestedProjectDetails?.end_date) {
+      questions.push({
+        type: 'clarification',
+        question: 'Δεν βρήκα σαφείς ημερομηνίες έναρξης/λήξης. Μπορείς να τις διευκρινίσεις;',
+        context: 'Ελλιπής πληροφορία: Χρονοδιάγραμμα'
+      });
+    }
+    
+    // Suggestions based on analysis
+    if (sugg.deliverables.length > 0 && sugg.tasks.length < sugg.deliverables.length * 2) {
+      questions.push({
+        type: 'suggestion',
+        question: 'Τα tasks φαίνονται λίγα σε σχέση με τα παραδοτέα. Θέλεις να κάνω πιο λεπτομερή ανάλυση για tasks;',
+        context: 'Πρόταση βελτίωσης: Περισσότερα tasks'
+      });
+    }
+    
+    setAiQuestions(questions);
+  };
+
+  const mergeSuggestions = (
+    existing: TenderSuggestion, 
+    newSugg: TenderSuggestion,
+    selected: { selectedDeliverables: number[], selectedTasks: number[], selectedInvoices: number[] }
+  ): TenderSuggestion => {
+    // Keep selected items from existing
+    const keptDeliverables = selected.selectedDeliverables.map(i => existing.deliverables[i]);
+    const keptTasks = selected.selectedTasks.map(i => existing.tasks[i]);
+    const keptInvoices = selected.selectedInvoices.map(i => existing.invoices[i]);
+    
+    // Filter out duplicates from new suggestions
+    const newDeliverables = newSugg.deliverables.filter(
+      nd => !keptDeliverables.some(kd => kd.name.toLowerCase() === nd.name.toLowerCase())
+    );
+    const newTasks = newSugg.tasks.filter(
+      nt => !keptTasks.some(kt => kt.title.toLowerCase() === nt.title.toLowerCase())
+    );
+    const newInvoices = newSugg.invoices.filter(
+      ni => !keptInvoices.some(ki => ki.description.toLowerCase() === ni.description.toLowerCase())
+    );
+    
+    // Merge and update selection indices
+    const mergedDeliverables = [...keptDeliverables, ...newDeliverables];
+    const mergedTasks = [...keptTasks, ...newTasks];
+    const mergedInvoices = [...keptInvoices, ...newInvoices];
+    
+    // Auto-select all including new ones
+    setSelectedDeliverables(mergedDeliverables.map((_, i) => i));
+    setSelectedTasks(mergedTasks.map((_, i) => i));
+    setSelectedInvoices(mergedInvoices.map((_, i) => i));
+    
+    return {
+      ...newSugg,
+      deliverables: mergedDeliverables,
+      tasks: mergedTasks,
+      invoices: mergedInvoices,
+      projectSummary: newSugg.projectSummary || existing.projectSummary,
+      suggestedProjectDetails: newSugg.suggestedProjectDetails || existing.suggestedProjectDetails
+    };
+  };
+
+  const handleQuestionAnswer = (index: number, answer: string) => {
+    setAiQuestions(prev => prev.map((q, i) => 
+      i === index ? { ...q, answered: true, answer } : q
+    ));
   };
 
   const saveSuggestions = async () => {
@@ -231,8 +421,19 @@ export function TenderAISuggestions({
     }
   };
 
-  const toggleSection = (section: 'deliverables' | 'tasks' | 'invoices') => {
+  const toggleSection = (section: 'deliverables' | 'tasks' | 'invoices' | 'questions') => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const getConfidenceBadge = (level: 'high' | 'medium' | 'low' | undefined) => {
+    if (!level) return null;
+    const colors = {
+      high: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+      medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+      low: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+    };
+    const labels = { high: 'Υψηλή', medium: 'Μέτρια', low: 'Χαμηλή' };
+    return <Badge className={colors[level]}>{labels[level]} βεβαιότητα</Badge>;
   };
 
   if (!suggestions) {
@@ -245,13 +446,50 @@ export function TenderAISuggestions({
             Ανεβάστε αρχεία (προκηρύξεις, τεχνικές προδιαγραφές) και το AI θα εξάγει 
             παραδοτέα, tasks και πρόγραμμα πληρωμών.
           </p>
+          
+          {/* Focus area selection */}
+          <div className="flex flex-wrap gap-2 mb-4 justify-center">
+            <Button
+              size="sm"
+              variant={analysisFocus === 'all' ? 'default' : 'outline'}
+              onClick={() => setAnalysisFocus('all')}
+            >
+              <Target className="h-3 w-3 mr-1" />
+              Πλήρης
+            </Button>
+            <Button
+              size="sm"
+              variant={analysisFocus === 'deliverables' ? 'default' : 'outline'}
+              onClick={() => setAnalysisFocus('deliverables')}
+            >
+              <Package className="h-3 w-3 mr-1" />
+              Παραδοτέα
+            </Button>
+            <Button
+              size="sm"
+              variant={analysisFocus === 'dates' ? 'default' : 'outline'}
+              onClick={() => setAnalysisFocus('dates')}
+            >
+              <FileText className="h-3 w-3 mr-1" />
+              Ημ/νίες
+            </Button>
+            <Button
+              size="sm"
+              variant={analysisFocus === 'budget' ? 'default' : 'outline'}
+              onClick={() => setAnalysisFocus('budget')}
+            >
+              <Receipt className="h-3 w-3 mr-1" />
+              Budget
+            </Button>
+          </div>
+          
           {existingSuggestions && (
             <Badge variant="secondary" className="mb-3">
               ✓ Υπάρχουν αποθηκευμένες προτάσεις
             </Badge>
           )}
           <Button 
-            onClick={analyzeFiles} 
+            onClick={() => analyzeFiles(false, analysisFocus)} 
             disabled={analyzing || files.length === 0}
           >
             {analyzing ? (
@@ -283,6 +521,164 @@ export function TenderAISuggestions({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* AI Questions Section */}
+        {aiQuestions.length > 0 && (
+          <Collapsible open={expandedSections.questions} onOpenChange={() => toggleSection('questions')}>
+            <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-muted bg-amber-50 dark:bg-amber-950/20">
+              <div className="flex items-center gap-2">
+                <MessageCircleQuestion className="h-4 w-4 text-amber-600" />
+                <span className="font-medium text-amber-800 dark:text-amber-200">Ερωτήσεις AI ({aiQuestions.length})</span>
+                <Badge variant="outline" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                  {aiQuestions.filter(q => !q.answered).length} αναπάντητες
+                </Badge>
+              </div>
+              {expandedSections.questions ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-3 mt-3">
+              {aiQuestions.map((q, idx) => (
+                <div 
+                  key={idx} 
+                  className={`p-4 rounded-lg border ${q.answered ? 'bg-green-50 dark:bg-green-950/20 border-green-200' : 'bg-amber-50 dark:bg-amber-950/20 border-amber-200'}`}
+                >
+                  <div className="flex items-start gap-3">
+                    {q.type === 'confirmation' && <Check className="h-5 w-5 text-blue-500 mt-0.5" />}
+                    {q.type === 'clarification' && <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5" />}
+                    {q.type === 'suggestion' && <Lightbulb className="h-5 w-5 text-purple-500 mt-0.5" />}
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">{q.question}</p>
+                      {q.context && (
+                        <p className="text-xs text-muted-foreground mt-1">{q.context}</p>
+                      )}
+                      {q.answered ? (
+                        <div className="mt-2 p-2 bg-background rounded text-sm">
+                          <span className="text-muted-foreground">Απάντηση: </span>
+                          {q.answer}
+                        </div>
+                      ) : (
+                        <div className="mt-2 flex gap-2">
+                          {q.type === 'confirmation' && (
+                            <>
+                              <Button size="sm" variant="outline" onClick={() => handleQuestionAnswer(idx, 'Ναι, σωστά')}>
+                                <Check className="h-3 w-3 mr-1" /> Ναι
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => handleQuestionAnswer(idx, 'Όχι, χρειάζεται επανανάλυση')}>
+                                Όχι
+                              </Button>
+                            </>
+                          )}
+                          {q.type === 'suggestion' && (
+                            <>
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                onClick={() => {
+                                  handleQuestionAnswer(idx, 'Ναι, κάνε ανάλυση');
+                                  setShowReanalysisOptions(true);
+                                }}
+                              >
+                                <Check className="h-3 w-3 mr-1" /> Ναι, κάνε το
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => handleQuestionAnswer(idx, 'Όχι ευχαριστώ')}>
+                                Όχι
+                              </Button>
+                            </>
+                          )}
+                          {q.type === 'clarification' && (
+                            <Button size="sm" variant="ghost" onClick={() => handleQuestionAnswer(idx, 'Θα συμπληρώσω χειροκίνητα')}>
+                              Θα το συμπληρώσω
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+
+        {/* Reanalysis Options */}
+        {showReanalysisOptions && (
+          <div className="p-4 rounded-lg border bg-blue-50 dark:bg-blue-950/20 space-y-3">
+            <div className="flex items-center gap-2">
+              <RefreshCw className="h-4 w-4 text-blue-600" />
+              <span className="font-medium text-blue-800 dark:text-blue-200">Επανανάλυση Αρχείων</span>
+            </div>
+            
+            <div className="space-y-2">
+              <Label className="text-sm">Εστίαση σε:</Label>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant={analysisFocus === 'all' ? 'default' : 'outline'}
+                  onClick={() => setAnalysisFocus('all')}
+                >
+                  Όλα
+                </Button>
+                <Button
+                  size="sm"
+                  variant={analysisFocus === 'tasks' ? 'default' : 'outline'}
+                  onClick={() => setAnalysisFocus('tasks')}
+                >
+                  Tasks
+                </Button>
+                <Button
+                  size="sm"
+                  variant={analysisFocus === 'dates' ? 'default' : 'outline'}
+                  onClick={() => setAnalysisFocus('dates')}
+                >
+                  Ημ/νίες
+                </Button>
+                <Button
+                  size="sm"
+                  variant={analysisFocus === 'budget' ? 'default' : 'outline'}
+                  onClick={() => setAnalysisFocus('budget')}
+                >
+                  Budget
+                </Button>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label className="text-sm">Πρόσθετες οδηγίες (προαιρετικό):</Label>
+              <Textarea
+                placeholder="π.χ. Ψάξε για επιπλέον παραδοτέα στο κεφάλαιο 3..."
+                value={userContext}
+                onChange={(e) => setUserContext(e.target.value)}
+                rows={2}
+              />
+            </div>
+            
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => analyzeFiles(true, analysisFocus)} 
+                disabled={analyzing}
+                size="sm"
+              >
+                {analyzing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Ανάλυση...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Επανανάλυση
+                  </>
+                )}
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setShowReanalysisOptions(false)}
+              >
+                Ακύρωση
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Info Alert */}
         <Alert>
           <Info className="h-4 w-4" />
@@ -298,6 +694,7 @@ export function TenderAISuggestions({
               <Package className="h-4 w-4 text-primary" />
               <span className="font-medium">Παραδοτέα ({suggestions.deliverables.length})</span>
               <Badge variant="secondary">{selectedDeliverables.length} επιλεγμένα</Badge>
+              {suggestions.analysisConfidence?.deliverables && getConfidenceBadge(suggestions.analysisConfidence.deliverables)}
             </div>
             {expandedSections.deliverables ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </CollapsibleTrigger>
@@ -337,6 +734,7 @@ export function TenderAISuggestions({
               <CheckSquare className="h-4 w-4 text-success" />
               <span className="font-medium">Tasks ({suggestions.tasks.length})</span>
               <Badge variant="secondary">{selectedTasks.length} επιλεγμένα</Badge>
+              {suggestions.analysisConfidence?.tasks && getConfidenceBadge(suggestions.analysisConfidence.tasks)}
             </div>
             {expandedSections.tasks ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </CollapsibleTrigger>
@@ -377,6 +775,7 @@ export function TenderAISuggestions({
               <Receipt className="h-4 w-4 text-warning" />
               <span className="font-medium">Τιμολόγια ({suggestions.invoices.length})</span>
               <Badge variant="secondary">{selectedInvoices.length} επιλεγμένα</Badge>
+              {suggestions.analysisConfidence?.invoices && getConfidenceBadge(suggestions.analysisConfidence.invoices)}
             </div>
             {expandedSections.invoices ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </CollapsibleTrigger>
@@ -454,6 +853,14 @@ export function TenderAISuggestions({
           </Button>
           <Button
             variant="outline"
+            onClick={() => setShowReanalysisOptions(true)}
+            disabled={saving || analyzing}
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Επανανάλυση
+          </Button>
+          <Button
+            variant="ghost"
             onClick={() => setSuggestions(null)}
             disabled={saving}
           >

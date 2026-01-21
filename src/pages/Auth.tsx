@@ -18,7 +18,7 @@ const authSchema = z.object({
 
 export default function Auth() {
   const navigate = useNavigate();
-  const { user, loading, isApproved, signIn, signUp, signOut } = useAuth();
+  const { user, loading, signIn, signUp, signOut } = useAuth();
 
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
@@ -28,11 +28,10 @@ export default function Auth() {
 
   useEffect(() => {
     if (!loading && user) {
-      if (isApproved) {
-        navigate('/');
-      }
+      // User is logged in, redirect to homepage
+      navigate('/');
     }
-  }, [user, loading, isApproved, navigate]);
+  }, [user, loading, navigate]);
 
   const validateForm = (isSignUp: boolean) => {
     try {
@@ -91,7 +90,7 @@ export default function Auth() {
         toast.error(error.message);
       }
     } else {
-      toast.success('Η εγγραφή ολοκληρώθηκε! Περιμένετε έγκριση από admin.');
+      toast.success('Η εγγραφή ολοκληρώθηκε! Μπορείτε να συνδεθείτε.');
     }
   };
 
@@ -103,30 +102,7 @@ export default function Auth() {
     );
   }
 
-  // Show pending approval message
-  if (user && !isApproved) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-md text-center">
-          <CardHeader>
-            <div className="mx-auto w-16 h-16 rounded-full bg-warning/10 flex items-center justify-center mb-4">
-              <Shield className="h-8 w-8 text-warning" />
-            </div>
-            <CardTitle>Αναμονή Έγκρισης</CardTitle>
-            <CardDescription>
-              Ο λογαριασμός σας βρίσκεται σε αναμονή έγκρισης από τον διαχειριστή.
-              Θα λάβετε ειδοποίηση όταν εγκριθεί.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button variant="outline" onClick={() => signOut()}>
-              Αποσύνδεση
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  // No more pending approval screen - users go directly to the app
 
   return (
     <div className="min-h-screen flex">
@@ -244,7 +220,7 @@ export default function Auth() {
                 <CardHeader>
                   <CardTitle>Δημιουργία λογαριασμού</CardTitle>
                   <CardDescription>
-                    Εγγραφείτε για να ξεκινήσετε. Ο λογαριασμός θα πρέπει να εγκριθεί από admin.
+                    Εγγραφείτε για να ξεκινήσετε
                   </CardDescription>
                 </CardHeader>
                 <CardContent>

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenderToProject } from '@/hooks/useTenderToProject';
+import { useDocumentParser } from '@/hooks/useDocumentParser';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -96,9 +97,20 @@ export default function TenderDetailPage() {
     submission_deadline: '',
   });
   
-  // AI Analysis state
+  // AI Analysis state - now uses document parser hook
   const [aiFiles, setAiFiles] = useState<Array<{ fileName: string; content: string }>>([]);
-  const [uploadingForAi, setUploadingForAi] = useState(false);
+  const [rawFiles, setRawFiles] = useState<File[]>([]);
+  
+  const { parsing: uploadingForAi, parseFiles } = useDocumentParser({
+    saveToStorage: true,
+    tenderId: id,
+    onSuccess: (parsedFiles) => {
+      setAiFiles(prev => [...prev, ...parsedFiles.map(f => ({
+        fileName: f.fileName,
+        content: f.content
+      }))]);
+    }
+  });
 
   const canManage = isAdmin || isManager;
 
@@ -154,28 +166,22 @@ export default function TenderDetailPage() {
     }
   };
 
-  // Handle AI file uploads
+  // Handle AI file uploads with document parsing
   const handleAiFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    setUploadingForAi(true);
-    const newFiles: Array<{ fileName: string; content: string }> = [];
-
-    try {
-      for (const file of Array.from(files)) {
-        const text = await file.text();
-        newFiles.push({ fileName: file.name, content: text });
-      }
-      setAiFiles(prev => [...prev, ...newFiles]);
-      toast.success(`${newFiles.length} αρχείο(α) έτοιμο για ανάλυση`);
-    } catch (error) {
-      console.error('Error reading files:', error);
-      toast.error('Σφάλμα κατά την ανάγνωση αρχείων');
-    } finally {
-      setUploadingForAi(false);
-      e.target.value = '';
+    // Store raw files for later storage
+    setRawFiles(prev => [...prev, ...Array.from(files)]);
+    
+    // Parse the files using the hook
+    const parsed = await parseFiles(files);
+    
+    if (parsed.length > 0) {
+      toast.success(`${parsed.length} αρχείο(α) αναλύθηκαν και είναι έτοιμα`);
     }
+    
+    e.target.value = '';
   };
 
   // Handle form submission

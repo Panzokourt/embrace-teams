@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useDocumentParser } from '@/hooks/useDocumentParser';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -103,7 +104,17 @@ export default function ProjectDetailPage() {
   // AI Analysis state
   const [aiFiles, setAiFiles] = useState<Array<{ fileName: string; content: string }>>([]);
   const [aiRawFiles, setAiRawFiles] = useState<File[]>([]); // Keep raw files for storage
-  const [uploadingForAi, setUploadingForAi] = useState(false);
+  
+  const { parsing: uploadingForAi, parseFiles } = useDocumentParser({
+    saveToStorage: true,
+    projectId: id,
+    onSuccess: (parsedFiles) => {
+      setAiFiles(prev => [...prev, ...parsedFiles.map(f => ({
+        fileName: f.fileName,
+        content: f.content
+      }))]);
+    }
+  });
 
   const canViewFinancials = isAdmin || isManager;
   const canEdit = isAdmin || isManager || hasPermission('projects.edit');
@@ -172,31 +183,22 @@ export default function ProjectDetailPage() {
     }
   };
 
-  // Handle AI file uploads - read content for AI and keep raw files for storage
+  // Handle AI file uploads with document parsing
   const handleAiFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    setUploadingForAi(true);
-    const newFiles: Array<{ fileName: string; content: string }> = [];
-    const rawFiles: File[] = [];
-
-    try {
-      for (const file of Array.from(files)) {
-        const text = await file.text();
-        newFiles.push({ fileName: file.name, content: text });
-        rawFiles.push(file);
-      }
-      setAiFiles(prev => [...prev, ...newFiles]);
-      setAiRawFiles(prev => [...prev, ...rawFiles]);
-      toast.success(`${newFiles.length} αρχείο(α) έτοιμο για ανάλυση`);
-    } catch (error) {
-      console.error('Error reading files:', error);
-      toast.error('Σφάλμα κατά την ανάγνωση αρχείων');
-    } finally {
-      setUploadingForAi(false);
-      e.target.value = '';
+    // Store raw files for later storage
+    setAiRawFiles(prev => [...prev, ...Array.from(files)]);
+    
+    // Parse the files using the hook
+    const parsed = await parseFiles(files);
+    
+    if (parsed.length > 0) {
+      toast.success(`${parsed.length} αρχείο(α) αναλύθηκαν και είναι έτοιμα`);
     }
+    
+    e.target.value = '';
   };
 
   // Save AI files to storage when suggestions are applied

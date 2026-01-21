@@ -1,6 +1,10 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 export interface ParsedFile {
   fileName: string;
@@ -9,6 +13,8 @@ export interface ParsedFile {
     fileType: string;
     wordCount: number;
     characterCount: number;
+    pagesProcessed?: number;
+    lowQuality?: boolean;
   };
 }
 
@@ -24,6 +30,68 @@ export function useDocumentParser(options: UseDocumentParserOptions = {}) {
   const [parsing, setParsing] = useState(false);
   const [parsedFiles, setParsedFiles] = useState<ParsedFile[]>([]);
 
+  const isReadableText = useCallback((text: string) => {
+    if (text.length < 100) return false;
+    const greekPattern = /[α-ωά-ώΑ-ΩΆ-Ώ]/g;
+    const latinPattern = /[a-zA-Z]/g;
+    const greekMatches = text.match(greekPattern) || [];
+    const latinMatches = text.match(latinPattern) || [];
+    const totalLetters = greekMatches.length + latinMatches.length;
+    const garbagePattern = /[^\x20-\x7E\xA0-\xFF\u0370-\u03FF\u1F00-\u1FFF\n\r\t]/g;
+    const garbageMatches = text.match(garbagePattern) || [];
+    const garbageRatio = garbageMatches.length / text.length;
+    const letterRatio = totalLetters / text.length;
+    return letterRatio > 0.25 && garbageRatio < 0.3;
+  }, []);
+
+  const extractPdfTextClientSide = useCallback(async (file: File) => {
+    const arrayBuffer = await file.arrayBuffer();
+    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    const pdf = await loadingTask.promise;
+
+    let combined = '';
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      const pageText = (textContent.items as any[])
+        .map((it) => (typeof it.str === 'string' ? it.str : ''))
+        .filter(Boolean)
+        .join(' ');
+      combined += `\n\n=== Σελίδα ${pageNum} ===\n${pageText}`;
+    }
+
+    return { text: combined.trim(), pages: pdf.numPages };
+  }, []);
+
+  const renderPdfToImages = useCallback(async (file: File) => {
+    const arrayBuffer = await file.arrayBuffer();
+    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    const pdf = await loadingTask.promise;
+
+    const pages: Array<{ fileName: string; contentType: string; data: string }> = [];
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 2 });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Failed to create canvas context');
+
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      const base64 = dataUrl.split(',')[1];
+
+      pages.push({
+        data: base64,
+        fileName: `${file.name.replace(/\.pdf$/i, '')}_page_${pageNum}.jpg`,
+        contentType: 'image/jpeg',
+      });
+    }
+
+    return { pages, numPages: pdf.numPages };
+  }, []);
+
   const parseFiles = useCallback(async (files: FileList | File[]) => {
     if (!files || files.length === 0) return [];
 
@@ -32,43 +100,116 @@ export function useDocumentParser(options: UseDocumentParserOptions = {}) {
     const results: ParsedFile[] = [];
 
     try {
-      // Convert files to base64 for sending to edge function
-      const base64Files = await Promise.all(
-        fileArray.map(async (file) => {
-          const arrayBuffer = await file.arrayBuffer();
-          const bytes = new Uint8Array(arrayBuffer);
-          let binary = '';
-          for (let i = 0; i < bytes.byteLength; i++) {
-            binary += String.fromCharCode(bytes[i]);
+      // PDFs: do client-side extraction first (most reliable for Greek text PDFs)
+      for (const file of fileArray) {
+        if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+          const loadingToast = toast.loading(`Ανάγνωση PDF: ${file.name}`);
+          try {
+            const { text, pages } = await extractPdfTextClientSide(file);
+            const readable = isReadableText(text) && text.length > 500;
+
+            if (readable) {
+              results.push({
+                fileName: file.name,
+                content: text,
+                metadata: {
+                  fileType: 'pdf',
+                  wordCount: text.split(/\s+/).filter(Boolean).length,
+                  characterCount: text.length,
+                  pagesProcessed: pages,
+                  lowQuality: false,
+                },
+              });
+              toast.dismiss(loadingToast);
+              continue;
+            }
+
+            // Scanned/garbled PDFs: OCR via backend by converting pages to images
+            toast.dismiss(loadingToast);
+            const ocrToast = toast.loading(`OCR PDF (σελίδες): ${file.name}`);
+
+            const { pages: images, numPages } = await renderPdfToImages(file);
+            const BATCH = 3;
+            let combined = '';
+            for (let i = 0; i < images.length; i += BATCH) {
+              const batch = images.slice(i, i + BATCH);
+              const { data, error } = await supabase.functions.invoke('parse-document', {
+                body: { base64Files: batch },
+              });
+              if (error) throw new Error(error.message || 'Failed OCR batch');
+
+              if (data?.success && data?.files) {
+                for (const f of data.files) {
+                  combined += `\n\n=== ${f.metadata.fileName} ===\n${f.text}`;
+                }
+              }
+            }
+
+            const finalText = combined.trim();
+            results.push({
+              fileName: file.name,
+              content: finalText,
+              metadata: {
+                fileType: 'pdf',
+                wordCount: finalText.split(/\s+/).filter(Boolean).length,
+                characterCount: finalText.length,
+                pagesProcessed: numPages,
+                lowQuality: !isReadableText(finalText),
+              },
+            });
+
+            toast.dismiss(ocrToast);
+          } catch (e: any) {
+            toast.dismiss(loadingToast);
+            console.error('PDF parse error:', e);
+            throw e;
           }
-          return {
-            data: btoa(binary),
-            fileName: file.name,
-            contentType: file.type || 'application/octet-stream'
-          };
-        })
-      );
-
-      // Call the parse-document edge function
-      const { data, error } = await supabase.functions.invoke('parse-document', {
-        body: { base64Files }
-      });
-
-      if (error) {
-        throw new Error(error.message || 'Failed to parse documents');
+          continue;
+        }
       }
 
-      if (data.success && data.files) {
-        for (const file of data.files) {
-          results.push({
-            fileName: file.metadata.fileName,
-            content: file.text,
-            metadata: {
-              fileType: file.metadata.fileType,
-              wordCount: file.metadata.wordCount,
-              characterCount: file.metadata.characterCount
+      // Non-PDFs: send to backend parse-document
+      const nonPdfFiles = fileArray.filter(
+        (f) => !(f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'))
+      );
+
+      if (nonPdfFiles.length > 0) {
+        const base64Files = await Promise.all(
+          nonPdfFiles.map(async (file) => {
+            const arrayBuffer = await file.arrayBuffer();
+            const bytes = new Uint8Array(arrayBuffer);
+            let binary = '';
+            for (let i = 0; i < bytes.byteLength; i++) {
+              binary += String.fromCharCode(bytes[i]);
             }
-          });
+            return {
+              data: btoa(binary),
+              fileName: file.name,
+              contentType: file.type || 'application/octet-stream',
+            };
+          })
+        );
+
+        const { data, error } = await supabase.functions.invoke('parse-document', {
+          body: { base64Files },
+        });
+
+        if (error) throw new Error(error.message || 'Failed to parse documents');
+
+        if (data?.success && data?.files) {
+          for (const file of data.files) {
+            results.push({
+              fileName: file.metadata.fileName,
+              content: file.text,
+              metadata: {
+                fileType: file.metadata.fileType,
+                wordCount: file.metadata.wordCount,
+                characterCount: file.metadata.characterCount,
+                pagesProcessed: file.metadata.pagesProcessed,
+                lowQuality: file.metadata.lowQuality,
+              },
+            });
+          }
         }
       }
 
@@ -123,7 +264,7 @@ export function useDocumentParser(options: UseDocumentParserOptions = {}) {
     } finally {
       setParsing(false);
     }
-  }, [options]);
+  }, [options, extractPdfTextClientSide, isReadableText, renderPdfToImages]);
 
   const clearParsedFiles = useCallback(() => {
     setParsedFiles([]);

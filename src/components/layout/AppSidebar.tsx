@@ -32,6 +32,7 @@ import {
   Sun,
   CalendarDays,
   Network,
+  FileArchive,
 } from 'lucide-react';
 
 import { PermissionType } from '@/contexts/AuthContext';
@@ -51,6 +52,7 @@ const navItems: NavItem[] = [
   { title: 'Έργα', href: '/projects', icon: FolderKanban, permission: 'projects.view' },
   { title: 'Tasks', href: '/tasks', icon: CheckSquare, permission: 'tasks.view' },
   { title: 'Ημερολόγιο', href: '/calendar', icon: CalendarDays },
+  { title: 'Αρχείο', href: '/files', icon: FileArchive, permission: 'files.view' },
   { title: 'Ομάδες', href: '/teams', icon: Users, adminOnly: true },
   { title: 'P&L', href: '/financials', icon: DollarSign, permission: 'financials.view' },
 ];

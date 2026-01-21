@@ -2,6 +2,8 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import JSZip from "https://esm.sh/jszip@3.10.1";
+import pdfParse from "npm:pdf-parse@1.1.1";
+import { Buffer } from "npm:buffer@6.0.3";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,14 +13,8 @@ const corsHeaders = {
 // Minimum text length to consider PDF as text-based (not scanned)
 const MIN_TEXT_LENGTH_FOR_VALID_PDF = 500;
 
-// Max file size for single AI call (5MB)
-const MAX_CHUNK_SIZE = 5 * 1024 * 1024;
-
-// Max total file size (20MB)
+// Max file size for processing (20MB)
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
-
-// Chunk size for page-by-page processing (2MB to stay well under limits)
-const PAGE_CHUNK_SIZE = 2 * 1024 * 1024;
 
 interface ParseResult {
   text: string;
@@ -29,6 +25,7 @@ interface ParseResult {
     characterCount: number;
     usedOcr?: boolean;
     pagesProcessed?: number;
+    lowQuality?: boolean;
   };
 }
 
@@ -131,28 +128,9 @@ async function parseDocumentWithGemini(
   }
 }
 
-// Split large PDF into chunks for processing
-function splitPdfIntoChunks(arrayBuffer: ArrayBuffer): Uint8Array[] {
-  const bytes = new Uint8Array(arrayBuffer);
-  const chunks: Uint8Array[] = [];
-  
-  // For very large files, split into chunks
-  if (bytes.length <= PAGE_CHUNK_SIZE) {
-    chunks.push(bytes);
-  } else {
-    // Split into roughly equal chunks
-    const numChunks = Math.ceil(bytes.length / PAGE_CHUNK_SIZE);
-    const chunkSize = Math.ceil(bytes.length / numChunks);
-    
-    for (let i = 0; i < numChunks; i++) {
-      const start = i * chunkSize;
-      const end = Math.min(start + chunkSize, bytes.length);
-      chunks.push(bytes.slice(start, end));
-    }
-  }
-  
-  return chunks;
-}
+// Note: We intentionally do NOT attempt "PDF -> Vision" inside the backend.
+// Converting PDF pages to images is not reliably supported in edge runtime.
+// For scanned PDFs, we fallback to client-side PDF-to-image and send images here.
 
 // Extract text from DOCX file
 async function parseDocx(arrayBuffer: ArrayBuffer): Promise<string> {
@@ -263,69 +241,30 @@ function isReadableText(text: string): boolean {
   return letterRatio > 0.3 && garbageRatio < 0.3;
 }
 
-// Main PDF parsing function with chunked AI processing
-async function parsePdf(arrayBuffer: ArrayBuffer, fileName: string): Promise<{ text: string; usedOcr: boolean; pagesProcessed: number }> {
+// Main PDF parsing function using robust native extraction (pdf-parse)
+async function parsePdf(arrayBuffer: ArrayBuffer, fileName: string): Promise<{ text: string; usedOcr: boolean; pagesProcessed: number; lowQuality: boolean }> {
   try {
-    // First, try standard text extraction
-    const textFromStreams = parsePdfTextStreams(arrayBuffer);
-    
-    console.log(`Standard PDF parsing extracted ${textFromStreams.length} characters`);
-    
-    // Check if text is readable and sufficient
-    const isReadable = isReadableText(textFromStreams);
-    const hasSufficientText = textFromStreams.length >= MIN_TEXT_LENGTH_FOR_VALID_PDF;
-    
-    if (hasSufficientText && isReadable) {
-      console.log("PDF has readable text content, using standard parsing");
-      return { text: textFromStreams, usedOcr: false, pagesProcessed: 1 };
+    const bytes = new Uint8Array(arrayBuffer);
+    if (bytes.byteLength > MAX_FILE_SIZE) {
+      throw new Error(`File too large: ${bytes.byteLength} bytes (max ${MAX_FILE_SIZE})`);
     }
-    
-    // Text is garbled or insufficient - use Gemini Vision with chunked processing
-    console.log("PDF text is garbled or insufficient, using Gemini Vision for parsing...");
-    
-    // Check file size
-    if (arrayBuffer.byteLength > MAX_FILE_SIZE) {
-      console.warn(`File too large (${arrayBuffer.byteLength} bytes), will process in chunks`);
-    }
-    
-    // Split into chunks for processing
-    const chunks = splitPdfIntoChunks(arrayBuffer);
-    console.log(`Split PDF into ${chunks.length} chunks for processing`);
-    
-    const extractedTexts: string[] = [];
-    
-    // Process each chunk
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      const base64 = btoa(String.fromCharCode.apply(null, Array.from(chunk)));
-      
-      const pageInfo = chunks.length > 1 ? `chunk ${i + 1}/${chunks.length}` : undefined;
-      
-      try {
-        const chunkText = await parseDocumentWithGemini(base64, 'application/pdf', fileName, pageInfo);
-        if (chunkText.length > 0) {
-          extractedTexts.push(chunkText);
-        }
-      } catch (error) {
-        console.error(`Error processing chunk ${i + 1}:`, error);
-        // Continue with other chunks
-      }
-      
-      // Small delay between chunks to avoid rate limiting
-      if (i < chunks.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-    }
-    
-    if (extractedTexts.length > 0) {
-      const combinedText = extractedTexts.join('\n\n--- ΣΥΝΕΧΕΙΑ ΕΓΓΡΑΦΟΥ ---\n\n');
-      console.log(`AI parsing successful: extracted ${combinedText.length} characters from ${extractedTexts.length} chunks`);
-      return { text: combinedText, usedOcr: true, pagesProcessed: chunks.length };
-    }
-    
-    // Fallback to whatever we have
-    console.log("AI parsing failed, returning basic extraction");
-    return { text: textFromStreams, usedOcr: false, pagesProcessed: 1 };
+
+    console.log(`Native PDF extraction (pdf-parse) for ${fileName}...`);
+    const parsed = await pdfParse(Buffer.from(bytes));
+    const text = (parsed.text || '').trim();
+
+    const isReadable = isReadableText(text);
+    const hasSufficientText = text.length >= MIN_TEXT_LENGTH_FOR_VALID_PDF;
+    const lowQuality = !(isReadable && hasSufficientText);
+
+    console.log(`pdf-parse extracted ${text.length} chars, pages=${parsed.numpages}, lowQuality=${lowQuality}`);
+
+    return {
+      text,
+      usedOcr: false,
+      pagesProcessed: parsed.numpages || 1,
+      lowQuality,
+    };
     
   } catch (error: unknown) {
     console.error("Error parsing PDF:", error);
@@ -350,6 +289,7 @@ async function parseDocument(
   let fileType = "unknown";
   let usedOcr = false;
   let pagesProcessed = 1;
+  let lowQuality = false;
   
   const lowerFileName = fileName.toLowerCase();
   const lowerContentType = contentType.toLowerCase();
@@ -384,6 +324,7 @@ async function parseDocument(
     text = pdfResult.text;
     usedOcr = pdfResult.usedOcr;
     pagesProcessed = pdfResult.pagesProcessed;
+    lowQuality = pdfResult.lowQuality;
   } else if (
     lowerFileName.endsWith('.txt') || 
     lowerFileName.endsWith('.md') ||
@@ -395,7 +336,7 @@ async function parseDocument(
   } else if (lowerFileName.endsWith('.doc')) {
     // Old .doc format - try AI parsing
     fileType = "doc";
-    const bytes = new Uint8Array(arrayBuffer.slice(0, MAX_CHUNK_SIZE));
+    const bytes = new Uint8Array(arrayBuffer.slice(0, Math.min(MAX_FILE_SIZE, arrayBuffer.byteLength)));
     const base64 = btoa(String.fromCharCode.apply(null, Array.from(bytes)));
     try {
       text = await parseDocumentWithGemini(base64, 'application/msword', fileName);
@@ -437,7 +378,8 @@ async function parseDocument(
       wordCount,
       characterCount,
       usedOcr,
-      pagesProcessed
+      pagesProcessed,
+      lowQuality,
     }
   };
 }

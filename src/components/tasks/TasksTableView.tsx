@@ -11,11 +11,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { EnhancedInlineEditCell } from '@/components/shared/EnhancedInlineEditCell';
 import { TableToolbar } from '@/components/shared/TableToolbar';
 import { BulkActionsDialog } from '@/components/shared/BulkActionsDialog';
 import { EditDeleteActions } from '@/components/dialogs/EditDeleteActions';
-import { useTableViews } from '@/hooks/useTableViews';
+import { ResizableTableHeader } from '@/components/shared/ResizableTableHeader';
+import { GroupedTableSection } from '@/components/shared/GroupedTableSection';
+import { useTableViews, GroupByField } from '@/hooks/useTableViews';
 import { exportToCSV, exportToExcel, formatters } from '@/utils/exportUtils';
 import { 
   ChevronDown, 
@@ -141,6 +144,14 @@ const BULK_ACTIONS = [
   { id: 'priority', label: 'Αλλαγή Προτεραιότητας', icon: <Flag className="h-4 w-4" /> },
 ];
 
+const GROUP_OPTIONS = [
+  { value: 'none' as GroupByField, label: 'Χωρίς ομαδοποίηση' },
+  { value: 'status' as GroupByField, label: 'Κατάσταση' },
+  { value: 'assignee' as GroupByField, label: 'Υπεύθυνος' },
+  { value: 'project' as GroupByField, label: 'Έργο' },
+  { value: 'priority' as GroupByField, label: 'Προτεραιότητα' },
+];
+
 export function TasksTableView({
   tasks,
   projects,
@@ -156,6 +167,10 @@ export function TasksTableView({
   const {
     columns,
     setColumns,
+    columnWidths,
+    setColumnWidth,
+    groupBy,
+    setGroupBy,
     savedViews,
     currentViewId,
     saveView,
@@ -165,6 +180,7 @@ export function TasksTableView({
   } = useTableViews({ storageKey: 'tasks_table', defaultColumns: DEFAULT_COLUMNS });
 
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['all']));
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
@@ -232,6 +248,82 @@ export function TasksTableView({
     });
   }, [parentTasks, sortField, sortDirection]);
 
+  // Group tasks
+  const groupedTasks = useMemo(() => {
+    if (groupBy === 'none') {
+      return [{ key: 'all', label: 'Όλα τα Tasks', tasks: sortedTasks }];
+    }
+
+    const groups: Map<string, { label: string; tasks: Task[]; badge?: React.ReactNode }> = new Map();
+
+    sortedTasks.forEach(task => {
+      let groupKey: string;
+      let groupLabel: string;
+      let badge: React.ReactNode = null;
+
+      switch (groupBy) {
+        case 'status':
+          groupKey = task.status;
+          const statusOption = STATUS_OPTIONS.find(s => s.value === task.status);
+          groupLabel = statusOption?.label || task.status;
+          badge = (
+            <Badge 
+              variant="outline" 
+              className="text-xs"
+              style={{ borderColor: statusOption?.color, color: statusOption?.color }}
+            >
+              {statusOption?.label}
+            </Badge>
+          );
+          break;
+        case 'assignee':
+          groupKey = task.assigned_to || 'unassigned';
+          groupLabel = task.assignee?.full_name || 'Μη ανατεθειμένο';
+          if (task.assignee?.avatar_url) {
+            badge = (
+              <Avatar className="h-5 w-5">
+                <AvatarImage src={task.assignee.avatar_url} />
+                <AvatarFallback>{task.assignee.full_name?.charAt(0) || '?'}</AvatarFallback>
+              </Avatar>
+            );
+          }
+          break;
+        case 'project':
+          groupKey = task.project_id;
+          groupLabel = task.project?.name || 'Χωρίς Έργο';
+          break;
+        case 'priority':
+          groupKey = task.priority || 'none';
+          const priorityOption = PRIORITY_OPTIONS.find(p => p.value === task.priority);
+          groupLabel = priorityOption?.label || 'Χωρίς Προτεραιότητα';
+          if (priorityOption) {
+            badge = (
+              <div 
+                className="w-3 h-3 rounded-full" 
+                style={{ backgroundColor: priorityOption.color }}
+              />
+            );
+          }
+          break;
+        default:
+          groupKey = 'all';
+          groupLabel = 'Όλα';
+      }
+
+      if (!groups.has(groupKey)) {
+        groups.set(groupKey, { label: groupLabel, tasks: [], badge });
+      }
+      groups.get(groupKey)!.tasks.push(task);
+    });
+
+    return Array.from(groups.entries()).map(([key, value]) => ({
+      key,
+      label: value.label,
+      tasks: value.tasks,
+      badge: value.badge,
+    }));
+  }, [sortedTasks, groupBy]);
+
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
       if (sortDirection === 'asc') setSortDirection('desc');
@@ -273,6 +365,8 @@ export function TasksTableView({
 
   const isColumnVisible = (columnId: string) => 
     columns.find(c => c.id === columnId)?.visible ?? true;
+
+  const getColumnWidth = (columnId: string) => columnWidths[columnId];
 
   const userOptions = users.map(u => ({
     value: u.id,
@@ -350,6 +444,8 @@ export function TasksTableView({
     setNewSubtaskTitle('');
   };
 
+  const visibleColumnCount = columns.filter(c => c.visible).length;
+
   const renderTaskRow = (task: Task, level = 0) => {
     const children = childTasksMap.get(task.id) || [];
     const hasChildren = children.length > 0;
@@ -363,7 +459,7 @@ export function TasksTableView({
         <TableRow key={task.id} className={cn("group hover:bg-muted/50", isSelected && "bg-primary/5")}>
           {/* Checkbox */}
           {isColumnVisible('select') && (
-            <TableCell className="w-[40px]">
+            <TableCell className="w-[40px]" style={{ width: getColumnWidth('select') }}>
               <Checkbox
                 checked={isSelected}
                 onCheckedChange={() => toggleSelectTask(task.id)}
@@ -372,7 +468,7 @@ export function TasksTableView({
           )}
 
           {/* Title with expand/collapse */}
-          <TableCell className="font-medium">
+          <TableCell className="font-medium" style={{ width: getColumnWidth('title') }}>
             <div className="flex items-center gap-2" style={{ paddingLeft: `${level * 20}px` }}>
               {hasChildren || level === 0 ? (
                 <button 
@@ -418,7 +514,7 @@ export function TasksTableView({
 
           {/* Assignee */}
           {isColumnVisible('assignee') && (
-            <TableCell>
+            <TableCell style={{ width: getColumnWidth('assignee') }}>
               <EnhancedInlineEditCell
                 value={task.assigned_to}
                 onSave={(val) => onInlineUpdate(task.id, 'assigned_to', val)}
@@ -432,7 +528,7 @@ export function TasksTableView({
 
           {/* Project */}
           {isColumnVisible('project') && showProject && (
-            <TableCell>
+            <TableCell style={{ width: getColumnWidth('project') }}>
               <EnhancedInlineEditCell
                 value={task.project_id}
                 onSave={(val) => onInlineUpdate(task.id, 'project_id', val)}
@@ -446,7 +542,7 @@ export function TasksTableView({
 
           {/* Start Date */}
           {isColumnVisible('start_date') && (
-            <TableCell>
+            <TableCell style={{ width: getColumnWidth('start_date') }}>
               <EnhancedInlineEditCell
                 value={task.start_date}
                 onSave={(val) => onInlineUpdate(task.id, 'start_date', val)}
@@ -458,7 +554,7 @@ export function TasksTableView({
 
           {/* Due Date */}
           {isColumnVisible('due_date') && (
-            <TableCell>
+            <TableCell style={{ width: getColumnWidth('due_date') }}>
               <div className={cn(dueDateInfo?.isOverdue && "text-destructive font-medium")}>
                 <EnhancedInlineEditCell
                   value={task.due_date}
@@ -473,7 +569,7 @@ export function TasksTableView({
 
           {/* Status */}
           {isColumnVisible('status') && (
-            <TableCell>
+            <TableCell style={{ width: getColumnWidth('status') }}>
               <EnhancedInlineEditCell
                 value={task.status}
                 onSave={(val) => onInlineUpdate(task.id, 'status', val)}
@@ -486,7 +582,7 @@ export function TasksTableView({
 
           {/* Priority */}
           {isColumnVisible('priority') && (
-            <TableCell>
+            <TableCell style={{ width: getColumnWidth('priority') }}>
               <EnhancedInlineEditCell
                 value={task.priority}
                 onSave={(val) => onInlineUpdate(task.id, 'priority', val)}
@@ -500,7 +596,7 @@ export function TasksTableView({
 
           {/* Progress */}
           {isColumnVisible('progress') && (
-            <TableCell>
+            <TableCell style={{ width: getColumnWidth('progress') }}>
               <EnhancedInlineEditCell
                 value={task.progress ?? 0}
                 onSave={(val) => onInlineUpdate(task.id, 'progress', val)}
@@ -512,7 +608,7 @@ export function TasksTableView({
 
           {/* Estimated Hours */}
           {isColumnVisible('estimated_hours') && (
-            <TableCell>
+            <TableCell style={{ width: getColumnWidth('estimated_hours') }}>
               <EnhancedInlineEditCell
                 value={task.estimated_hours}
                 onSave={(val) => onInlineUpdate(task.id, 'estimated_hours', val)}
@@ -526,7 +622,7 @@ export function TasksTableView({
 
           {/* Actual Hours */}
           {isColumnVisible('actual_hours') && (
-            <TableCell>
+            <TableCell style={{ width: getColumnWidth('actual_hours') }}>
               <EnhancedInlineEditCell
                 value={task.actual_hours}
                 onSave={(val) => onInlineUpdate(task.id, 'actual_hours', val)}
@@ -540,7 +636,7 @@ export function TasksTableView({
 
           {/* Task Type */}
           {isColumnVisible('task_type') && (
-            <TableCell>
+            <TableCell style={{ width: getColumnWidth('task_type') }}>
               <EnhancedInlineEditCell
                 value={task.task_type}
                 onSave={(val) => onInlineUpdate(task.id, 'task_type', val)}
@@ -553,7 +649,7 @@ export function TasksTableView({
 
           {/* Category */}
           {isColumnVisible('category') && (
-            <TableCell>
+            <TableCell style={{ width: getColumnWidth('category') }}>
               <EnhancedInlineEditCell
                 value={task.task_category}
                 onSave={(val) => onInlineUpdate(task.id, 'task_category', val)}
@@ -565,7 +661,7 @@ export function TasksTableView({
           )}
 
           {/* Actions */}
-          <TableCell>
+          <TableCell style={{ width: getColumnWidth('actions') }}>
             {canManage && (
               <EditDeleteActions
                 onEdit={() => onEdit(task)}
@@ -579,7 +675,7 @@ export function TasksTableView({
         {/* Inline subtask creation */}
         {addingSubtaskTo === task.id && (
           <TableRow>
-            <TableCell colSpan={columns.filter(c => c.visible).length}>
+            <TableCell colSpan={visibleColumnCount}>
               <div className="flex items-center gap-2 pl-8">
                 <Input
                   placeholder="Τίτλος νέου subtask..."
@@ -610,7 +706,7 @@ export function TasksTableView({
 
   return (
     <div className="space-y-4">
-      {/* Toolbar with saved views, columns, export, bulk actions */}
+      {/* Toolbar with saved views, columns, export, bulk actions, grouping */}
       <TableToolbar
         columns={columns}
         onColumnsChange={setColumns}
@@ -631,6 +727,9 @@ export function TasksTableView({
         selectedCount={selectedTasks.size}
         onBulkAction={canManage ? handleBulkAction : undefined}
         bulkActions={BULK_ACTIONS}
+        groupBy={groupBy}
+        onGroupByChange={setGroupBy}
+        groupOptions={GROUP_OPTIONS}
       />
 
       {/* Table */}
@@ -639,89 +738,184 @@ export function TasksTableView({
           <TableHeader>
             <TableRow>
               {isColumnVisible('select') && (
-                <TableHead className="w-[40px]">
+                <ResizableTableHeader 
+                  width={getColumnWidth('select')}
+                  onWidthChange={(w) => setColumnWidth('select', w)}
+                  minWidth={40}
+                  className="w-[40px]"
+                >
                   <Checkbox
                     checked={allSelected}
                     // @ts-ignore - indeterminate is valid but not in types
                     indeterminate={someSelected}
                     onCheckedChange={toggleSelectAll}
                   />
-                </TableHead>
+                </ResizableTableHeader>
               )}
               
-              <TableHead 
+              <ResizableTableHeader 
+                width={getColumnWidth('title')}
+                onWidthChange={(w) => setColumnWidth('title', w)}
+                minWidth={150}
                 className="cursor-pointer select-none"
                 onClick={() => toggleSort('title')}
               >
                 <div className="flex items-center gap-1">
                   Τίτλος {getSortIcon('title')}
                 </div>
-              </TableHead>
+              </ResizableTableHeader>
               
-              {isColumnVisible('assignee') && <TableHead>Υπεύθυνος</TableHead>}
-              {isColumnVisible('project') && showProject && <TableHead>Έργο</TableHead>}
-              {isColumnVisible('start_date') && <TableHead>Έναρξη</TableHead>}
+              {isColumnVisible('assignee') && (
+                <ResizableTableHeader 
+                  width={getColumnWidth('assignee')}
+                  onWidthChange={(w) => setColumnWidth('assignee', w)}
+                  minWidth={100}
+                >
+                  Υπεύθυνος
+                </ResizableTableHeader>
+              )}
+              
+              {isColumnVisible('project') && showProject && (
+                <ResizableTableHeader 
+                  width={getColumnWidth('project')}
+                  onWidthChange={(w) => setColumnWidth('project', w)}
+                  minWidth={100}
+                >
+                  Έργο
+                </ResizableTableHeader>
+              )}
+              
+              {isColumnVisible('start_date') && (
+                <ResizableTableHeader 
+                  width={getColumnWidth('start_date')}
+                  onWidthChange={(w) => setColumnWidth('start_date', w)}
+                  minWidth={90}
+                >
+                  Έναρξη
+                </ResizableTableHeader>
+              )}
               
               {isColumnVisible('due_date') && (
-                <TableHead 
+                <ResizableTableHeader 
+                  width={getColumnWidth('due_date')}
+                  onWidthChange={(w) => setColumnWidth('due_date', w)}
+                  minWidth={90}
                   className="cursor-pointer select-none"
                   onClick={() => toggleSort('due_date')}
                 >
                   <div className="flex items-center gap-1">
                     Προθεσμία {getSortIcon('due_date')}
                   </div>
-                </TableHead>
+                </ResizableTableHeader>
               )}
               
               {isColumnVisible('status') && (
-                <TableHead 
+                <ResizableTableHeader 
+                  width={getColumnWidth('status')}
+                  onWidthChange={(w) => setColumnWidth('status', w)}
+                  minWidth={100}
                   className="cursor-pointer select-none"
                   onClick={() => toggleSort('status')}
                 >
                   <div className="flex items-center gap-1">
                     Κατάσταση {getSortIcon('status')}
                   </div>
-                </TableHead>
+                </ResizableTableHeader>
               )}
               
               {isColumnVisible('priority') && (
-                <TableHead 
+                <ResizableTableHeader 
+                  width={getColumnWidth('priority')}
+                  onWidthChange={(w) => setColumnWidth('priority', w)}
+                  minWidth={100}
                   className="cursor-pointer select-none"
                   onClick={() => toggleSort('priority')}
                 >
                   <div className="flex items-center gap-1">
                     Προτεραιότητα {getSortIcon('priority')}
                   </div>
-                </TableHead>
+                </ResizableTableHeader>
               )}
               
               {isColumnVisible('progress') && (
-                <TableHead 
+                <ResizableTableHeader 
+                  width={getColumnWidth('progress')}
+                  onWidthChange={(w) => setColumnWidth('progress', w)}
+                  minWidth={80}
                   className="cursor-pointer select-none"
                   onClick={() => toggleSort('progress')}
                 >
                   <div className="flex items-center gap-1">
                     Πρόοδος {getSortIcon('progress')}
                   </div>
-                </TableHead>
+                </ResizableTableHeader>
               )}
               
-              {isColumnVisible('estimated_hours') && <TableHead>Εκτίμηση</TableHead>}
-              {isColumnVisible('actual_hours') && <TableHead>Πραγματικός</TableHead>}
-              {isColumnVisible('task_type') && <TableHead>Τύπος</TableHead>}
-              {isColumnVisible('category') && <TableHead>Κατηγορία</TableHead>}
+              {isColumnVisible('estimated_hours') && (
+                <ResizableTableHeader 
+                  width={getColumnWidth('estimated_hours')}
+                  onWidthChange={(w) => setColumnWidth('estimated_hours', w)}
+                  minWidth={80}
+                >
+                  Εκτίμηση
+                </ResizableTableHeader>
+              )}
+              
+              {isColumnVisible('actual_hours') && (
+                <ResizableTableHeader 
+                  width={getColumnWidth('actual_hours')}
+                  onWidthChange={(w) => setColumnWidth('actual_hours', w)}
+                  minWidth={80}
+                >
+                  Πραγματικός
+                </ResizableTableHeader>
+              )}
+              
+              {isColumnVisible('task_type') && (
+                <ResizableTableHeader 
+                  width={getColumnWidth('task_type')}
+                  onWidthChange={(w) => setColumnWidth('task_type', w)}
+                  minWidth={80}
+                >
+                  Τύπος
+                </ResizableTableHeader>
+              )}
+              
+              {isColumnVisible('category') && (
+                <ResizableTableHeader 
+                  width={getColumnWidth('category')}
+                  onWidthChange={(w) => setColumnWidth('category', w)}
+                  minWidth={100}
+                >
+                  Κατηγορία
+                </ResizableTableHeader>
+              )}
+              
               <TableHead className="w-[80px]">Ενέργειες</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {sortedTasks.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.filter(c => c.visible).length} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={visibleColumnCount} className="text-center py-8 text-muted-foreground">
                   Δεν υπάρχουν tasks
                 </TableCell>
               </TableRow>
-            ) : (
+            ) : groupBy === 'none' ? (
               sortedTasks.map(task => renderTaskRow(task))
+            ) : (
+              groupedTasks.map(group => (
+                <GroupedTableSection
+                  key={group.key}
+                  groupKey={group.key}
+                  groupLabel={group.label}
+                  itemCount={group.tasks.length}
+                  colSpan={visibleColumnCount}
+                  badge={group.badge}
+                >
+                  {group.tasks.map(task => renderTaskRow(task))}
+                </GroupedTableSection>
+              ))
             )}
           </TableBody>
         </Table>

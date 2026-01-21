@@ -12,7 +12,9 @@ import { Badge } from '@/components/ui/badge';
 import { EnhancedInlineEditCell } from '@/components/shared/EnhancedInlineEditCell';
 import { TableToolbar } from '@/components/shared/TableToolbar';
 import { EditDeleteActions } from '@/components/dialogs/EditDeleteActions';
-import { useTableViews } from '@/hooks/useTableViews';
+import { ResizableTableHeader } from '@/components/shared/ResizableTableHeader';
+import { GroupedTableSection } from '@/components/shared/GroupedTableSection';
+import { useTableViews, GroupByField } from '@/hooks/useTableViews';
 import { exportToCSV, exportToExcel, formatters } from '@/utils/exportUtils';
 import { 
   ArrowUpDown,
@@ -77,6 +79,11 @@ const DEFAULT_COLUMNS = [
   { id: 'actions', label: 'Ενέργειες', visible: true, locked: true },
 ];
 
+const GROUP_OPTIONS = [
+  { value: 'none' as GroupByField, label: 'Χωρίς ομαδοποίηση' },
+  { value: 'status' as GroupByField, label: 'Στάδιο' },
+];
+
 type SortDirection = 'asc' | 'desc' | null;
 type SortField = 'name' | 'stage' | 'deadline' | 'budget' | 'probability';
 
@@ -92,6 +99,10 @@ export function TendersTableView({
   const {
     columns,
     setColumns,
+    columnWidths,
+    setColumnWidth,
+    groupBy,
+    setGroupBy,
     savedViews,
     currentViewId,
     saveView,
@@ -142,6 +153,52 @@ export function TendersTableView({
     });
   }, [tenders, sortField, sortDirection]);
 
+  // Group tenders
+  const groupedTenders = useMemo(() => {
+    if (groupBy === 'none') {
+      return [{ key: 'all', label: 'Όλοι οι Διαγωνισμοί', tenders: sortedTenders }];
+    }
+
+    const groups: Map<string, { label: string; tenders: Tender[]; badge?: React.ReactNode }> = new Map();
+
+    sortedTenders.forEach(tender => {
+      let groupKey: string;
+      let groupLabel: string;
+      let badge: React.ReactNode = null;
+
+      // For 'status' groupBy, we use the 'stage' field
+      if (groupBy === 'status') {
+        groupKey = tender.stage;
+        const stageOption = STAGE_OPTIONS.find(s => s.value === tender.stage);
+        groupLabel = stageOption?.label || tender.stage;
+        badge = (
+          <Badge 
+            variant="outline" 
+            className="text-xs"
+            style={{ borderColor: stageOption?.color, color: stageOption?.color }}
+          >
+            {stageOption?.label}
+          </Badge>
+        );
+      } else {
+        groupKey = 'all';
+        groupLabel = 'Όλοι';
+      }
+
+      if (!groups.has(groupKey)) {
+        groups.set(groupKey, { label: groupLabel, tenders: [], badge });
+      }
+      groups.get(groupKey)!.tenders.push(tender);
+    });
+
+    return Array.from(groups.entries()).map(([key, value]) => ({
+      key,
+      label: value.label,
+      tenders: value.tenders,
+      badge: value.badge,
+    }));
+  }, [sortedTenders, groupBy]);
+
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
       if (sortDirection === 'asc') setSortDirection('desc');
@@ -162,10 +219,14 @@ export function TendersTableView({
   const isColumnVisible = (columnId: string) => 
     columns.find(c => c.id === columnId)?.visible ?? true;
 
+  const getColumnWidth = (columnId: string) => columnWidths[columnId];
+
   const clientOptions = clients.map(c => ({
     value: c.id,
     label: c.name
   }));
+
+  const visibleColumnCount = columns.filter(c => c.visible).length;
 
   const getDeadlineInfo = (deadline: string | null) => {
     if (!deadline) return null;
@@ -208,6 +269,139 @@ export function TendersTableView({
     toast.success('Εξαγωγή Excel ολοκληρώθηκε!');
   }, [tenders]);
 
+  const renderTenderRow = (tender: Tender) => {
+    const deadlineInfo = getDeadlineInfo(tender.submission_deadline);
+    
+    return (
+      <TableRow 
+        key={tender.id} 
+        className="group hover:bg-muted/50 cursor-pointer"
+        onClick={() => navigate(`/tenders/${tender.id}`)}
+      >
+        {/* Name */}
+        <TableCell className="font-medium" style={{ width: getColumnWidth('name') }} onClick={(e) => e.stopPropagation()}>
+          <EnhancedInlineEditCell
+            value={tender.name}
+            onSave={(val) => onInlineUpdate(tender.id, 'name', val)}
+            type="text"
+            disabled={!canManage}
+          />
+        </TableCell>
+
+        {/* Client */}
+        {isColumnVisible('client') && (
+          <TableCell style={{ width: getColumnWidth('client') }} onClick={(e) => e.stopPropagation()}>
+            <EnhancedInlineEditCell
+              value={tender.client_id}
+              onSave={(val) => onInlineUpdate(tender.id, 'client_id', val)}
+              type="select"
+              options={clientOptions}
+              displayValue={tender.client?.name}
+              placeholder="Κανένας"
+              disabled={!canManage}
+            />
+          </TableCell>
+        )}
+
+        {/* Stage */}
+        {isColumnVisible('stage') && (
+          <TableCell style={{ width: getColumnWidth('stage') }} onClick={(e) => e.stopPropagation()}>
+            <EnhancedInlineEditCell
+              value={tender.stage}
+              onSave={(val) => onInlineUpdate(tender.id, 'stage', val)}
+              type="select"
+              options={STAGE_OPTIONS}
+              disabled={!canManage}
+            />
+          </TableCell>
+        )}
+
+        {/* Deadline */}
+        {isColumnVisible('deadline') && (
+          <TableCell style={{ width: getColumnWidth('deadline') }} onClick={(e) => e.stopPropagation()}>
+            <EnhancedInlineEditCell
+              value={tender.submission_deadline}
+              onSave={(val) => onInlineUpdate(tender.id, 'submission_deadline', val)}
+              type="date"
+              disabled={!canManage}
+            />
+          </TableCell>
+        )}
+
+        {/* Days Left */}
+        {isColumnVisible('days_left') && (
+          <TableCell style={{ width: getColumnWidth('days_left') }}>
+            {deadlineInfo && (
+              <div className={cn(
+                "flex items-center gap-1 text-sm",
+                deadlineInfo.isOverdue && "text-destructive",
+                deadlineInfo.isUrgent && !deadlineInfo.isOverdue && "text-warning"
+              )}>
+                {deadlineInfo.isOverdue ? (
+                  <AlertTriangle className="h-3 w-3" />
+                ) : (
+                  <Clock className="h-3 w-3" />
+                )}
+                {deadlineInfo.isOverdue 
+                  ? `${Math.abs(deadlineInfo.daysLeft)} μέρες πριν`
+                  : `${deadlineInfo.daysLeft} μέρες`
+                }
+              </div>
+            )}
+          </TableCell>
+        )}
+
+        {/* Budget */}
+        {isColumnVisible('budget') && (
+          <TableCell style={{ width: getColumnWidth('budget') }} onClick={(e) => e.stopPropagation()}>
+            <EnhancedInlineEditCell
+              value={tender.budget}
+              onSave={(val) => onInlineUpdate(tender.id, 'budget', val)}
+              type="number"
+              displayValue={`€${tender.budget?.toLocaleString('el-GR') || 0}`}
+              disabled={!canManage}
+            />
+          </TableCell>
+        )}
+
+        {/* Probability */}
+        {isColumnVisible('probability') && (
+          <TableCell style={{ width: getColumnWidth('probability') }} onClick={(e) => e.stopPropagation()}>
+            <EnhancedInlineEditCell
+              value={tender.probability ?? 50}
+              onSave={(val) => onInlineUpdate(tender.id, 'probability', val)}
+              type="progress"
+              disabled={!canManage}
+            />
+          </TableCell>
+        )}
+
+        {/* Progress */}
+        {isColumnVisible('progress') && (
+          <TableCell style={{ width: getColumnWidth('progress') }} onClick={(e) => e.stopPropagation()}>
+            <EnhancedInlineEditCell
+              value={tender.progress ?? 0}
+              onSave={(val) => onInlineUpdate(tender.id, 'progress', val)}
+              type="progress"
+              disabled={!canManage}
+            />
+          </TableCell>
+        )}
+
+        {/* Actions */}
+        <TableCell onClick={(e) => e.stopPropagation()}>
+          {canManage && (
+            <EditDeleteActions
+              onEdit={() => onEdit(tender)}
+              onDelete={() => onDelete(tender.id)}
+              itemName={tender.name}
+            />
+          )}
+        </TableCell>
+      </TableRow>
+    );
+  };
+
   return (
     <div className="space-y-4">
       {/* Toolbar */}
@@ -228,6 +422,9 @@ export function TendersTableView({
         onResetToDefault={resetToDefault}
         onExportCSV={handleExportCSV}
         onExportExcel={handleExportExcel}
+        groupBy={groupBy}
+        onGroupByChange={setGroupBy}
+        groupOptions={GROUP_OPTIONS}
       />
 
       {/* Table */}
@@ -235,207 +432,129 @@ export function TendersTableView({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead 
+              <ResizableTableHeader 
+                width={getColumnWidth('name')}
+                onWidthChange={(w) => setColumnWidth('name', w)}
+                minWidth={150}
                 className="cursor-pointer select-none"
                 onClick={() => toggleSort('name')}
               >
                 <div className="flex items-center gap-1">
                   Όνομα {getSortIcon('name')}
                 </div>
-              </TableHead>
+              </ResizableTableHeader>
               
-              {isColumnVisible('client') && <TableHead>Πελάτης</TableHead>}
+              {isColumnVisible('client') && (
+                <ResizableTableHeader 
+                  width={getColumnWidth('client')}
+                  onWidthChange={(w) => setColumnWidth('client', w)}
+                  minWidth={100}
+                >
+                  Πελάτης
+                </ResizableTableHeader>
+              )}
               
               {isColumnVisible('stage') && (
-                <TableHead 
+                <ResizableTableHeader 
+                  width={getColumnWidth('stage')}
+                  onWidthChange={(w) => setColumnWidth('stage', w)}
+                  minWidth={100}
                   className="cursor-pointer select-none"
                   onClick={() => toggleSort('stage')}
                 >
                   <div className="flex items-center gap-1">
                     Στάδιο {getSortIcon('stage')}
                   </div>
-                </TableHead>
+                </ResizableTableHeader>
               )}
               
               {isColumnVisible('deadline') && (
-                <TableHead 
+                <ResizableTableHeader 
+                  width={getColumnWidth('deadline')}
+                  onWidthChange={(w) => setColumnWidth('deadline', w)}
+                  minWidth={100}
                   className="cursor-pointer select-none"
                   onClick={() => toggleSort('deadline')}
                 >
                   <div className="flex items-center gap-1">
                     Προθεσμία {getSortIcon('deadline')}
                   </div>
-                </TableHead>
+                </ResizableTableHeader>
               )}
               
-              {isColumnVisible('days_left') && <TableHead>Ημέρες</TableHead>}
+              {isColumnVisible('days_left') && (
+                <ResizableTableHeader 
+                  width={getColumnWidth('days_left')}
+                  onWidthChange={(w) => setColumnWidth('days_left', w)}
+                  minWidth={80}
+                >
+                  Ημέρες
+                </ResizableTableHeader>
+              )}
               
               {isColumnVisible('budget') && (
-                <TableHead 
+                <ResizableTableHeader 
+                  width={getColumnWidth('budget')}
+                  onWidthChange={(w) => setColumnWidth('budget', w)}
+                  minWidth={100}
                   className="cursor-pointer select-none"
                   onClick={() => toggleSort('budget')}
                 >
                   <div className="flex items-center gap-1">
                     Προϋπολογισμός {getSortIcon('budget')}
                   </div>
-                </TableHead>
+                </ResizableTableHeader>
               )}
               
               {isColumnVisible('probability') && (
-                <TableHead 
+                <ResizableTableHeader 
+                  width={getColumnWidth('probability')}
+                  onWidthChange={(w) => setColumnWidth('probability', w)}
+                  minWidth={80}
                   className="cursor-pointer select-none"
                   onClick={() => toggleSort('probability')}
                 >
                   <div className="flex items-center gap-1">
                     Πιθανότητα {getSortIcon('probability')}
                   </div>
-                </TableHead>
+                </ResizableTableHeader>
               )}
               
-              {isColumnVisible('progress') && <TableHead>Πρόοδος</TableHead>}
+              {isColumnVisible('progress') && (
+                <ResizableTableHeader 
+                  width={getColumnWidth('progress')}
+                  onWidthChange={(w) => setColumnWidth('progress', w)}
+                  minWidth={80}
+                >
+                  Πρόοδος
+                </ResizableTableHeader>
+              )}
+              
               <TableHead className="w-[80px]">Ενέργειες</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {sortedTenders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.filter(c => c.visible).length} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={visibleColumnCount} className="text-center py-8 text-muted-foreground">
                   Δεν υπάρχουν διαγωνισμοί
                 </TableCell>
               </TableRow>
+            ) : groupBy === 'none' ? (
+              sortedTenders.map(tender => renderTenderRow(tender))
             ) : (
-              sortedTenders.map(tender => {
-                const deadlineInfo = getDeadlineInfo(tender.submission_deadline);
-                
-                return (
-                  <TableRow 
-                    key={tender.id} 
-                    className="group hover:bg-muted/50 cursor-pointer"
-                    onClick={() => navigate(`/tenders/${tender.id}`)}
-                  >
-                    {/* Name */}
-                    <TableCell className="font-medium" onClick={(e) => e.stopPropagation()}>
-                      <EnhancedInlineEditCell
-                        value={tender.name}
-                        onSave={(val) => onInlineUpdate(tender.id, 'name', val)}
-                        type="text"
-                        disabled={!canManage}
-                      />
-                    </TableCell>
-
-                    {/* Client */}
-                    {isColumnVisible('client') && (
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <EnhancedInlineEditCell
-                          value={tender.client_id}
-                          onSave={(val) => onInlineUpdate(tender.id, 'client_id', val)}
-                          type="select"
-                          options={clientOptions}
-                          displayValue={tender.client?.name}
-                          placeholder="Κανένας"
-                          disabled={!canManage}
-                        />
-                      </TableCell>
-                    )}
-
-                    {/* Stage */}
-                    {isColumnVisible('stage') && (
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <EnhancedInlineEditCell
-                          value={tender.stage}
-                          onSave={(val) => onInlineUpdate(tender.id, 'stage', val)}
-                          type="select"
-                          options={STAGE_OPTIONS}
-                          disabled={!canManage}
-                        />
-                      </TableCell>
-                    )}
-
-                    {/* Deadline */}
-                    {isColumnVisible('deadline') && (
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <EnhancedInlineEditCell
-                          value={tender.submission_deadline}
-                          onSave={(val) => onInlineUpdate(tender.id, 'submission_deadline', val)}
-                          type="date"
-                          disabled={!canManage}
-                        />
-                      </TableCell>
-                    )}
-
-                    {/* Days Left */}
-                    {isColumnVisible('days_left') && (
-                      <TableCell>
-                        {deadlineInfo && (
-                          <div className={cn(
-                            "flex items-center gap-1 text-sm",
-                            deadlineInfo.isOverdue && "text-destructive",
-                            deadlineInfo.isUrgent && !deadlineInfo.isOverdue && "text-warning"
-                          )}>
-                            {deadlineInfo.isOverdue ? (
-                              <AlertTriangle className="h-3 w-3" />
-                            ) : (
-                              <Clock className="h-3 w-3" />
-                            )}
-                            {deadlineInfo.isOverdue 
-                              ? `${Math.abs(deadlineInfo.daysLeft)} μέρες πριν`
-                              : `${deadlineInfo.daysLeft} μέρες`
-                            }
-                          </div>
-                        )}
-                      </TableCell>
-                    )}
-
-                    {/* Budget */}
-                    {isColumnVisible('budget') && (
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <EnhancedInlineEditCell
-                          value={tender.budget}
-                          onSave={(val) => onInlineUpdate(tender.id, 'budget', val)}
-                          type="number"
-                          displayValue={`€${tender.budget?.toLocaleString('el-GR') || 0}`}
-                          disabled={!canManage}
-                        />
-                      </TableCell>
-                    )}
-
-                    {/* Probability */}
-                    {isColumnVisible('probability') && (
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <EnhancedInlineEditCell
-                          value={tender.probability ?? 50}
-                          onSave={(val) => onInlineUpdate(tender.id, 'probability', val)}
-                          type="progress"
-                          disabled={!canManage}
-                        />
-                      </TableCell>
-                    )}
-
-                    {/* Progress */}
-                    {isColumnVisible('progress') && (
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <EnhancedInlineEditCell
-                          value={tender.progress ?? 0}
-                          onSave={(val) => onInlineUpdate(tender.id, 'progress', val)}
-                          type="progress"
-                          disabled={!canManage}
-                        />
-                      </TableCell>
-                    )}
-
-                    {/* Actions */}
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      {canManage && (
-                        <EditDeleteActions
-                          onEdit={() => onEdit(tender)}
-                          onDelete={() => onDelete(tender.id)}
-                          itemName={tender.name}
-                        />
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })
+              groupedTenders.map(group => (
+                <GroupedTableSection
+                  key={group.key}
+                  groupKey={group.key}
+                  groupLabel={group.label}
+                  itemCount={group.tenders.length}
+                  colSpan={visibleColumnCount}
+                  badge={group.badge}
+                >
+                  {group.tenders.map(tender => renderTenderRow(tender))}
+                </GroupedTableSection>
+              ))
             )}
           </TableBody>
         </Table>

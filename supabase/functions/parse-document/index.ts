@@ -8,6 +8,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Minimum text length to consider PDF as text-based (not scanned)
+const MIN_TEXT_LENGTH_FOR_VALID_PDF = 200;
+
 interface ParseResult {
   text: string;
   metadata: {
@@ -15,7 +18,88 @@ interface ParseResult {
     fileType: string;
     wordCount: number;
     characterCount: number;
+    usedOcr?: boolean;
   };
+}
+
+// OCR using Gemini Vision via Lovable API Gateway
+async function performOcrWithGemini(base64Image: string, mimeType: string): Promise<string> {
+  const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+  
+  if (!lovableApiKey) {
+    console.warn("LOVABLE_API_KEY not found, skipping OCR");
+    return "";
+  }
+  
+  try {
+    console.log("Performing OCR with Gemini Vision...");
+    
+    const response = await fetch("https://api.lovable.dev/api/v1/chat", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${lovableApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:${mimeType};base64,${base64Image}`
+                }
+              },
+              {
+                type: "text",
+                text: `Εξάγαγε ΟΛΟ το κείμενο από αυτή την εικόνα εγγράφου. 
+                
+Οδηγίες:
+- Διατήρησε τη δομή και τη μορφοποίηση (παραγράφους, λίστες, πίνακες)
+- Συμπερίλαβε όλους τους αριθμούς, ημερομηνίες και ποσά
+- Για πίνακες, χρησιμοποίησε tabs για διαχωρισμό στηλών
+- Αν υπάρχουν δυσανάγνωστα σημεία, σημείωσέ τα με [δυσανάγνωστο]
+- Επέστρεψε ΜΟΝΟ το κείμενο, χωρίς επεξηγήσεις
+
+Κείμενο:`
+              }
+            ]
+          }
+        ],
+        max_tokens: 4096,
+        temperature: 0.1
+      })
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Gemini OCR API error:", response.status, errorText);
+      return "";
+    }
+    
+    const data = await response.json();
+    const extractedText = data.choices?.[0]?.message?.content || "";
+    
+    console.log(`OCR extracted ${extractedText.length} characters`);
+    return extractedText.trim();
+    
+  } catch (error) {
+    console.error("OCR error:", error);
+    return "";
+  }
+}
+
+// Extract images from PDF for OCR
+function extractPdfPages(arrayBuffer: ArrayBuffer): { images: string[], mimeType: string }[] {
+  // For scanned PDFs, we'll convert the entire PDF to be processed
+  // Since we can't easily extract individual page images without heavy libraries,
+  // we'll send the raw PDF bytes as base64 and let Gemini handle it
+  const bytes = new Uint8Array(arrayBuffer);
+  const base64 = btoa(String.fromCharCode(...bytes));
+  
+  return [{ images: [base64], mimeType: 'application/pdf' }];
 }
 
 // Extract text from DOCX file
@@ -62,15 +146,14 @@ async function parseDocx(arrayBuffer: ArrayBuffer): Promise<string> {
   }
 }
 
-// Extract text from PDF using pdf.js approach (simplified text extraction)
-async function parsePdf(arrayBuffer: ArrayBuffer): Promise<string> {
+// Extract text from PDF using text stream parsing
+function parsePdfTextStreams(arrayBuffer: ArrayBuffer): string {
   try {
     // Convert ArrayBuffer to string to find text streams
     const bytes = new Uint8Array(arrayBuffer);
     let text = "";
     
     // Simple PDF text extraction - look for text between BT and ET markers
-    // This is a basic approach that works for many PDFs
     const decoder = new TextDecoder("latin1");
     const pdfContent = decoder.decode(bytes);
     
@@ -98,12 +181,10 @@ async function parsePdf(arrayBuffer: ArrayBuffer): Promise<string> {
     // Also try to extract text from streams (for newer PDFs)
     const streamMatches = pdfContent.matchAll(/stream\s*([\s\S]*?)\s*endstream/g);
     for (const stream of streamMatches) {
-      // Check if stream contains readable text
       const streamContent = stream[1];
       if (streamContent.includes("(") && streamContent.includes(")")) {
         const textInStream = streamContent.matchAll(/\((.*?)\)/g);
         for (const t of textInStream) {
-          // Only add if it looks like text (has letters)
           if (/[a-zA-Zα-ωΑ-Ω]/.test(t[1])) {
             text += t[1] + " ";
           }
@@ -123,12 +204,51 @@ async function parsePdf(arrayBuffer: ArrayBuffer): Promise<string> {
       .replace(/\n{3,}/g, '\n\n')
       .trim();
     
-    // If we couldn't extract much text, the PDF might be image-based
-    if (text.length < 100) {
-      console.warn("PDF might be image-based or encrypted - limited text extracted");
+    return text;
+  } catch (error) {
+    console.error("Error in PDF text stream parsing:", error);
+    return "";
+  }
+}
+
+// Main PDF parsing function with OCR fallback
+async function parsePdf(arrayBuffer: ArrayBuffer, enableOcr: boolean = true): Promise<{ text: string; usedOcr: boolean }> {
+  try {
+    // First, try standard text extraction
+    const textFromStreams = parsePdfTextStreams(arrayBuffer);
+    
+    console.log(`Standard PDF parsing extracted ${textFromStreams.length} characters`);
+    
+    // If we got enough text, return it
+    if (textFromStreams.length >= MIN_TEXT_LENGTH_FOR_VALID_PDF) {
+      console.log("PDF has sufficient text content, using standard parsing");
+      return { text: textFromStreams, usedOcr: false };
     }
     
-    return text;
+    // PDF might be scanned/image-based - try OCR if enabled
+    if (!enableOcr) {
+      console.log("OCR disabled, returning limited text");
+      return { text: textFromStreams, usedOcr: false };
+    }
+    
+    console.log("PDF appears to be scanned/image-based, attempting OCR...");
+    
+    // Convert PDF to base64 for Gemini Vision
+    const bytes = new Uint8Array(arrayBuffer);
+    const base64 = btoa(String.fromCharCode.apply(null, Array.from(bytes)));
+    
+    // Perform OCR with Gemini
+    const ocrText = await performOcrWithGemini(base64, 'application/pdf');
+    
+    if (ocrText.length > textFromStreams.length) {
+      console.log(`OCR successful: extracted ${ocrText.length} characters`);
+      return { text: ocrText, usedOcr: true };
+    }
+    
+    // If OCR didn't help, return whatever we have
+    console.log("OCR did not improve extraction, using standard parsing result");
+    return { text: textFromStreams || ocrText, usedOcr: ocrText.length > 0 };
+    
   } catch (error: unknown) {
     console.error("Error parsing PDF:", error);
     const message = error instanceof Error ? error.message : String(error);
@@ -146,10 +266,12 @@ function parseText(arrayBuffer: ArrayBuffer): string {
 async function parseDocument(
   arrayBuffer: ArrayBuffer, 
   fileName: string, 
-  contentType: string
+  contentType: string,
+  enableOcr: boolean = true
 ): Promise<ParseResult> {
   let text = "";
   let fileType = "unknown";
+  let usedOcr = false;
   
   const lowerFileName = fileName.toLowerCase();
   const lowerContentType = contentType.toLowerCase();
@@ -166,7 +288,9 @@ async function parseDocument(
     lowerContentType.includes('application/pdf')
   ) {
     fileType = "pdf";
-    text = await parsePdf(arrayBuffer);
+    const pdfResult = await parsePdf(arrayBuffer, enableOcr);
+    text = pdfResult.text;
+    usedOcr = pdfResult.usedOcr;
   } else if (
     lowerFileName.endsWith('.txt') || 
     lowerFileName.endsWith('.md') ||
@@ -184,6 +308,22 @@ async function parseDocument(
     // Filter out binary garbage
     text = text.replace(/[^\x20-\x7E\xA0-\xFF\n\r\t]/g, ' ');
     text = text.replace(/\s{3,}/g, ' ').trim();
+  } else if (
+    // Image files - use OCR directly
+    lowerFileName.endsWith('.png') ||
+    lowerFileName.endsWith('.jpg') ||
+    lowerFileName.endsWith('.jpeg') ||
+    lowerFileName.endsWith('.webp') ||
+    lowerContentType.includes('image/')
+  ) {
+    fileType = "image";
+    if (enableOcr) {
+      const bytes = new Uint8Array(arrayBuffer);
+      const base64 = btoa(String.fromCharCode.apply(null, Array.from(bytes)));
+      const mimeType = lowerContentType || 'image/png';
+      text = await performOcrWithGemini(base64, mimeType);
+      usedOcr = true;
+    }
   } else {
     // Try text extraction as fallback
     fileType = "unknown";
@@ -200,7 +340,8 @@ async function parseDocument(
       fileName,
       fileType,
       wordCount,
-      characterCount
+      characterCount,
+      usedOcr
     }
   };
 }
@@ -237,6 +378,9 @@ serve(async (req) => {
       // Handle request with storage paths or base64 data
       const body = await req.json();
       
+      // Check if OCR is enabled (default: true)
+      const enableOcr = body.enableOcr !== false;
+      
       if (body.storagePaths && Array.isArray(body.storagePaths)) {
         // Parse files from Supabase storage
         for (const pathInfo of body.storagePaths) {
@@ -255,7 +399,8 @@ serve(async (req) => {
           const result = await parseDocument(
             arrayBuffer, 
             fileName || path.split('/').pop() || 'unknown',
-            fileData.type || 'application/octet-stream'
+            fileData.type || 'application/octet-stream',
+            enableOcr
           );
           results.push(result);
         }
@@ -274,7 +419,8 @@ serve(async (req) => {
           const result = await parseDocument(
             bytes.buffer, 
             fileName,
-            fileContentType || 'application/octet-stream'
+            fileContentType || 'application/octet-stream',
+            enableOcr
           );
           results.push(result);
         }
@@ -301,6 +447,9 @@ serve(async (req) => {
     const totalWordCount = results.reduce((sum, r) => sum + r.metadata.wordCount, 0);
     const totalCharCount = results.reduce((sum, r) => sum + r.metadata.characterCount, 0);
     
+    // Check if any file used OCR
+    const usedOcr = results.some(r => r.metadata.usedOcr);
+    
     return new Response(
       JSON.stringify({
         success: true,
@@ -309,7 +458,8 @@ serve(async (req) => {
         metadata: {
           fileCount: results.length,
           totalWordCount,
-          totalCharacterCount: totalCharCount
+          totalCharacterCount: totalCharCount,
+          usedOcr
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

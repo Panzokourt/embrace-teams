@@ -21,6 +21,8 @@ import {
 import { TenderAISuggestions } from '@/components/tenders/TenderAISuggestions';
 import { TenderEvaluationCriteria } from '@/components/tenders/TenderEvaluationCriteria';
 import { TenderTeamManager } from '@/components/tenders/TenderTeamManager';
+import { TenderDeliverables } from '@/components/tenders/TenderDeliverables';
+import { TenderTasksManager } from '@/components/tenders/TenderTasksManager';
 import { ClientSelector } from '@/components/shared/ClientSelector';
 import { toast } from 'sonner';
 import { 
@@ -41,7 +43,9 @@ import {
   X,
   Users,
   Target,
-  TrendingUp
+  TrendingUp,
+  Package,
+  ListTodo
 } from 'lucide-react';
 import { format, isPast } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -416,6 +420,14 @@ export default function TenderDetailPage() {
       <Tabs defaultValue="details" className="space-y-6">
         <TabsList>
           <TabsTrigger value="details">Στοιχεία</TabsTrigger>
+          <TabsTrigger value="deliverables">
+            <Package className="h-4 w-4 mr-1.5" />
+            Παραδοτέα
+          </TabsTrigger>
+          <TabsTrigger value="tasks">
+            <ListTodo className="h-4 w-4 mr-1.5" />
+            Tasks
+          </TabsTrigger>
           <TabsTrigger value="team">
             <Users className="h-4 w-4 mr-1.5" />
             Ομάδα
@@ -541,6 +553,16 @@ export default function TenderDetailPage() {
               </form>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Deliverables Tab */}
+        <TabsContent value="deliverables">
+          <TenderDeliverables tenderId={tender.id} tenderName={tender.name} />
+        </TabsContent>
+
+        {/* Tasks Tab */}
+        <TabsContent value="tasks">
+          <TenderTasksManager tenderId={tender.id} />
         </TabsContent>
 
         {/* Team Tab */}

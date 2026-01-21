@@ -105,13 +105,32 @@ export function TenderTeamManager({ tenderId }: TenderTeamManagerProps) {
 
   const fetchAvailableProfiles = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, avatar_url')
+      // Get active users from user_company_roles and join with profiles
+      const { data: activeUsers, error: rolesError } = await supabase
+        .from('user_company_roles')
+        .select('user_id')
         .eq('status', 'active');
 
-      if (error) throw error;
-      setAvailableProfiles(data || []);
+      if (rolesError) throw rolesError;
+
+      if (activeUsers && activeUsers.length > 0) {
+        const userIds = activeUsers.map(u => u.user_id);
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, avatar_url')
+          .in('id', userIds);
+
+        if (profilesError) throw profilesError;
+        setAvailableProfiles(profiles || []);
+      } else {
+        // Fallback: get all profiles in the company
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, avatar_url');
+
+        if (error) throw error;
+        setAvailableProfiles(data || []);
+      }
     } catch (error) {
       console.error('Error fetching profiles:', error);
     }

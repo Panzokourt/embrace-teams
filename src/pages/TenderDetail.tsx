@@ -20,6 +20,7 @@ import {
 import { TenderAISuggestions } from '@/components/tenders/TenderAISuggestions';
 import { TenderEvaluationCriteria } from '@/components/tenders/TenderEvaluationCriteria';
 import { TenderTeamManager } from '@/components/tenders/TenderTeamManager';
+import { ClientSelector } from '@/components/shared/ClientSelector';
 import { toast } from 'sonner';
 import { 
   ArrowLeft,
@@ -456,22 +457,16 @@ export default function TenderDetailPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="client">Πελάτης/Φορέας</Label>
-                    <Select
+                    <ClientSelector
                       value={formData.client_id}
                       onValueChange={(value) => setFormData(prev => ({ ...prev, client_id: value }))}
+                      clients={clients}
+                      onClientCreated={(newClient) => {
+                        setClients(prev => [...prev, newClient].sort((a, b) => a.name.localeCompare(b.name)));
+                      }}
+                      placeholder="Επιλέξτε"
                       disabled={!canManage}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Επιλέξτε" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clients.map(client => (
-                          <SelectItem key={client.id} value={client.id}>
-                            {client.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    />
                   </div>
 
                   <div className="space-y-2">

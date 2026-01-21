@@ -25,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { UnifiedViewToggle, type UnifiedViewMode } from '@/components/ui/unified-view-toggle';
+import { UnifiedViewToggle, usePersistedViewMode, type UnifiedViewMode } from '@/components/ui/unified-view-toggle';
 import { TasksTableView } from '@/components/tasks/TasksTableView';
 import { toast } from 'sonner';
 import { 
@@ -114,7 +114,7 @@ export default function TasksPage() {
   const [saving, setSaving] = useState(false);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [viewMode, setViewMode] = useState<UnifiedViewMode>('kanban');
+  const [viewMode, setViewMode] = usePersistedViewMode('tasks', 'kanban');
 
   const [formData, setFormData] = useState({
     title: '',

@@ -34,7 +34,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { UnifiedViewToggle, type UnifiedViewMode } from '@/components/ui/unified-view-toggle';
+import { UnifiedViewToggle, usePersistedViewMode, type UnifiedViewMode } from '@/components/ui/unified-view-toggle';
 import { ClientSelector } from '@/components/shared/ClientSelector';
 import { ProjectsTableView } from '@/components/projects/ProjectsTableView';
 import { FileAttachments } from '@/components/files/FileAttachments';
@@ -106,7 +106,7 @@ export default function ProjectsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [viewMode, setViewMode] = useState<UnifiedViewMode>('card');
+  const [viewMode, setViewMode] = usePersistedViewMode('projects', 'card');
   const [dialogTab, setDialogTab] = useState('details');
   const [uploadedFiles, setUploadedFiles] = useState<FileContent[]>([]);
   const [tempProjectId, setTempProjectId] = useState<string | null>(null);

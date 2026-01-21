@@ -95,19 +95,14 @@ export default function AppSidebar() {
       {/* Logo */}
       <div className="p-4 flex items-center justify-between">
         {(!collapsed || isMobile) && (
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-200 flex items-center justify-center shadow-soft">
-              <img src={mscommLogo} alt="MSCOMM" className="h-6 w-auto" />
-            </div>
-            <span className="font-semibold text-foreground tracking-tight">
-              MSCOMM
-            </span>
-          </div>
+          <span className="font-bold text-lg text-foreground tracking-tight">
+            MSCOMM
+          </span>
         )}
         {collapsed && !isMobile && (
-          <div className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-200 flex items-center justify-center shadow-soft mx-auto">
-            <img src={mscommLogo} alt="MSCOMM" className="h-6 w-auto" />
-          </div>
+          <span className="font-bold text-sm text-foreground mx-auto">
+            MS
+          </span>
         )}
         {!isMobile && (
           <Button

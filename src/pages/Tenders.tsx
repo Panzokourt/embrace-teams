@@ -36,8 +36,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { UnifiedViewToggle, type UnifiedViewMode } from '@/components/ui/unified-view-toggle';
-import { InlineEditCell } from '@/components/shared/InlineEditCell';
 import { ClientSelector } from '@/components/shared/ClientSelector';
+import { TendersTableView } from '@/components/tenders/TendersTableView';
 import { toast } from 'sonner';
 import { 
   FileText, 
@@ -528,65 +528,14 @@ export default function TendersPage() {
   );
 
   const renderTableView = () => (
-    <div className="rounded-2xl border border-border/50 overflow-hidden bg-card shadow-soft">
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-secondary/30 border-b border-border/30 hover:bg-secondary/30">
-            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Τίτλος</TableHead>
-            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Πελάτης</TableHead>
-            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Φάση</TableHead>
-            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Budget</TableHead>
-            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Deadline</TableHead>
-            {canManage && <TableHead className="w-[100px] text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Ενέργειες</TableHead>}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {filteredTenders.map((tender, index) => (
-            <TableRow 
-              key={tender.id} 
-              className="cursor-pointer transition-colors duration-150 hover:bg-secondary/40 border-b border-border/20 last:border-0"
-              style={{ animationDelay: `${index * 20}ms` }}
-              onClick={() => navigate(`/tenders/${tender.id}`)}
-            >
-              <TableCell className="font-medium" onClick={(e) => e.stopPropagation()}>
-                <InlineEditCell
-                  value={tender.name}
-                  onSave={(val) => handleInlineUpdate(tender.id, 'name', val)}
-                />
-              </TableCell>
-              <TableCell className="text-muted-foreground">{tender.client?.name || '-'}</TableCell>
-              <TableCell>{getStageBadge(tender.stage)}</TableCell>
-              <TableCell onClick={(e) => e.stopPropagation()}>
-                <InlineEditCell
-                  value={tender.budget}
-                  type="number"
-                  displayValue={`€${tender.budget.toLocaleString()}`}
-                  onSave={(val) => handleInlineUpdate(tender.id, 'budget', val)}
-                />
-              </TableCell>
-              <TableCell className="text-muted-foreground text-sm">
-                {tender.submission_deadline 
-                  ? format(new Date(tender.submission_deadline), 'd MMM yyyy', { locale: el })
-                  : '-'
-                }
-              </TableCell>
-              {canManage && (
-                <TableCell onClick={(e) => e.stopPropagation()}>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-secondary" onClick={() => handleEdit(tender)}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/70 hover:text-destructive hover:bg-destructive/10" onClick={() => handleDelete(tender.id)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </TableCell>
-              )}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+    <TendersTableView
+      tenders={filteredTenders}
+      clients={clients}
+      onEdit={handleEdit}
+      onDelete={handleDelete}
+      onInlineUpdate={handleInlineUpdate}
+      canManage={canManage}
+    />
   );
 
   const renderKanbanView = () => (

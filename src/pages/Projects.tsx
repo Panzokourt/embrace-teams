@@ -35,8 +35,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { UnifiedViewToggle, type UnifiedViewMode } from '@/components/ui/unified-view-toggle';
-import { InlineEditCell } from '@/components/shared/InlineEditCell';
 import { ClientSelector } from '@/components/shared/ClientSelector';
+import { ProjectsTableView } from '@/components/projects/ProjectsTableView';
 import { FileAttachments } from '@/components/files/FileAttachments';
 import { ProjectAISuggestions } from '@/components/projects/ProjectAISuggestions';
 import { EditDeleteActions } from '@/components/dialogs/EditDeleteActions';
@@ -84,8 +84,10 @@ interface Project {
   agency_fee_percentage: number;
   start_date: string | null;
   end_date: string | null;
+  progress?: number | null;
   created_at: string;
   client?: { name: string } | null;
+  taskStats?: { total: number; completed: number };
 }
 
 interface FileContent {
@@ -143,7 +145,34 @@ export default function ProjectsPage() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setProjects(data || []);
+
+      // Fetch task stats for each project
+      const projectIds = (data || []).map(p => p.id);
+      if (projectIds.length > 0) {
+        const { data: tasks } = await supabase
+          .from('tasks')
+          .select('project_id, status')
+          .in('project_id', projectIds);
+
+        const taskStatsMap: Record<string, { total: number; completed: number }> = {};
+        (tasks || []).forEach(task => {
+          if (!task.project_id) return;
+          if (!taskStatsMap[task.project_id]) {
+            taskStatsMap[task.project_id] = { total: 0, completed: 0 };
+          }
+          taskStatsMap[task.project_id].total++;
+          if (task.status === 'completed') {
+            taskStatsMap[task.project_id].completed++;
+          }
+        });
+
+        setProjects((data || []).map(p => ({
+          ...p,
+          taskStats: taskStatsMap[p.id] || { total: 0, completed: 0 }
+        })));
+      } else {
+        setProjects(data || []);
+      }
     } catch (error) {
       console.error('Error fetching projects:', error);
       toast.error('Σφάλμα κατά τη φόρτωση έργων');
@@ -539,71 +568,14 @@ export default function ProjectsPage() {
   );
 
   const renderTableView = () => (
-    <div className="rounded-2xl border border-border/50 overflow-hidden bg-card shadow-soft">
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-secondary/30 border-b border-border/30 hover:bg-secondary/30">
-            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Όνομα</TableHead>
-            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Πελάτης</TableHead>
-            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Κατάσταση</TableHead>
-            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Budget</TableHead>
-            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Fee %</TableHead>
-            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Λήξη</TableHead>
-            {canManage && <TableHead className="w-[100px] text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Ενέργειες</TableHead>}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {filteredProjects.map((project, index) => (
-            <TableRow 
-              key={project.id} 
-              className="cursor-pointer transition-colors duration-150 hover:bg-secondary/40 border-b border-border/20 last:border-0"
-              style={{ animationDelay: `${index * 20}ms` }}
-              onClick={() => navigate(`/projects/${project.id}`)}
-            >
-              <TableCell className="font-medium" onClick={(e) => e.stopPropagation()}>
-                <InlineEditCell
-                  value={project.name}
-                  onSave={(val) => handleInlineUpdate(project.id, 'name', val)}
-                />
-              </TableCell>
-              <TableCell className="text-muted-foreground">{project.client?.name || '-'}</TableCell>
-              <TableCell>{getStatusBadge(project.status)}</TableCell>
-              <TableCell onClick={(e) => e.stopPropagation()}>
-                <InlineEditCell
-                  value={project.budget}
-                  type="number"
-                  displayValue={`€${project.budget?.toLocaleString() || 0}`}
-                  onSave={(val) => handleInlineUpdate(project.id, 'budget', val)}
-                />
-              </TableCell>
-              <TableCell onClick={(e) => e.stopPropagation()}>
-                <InlineEditCell
-                  value={project.agency_fee_percentage}
-                  type="number"
-                  displayValue={`${project.agency_fee_percentage || 0}%`}
-                  onSave={(val) => handleInlineUpdate(project.id, 'agency_fee_percentage', val)}
-                />
-              </TableCell>
-              <TableCell className="text-muted-foreground text-sm">
-                {project.end_date 
-                  ? format(new Date(project.end_date), 'd MMM yyyy', { locale: el })
-                  : '-'
-                }
-              </TableCell>
-              {canManage && (
-                <TableCell onClick={(e) => e.stopPropagation()}>
-                  <EditDeleteActions
-                    onEdit={() => handleEdit(project)}
-                    onDelete={() => handleDelete(project.id)}
-                    itemName={`το έργο "${project.name}"`}
-                  />
-                </TableCell>
-              )}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+    <ProjectsTableView
+      projects={filteredProjects}
+      clients={clients}
+      onEdit={handleEdit}
+      onDelete={handleDelete}
+      onInlineUpdate={handleInlineUpdate}
+      canManage={canManage}
+    />
   );
 
   const statusLabels: Record<ProjectStatus, string> = {

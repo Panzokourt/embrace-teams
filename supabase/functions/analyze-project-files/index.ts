@@ -294,10 +294,51 @@ ${f.content}
     const aiResponse = await response.json();
     console.log("AI Response:", JSON.stringify(aiResponse, null, 2));
 
+    // Check if the AI provider returned an error in the response body
+    if (aiResponse.error) {
+      console.error("AI provider error:", aiResponse.error);
+      const errorCode = aiResponse.error.code || 500;
+      const errorMessage = aiResponse.error.message || "AI provider error";
+      const providerName = aiResponse.error.metadata?.provider_name || "AI";
+      
+      // Handle timeout errors (524)
+      if (errorCode === 524) {
+        return new Response(
+          JSON.stringify({ 
+            error: "Η ανάλυση έληξε λόγω μεγάλου μεγέθους αρχείου. Δοκιμάστε με μικρότερο αρχείο ή λιγότερα αρχεία." 
+          }),
+          { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      return new Response(
+        JSON.stringify({ error: `${providerName} error: ${errorMessage}` }),
+        { status: errorCode >= 400 && errorCode < 600 ? errorCode : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Extract the tool call result
     const toolCall = aiResponse.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall) {
-      throw new Error("No tool call in AI response");
+      // Try to extract from regular message content as fallback
+      const messageContent = aiResponse.choices?.[0]?.message?.content;
+      if (messageContent) {
+        console.log("No tool call, trying to parse message content as JSON");
+        try {
+          // Try to extract JSON from the message
+          const jsonMatch = messageContent.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const suggestions: ProjectSuggestion = JSON.parse(jsonMatch[0]);
+            return new Response(
+              JSON.stringify({ success: true, suggestions }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+        } catch (parseError) {
+          console.error("Failed to parse message content as JSON:", parseError);
+        }
+      }
+      throw new Error("Η AI δεν επέστρεψε δομημένα δεδομένα. Δοκιμάστε ξανά.");
     }
 
     const suggestions: ProjectSuggestion = JSON.parse(toolCall.function.arguments);

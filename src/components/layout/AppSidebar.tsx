@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 
 import { PermissionType } from '@/contexts/AuthContext';
+import mscommLogo from '@/assets/mscomm-logo.png';
 
 interface NavItem {
   title: string;
@@ -95,17 +96,17 @@ export default function AppSidebar() {
       <div className="p-4 flex items-center justify-between">
         {(!collapsed || isMobile) && (
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-soft">
-              <Zap className="h-4 w-4 text-primary-foreground" />
+            <div className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-200 flex items-center justify-center shadow-soft">
+              <img src={mscommLogo} alt="MSCOMM" className="h-6 w-auto" />
             </div>
             <span className="font-semibold text-foreground tracking-tight">
-              {isClient && !isAdmin && !isManager ? 'Portal' : 'Agency'}
+              MSCOMM
             </span>
           </div>
         )}
         {collapsed && !isMobile && (
-          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-soft mx-auto">
-            <Zap className="h-4 w-4 text-primary-foreground" />
+          <div className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-200 flex items-center justify-center shadow-soft mx-auto">
+            <img src={mscommLogo} alt="MSCOMM" className="h-6 w-auto" />
           </div>
         )}
         {!isMobile && (

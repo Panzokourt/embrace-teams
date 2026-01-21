@@ -130,9 +130,10 @@ serve(async (req) => {
       );
     }
 
-    // Limit file content size (2MB total for all files)
-    const maxTotalContentLength = 2000000; // 2MB
-    const maxSingleFileLength = 500000; // 500KB per file - will truncate if larger
+    // Limit file content size - Perplexity has 200K token limit (~150K chars safe)
+    // Using conservative limits to account for system prompt + response
+    const maxTotalContentLength = usePerplexity ? 120000 : 500000; // 120KB for Perplexity, 500KB for Gemini
+    const maxSingleFileLength = usePerplexity ? 100000 : 250000; // 100KB per file for Perplexity
     
     // Truncate large files and calculate total size
     const processedFiles = fileContents.map((f: any) => {

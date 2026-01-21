@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useDocumentParser } from '@/hooks/useDocumentParser';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -148,7 +149,16 @@ export function TenderCreationWizard({
   
   // Files state
   const [files, setFiles] = useState<FileContent[]>([]);
-  const [uploading, setUploading] = useState(false);
+  const [rawFiles, setRawFiles] = useState<File[]>([]);
+  
+  const { parsing: uploading, parseFiles } = useDocumentParser({
+    onSuccess: (parsedFiles) => {
+      setFiles(prev => [...prev, ...parsedFiles.map(f => ({
+        fileName: f.fileName,
+        content: f.content
+      }))]);
+    }
+  });
   
   // AI Suggestions
   const [suggestions, setSuggestions] = useState<AISuggestion | null>(null);
@@ -172,27 +182,22 @@ export function TenderCreationWizard({
     const fileList = e.target.files;
     if (!fileList || fileList.length === 0) return;
 
-    setUploading(true);
-    const newFiles: FileContent[] = [];
-
-    try {
-      for (const file of Array.from(fileList)) {
-        const text = await file.text();
-        newFiles.push({ fileName: file.name, content: text });
-      }
-      setFiles(prev => [...prev, ...newFiles]);
-      toast.success(`${newFiles.length} αρχείο(α) προστέθηκαν`);
-    } catch (error) {
-      console.error('Error reading files:', error);
-      toast.error('Σφάλμα κατά την ανάγνωση αρχείων');
-    } finally {
-      setUploading(false);
-      e.target.value = '';
+    // Store raw files
+    setRawFiles(prev => [...prev, ...Array.from(fileList)]);
+    
+    // Parse files using the hook
+    const parsed = await parseFiles(fileList);
+    
+    if (parsed.length > 0) {
+      toast.success(`${parsed.length} αρχείο(α) αναλύθηκαν`);
     }
+    
+    e.target.value = '';
   };
 
   const removeFile = (index: number) => {
     setFiles(prev => prev.filter((_, i) => i !== index));
+    setRawFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const analyzeWithAI = async () => {

@@ -16,7 +16,7 @@ import {
   ChevronUp,
   AlertCircle
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isValid, parseISO } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -88,6 +88,26 @@ export function ProjectAISuggestions({
       onProjectDetailsUpdate(suggestions.suggestedProjectDetails);
     }
   }, [suggestions, onProjectDetailsUpdate]);
+
+  const parseLocalDateString = (dateStr: string): Date | null => {
+    // Handles YYYY-MM-DD without timezone shifting.
+    const m = /^\d{4}-\d{2}-\d{2}$/.exec(dateStr);
+    if (!m) return null;
+    const [y, mo, d] = dateStr.split('-').map(Number);
+    const dt = new Date(y, mo - 1, d);
+    return isValid(dt) ? dt : null;
+  };
+
+  const safeFormatDate = (dateStr?: string): string | null => {
+    if (!dateStr) return null;
+    const date = parseLocalDateString(dateStr) ?? (isValid(parseISO(dateStr)) ? parseISO(dateStr) : null);
+    if (!date) return null;
+    try {
+      return format(date, 'd MMM yyyy', { locale: el });
+    } catch {
+      return null;
+    }
+  };
 
   const analyzeFiles = async () => {
     if (files.length === 0) {
@@ -305,7 +325,10 @@ export function ProjectAISuggestions({
                   <p className="font-medium">{d.name}</p>
                   <p className="text-sm text-muted-foreground">{d.description}</p>
                   <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
-                    {d.due_date && <span>Προθεσμία: {format(new Date(d.due_date), 'd MMM yyyy', { locale: el })}</span>}
+                    {(() => {
+                      const fd = safeFormatDate(d.due_date);
+                      return fd ? <span>Προθεσμία: {fd}</span> : null;
+                    })()}
                     {d.budget && <span>Budget: €{d.budget.toLocaleString()}</span>}
                   </div>
                 </div>
@@ -343,11 +366,14 @@ export function ProjectAISuggestions({
                 <div className="flex-1">
                   <p className="font-medium">{t.title}</p>
                   <p className="text-sm text-muted-foreground">{t.description}</p>
-                  {t.due_date && (
-                    <span className="text-xs text-muted-foreground">
-                      Προθεσμία: {format(new Date(t.due_date), 'd MMM yyyy', { locale: el })}
-                    </span>
-                  )}
+                  {(() => {
+                    const fd = safeFormatDate(t.due_date);
+                    return fd ? (
+                      <span className="text-xs text-muted-foreground">
+                        Προθεσμία: {fd}
+                      </span>
+                    ) : null;
+                  })()}
                 </div>
               </div>
             ))}
@@ -384,11 +410,14 @@ export function ProjectAISuggestions({
                   <p className="font-medium">{inv.description}</p>
                   <div className="flex gap-4 mt-1 text-sm">
                     <span className="text-primary font-medium">€{inv.amount.toLocaleString()}</span>
-                    {inv.due_date && (
-                      <span className="text-muted-foreground">
-                        Λήξη: {format(new Date(inv.due_date), 'd MMM yyyy', { locale: el })}
-                      </span>
-                    )}
+                    {(() => {
+                      const fd = safeFormatDate(inv.due_date);
+                      return fd ? (
+                        <span className="text-muted-foreground">
+                          Λήξη: {fd}
+                        </span>
+                      ) : null;
+                    })()}
                   </div>
                 </div>
               </div>
@@ -417,12 +446,14 @@ export function ProjectAISuggestions({
               {suggestions.suggestedProjectDetails.budget && (
                 <span>Budget: €{suggestions.suggestedProjectDetails.budget.toLocaleString()}</span>
               )}
-              {suggestions.suggestedProjectDetails.start_date && (
-                <span>Έναρξη: {format(new Date(suggestions.suggestedProjectDetails.start_date), 'd MMM yyyy', { locale: el })}</span>
-              )}
-              {suggestions.suggestedProjectDetails.end_date && (
-                <span>Λήξη: {format(new Date(suggestions.suggestedProjectDetails.end_date), 'd MMM yyyy', { locale: el })}</span>
-              )}
+              {(() => {
+                const fd = safeFormatDate(suggestions.suggestedProjectDetails.start_date);
+                return fd ? <span>Έναρξη: {fd}</span> : null;
+              })()}
+              {(() => {
+                const fd = safeFormatDate(suggestions.suggestedProjectDetails.end_date);
+                return fd ? <span>Λήξη: {fd}</span> : null;
+              })()}
             </div>
           </div>
         )}

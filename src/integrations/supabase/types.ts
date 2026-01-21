@@ -814,35 +814,122 @@ export type Database = {
           },
         ]
       }
+      org_chart_positions: {
+        Row: {
+          color: string | null
+          company_id: string
+          created_at: string
+          department: string | null
+          id: string
+          level: number | null
+          parent_position_id: string | null
+          position_title: string
+          sort_order: number | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          color?: string | null
+          company_id: string
+          created_at?: string
+          department?: string | null
+          id?: string
+          level?: number | null
+          parent_position_id?: string | null
+          position_title: string
+          sort_order?: number | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          color?: string | null
+          company_id?: string
+          created_at?: string
+          department?: string | null
+          id?: string
+          level?: number | null
+          parent_position_id?: string | null
+          position_title?: string
+          sort_order?: number | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_chart_positions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_chart_positions_parent_position_id_fkey"
+            columns: ["parent_position_id"]
+            isOneToOne: false
+            referencedRelation: "org_chart_positions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_chart_positions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
           created_at: string
+          department: string | null
           email: string
           full_name: string | null
+          hire_date: string | null
           id: string
+          job_title: string | null
+          phone: string | null
+          reports_to: string | null
           status: Database["public"]["Enums"]["user_status"]
           updated_at: string
         }
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          department?: string | null
           email: string
           full_name?: string | null
+          hire_date?: string | null
           id: string
+          job_title?: string | null
+          phone?: string | null
+          reports_to?: string | null
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
         }
         Update: {
           avatar_url?: string | null
           created_at?: string
+          department?: string | null
           email?: string
           full_name?: string | null
+          hire_date?: string | null
           id?: string
+          job_title?: string | null
+          phone?: string | null
+          reports_to?: string | null
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_reports_to_fkey"
+            columns: ["reports_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       project_team_access: {
         Row: {

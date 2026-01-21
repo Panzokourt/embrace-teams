@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -10,11 +10,15 @@ import {
   TableRow 
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Checkbox } from '@/components/ui/checkbox';
+import { EnhancedInlineEditCell } from '@/components/shared/EnhancedInlineEditCell';
+import { TableToolbar } from '@/components/shared/TableToolbar';
+import { ResizableTableHeader } from '@/components/shared/ResizableTableHeader';
+import { useTableViews } from '@/hooks/useTableViews';
+import { exportToCSV, exportToExcel, formatters } from '@/utils/exportUtils';
 import {
   Dialog,
   DialogContent,
@@ -39,9 +43,12 @@ import {
   Clock,
   Circle,
   AlertCircle,
-  ListTodo
+  ListTodo,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import type { Tables } from '@/integrations/supabase/types';
@@ -71,12 +78,25 @@ interface TenderTasksTableProps {
   tenderId: string;
 }
 
-const STATUS_CONFIG: Record<TaskStatus, { label: string; icon: React.ReactNode; className: string }> = {
-  todo: { label: 'Προς Υλοποίηση', icon: <Circle className="h-4 w-4" />, className: 'bg-muted text-muted-foreground' },
-  in_progress: { label: 'Σε Εξέλιξη', icon: <Clock className="h-4 w-4" />, className: 'bg-primary/10 text-primary' },
-  review: { label: 'Αναθεώρηση', icon: <AlertCircle className="h-4 w-4" />, className: 'bg-warning/10 text-warning' },
-  completed: { label: 'Ολοκληρώθηκε', icon: <CheckCircle2 className="h-4 w-4" />, className: 'bg-success/10 text-success' },
-};
+const STATUS_OPTIONS = [
+  { value: 'todo', label: 'Προς Υλοποίηση', icon: <Circle className="h-4 w-4" />, color: 'hsl(var(--muted-foreground))' },
+  { value: 'in_progress', label: 'Σε Εξέλιξη', icon: <Clock className="h-4 w-4" />, color: 'hsl(var(--primary))' },
+  { value: 'review', label: 'Αναθεώρηση', icon: <AlertCircle className="h-4 w-4" />, color: 'hsl(var(--warning))' },
+  { value: 'completed', label: 'Ολοκληρώθηκε', icon: <CheckCircle2 className="h-4 w-4" />, color: 'hsl(var(--success))' },
+];
+
+const DEFAULT_COLUMNS = [
+  { id: 'select', label: 'Επιλογή', visible: true, locked: true },
+  { id: 'title', label: 'Τίτλος', visible: true, locked: true },
+  { id: 'assignee', label: 'Υπεύθυνος', visible: true },
+  { id: 'deliverable', label: 'Παραδοτέο', visible: true },
+  { id: 'due_date', label: 'Προθεσμία', visible: true },
+  { id: 'status', label: 'Κατάσταση', visible: true },
+  { id: 'actions', label: 'Ενέργειες', visible: true, locked: true },
+];
+
+type SortField = 'title' | 'due_date' | 'status' | 'assignee';
+type SortDirection = 'asc' | 'desc' | null;
 
 export function TenderTasksTable({ tenderId }: TenderTasksTableProps) {
   const { isAdmin, isManager } = useAuth();
@@ -87,6 +107,22 @@ export function TenderTasksTable({ tenderId }: TenderTasksTableProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingTask, setEditingTask] = useState<TenderTask | null>(null);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+
+  const {
+    columns,
+    setColumns,
+    columnWidths,
+    setColumnWidth,
+    savedViews,
+    currentViewId,
+    saveView,
+    loadView,
+    deleteView,
+    resetToDefault,
+  } = useTableViews({ storageKey: 'tender_tasks_table', defaultColumns: DEFAULT_COLUMNS });
 
   const [formData, setFormData] = useState({
     title: '',
@@ -115,7 +151,6 @@ export function TenderTasksTable({ tenderId }: TenderTasksTableProps) {
 
       if (error) throw error;
       
-      // Fetch assignee profiles separately
       const assigneeIds = [...new Set((data || []).filter(t => t.assigned_to).map(t => t.assigned_to as string))];
       let profilesMap = new Map<string, { full_name: string | null; avatar_url?: string | null }>();
       
@@ -158,6 +193,58 @@ export function TenderTasksTable({ tenderId }: TenderTasksTableProps) {
       .eq('status', 'active')
       .order('full_name');
     setProfiles(data || []);
+  };
+
+  // Sorting
+  const sortedTasks = useMemo(() => {
+    if (!sortField || !sortDirection) return tasks;
+    
+    return [...tasks].sort((a, b) => {
+      let aVal: any, bVal: any;
+      
+      switch (sortField) {
+        case 'title':
+          aVal = a.title.toLowerCase();
+          bVal = b.title.toLowerCase();
+          break;
+        case 'due_date':
+          aVal = a.due_date ? new Date(a.due_date).getTime() : Infinity;
+          bVal = b.due_date ? new Date(b.due_date).getTime() : Infinity;
+          break;
+        case 'status':
+          const statusOrder = { todo: 0, in_progress: 1, review: 2, completed: 3 };
+          aVal = statusOrder[a.status as TaskStatus] ?? 0;
+          bVal = statusOrder[b.status as TaskStatus] ?? 0;
+          break;
+        case 'assignee':
+          aVal = a.assignee?.full_name?.toLowerCase() || 'zzz';
+          bVal = b.assignee?.full_name?.toLowerCase() || 'zzz';
+          break;
+        default:
+          return 0;
+      }
+      
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [tasks, sortField, sortDirection]);
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      if (sortDirection === 'asc') setSortDirection('desc');
+      else if (sortDirection === 'desc') { setSortField(null); setSortDirection(null); }
+      else setSortDirection('asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 text-muted-foreground" />;
+    if (sortDirection === 'asc') return <ArrowUp className="h-3 w-3" />;
+    return <ArrowDown className="h-3 w-3" />;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -228,19 +315,30 @@ export function TenderTasksTable({ tenderId }: TenderTasksTableProps) {
     }
   };
 
-  const handleStatusChange = async (taskId: string, newStatus: TaskStatus) => {
+  const handleInlineUpdate = async (taskId: string, field: string, value: string | number | null) => {
     try {
+      const updateData: Record<string, any> = { [field]: value };
+      
       const { error } = await supabase
         .from('tender_tasks')
-        .update({ status: newStatus })
+        .update(updateData)
         .eq('id', taskId);
 
       if (error) throw error;
-      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
-      toast.success('Η κατάσταση ενημερώθηκε!');
+      
+      // Refresh if assignee changed to get the profile data
+      if (field === 'assigned_to' || field === 'tender_deliverable_id') {
+        await fetchTasks();
+      } else {
+        setTasks(prev => prev.map(t => 
+          t.id === taskId ? { ...t, ...updateData } : t
+        ));
+      }
+      toast.success('Ενημερώθηκε!');
     } catch (error) {
-      console.error('Error updating status:', error);
+      console.error('Error updating task:', error);
       toast.error('Σφάλμα κατά την ενημέρωση');
+      throw error;
     }
   };
 
@@ -256,10 +354,63 @@ export function TenderTasksTable({ tenderId }: TenderTasksTableProps) {
     });
   };
 
-  const getInitials = (name: string | null) => {
-    if (!name) return '?';
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  const toggleSelectItem = (id: string) => {
+    const newSelected = new Set(selectedItems);
+    if (newSelected.has(id)) newSelected.delete(id);
+    else newSelected.add(id);
+    setSelectedItems(newSelected);
   };
+
+  const toggleSelectAll = () => {
+    if (selectedItems.size === tasks.length) {
+      setSelectedItems(new Set());
+    } else {
+      setSelectedItems(new Set(tasks.map(t => t.id)));
+    }
+  };
+
+  const isColumnVisible = (columnId: string) => 
+    columns.find(c => c.id === columnId)?.visible ?? true;
+
+  const getColumnWidth = (columnId: string) => columnWidths[columnId];
+
+  // User options for inline select
+  const userOptions = profiles.map(p => ({
+    value: p.id,
+    label: p.full_name || p.email,
+    avatar: p.avatar_url || undefined
+  }));
+
+  // Deliverable options for inline select
+  const deliverableOptions = deliverables.map(d => ({
+    value: d.id,
+    label: d.name
+  }));
+
+  // Export functions
+  const handleExportCSV = useCallback(() => {
+    const exportColumns = [
+      { key: 'title', label: 'Τίτλος' },
+      { key: 'status', label: 'Κατάσταση', format: (v: string) => STATUS_OPTIONS.find(o => o.value === v)?.label || v },
+      { key: 'assignee', label: 'Υπεύθυνος', format: (_: any, row: TenderTask) => row.assignee?.full_name || '-' },
+      { key: 'deliverable', label: 'Παραδοτέο', format: (_: any, row: TenderTask) => row.deliverable?.name || '-' },
+      { key: 'due_date', label: 'Προθεσμία', format: formatters.date },
+    ];
+    exportToCSV(tasks, exportColumns, `tender_tasks_${format(new Date(), 'yyyy-MM-dd')}`);
+    toast.success('Εξαγωγή CSV ολοκληρώθηκε!');
+  }, [tasks]);
+
+  const handleExportExcel = useCallback(() => {
+    const exportColumns = [
+      { key: 'title', label: 'Τίτλος' },
+      { key: 'status', label: 'Κατάσταση', format: (v: string) => STATUS_OPTIONS.find(o => o.value === v)?.label || v },
+      { key: 'assignee', label: 'Υπεύθυνος', format: (_: any, row: TenderTask) => row.assignee?.full_name || '-' },
+      { key: 'deliverable', label: 'Παραδοτέο', format: (_: any, row: TenderTask) => row.deliverable?.name || '-' },
+      { key: 'due_date', label: 'Προθεσμία', format: formatters.date },
+    ];
+    exportToExcel(tasks, exportColumns, `tender_tasks_${format(new Date(), 'yyyy-MM-dd')}`);
+    toast.success('Εξαγωγή Excel ολοκληρώθηκε!');
+  }, [tasks]);
 
   if (loading) {
     return (
@@ -271,15 +422,27 @@ export function TenderTasksTable({ tenderId }: TenderTasksTableProps) {
 
   return (
     <div className="space-y-4">
-      {/* Header with Add button */}
-      {canManage && (
-        <div className="flex justify-end">
+      {/* Toolbar + Add Button */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <TableToolbar
+          columns={columns}
+          onColumnsChange={setColumns}
+          onExportCSV={handleExportCSV}
+          onExportExcel={handleExportExcel}
+          savedViews={savedViews}
+          currentViewId={currentViewId}
+          onSaveView={(name) => saveView(name, sortField, sortDirection)}
+          onLoadView={loadView}
+          onDeleteView={deleteView}
+          onResetToDefault={resetToDefault}
+        />
+        {canManage && (
           <Button onClick={() => { resetForm(); setDialogOpen(true); }}>
             <Plus className="h-4 w-4 mr-2" />
             Νέο Task
           </Button>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Table */}
       {tasks.length === 0 ? (
@@ -293,88 +456,164 @@ export function TenderTasksTable({ tenderId }: TenderTasksTableProps) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Τίτλος</TableHead>
-                <TableHead className="w-[150px]">Υπεύθυνος</TableHead>
-                <TableHead className="hidden md:table-cell">Παραδοτέο</TableHead>
-                <TableHead className="w-[120px]">Προθεσμία</TableHead>
-                <TableHead className="w-[160px]">Κατάσταση</TableHead>
-                <TableHead className="w-[80px]">Ενέργειες</TableHead>
+                {isColumnVisible('select') && (
+                  <TableHead className="w-[40px]">
+                    <Checkbox
+                      checked={selectedItems.size === tasks.length && tasks.length > 0}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </TableHead>
+                )}
+                {isColumnVisible('title') && (
+                  <ResizableTableHeader
+                    width={getColumnWidth('title')}
+                    onWidthChange={(w) => setColumnWidth('title', w)}
+                  >
+                    <button
+                      onClick={() => toggleSort('title')}
+                      className="flex items-center gap-1 hover:text-foreground transition-colors"
+                    >
+                      Τίτλος {getSortIcon('title')}
+                    </button>
+                  </ResizableTableHeader>
+                )}
+                {isColumnVisible('assignee') && (
+                  <ResizableTableHeader
+                    width={getColumnWidth('assignee') || 150}
+                    onWidthChange={(w) => setColumnWidth('assignee', w)}
+                  >
+                    <button
+                      onClick={() => toggleSort('assignee')}
+                      className="flex items-center gap-1 hover:text-foreground transition-colors"
+                    >
+                      Υπεύθυνος {getSortIcon('assignee')}
+                    </button>
+                  </ResizableTableHeader>
+                )}
+                {isColumnVisible('deliverable') && (
+                  <ResizableTableHeader
+                    width={getColumnWidth('deliverable') || 150}
+                    onWidthChange={(w) => setColumnWidth('deliverable', w)}
+                  >
+                    Παραδοτέο
+                  </ResizableTableHeader>
+                )}
+                {isColumnVisible('due_date') && (
+                  <ResizableTableHeader
+                    width={getColumnWidth('due_date') || 120}
+                    onWidthChange={(w) => setColumnWidth('due_date', w)}
+                  >
+                    <button
+                      onClick={() => toggleSort('due_date')}
+                      className="flex items-center gap-1 hover:text-foreground transition-colors"
+                    >
+                      Προθεσμία {getSortIcon('due_date')}
+                    </button>
+                  </ResizableTableHeader>
+                )}
+                {isColumnVisible('status') && (
+                  <ResizableTableHeader
+                    width={getColumnWidth('status') || 160}
+                    onWidthChange={(w) => setColumnWidth('status', w)}
+                  >
+                    <button
+                      onClick={() => toggleSort('status')}
+                      className="flex items-center gap-1 hover:text-foreground transition-colors"
+                    >
+                      Κατάσταση {getSortIcon('status')}
+                    </button>
+                  </ResizableTableHeader>
+                )}
+                {isColumnVisible('actions') && (
+                  <TableHead className="w-[80px]">Ενέργειες</TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {tasks.map(task => {
-                const statusConfig = STATUS_CONFIG[task.status as TaskStatus] || STATUS_CONFIG.todo;
-                return (
-                  <TableRow key={task.id}>
+              {sortedTasks.map(task => (
+                <TableRow 
+                  key={task.id}
+                  className={cn(
+                    "group hover:bg-muted/50",
+                    selectedItems.has(task.id) && "bg-primary/5"
+                  )}
+                >
+                  {isColumnVisible('select') && (
                     <TableCell>
-                      <span className={cn(
-                        "font-medium",
-                        task.status === 'completed' && "line-through text-muted-foreground"
-                      )}>
-                        {task.title}
-                      </span>
+                      <Checkbox
+                        checked={selectedItems.has(task.id)}
+                        onCheckedChange={() => toggleSelectItem(task.id)}
+                      />
+                    </TableCell>
+                  )}
+                  {isColumnVisible('title') && (
+                    <TableCell style={{ width: getColumnWidth('title') }}>
+                      <EnhancedInlineEditCell
+                        value={task.title}
+                        onSave={(val) => handleInlineUpdate(task.id, 'title', val as string)}
+                        disabled={!canManage}
+                        className={cn(task.status === 'completed' && "line-through text-muted-foreground")}
+                      />
                       {task.description && (
                         <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
                           {task.description}
                         </p>
                       )}
                     </TableCell>
-                    <TableCell>
-                      {task.assignee ? (
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-6 w-6">
-                            <AvatarImage src={task.assignee.avatar_url || undefined} />
-                            <AvatarFallback className="text-xs">
-                              {getInitials(task.assignee.full_name)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="text-sm truncate max-w-[100px]">
-                            {task.assignee.full_name}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {task.deliverable?.name ? (
-                        <Badge variant="outline" className="text-xs">
-                          {task.deliverable.name}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {task.due_date ? (
-                        <span className="text-sm">
-                          {format(new Date(task.due_date), 'd MMM', { locale: el })}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={task.status}
-                        onValueChange={(value) => handleStatusChange(task.id, value as TaskStatus)}
+                  )}
+                  {isColumnVisible('assignee') && (
+                    <TableCell style={{ width: getColumnWidth('assignee') }}>
+                      <EnhancedInlineEditCell
+                        value={task.assigned_to || ''}
+                        onSave={(val) => handleInlineUpdate(task.id, 'assigned_to', val as string || null)}
+                        type="avatar-select"
+                        options={[{ value: '', label: 'Κανένας' }, ...userOptions]}
                         disabled={!canManage}
-                      >
-                        <SelectTrigger className="h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Object.entries(STATUS_CONFIG).map(([value, config]) => (
-                            <SelectItem key={value} value={value}>
-                              <div className="flex items-center gap-2">
-                                {config.icon}
-                                {config.label}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        displayValue={task.assignee?.full_name || '-'}
+                      />
                     </TableCell>
+                  )}
+                  {isColumnVisible('deliverable') && (
+                    <TableCell style={{ width: getColumnWidth('deliverable') }}>
+                      <EnhancedInlineEditCell
+                        value={task.tender_deliverable_id || ''}
+                        onSave={(val) => handleInlineUpdate(task.id, 'tender_deliverable_id', val as string || null)}
+                        type="select"
+                        options={[{ value: '', label: 'Κανένα' }, ...deliverableOptions]}
+                        disabled={!canManage}
+                        displayValue={task.deliverable?.name || '-'}
+                      />
+                    </TableCell>
+                  )}
+                  {isColumnVisible('due_date') && (
+                    <TableCell style={{ width: getColumnWidth('due_date') }}>
+                      <EnhancedInlineEditCell
+                        value={task.due_date || ''}
+                        onSave={(val) => handleInlineUpdate(task.id, 'due_date', val as string || null)}
+                        type="date"
+                        disabled={!canManage}
+                        displayValue={task.due_date ? format(parseISO(task.due_date), 'd MMM', { locale: el }) : '-'}
+                      />
+                    </TableCell>
+                  )}
+                  {isColumnVisible('status') && (
+                    <TableCell style={{ width: getColumnWidth('status') }}>
+                      <EnhancedInlineEditCell
+                        value={task.status}
+                        onSave={(val) => handleInlineUpdate(task.id, 'status', val as string)}
+                        type="select"
+                        options={STATUS_OPTIONS.map(s => ({ 
+                          value: s.value, 
+                          label: s.label,
+                          icon: s.icon,
+                          color: s.color
+                        }))}
+                        disabled={!canManage}
+                        displayValue={STATUS_OPTIONS.find(s => s.value === task.status)?.label || task.status}
+                      />
+                    </TableCell>
+                  )}
+                  {isColumnVisible('actions') && (
                     <TableCell>
                       {canManage && (
                         <EditDeleteActions
@@ -384,9 +623,9 @@ export function TenderTasksTable({ tenderId }: TenderTasksTableProps) {
                         />
                       )}
                     </TableCell>
-                  </TableRow>
-                );
-              })}
+                  )}
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </div>
@@ -435,8 +674,8 @@ export function TenderTasksTable({ tenderId }: TenderTasksTableProps) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(STATUS_CONFIG).map(([value, config]) => (
-                      <SelectItem key={value} value={value}>
+                    {STATUS_OPTIONS.map((config) => (
+                      <SelectItem key={config.value} value={config.value}>
                         {config.label}
                       </SelectItem>
                     ))}
@@ -500,7 +739,7 @@ export function TenderTasksTable({ tenderId }: TenderTasksTableProps) {
                 Ακύρωση
               </Button>
               <Button type="submit" disabled={saving}>
-                {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 {editingTask ? 'Αποθήκευση' : 'Δημιουργία'}
               </Button>
             </DialogFooter>

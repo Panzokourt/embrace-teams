@@ -2,8 +2,6 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import JSZip from "https://esm.sh/jszip@3.10.1";
-import pdfParse from "npm:pdf-parse@1.1.1";
-import { Buffer } from "npm:buffer@6.0.3";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -241,7 +239,11 @@ function isReadableText(text: string): boolean {
   return letterRatio > 0.3 && garbageRatio < 0.3;
 }
 
-// Main PDF parsing function using robust native extraction (pdf-parse)
+// Main PDF parsing function
+// IMPORTANT: Reliable full-PDF OCR requires rendering pages to images.
+// Edge runtime cannot reliably do PDF->image conversion, so we keep backend PDF handling
+// as best-effort text extraction only. For scanned/garbled PDFs, the frontend converts
+// pages to images (pdfjs) and sends them here as images for OCR.
 async function parsePdf(arrayBuffer: ArrayBuffer, fileName: string): Promise<{ text: string; usedOcr: boolean; pagesProcessed: number; lowQuality: boolean }> {
   try {
     const bytes = new Uint8Array(arrayBuffer);
@@ -249,20 +251,19 @@ async function parsePdf(arrayBuffer: ArrayBuffer, fileName: string): Promise<{ t
       throw new Error(`File too large: ${bytes.byteLength} bytes (max ${MAX_FILE_SIZE})`);
     }
 
-    console.log(`Native PDF extraction (pdf-parse) for ${fileName}...`);
-    const parsed = await pdfParse(Buffer.from(bytes));
-    const text = (parsed.text || '').trim();
+    console.log(`PDF best-effort text extraction for ${fileName}...`);
+    const text = parsePdfTextStreams(arrayBuffer).trim();
 
-    const isReadable = isReadableText(text);
+    const readable = isReadableText(text);
     const hasSufficientText = text.length >= MIN_TEXT_LENGTH_FOR_VALID_PDF;
-    const lowQuality = !(isReadable && hasSufficientText);
+    const lowQuality = !(readable && hasSufficientText);
 
-    console.log(`pdf-parse extracted ${text.length} chars, pages=${parsed.numpages}, lowQuality=${lowQuality}`);
+    console.log(`PDF extracted ${text.length} chars, lowQuality=${lowQuality}`);
 
     return {
       text,
       usedOcr: false,
-      pagesProcessed: parsed.numpages || 1,
+      pagesProcessed: 1,
       lowQuality,
     };
     
@@ -307,7 +308,7 @@ async function parseDocument(
     // If DOCX text is garbled, try AI
     if (!isReadableText(text) && text.length < 500) {
       console.log("DOCX text seems garbled, trying AI parsing...");
-      const bytes = new Uint8Array(arrayBuffer.slice(0, MAX_CHUNK_SIZE));
+      const bytes = new Uint8Array(arrayBuffer.slice(0, Math.min(MAX_FILE_SIZE, arrayBuffer.byteLength)));
       const base64 = btoa(String.fromCharCode.apply(null, Array.from(bytes)));
       const aiText = await parseDocumentWithGemini(base64, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', fileName);
       if (aiText.length > text.length) {

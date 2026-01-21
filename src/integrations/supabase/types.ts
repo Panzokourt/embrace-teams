@@ -466,6 +466,7 @@ export type Database = {
           id: string
           project_id: string | null
           task_id: string | null
+          tender_id: string | null
           uploaded_by: string
         }
         Insert: {
@@ -478,6 +479,7 @@ export type Database = {
           id?: string
           project_id?: string | null
           task_id?: string | null
+          tender_id?: string | null
           uploaded_by: string
         }
         Update: {
@@ -490,6 +492,7 @@ export type Database = {
           id?: string
           project_id?: string | null
           task_id?: string | null
+          tender_id?: string | null
           uploaded_by?: string
         }
         Relationships: [
@@ -512,6 +515,13 @@ export type Database = {
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "file_attachments_tender_id_fkey"
+            columns: ["tender_id"]
+            isOneToOne: false
+            referencedRelation: "tenders"
             referencedColumns: ["id"]
           },
         ]

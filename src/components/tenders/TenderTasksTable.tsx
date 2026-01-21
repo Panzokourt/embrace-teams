@@ -564,10 +564,10 @@ export function TenderTasksTable({ tenderId }: TenderTasksTableProps) {
                   {isColumnVisible('assignee') && (
                     <TableCell style={{ width: getColumnWidth('assignee') }}>
                       <EnhancedInlineEditCell
-                        value={task.assigned_to || ''}
-                        onSave={(val) => handleInlineUpdate(task.id, 'assigned_to', val as string || null)}
+                        value={task.assigned_to || 'none'}
+                        onSave={(val) => handleInlineUpdate(task.id, 'assigned_to', val === 'none' ? null : val as string)}
                         type="avatar-select"
-                        options={[{ value: '', label: 'Κανένας' }, ...userOptions]}
+                        options={[{ value: 'none', label: 'Κανένας' }, ...userOptions]}
                         disabled={!canManage}
                         displayValue={task.assignee?.full_name || '-'}
                       />
@@ -576,10 +576,10 @@ export function TenderTasksTable({ tenderId }: TenderTasksTableProps) {
                   {isColumnVisible('deliverable') && (
                     <TableCell style={{ width: getColumnWidth('deliverable') }}>
                       <EnhancedInlineEditCell
-                        value={task.tender_deliverable_id || ''}
-                        onSave={(val) => handleInlineUpdate(task.id, 'tender_deliverable_id', val as string || null)}
+                        value={task.tender_deliverable_id || 'none'}
+                        onSave={(val) => handleInlineUpdate(task.id, 'tender_deliverable_id', val === 'none' ? null : val as string)}
                         type="select"
-                        options={[{ value: '', label: 'Κανένα' }, ...deliverableOptions]}
+                        options={[{ value: 'none', label: 'Κανένα' }, ...deliverableOptions]}
                         disabled={!canManage}
                         displayValue={task.deliverable?.name || '-'}
                       />

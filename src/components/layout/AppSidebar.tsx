@@ -59,6 +59,7 @@ const navItems: NavItem[] = [
 
 const adminNavItems: NavItem[] = [
   { title: 'Χρήστες', href: '/users', icon: UserCog, permission: 'users.view' },
+  { title: 'Τμήματα', href: '/departments', icon: Building2, adminOnly: true },
   { title: 'Οργανόγραμμα', href: '/org-chart', icon: Network },
   { title: 'Πελάτες', href: '/clients', icon: Building2, permission: 'clients.view' },
   { title: 'Ρυθμίσεις', href: '/settings', icon: Settings, permission: 'settings.company' },

@@ -23,6 +23,7 @@ import Settings from "@/pages/Settings";
 import Calendar from "@/pages/Calendar";
 import OrgChart from "@/pages/OrgChart";
 import Files from "@/pages/Files";
+import Departments from "@/pages/Departments";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -54,6 +55,7 @@ const App = () => (
                 <Route path="/calendar" element={<Calendar />} />
                 <Route path="/org-chart" element={<OrgChart />} />
                 <Route path="/files" element={<Files />} />
+                <Route path="/departments" element={<Departments />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

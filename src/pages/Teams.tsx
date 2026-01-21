@@ -123,12 +123,28 @@ export default function TeamsPage() {
     }
   }, []);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
+      // First get active users from user_company_roles for this company
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('user_company_roles')
+        .select('user_id')
+        .eq('status', 'active');
+
+      if (rolesError) throw rolesError;
+      
+      const userIds = rolesData?.map(r => r.user_id) || [];
+      
+      if (userIds.length === 0) {
+        setAvailableUsers([]);
+        return;
+      }
+
+      // Then fetch profiles for those users
       const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name, email, avatar_url')
-        .eq('status', 'active')
+        .in('id', userIds)
         .order('full_name');
 
       if (error) throw error;
@@ -136,7 +152,7 @@ export default function TeamsPage() {
     } catch (error) {
       console.error('Error fetching users:', error);
     }
-  };
+  }, []);
 
   // Subscribe to realtime updates
   useTeamsRealtime(fetchTeams);
@@ -144,7 +160,7 @@ export default function TeamsPage() {
   useEffect(() => {
     fetchTeams();
     fetchUsers();
-  }, [fetchTeams]);
+  }, [fetchTeams, fetchUsers]);
 
 
   const handleSubmit = async (e: React.FormEvent) => {

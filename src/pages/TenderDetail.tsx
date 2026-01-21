@@ -23,6 +23,7 @@ import { TenderEvaluationCriteria } from '@/components/tenders/TenderEvaluationC
 import { TenderTeamManager } from '@/components/tenders/TenderTeamManager';
 import { TenderDeliverables } from '@/components/tenders/TenderDeliverables';
 import { TenderTasksManager } from '@/components/tenders/TenderTasksManager';
+import { TenderFileAttachments } from '@/components/tenders/TenderFileAttachments';
 import { ClientSelector } from '@/components/shared/ClientSelector';
 import { toast } from 'sonner';
 import { 
@@ -45,7 +46,8 @@ import {
   Target,
   TrendingUp,
   Package,
-  ListTodo
+  ListTodo,
+  Paperclip
 } from 'lucide-react';
 import { format, isPast } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -428,6 +430,10 @@ export default function TenderDetailPage() {
             <ListTodo className="h-4 w-4 mr-1.5" />
             Tasks
           </TabsTrigger>
+          <TabsTrigger value="files">
+            <Paperclip className="h-4 w-4 mr-1.5" />
+            Αρχεία
+          </TabsTrigger>
           <TabsTrigger value="team">
             <Users className="h-4 w-4 mr-1.5" />
             Ομάδα
@@ -563,6 +569,11 @@ export default function TenderDetailPage() {
         {/* Tasks Tab */}
         <TabsContent value="tasks">
           <TenderTasksManager tenderId={tender.id} />
+        </TabsContent>
+
+        {/* Files Tab */}
+        <TabsContent value="files">
+          <TenderFileAttachments tenderId={tender.id} />
         </TabsContent>
 
         {/* Team Tab */}

@@ -40,7 +40,104 @@ export async function convertTenderToProject(tender: TenderData): Promise<string
 
     if (projectError) throw projectError;
 
-    // Fetch saved AI suggestions for this tender
+    // Track counts for success message
+    let deliverableCount = 0;
+    let taskCount = 0;
+    let invoiceCount = 0;
+    let fileCount = 0;
+
+    // ========================================
+    // 1. Transfer tender_deliverables to deliverables
+    // ========================================
+    const { data: tenderDeliverables } = await supabase
+      .from('tender_deliverables')
+      .select('*')
+      .eq('tender_id', tender.id)
+      .order('created_at');
+
+    const tenderDeliverableIdMap: Record<string, string> = {};
+
+    if (tenderDeliverables && tenderDeliverables.length > 0) {
+      for (const td of tenderDeliverables) {
+        const { data: newDeliverable, error: delError } = await supabase
+          .from('deliverables')
+          .insert({
+            project_id: project.id,
+            name: td.name,
+            description: td.description,
+            due_date: td.due_date,
+            budget: Number(td.budget) || 0,
+            completed: td.completed || false,
+          })
+          .select('id')
+          .single();
+
+        if (!delError && newDeliverable) {
+          tenderDeliverableIdMap[td.id] = newDeliverable.id;
+          deliverableCount++;
+        }
+      }
+    }
+
+    // ========================================
+    // 2. Transfer tender_tasks to tasks
+    // ========================================
+    const { data: tenderTasks } = await supabase
+      .from('tender_tasks')
+      .select('*')
+      .eq('tender_id', tender.id)
+      .order('created_at');
+
+    if (tenderTasks && tenderTasks.length > 0) {
+      for (const tt of tenderTasks) {
+        // Map tender_deliverable_id to new deliverable_id
+        const deliverableId = tt.tender_deliverable_id 
+          ? tenderDeliverableIdMap[tt.tender_deliverable_id] 
+          : null;
+
+        const { error: taskError } = await supabase
+          .from('tasks')
+          .insert({
+            project_id: project.id,
+            title: tt.title,
+            description: tt.description,
+            status: (tt.status as 'todo' | 'in_progress' | 'review' | 'completed') || 'todo',
+            due_date: tt.due_date,
+            assigned_to: tt.assigned_to,
+            deliverable_id: deliverableId,
+          });
+
+        if (!taskError) {
+          taskCount++;
+        }
+      }
+    }
+
+    // ========================================
+    // 3. Transfer tender files to project files
+    // ========================================
+    const { data: tenderFiles } = await supabase
+      .from('file_attachments')
+      .select('*')
+      .eq('tender_id', tender.id);
+
+    if (tenderFiles && tenderFiles.length > 0) {
+      for (const file of tenderFiles) {
+        // Update file to also belong to the project
+        const { error: fileError } = await supabase
+          .from('file_attachments')
+          .update({ project_id: project.id })
+          .eq('id', file.id);
+
+        if (!fileError) {
+          fileCount++;
+        }
+      }
+    }
+
+    // ========================================
+    // 4. Process AI suggestions (existing logic)
+    // ========================================
     const { data: suggestions, error: suggestionsError } = await supabase
       .from('tender_suggestions')
       .select('*')
@@ -53,15 +150,15 @@ export async function convertTenderToProject(tender: TenderData): Promise<string
     }
 
     if (suggestions && suggestions.length > 0) {
-      const deliverables = suggestions.filter(s => s.suggestion_type === 'deliverable');
-      const tasks = suggestions.filter(s => s.suggestion_type === 'task');
+      const aiDeliverables = suggestions.filter(s => s.suggestion_type === 'deliverable');
+      const aiTasks = suggestions.filter(s => s.suggestion_type === 'task');
       const invoices = suggestions.filter(s => s.suggestion_type === 'invoice');
 
-      // Create deliverables and map their IDs
-      const deliverableIdMap: Record<number, string> = {};
+      // Create AI-suggested deliverables and map their IDs
+      const aiDeliverableIdMap: Record<number, string> = {};
       
-      for (let i = 0; i < deliverables.length; i++) {
-        const d = deliverables[i].data as TenderSuggestionData;
+      for (let i = 0; i < aiDeliverables.length; i++) {
+        const d = aiDeliverables[i].data as TenderSuggestionData;
         const { data: newDeliverable, error: delError } = await supabase
           .from('deliverables')
           .insert({
@@ -76,18 +173,19 @@ export async function convertTenderToProject(tender: TenderData): Promise<string
           .single();
 
         if (!delError && newDeliverable) {
-          deliverableIdMap[i] = newDeliverable.id;
+          aiDeliverableIdMap[i] = newDeliverable.id;
+          deliverableCount++;
         }
       }
 
-      // Create tasks
-      for (const taskSuggestion of tasks) {
+      // Create AI-suggested tasks
+      for (const taskSuggestion of aiTasks) {
         const t = taskSuggestion.data as TenderSuggestionData;
         const deliverableId = t.deliverable_index !== undefined 
-          ? deliverableIdMap[t.deliverable_index] 
+          ? aiDeliverableIdMap[t.deliverable_index] 
           : null;
 
-        await supabase
+        const { error: taskError } = await supabase
           .from('tasks')
           .insert({
             project_id: project.id,
@@ -97,14 +195,18 @@ export async function convertTenderToProject(tender: TenderData): Promise<string
             status: 'todo',
             deliverable_id: deliverableId
           });
+
+        if (!taskError) {
+          taskCount++;
+        }
       }
 
-      // Create invoices
+      // Create invoices from AI suggestions
       for (const invSuggestion of invoices) {
         const inv = invSuggestion.data as TenderSuggestionData;
         const invoiceNumber = `INV-${Date.now().toString().slice(-6)}-${Math.random().toString(36).slice(2, 5)}`;
         
-        await supabase
+        const { error: invError } = await supabase
           .from('invoices')
           .insert({
             project_id: project.id,
@@ -115,6 +217,10 @@ export async function convertTenderToProject(tender: TenderData): Promise<string
             issued_date: new Date().toISOString().split('T')[0],
             paid: false
           });
+
+        if (!invError) {
+          invoiceCount++;
+        }
       }
 
       // Mark suggestions as applied
@@ -123,8 +229,17 @@ export async function convertTenderToProject(tender: TenderData): Promise<string
         .update({ applied: true })
         .eq('tender_id', tender.id)
         .eq('selected', true);
+    }
 
-      toast.success(`Ο διαγωνισμός "${tender.name}" μετατράπηκε σε έργο με ${deliverables.length} παραδοτέα, ${tasks.length} tasks και ${invoices.length} τιμολόγια!`);
+    // Build success message
+    const parts: string[] = [];
+    if (deliverableCount > 0) parts.push(`${deliverableCount} παραδοτέα`);
+    if (taskCount > 0) parts.push(`${taskCount} tasks`);
+    if (invoiceCount > 0) parts.push(`${invoiceCount} τιμολόγια`);
+    if (fileCount > 0) parts.push(`${fileCount} αρχεία`);
+
+    if (parts.length > 0) {
+      toast.success(`Ο διαγωνισμός "${tender.name}" μετατράπηκε σε έργο με ${parts.join(', ')}!`);
     } else {
       toast.success(`Ο διαγωνισμός "${tender.name}" μετατράπηκε σε έργο!`);
     }

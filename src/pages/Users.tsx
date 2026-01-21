@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -16,10 +18,20 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   Table,
   TableBody,
@@ -28,6 +40,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { 
   UserCheck, 
@@ -38,7 +58,14 @@ import {
   XCircle,
   Users,
   UserPlus,
-  Loader2
+  Loader2,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  Search,
+  Ban,
+  Crown,
+  Briefcase
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -49,18 +76,44 @@ interface UserProfile {
   id: string;
   email: string;
   full_name: string | null;
+  avatar_url: string | null;
   status: UserStatus;
   created_at: string;
   roles: AppRole[];
 }
+
+const ROLE_CONFIG: Record<AppRole, { label: string; icon: React.ReactNode; className: string }> = {
+  admin: { label: 'Admin', icon: <Shield className="h-3 w-3" />, className: 'bg-destructive/10 text-destructive border-destructive/20' },
+  manager: { label: 'Manager', icon: <Briefcase className="h-3 w-3" />, className: 'bg-primary/10 text-primary border-primary/20' },
+  employee: { label: 'Employee', icon: <Users className="h-3 w-3" />, className: 'bg-secondary text-secondary-foreground border-border' },
+  client: { label: 'Client', icon: <Users className="h-3 w-3" />, className: 'bg-success/10 text-success border-success/20' },
+};
+
+const STATUS_CONFIG: Record<UserStatus, { label: string; icon: React.ReactNode; className: string }> = {
+  invited: { label: 'Προσκλήθηκε', icon: <UserPlus className="h-3 w-3" />, className: 'bg-primary/10 text-primary border-primary/20' },
+  pending: { label: 'Αναμονή', icon: <Clock className="h-3 w-3" />, className: 'bg-warning/10 text-warning border-warning/20' },
+  active: { label: 'Ενεργός', icon: <CheckCircle2 className="h-3 w-3" />, className: 'bg-success/10 text-success border-success/20' },
+  suspended: { label: 'Ανεσταλμένος', icon: <Ban className="h-3 w-3" />, className: 'bg-destructive/10 text-destructive border-destructive/20' },
+  deactivated: { label: 'Απενεργοποιημένος', icon: <XCircle className="h-3 w-3" />, className: 'bg-muted text-muted-foreground border-border' },
+};
 
 export default function UsersPage() {
   const { isAdmin } = useAuth();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Edit dialog state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
+  const [editForm, setEditForm] = useState({ full_name: '', role: '' as AppRole, status: '' as UserStatus });
+  const [saving, setSaving] = useState(false);
+  
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingUser, setDeletingUser] = useState<UserProfile | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -97,6 +150,94 @@ export default function UsersPage() {
     }
   };
 
+  const handleEdit = (user: UserProfile) => {
+    setEditingUser(user);
+    setEditForm({
+      full_name: user.full_name || '',
+      role: user.roles[0] || 'employee',
+      status: user.status,
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingUser) return;
+    setSaving(true);
+
+    try {
+      // Update profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ 
+          full_name: editForm.full_name,
+          status: editForm.status 
+        } as any)
+        .eq('id', editingUser.id);
+
+      if (profileError) throw profileError;
+
+      // Update role - delete existing and insert new
+      await supabase.from('user_roles').delete().eq('user_id', editingUser.id);
+      
+      if (editForm.role) {
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .insert({ user_id: editingUser.id, role: editForm.role });
+        
+        if (roleError) throw roleError;
+      }
+
+      // Update local state
+      setUsers(prev => prev.map(u => 
+        u.id === editingUser.id 
+          ? { ...u, full_name: editForm.full_name, status: editForm.status, roles: editForm.role ? [editForm.role] : [] }
+          : u
+      ));
+
+      toast.success('Ο χρήστης ενημερώθηκε!');
+      setEditDialogOpen(false);
+      setEditingUser(null);
+    } catch (error) {
+      console.error('Error updating user:', error);
+      toast.error('Σφάλμα κατά την ενημέρωση');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = (user: UserProfile) => {
+    setDeletingUser(user);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingUser) return;
+    setDeleting(true);
+
+    try {
+      // Delete user roles first
+      await supabase.from('user_roles').delete().eq('user_id', deletingUser.id);
+      
+      // Delete profile (this won't delete auth user, just the profile)
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', deletingUser.id);
+
+      if (error) throw error;
+
+      setUsers(prev => prev.filter(u => u.id !== deletingUser.id));
+      toast.success('Ο χρήστης διαγράφηκε!');
+      setDeleteDialogOpen(false);
+      setDeletingUser(null);
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast.error('Σφάλμα κατά τη διαγραφή');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const updateUserStatus = async (userId: string, newStatus: UserStatus) => {
     setActionLoading(userId);
     try {
@@ -111,14 +252,7 @@ export default function UsersPage() {
         u.id === userId ? { ...u, status: newStatus } : u
       ));
 
-      const statusMessages: Record<UserStatus, string> = {
-        active: 'Ο χρήστης ενεργοποιήθηκε!',
-        suspended: 'Ο χρήστης αναστάλθηκε!',
-        deactivated: 'Ο χρήστης απενεργοποιήθηκε!',
-        pending: 'Ο χρήστης σε αναμονή!',
-        invited: 'Ο χρήστης προσκλήθηκε!',
-      };
-      toast.success(statusMessages[newStatus]);
+      toast.success('Η κατάσταση ενημερώθηκε!');
     } catch (error) {
       console.error('Error updating user status:', error);
       toast.error('Σφάλμα κατά την ενημέρωση');
@@ -130,13 +264,8 @@ export default function UsersPage() {
   const assignRole = async (userId: string, role: AppRole) => {
     setActionLoading(userId);
     try {
-      // First, remove existing roles
-      await supabase
-        .from('user_roles')
-        .delete()
-        .eq('user_id', userId);
-
-      // Then add new role
+      await supabase.from('user_roles').delete().eq('user_id', userId);
+      
       const { error } = await supabase
         .from('user_roles')
         .insert({ user_id: userId, role });
@@ -156,47 +285,15 @@ export default function UsersPage() {
     }
   };
 
-  const getStatusBadge = (status: UserStatus) => {
-    switch (status) {
-      case 'invited':
-        return <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20"><UserPlus className="h-3 w-3 mr-1" /> Προσκλήθηκε</Badge>;
-      case 'pending':
-        return <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20"><Clock className="h-3 w-3 mr-1" /> Αναμονή</Badge>;
-      case 'active':
-        return <Badge variant="outline" className="bg-success/10 text-success border-success/20"><CheckCircle2 className="h-3 w-3 mr-1" /> Ενεργός</Badge>;
-      case 'suspended':
-        return <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20"><XCircle className="h-3 w-3 mr-1" /> Ανεσταλμένος</Badge>;
-      case 'deactivated':
-        return <Badge variant="outline" className="bg-muted text-muted-foreground"><XCircle className="h-3 w-3 mr-1" /> Απενεργοποιημένος</Badge>;
-    }
-  };
-
-  const getRoleBadge = (role: AppRole) => {
-    const styles = {
-      admin: 'bg-destructive/10 text-destructive border-destructive/20',
-      manager: 'bg-primary/10 text-primary border-primary/20',
-      employee: 'bg-accent/10 text-accent border-accent/20',
-      client: 'bg-success/10 text-success border-success/20',
-    };
-    
-    const labels = {
-      admin: 'Admin',
-      manager: 'Manager',
-      employee: 'Employee',
-      client: 'Client',
-    };
-
-    return (
-      <Badge variant="outline" className={styles[role]}>
-        {labels[role]}
-      </Badge>
-    );
-  };
-
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
+
+  const filteredUsers = users.filter(u =>
+    u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    u.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const pendingUsers = users.filter(u => u.status === 'pending' || u.status === 'invited');
   const activeUsers = users.filter(u => u.status === 'active');
@@ -220,7 +317,7 @@ export default function UsersPage() {
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
             <Users className="h-8 w-8" />
@@ -229,6 +326,15 @@ export default function UsersPage() {
           <p className="text-muted-foreground mt-1">
             Έγκριση, ανάθεση ρόλων και διαχείριση πρόσβασης
           </p>
+        </div>
+        <div className="relative w-64">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Αναζήτηση χρήστη..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
         </div>
       </div>
 
@@ -306,6 +412,7 @@ export default function UsersPage() {
                 <div key={user.id} className="flex items-center justify-between p-4 rounded-lg bg-background border">
                   <div className="flex items-center gap-4">
                     <Avatar>
+                      <AvatarImage src={user.avatar_url || undefined} />
                       <AvatarFallback className="bg-primary text-primary-foreground">
                         {getInitials(user.full_name)}
                       </AvatarFallback>
@@ -352,7 +459,7 @@ export default function UsersPage() {
         </Card>
       )}
 
-      {/* All Users Table */}
+      {/* Users Table */}
       <Card>
         <CardHeader>
           <CardTitle>Όλοι οι Χρήστες</CardTitle>
@@ -365,11 +472,16 @@ export default function UsersPage() {
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
+          ) : filteredUsers.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              Δεν βρέθηκαν χρήστες
+            </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Χρήστης</TableHead>
+                  <TableHead>Email</TableHead>
                   <TableHead>Ρόλος</TableHead>
                   <TableHead>Κατάσταση</TableHead>
                   <TableHead>Ημ/νία εγγραφής</TableHead>
@@ -377,83 +489,198 @@ export default function UsersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map(user => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                            {getInitials(user.full_name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">{user.full_name || 'Χωρίς όνομα'}</p>
-                          <p className="text-xs text-muted-foreground">{user.email}</p>
+                {filteredUsers.map(user => {
+                  const roleConfig = user.roles[0] ? ROLE_CONFIG[user.roles[0]] : null;
+                  const statusConfig = STATUS_CONFIG[user.status];
+                  
+                  return (
+                    <TableRow key={user.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={user.avatar_url || undefined} />
+                            <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                              {getInitials(user.full_name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium">{user.full_name || 'Χωρίς όνομα'}</span>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        {user.roles.length > 0 ? (
-                          user.roles.map(role => (
-                            <span key={role}>{getRoleBadge(role)}</span>
-                          ))
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                      <TableCell>
+                        {roleConfig ? (
+                          <Badge variant="outline" className={cn("flex items-center gap-1 w-fit", roleConfig.className)}>
+                            {roleConfig.icon}
+                            {roleConfig.label}
+                          </Badge>
                         ) : (
                           <span className="text-muted-foreground text-sm">Χωρίς ρόλο</span>
                         )}
-                      </div>
-                    </TableCell>
-                    <TableCell>{getStatusBadge(user.status)}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {new Date(user.created_at).toLocaleDateString('el-GR')}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Select
-                          value={user.roles[0] || ''}
-                          onValueChange={(role) => assignRole(user.id, role as AppRole)}
-                          disabled={actionLoading === user.id}
-                        >
-                          <SelectTrigger className="w-[120px] h-8">
-                            <SelectValue placeholder="Ρόλος" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="employee">Employee</SelectItem>
-                            <SelectItem value="manager">Manager</SelectItem>
-                            <SelectItem value="client">Client</SelectItem>
-                            <SelectItem value="admin">Admin</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        {user.status === 'active' ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => updateUserStatus(user.id, 'suspended')}
-                            disabled={actionLoading === user.id}
-                            title="Αναστολή"
-                          >
-                            <UserX className="h-4 w-4" />
-                          </Button>
-                        ) : user.status === 'suspended' || user.status === 'deactivated' ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => updateUserStatus(user.id, 'active')}
-                            disabled={actionLoading === user.id}
-                            title="Ενεργοποίηση"
-                          >
-                            <UserCheck className="h-4 w-4" />
-                          </Button>
-                        ) : null}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={cn("flex items-center gap-1 w-fit", statusConfig.className)}>
+                          {statusConfig.icon}
+                          {statusConfig.label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {new Date(user.created_at).toLocaleDateString('el-GR')}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuLabel>Ενέργειες</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleEdit(user)}>
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Επεξεργασία
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuLabel className="text-xs text-muted-foreground">Γρήγορη αλλαγή ρόλου</DropdownMenuLabel>
+                            {(['admin', 'manager', 'employee', 'client'] as AppRole[]).map(role => (
+                              <DropdownMenuItem 
+                                key={role}
+                                disabled={user.roles[0] === role || actionLoading === user.id}
+                                onClick={() => assignRole(user.id, role)}
+                              >
+                                {ROLE_CONFIG[role].icon}
+                                <span className="ml-2">{ROLE_CONFIG[role].label}</span>
+                              </DropdownMenuItem>
+                            ))}
+                            <DropdownMenuSeparator />
+                            {user.status === 'active' ? (
+                              <DropdownMenuItem onClick={() => updateUserStatus(user.id, 'suspended')}>
+                                <Ban className="h-4 w-4 mr-2 text-warning" />
+                                Αναστολή
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem onClick={() => updateUserStatus(user.id, 'active')}>
+                                <UserCheck className="h-4 w-4 mr-2 text-success" />
+                                Ενεργοποίηση
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem 
+                              onClick={() => handleDelete(user)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Διαγραφή
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              {editingUser && (
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={editingUser.avatar_url || undefined} />
+                  <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                    {getInitials(editingUser.full_name)}
+                  </AvatarFallback>
+                </Avatar>
+              )}
+              Επεξεργασία Χρήστη
+            </DialogTitle>
+            <DialogDescription>
+              {editingUser?.email}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="fullName">Ονοματεπώνυμο</Label>
+              <Input
+                id="fullName"
+                value={editForm.full_name}
+                onChange={(e) => setEditForm(prev => ({ ...prev, full_name: e.target.value }))}
+                placeholder="π.χ. Γιάννης Παπαδόπουλος"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Ρόλος</Label>
+              <Select 
+                value={editForm.role} 
+                onValueChange={(v) => setEditForm(prev => ({ ...prev, role: v as AppRole }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Επιλέξτε ρόλο" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="employee">Employee</SelectItem>
+                  <SelectItem value="client">Client</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Κατάσταση</Label>
+              <Select 
+                value={editForm.status} 
+                onValueChange={(v) => setEditForm(prev => ({ ...prev, status: v as UserStatus }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Ενεργός</SelectItem>
+                  <SelectItem value="suspended">Ανεσταλμένος</SelectItem>
+                  <SelectItem value="deactivated">Απενεργοποιημένος</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              Ακύρωση
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={saving}>
+              {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Αποθήκευση
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Διαγραφή χρήστη</AlertDialogTitle>
+            <AlertDialogDescription>
+              Είστε σίγουροι ότι θέλετε να διαγράψετε τον χρήστη "{deletingUser?.full_name || deletingUser?.email}"; 
+              Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Ακύρωση</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleting}
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Διαγραφή
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

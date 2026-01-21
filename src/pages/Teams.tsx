@@ -31,7 +31,8 @@ import {
   Plus, 
   UserPlus,
   Loader2,
-  X
+  X,
+  Crown
 } from 'lucide-react';
 
 interface Profile {
@@ -46,8 +47,10 @@ interface Team {
   name: string;
   description: string | null;
   color: string;
+  team_lead_id: string | null;
   created_at: string;
   members?: TeamMember[];
+  teamLead?: Profile | null;
 }
 
 interface TeamMember {
@@ -77,6 +80,7 @@ export default function TeamsPage() {
     name: '',
     description: '',
     color: TEAM_COLORS[0],
+    team_lead_id: 'none' as string,
   });
 
   const fetchTeams = useCallback(async () => {
@@ -103,16 +107,20 @@ export default function TeamsPage() {
 
       const profilesMap = new Map((profilesData || []).map(p => [p.id, p]));
 
-      const teamsWithMembers = (teamsData || []).map(team => ({
-        ...team,
-        members: (membersData || [])
-          .filter(m => m.team_id === team.id)
-          .map(m => ({
-            id: m.id,
-            user_id: m.user_id,
-            profile: profilesMap.get(m.user_id) as Profile | undefined
-          }))
-      }));
+      const teamsWithMembers = (teamsData || []).map(team => {
+        const teamLead = profilesMap.get(team.team_lead_id) || null;
+        return {
+          ...team,
+          teamLead,
+          members: (membersData || [])
+            .filter(m => m.team_id === team.id)
+            .map(m => ({
+              id: m.id,
+              user_id: m.user_id,
+              profile: profilesMap.get(m.user_id) as Profile | undefined
+            }))
+        };
+      });
 
       setTeams(teamsWithMembers);
     } catch (error) {
@@ -172,6 +180,7 @@ export default function TeamsPage() {
         name: formData.name,
         description: formData.description || null,
         color: formData.color,
+        team_lead_id: formData.team_lead_id === 'none' ? null : formData.team_lead_id,
       };
 
       if (editingTeam) {
@@ -213,6 +222,7 @@ export default function TeamsPage() {
       name: team.name,
       description: team.description || '',
       color: team.color,
+      team_lead_id: team.team_lead_id || 'none',
     });
     setDialogOpen(true);
   };
@@ -300,7 +310,7 @@ export default function TeamsPage() {
 
   const resetForm = () => {
     setEditingTeam(null);
-    setFormData({ name: '', description: '', color: TEAM_COLORS[0] });
+    setFormData({ name: '', description: '', color: TEAM_COLORS[0], team_lead_id: 'none' });
   };
 
   const getInitials = (name: string | null) => {
@@ -381,6 +391,34 @@ export default function TeamsPage() {
                       />
                     ))}
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Team Lead</Label>
+                  <Select 
+                    value={formData.team_lead_id} 
+                    onValueChange={(v) => setFormData(prev => ({ ...prev, team_lead_id: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Επιλέξτε team lead" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Κανένας</SelectItem>
+                      {availableUsers.map(user => (
+                        <SelectItem key={user.id} value={user.id}>
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-5 w-5">
+                              <AvatarImage src={user.avatar_url || undefined} />
+                              <AvatarFallback className="text-[10px]">
+                                {getInitials(user.full_name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            {user.full_name || user.email}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <DialogFooter>
@@ -487,6 +525,23 @@ export default function TeamsPage() {
                 </div>
               </CardHeader>
               <CardContent>
+                {/* Team Lead */}
+                {team.teamLead && (
+                  <div className="flex items-center gap-2 mb-4 p-2 bg-amber-500/10 rounded-lg">
+                    <Crown className="h-4 w-4 text-amber-500" />
+                    <Avatar className="h-6 w-6">
+                      <AvatarImage src={team.teamLead.avatar_url || undefined} />
+                      <AvatarFallback className="text-[10px]">
+                        {getInitials(team.teamLead.full_name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm font-medium">
+                      {team.teamLead.full_name || team.teamLead.email}
+                    </span>
+                    <span className="text-xs text-muted-foreground">(Lead)</span>
+                  </div>
+                )}
+
                 {team.description && (
                   <p className="text-sm text-muted-foreground mb-4">
                     {team.description}

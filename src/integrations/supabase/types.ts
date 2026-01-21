@@ -417,6 +417,64 @@ export type Database = {
           },
         ]
       }
+      departments: {
+        Row: {
+          color: string | null
+          company_id: string
+          created_at: string
+          description: string | null
+          head_user_id: string | null
+          id: string
+          name: string
+          parent_department_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          company_id: string
+          created_at?: string
+          description?: string | null
+          head_user_id?: string | null
+          id?: string
+          name: string
+          parent_department_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          head_user_id?: string | null
+          id?: string
+          name?: string
+          parent_department_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "departments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "departments_head_user_id_fkey"
+            columns: ["head_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "departments_parent_department_id_fkey"
+            columns: ["parent_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expenses: {
         Row: {
           amount: number
@@ -883,6 +941,7 @@ export type Database = {
           avatar_url: string | null
           created_at: string
           department: string | null
+          department_id: string | null
           email: string
           full_name: string | null
           hire_date: string | null
@@ -897,6 +956,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           department?: string | null
+          department_id?: string | null
           email: string
           full_name?: string | null
           hire_date?: string | null
@@ -911,6 +971,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           department?: string | null
+          department_id?: string | null
           email?: string
           full_name?: string | null
           hire_date?: string | null
@@ -922,6 +983,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_reports_to_fkey"
             columns: ["reports_to"]
@@ -1322,6 +1390,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          team_lead_id: string | null
           updated_at: string
         }
         Insert: {
@@ -1331,6 +1400,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          team_lead_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -1340,6 +1410,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          team_lead_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1348,6 +1419,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teams_team_lead_id_fkey"
+            columns: ["team_lead_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1795,13 +1873,21 @@ export type Database = {
     }
     Functions: {
       accept_invitation: { Args: { _token: string }; Returns: Json }
+      get_department_users: { Args: { dept_id: string }; Returns: string[] }
+      get_subordinate_users: { Args: { manager_id: string }; Returns: string[] }
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
       get_user_company_role: {
         Args: { _company_id: string; _user_id: string }
         Returns: Database["public"]["Enums"]["company_role"]
       }
+      get_visible_projects: { Args: { p_user_id: string }; Returns: string[] }
+      get_visible_tasks: { Args: { p_user_id: string }; Returns: string[] }
       has_client_access: {
         Args: { _client_id: string; _user_id: string }
+        Returns: boolean
+      }
+      has_hierarchical_access: {
+        Args: { target_user_id: string; viewer_id: string }
         Returns: boolean
       }
       has_new_project_access: {
@@ -1835,7 +1921,7 @@ export type Database = {
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      access_scope: "company" | "assigned"
+      access_scope: "company" | "assigned" | "department" | "team"
       app_role: "admin" | "manager" | "employee" | "client"
       company_role: "super_admin" | "admin" | "manager" | "standard" | "client"
       invitation_status: "pending" | "accepted" | "expired" | "cancelled"
@@ -2027,7 +2113,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      access_scope: ["company", "assigned"],
+      access_scope: ["company", "assigned", "department", "team"],
       app_role: ["admin", "manager", "employee", "client"],
       company_role: ["super_admin", "admin", "manager", "standard", "client"],
       invitation_status: ["pending", "accepted", "expired", "cancelled"],

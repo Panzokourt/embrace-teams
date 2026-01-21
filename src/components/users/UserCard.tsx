@@ -20,7 +20,8 @@ import {
   Users,
   Briefcase,
   Settings,
-  Ban
+  Ban,
+  Pencil
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -32,6 +33,7 @@ import { cn } from '@/lib/utils';
 interface UserCardProps {
   user: CompanyUser;
   onEditPermissions: (user: CompanyUser) => void;
+  onEditUser?: (user: CompanyUser) => void;
   onChangeRole: (userId: string, role: CompanyRole) => void;
   onChangeStatus: (userId: string, status: UserStatus) => void;
 }
@@ -52,7 +54,7 @@ const STATUS_CONFIG: Record<UserStatus, { label: string; icon: React.ReactNode; 
   deactivated: { label: 'Απενεργοποιημένος', icon: <UserX className="h-3 w-3" />, className: 'bg-muted text-muted-foreground border-border' },
 };
 
-export function UserCard({ user, onEditPermissions, onChangeRole, onChangeStatus }: UserCardProps) {
+export function UserCard({ user, onEditPermissions, onEditUser, onChangeRole, onChangeStatus }: UserCardProps) {
   const { isSuperAdmin, user: currentUser } = useAuth();
   const isCurrentUser = currentUser?.id === user.user_id;
   const isSuperAdminUser = user.role === 'super_admin';
@@ -133,6 +135,11 @@ export function UserCard({ user, onEditPermissions, onChangeRole, onChangeStatus
               <DropdownMenuLabel>Ενέργειες</DropdownMenuLabel>
               <DropdownMenuSeparator />
               
+              <DropdownMenuItem onClick={() => onEditUser?.(user)}>
+                <Pencil className="h-4 w-4 mr-2" />
+                Επεξεργασία χρήστη
+              </DropdownMenuItem>
+
               <DropdownMenuItem onClick={() => onEditPermissions(user)}>
                 <Settings className="h-4 w-4 mr-2" />
                 Επεξεργασία δικαιωμάτων

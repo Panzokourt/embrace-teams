@@ -10,13 +10,14 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { 
   Users, UserPlus, Shield, Clock, Search, 
-  Mail, X, History, Loader2, Crown, CheckCircle2
+  Mail, X, History, Loader2, Crown, CheckCircle2, Pencil
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { InviteUserDialog } from '@/components/users/InviteUserDialog';
 import { UserCard } from '@/components/users/UserCard';
 import { EditPermissionsDialog } from '@/components/users/EditPermissionsDialog';
+import { EditUserDialog } from '@/components/users/EditUserDialog';
 import { CompanyRole, UserStatus } from '@/contexts/AuthContext';
 
 export default function UsersAccessPage() {
@@ -25,6 +26,7 @@ export default function UsersAccessPage() {
   
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<CompanyUser | null>(null);
+  const [editingPermissionsUser, setEditingPermissionsUser] = useState<CompanyUser | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredUsers = users.filter(u => 
@@ -128,7 +130,14 @@ export default function UsersAccessPage() {
               <Card className="py-12 text-center"><CardContent><Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" /><p>Δεν βρέθηκαν χρήστες</p></CardContent></Card>
             ) : (
               <div className="grid gap-4 md:grid-cols-2">{filteredUsers.map(user => (
-                <UserCard key={user.id} user={user} onEditPermissions={setEditingUser} onChangeRole={handleChangeRole} onChangeStatus={handleChangeStatus} />
+                <UserCard 
+                  key={user.id} 
+                  user={user} 
+                  onEditPermissions={setEditingPermissionsUser} 
+                  onEditUser={setEditingUser}
+                  onChangeRole={handleChangeRole} 
+                  onChangeStatus={handleChangeStatus} 
+                />
               ))}</div>
             )}
           </TabsContent>
@@ -185,7 +194,15 @@ export default function UsersAccessPage() {
       )}
 
       <InviteUserDialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen} onSuccess={refreshData} />
-      <EditPermissionsDialog user={editingUser} open={!!editingUser} onOpenChange={(o) => !o && setEditingUser(null)} onSuccess={refreshData} />
+      <EditPermissionsDialog user={editingPermissionsUser} open={!!editingPermissionsUser} onOpenChange={(o) => !o && setEditingPermissionsUser(null)} onSuccess={refreshData} />
+      <EditUserDialog 
+        user={editingUser} 
+        open={!!editingUser} 
+        onOpenChange={(o) => !o && setEditingUser(null)} 
+        onSuccess={refreshData}
+        onChangeRole={handleChangeRole}
+        onChangeStatus={handleChangeStatus}
+      />
     </div>
   );
 }

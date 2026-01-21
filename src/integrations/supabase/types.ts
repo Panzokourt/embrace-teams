@@ -1187,6 +1187,50 @@ export type Database = {
           },
         ]
       }
+      tender_deliverables: {
+        Row: {
+          budget: number | null
+          completed: boolean | null
+          created_at: string
+          description: string | null
+          due_date: string | null
+          id: string
+          name: string
+          tender_id: string
+          updated_at: string
+        }
+        Insert: {
+          budget?: number | null
+          completed?: boolean | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          name: string
+          tender_id: string
+          updated_at?: string
+        }
+        Update: {
+          budget?: number | null
+          completed?: boolean | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          name?: string
+          tender_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tender_deliverables_tender_id_fkey"
+            columns: ["tender_id"]
+            isOneToOne: false
+            referencedRelation: "tenders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tender_evaluation_criteria: {
         Row: {
           created_at: string
@@ -1268,6 +1312,67 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "tender_suggestions_tender_id_fkey"
+            columns: ["tender_id"]
+            isOneToOne: false
+            referencedRelation: "tenders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tender_tasks: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          description: string | null
+          due_date: string | null
+          id: string
+          status: string
+          tender_deliverable_id: string | null
+          tender_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          status?: string
+          tender_deliverable_id?: string | null
+          tender_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          status?: string
+          tender_deliverable_id?: string | null
+          tender_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tender_tasks_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tender_tasks_tender_deliverable_id_fkey"
+            columns: ["tender_deliverable_id"]
+            isOneToOne: false
+            referencedRelation: "tender_deliverables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tender_tasks_tender_id_fkey"
             columns: ["tender_id"]
             isOneToOne: false
             referencedRelation: "tenders"

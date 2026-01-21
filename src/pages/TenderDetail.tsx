@@ -23,7 +23,7 @@ import { TenderEvaluationCriteria } from '@/components/tenders/TenderEvaluationC
 import { TenderTeamManager } from '@/components/tenders/TenderTeamManager';
 import { TenderDeliverables } from '@/components/tenders/TenderDeliverables';
 import { TenderTasksManager } from '@/components/tenders/TenderTasksManager';
-import { TenderFileAttachments } from '@/components/tenders/TenderFileAttachments';
+import { FileExplorer } from '@/components/files/FileExplorer';
 import { ClientSelector } from '@/components/shared/ClientSelector';
 import { toast } from 'sonner';
 import { 
@@ -573,7 +573,7 @@ export default function TenderDetailPage() {
 
         {/* Files Tab */}
         <TabsContent value="files">
-          <TenderFileAttachments tenderId={tender.id} />
+          <FileExplorer tenderId={tender.id} />
         </TabsContent>
 
         {/* Team Tab */}

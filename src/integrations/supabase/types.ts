@@ -463,6 +463,7 @@ export type Database = {
           file_name: string
           file_path: string
           file_size: number | null
+          folder_id: string | null
           id: string
           project_id: string | null
           task_id: string | null
@@ -476,6 +477,7 @@ export type Database = {
           file_name: string
           file_path: string
           file_size?: number | null
+          folder_id?: string | null
           id?: string
           project_id?: string | null
           task_id?: string | null
@@ -489,6 +491,7 @@ export type Database = {
           file_name?: string
           file_path?: string
           file_size?: number | null
+          folder_id?: string | null
           id?: string
           project_id?: string | null
           task_id?: string | null
@@ -501,6 +504,13 @@ export type Database = {
             columns: ["deliverable_id"]
             isOneToOne: false
             referencedRelation: "deliverables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "file_attachments_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "file_folders"
             referencedColumns: ["id"]
           },
           {
@@ -519,6 +529,64 @@ export type Database = {
           },
           {
             foreignKeyName: "file_attachments_tender_id_fkey"
+            columns: ["tender_id"]
+            isOneToOne: false
+            referencedRelation: "tenders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      file_folders: {
+        Row: {
+          color: string | null
+          created_at: string
+          created_by: string
+          id: string
+          name: string
+          parent_folder_id: string | null
+          project_id: string | null
+          tender_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          name: string
+          parent_folder_id?: string | null
+          project_id?: string | null
+          tender_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          name?: string
+          parent_folder_id?: string | null
+          project_id?: string | null
+          tender_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "file_folders_parent_folder_id_fkey"
+            columns: ["parent_folder_id"]
+            isOneToOne: false
+            referencedRelation: "file_folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "file_folders_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "file_folders_tender_id_fkey"
             columns: ["tender_id"]
             isOneToOne: false
             referencedRelation: "tenders"

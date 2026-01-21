@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useTendersRealtime } from '@/hooks/useRealtimeSubscription';
 import { useTenderToProject } from '@/hooks/useTenderToProject';
+import { TenderCreationWizard } from '@/components/tenders/TenderCreationWizard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -50,7 +51,8 @@ import {
   Edit3,
   GripVertical,
   Pencil,
-  Trash2
+  Trash2,
+  Wand2
 } from 'lucide-react';
 import { format, isPast } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -100,10 +102,12 @@ export default function TendersPage() {
   const { handleStageChange } = useTenderToProject();
   const [tenders, setTenders] = useState<Tender[]>([]);
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [profiles, setProfiles] = useState<{ id: string; full_name: string | null; email: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [stageFilter, setStageFilter] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeTender, setActiveTender] = useState<Tender | null>(null);
   const [editingTender, setEditingTender] = useState<Tender | null>(null);
@@ -163,12 +167,28 @@ export default function TendersPage() {
     }
   };
 
+  const fetchProfiles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .eq('status', 'active')
+        .order('full_name');
+
+      if (error) throw error;
+      setProfiles(data || []);
+    } catch (error) {
+      console.error('Error fetching profiles:', error);
+    }
+  };
+
   // Subscribe to realtime updates
   useTendersRealtime(fetchTenders);
 
   useEffect(() => {
     fetchTenders();
     fetchClients();
+    fetchProfiles();
   }, [fetchTenders]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -621,119 +641,147 @@ export default function TendersPage() {
           />
           
           {canManage && (
-            <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
-              <DialogTrigger asChild>
-                <Button className="shadow-soft">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Νέος Διαγωνισμός
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-lg">
-                <DialogHeader>
-                  <DialogTitle className="text-lg">{editingTender ? 'Επεξεργασία Διαγωνισμού' : 'Νέος Διαγωνισμός'}</DialogTitle>
-                  <DialogDescription className="text-sm">
-                    {editingTender ? 'Ενημερώστε τα στοιχεία του διαγωνισμού' : 'Προσθέστε έναν νέο διαγωνισμό στο pipeline'}
-                  </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Τίτλος *</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                      placeholder="π.χ. Τουριστική Προβολή Ρόδου"
-                      required
-                    />
-                  </div>
+            <>
+              {/* Wizard Button - Primary */}
+              <Button className="shadow-soft" onClick={() => setWizardOpen(true)}>
+                <Wand2 className="h-4 w-4 mr-2" />
+                Νέος Διαγωνισμός
+              </Button>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Περιγραφή</Label>
-                    <Textarea
-                      id="description"
-                      value={formData.description}
-                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                      rows={3}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Quick Add Dialog - For editing */}
+              <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
+                <DialogContent className="max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle className="text-lg">Επεξεργασία Διαγωνισμού</DialogTitle>
+                    <DialogDescription className="text-sm">
+                      Ενημερώστε τα στοιχεία του διαγωνισμού
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="client">Πελάτης/Φορέας</Label>
-                      <Select
-                        value={formData.client_id}
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, client_id: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Επιλέξτε" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {clients.map(client => (
-                            <SelectItem key={client.id} value={client.id}>
-                              {client.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="budget">Προϋπολογισμός (€)</Label>
+                      <Label htmlFor="name">Τίτλος *</Label>
                       <Input
-                        id="budget"
-                        type="number"
-                        value={formData.budget}
-                        onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
-                        placeholder="0"
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder="π.χ. Τουριστική Προβολή Ρόδου"
+                        required
                       />
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="stage">Φάση</Label>
-                      <Select
-                        value={formData.stage}
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, stage: value as TenderStage }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="identification">Εντοπισμός</SelectItem>
-                          <SelectItem value="preparation">Προετοιμασία</SelectItem>
-                          <SelectItem value="submitted">Υποβλήθηκε</SelectItem>
-                          <SelectItem value="evaluation">Αξιολόγηση</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="deadline">Deadline Υποβολής</Label>
-                      <Input
-                        id="deadline"
-                        type="date"
-                        value={formData.submission_deadline}
-                        onChange={(e) => setFormData(prev => ({ ...prev, submission_deadline: e.target.value }))}
+                      <Label htmlFor="description">Περιγραφή</Label>
+                      <Textarea
+                        id="description"
+                        value={formData.description}
+                        onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                        rows={3}
                       />
                     </div>
-                  </div>
 
-                  <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
-                      Ακύρωση
-                    </Button>
-                    <Button type="submit" disabled={saving}>
-                      {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                      {editingTender ? 'Αποθήκευση' : 'Δημιουργία'}
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="client">Πελάτης/Φορέας</Label>
+                        <Select
+                          value={formData.client_id}
+                          onValueChange={(value) => setFormData(prev => ({ ...prev, client_id: value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Επιλέξτε" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {clients.map(client => (
+                              <SelectItem key={client.id} value={client.id}>
+                                {client.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="budget">Προϋπολογισμός (€)</Label>
+                        <Input
+                          id="budget"
+                          type="number"
+                          value={formData.budget}
+                          onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
+                          placeholder="0"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="stage">Φάση</Label>
+                        <Select
+                          value={formData.stage}
+                          onValueChange={(value) => setFormData(prev => ({ ...prev, stage: value as TenderStage }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="identification">Εντοπισμός</SelectItem>
+                            <SelectItem value="preparation">Προετοιμασία</SelectItem>
+                            <SelectItem value="submitted">Υποβλήθηκε</SelectItem>
+                            <SelectItem value="evaluation">Αξιολόγηση</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="deadline">Deadline Υποβολής</Label>
+                        <Input
+                          id="deadline"
+                          type="date"
+                          value={formData.submission_deadline}
+                          onChange={(e) => setFormData(prev => ({ ...prev, submission_deadline: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
+                        Ακύρωση
+                      </Button>
+                      <Button type="submit" disabled={saving}>
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                        Αποθήκευση
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </>
           )}
         </div>
       </div>
+
+      {/* Wizard Full-Screen Dialog */}
+      <Dialog open={wizardOpen} onOpenChange={setWizardOpen}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl flex items-center gap-2">
+              <Wand2 className="h-5 w-5 text-primary" />
+              Δημιουργία Νέου Διαγωνισμού
+            </DialogTitle>
+            <DialogDescription>
+              Ακολουθήστε τα βήματα για να δημιουργήσετε έναν νέο διαγωνισμό με AI ανάλυση
+            </DialogDescription>
+          </DialogHeader>
+          <TenderCreationWizard
+            clients={clients}
+            profiles={profiles}
+            onComplete={(tenderId) => {
+              setWizardOpen(false);
+              fetchTenders();
+              navigate(`/tenders/${tenderId}`);
+            }}
+            onCancel={() => setWizardOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 animate-fade-in" style={{ animationDelay: '50ms' }}>

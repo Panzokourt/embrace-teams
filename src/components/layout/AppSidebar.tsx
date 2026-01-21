@@ -31,6 +31,7 @@ import {
   Moon,
   Sun,
   CalendarDays,
+  Network,
 } from 'lucide-react';
 
 import { PermissionType } from '@/contexts/AuthContext';
@@ -56,6 +57,7 @@ const navItems: NavItem[] = [
 
 const adminNavItems: NavItem[] = [
   { title: 'Χρήστες', href: '/users', icon: UserCog, permission: 'users.view' },
+  { title: 'Οργανόγραμμα', href: '/org-chart', icon: Network },
   { title: 'Πελάτες', href: '/clients', icon: Building2, permission: 'clients.view' },
   { title: 'Ρυθμίσεις', href: '/settings', icon: Settings, permission: 'settings.company' },
 ];

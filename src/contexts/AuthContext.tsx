@@ -8,7 +8,7 @@ type LegacyRole = 'admin' | 'manager' | 'employee' | 'client';
 // New RBAC types
 export type CompanyRole = 'super_admin' | 'admin' | 'manager' | 'standard' | 'client';
 export type UserStatus = 'invited' | 'pending' | 'active' | 'suspended' | 'deactivated';
-export type AccessScope = 'company' | 'assigned';
+export type AccessScope = 'company' | 'department' | 'team' | 'assigned';
 
 export type PermissionType = 
   | 'users.view' | 'users.invite' | 'users.edit' | 'users.suspend' | 'users.delete'

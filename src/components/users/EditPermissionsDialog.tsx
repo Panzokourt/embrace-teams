@@ -27,10 +27,11 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
-import { Loader2, Shield, FolderOpen, Briefcase, Users } from 'lucide-react';
+import { Loader2, Shield, FolderOpen, Briefcase, Users, Building2, UsersRound } from 'lucide-react';
 import { AccessScope, PermissionType } from '@/contexts/AuthContext';
 import { CompanyUser, PERMISSION_CATEGORIES, useRBAC } from '@/hooks/useRBAC';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface EditPermissionsDialogProps {
   user: CompanyUser | null;
@@ -39,15 +40,32 @@ interface EditPermissionsDialogProps {
   onSuccess?: () => void;
 }
 
+interface Department {
+  id: string;
+  name: string;
+  color: string;
+}
+
+interface Team {
+  id: string;
+  name: string;
+  color: string | null;
+}
+
 export function EditPermissionsDialog({ user, open, onOpenChange, onSuccess }: EditPermissionsDialogProps) {
+  const { company } = useAuth();
   const { updateUserPermissions, updateUserAccessScope } = useRBAC();
   const [saving, setSaving] = useState(false);
   const [accessScope, setAccessScope] = useState<AccessScope>('assigned');
   const [selectedPermissions, setSelectedPermissions] = useState<PermissionType[]>([]);
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('none');
+  const [selectedTeam, setSelectedTeam] = useState<string>('none');
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -60,15 +78,47 @@ export function EditPermissionsDialog({ user, open, onOpenChange, onSuccess }: E
 
   useEffect(() => {
     const fetchData = async () => {
-      const [{ data: clientsData }, { data: projectsData }] = await Promise.all([
+      if (!company?.id) return;
+      
+      const [
+        { data: clientsData }, 
+        { data: projectsData },
+        { data: departmentsData },
+        { data: teamsData },
+        { data: profileData }
+      ] = await Promise.all([
         supabase.from('clients').select('id, name').order('name'),
-        supabase.from('projects').select('id, name').order('name')
+        supabase.from('projects').select('id, name').order('name'),
+        supabase.from('departments').select('id, name, color').eq('company_id', company.id).order('name'),
+        supabase.from('teams').select('id, name, color').eq('company_id', company.id).order('name'),
+        user ? supabase.from('profiles').select('department_id').eq('id', user.user_id).single() : Promise.resolve({ data: null })
       ]);
+      
       setClients(clientsData || []);
       setProjects(projectsData || []);
+      setDepartments(departmentsData || []);
+      setTeams(teamsData || []);
+      
+      if (profileData?.department_id) {
+        setSelectedDepartment(profileData.department_id);
+      }
+      
+      // Fetch user's team membership
+      if (user) {
+        const { data: teamMembership } = await supabase
+          .from('team_members')
+          .select('team_id')
+          .eq('user_id', user.user_id)
+          .limit(1)
+          .maybeSingle();
+        
+        if (teamMembership?.team_id) {
+          setSelectedTeam(teamMembership.team_id);
+        }
+      }
     };
     if (open) fetchData();
-  }, [open]);
+  }, [open, company?.id, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,6 +126,28 @@ export function EditPermissionsDialog({ user, open, onOpenChange, onSuccess }: E
 
     setSaving(true);
     try {
+      // Update department in profile if scope is department
+      if (accessScope === 'department' && selectedDepartment !== 'none') {
+        await supabase
+          .from('profiles')
+          .update({ department_id: selectedDepartment })
+          .eq('id', user.user_id);
+      }
+      
+      // Update team membership if scope is team
+      if (accessScope === 'team' && selectedTeam !== 'none') {
+        // Remove from other teams first
+        await supabase
+          .from('team_members')
+          .delete()
+          .eq('user_id', user.user_id);
+        
+        // Add to selected team
+        await supabase
+          .from('team_members')
+          .insert({ user_id: user.user_id, team_id: selectedTeam });
+      }
+      
       await updateUserPermissions(user.user_id, selectedPermissions);
       await updateUserAccessScope(user.user_id, accessScope, selectedClients, selectedProjects);
       
@@ -148,6 +220,18 @@ export function EditPermissionsDialog({ user, open, onOpenChange, onSuccess }: E
                           Όλη η εταιρεία
                         </div>
                       </SelectItem>
+                      <SelectItem value="department">
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4" />
+                          Τμήμα
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="team">
+                        <div className="flex items-center gap-2">
+                          <UsersRound className="h-4 w-4" />
+                          Ομάδα
+                        </div>
+                      </SelectItem>
                       <SelectItem value="assigned">
                         <div className="flex items-center gap-2">
                           <FolderOpen className="h-4 w-4" />
@@ -156,6 +240,70 @@ export function EditPermissionsDialog({ user, open, onOpenChange, onSuccess }: E
                       </SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              )}
+
+              {/* Department Selection for department scope */}
+              {accessScope === 'department' && user.role !== 'client' && (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4" />
+                    Τμήμα Πρόσβασης
+                  </Label>
+                  <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Επιλέξτε τμήμα" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Επιλέξτε τμήμα</SelectItem>
+                      {departments.map(dept => (
+                        <SelectItem key={dept.id} value={dept.id}>
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-3 h-3 rounded"
+                              style={{ backgroundColor: dept.color }}
+                            />
+                            {dept.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Ο χρήστης θα βλέπει όλα τα δεδομένα του τμήματος
+                  </p>
+                </div>
+              )}
+
+              {/* Team Selection for team scope */}
+              {accessScope === 'team' && user.role !== 'client' && (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <UsersRound className="h-4 w-4" />
+                    Ομάδα Πρόσβασης
+                  </Label>
+                  <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Επιλέξτε ομάδα" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Επιλέξτε ομάδα</SelectItem>
+                      {teams.map(team => (
+                        <SelectItem key={team.id} value={team.id}>
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-3 h-3 rounded"
+                              style={{ backgroundColor: team.color || '#3B82F6' }}
+                            />
+                            {team.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Ο χρήστης θα βλέπει τα δεδομένα της ομάδας και των υφισταμένων του
+                  </p>
                 </div>
               )}
 

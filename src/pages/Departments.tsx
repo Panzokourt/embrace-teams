@@ -41,11 +41,15 @@ import {
   Loader2,
   Crown,
   ChevronRight,
-  FolderTree
+  FolderTree,
+  UserPlus,
+  X
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { EditDeleteActions } from '@/components/dialogs/EditDeleteActions';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface Department {
   id: string;
@@ -82,9 +86,12 @@ export default function DepartmentsPage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [membersDialogOpen, setMembersDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
   const [deletingDepartment, setDeletingDepartment] = useState<Department | null>(null);
+  const [managingDepartment, setManagingDepartment] = useState<Department | null>(null);
+  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
 
   // Form state
   const [name, setName] = useState('');
@@ -233,6 +240,62 @@ export default function DepartmentsPage() {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
+  const handleManageMembers = (dept: Department) => {
+    setManagingDepartment(dept);
+    const currentMembers = profiles.filter(p => p.department_id === dept.id).map(p => p.id);
+    setSelectedMembers(currentMembers);
+    setMembersDialogOpen(true);
+  };
+
+  const handleSaveMembers = async () => {
+    if (!managingDepartment) return;
+    setSaving(true);
+
+    try {
+      // Get current members of this department
+      const currentMembers = profiles.filter(p => p.department_id === managingDepartment.id);
+      
+      // Remove users that are no longer selected
+      for (const member of currentMembers) {
+        if (!selectedMembers.includes(member.id)) {
+          await supabase
+            .from('profiles')
+            .update({ department_id: null })
+            .eq('id', member.id);
+        }
+      }
+      
+      // Add newly selected users
+      for (const userId of selectedMembers) {
+        const currentDept = profiles.find(p => p.id === userId)?.department_id;
+        if (currentDept !== managingDepartment.id) {
+          await supabase
+            .from('profiles')
+            .update({ department_id: managingDepartment.id })
+            .eq('id', userId);
+        }
+      }
+
+      toast.success('Τα μέλη ενημερώθηκαν');
+      setMembersDialogOpen(false);
+      setManagingDepartment(null);
+      fetchDepartments();
+    } catch (error: any) {
+      console.error('Error saving members:', error);
+      toast.error(error.message || 'Σφάλμα κατά την αποθήκευση');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleMember = (userId: string) => {
+    setSelectedMembers(prev =>
+      prev.includes(userId)
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
   // Get flat list of all departments for parent selection
   const getAllDepartments = useCallback((): Department[] => {
     const flat: Department[] = [];
@@ -293,11 +356,17 @@ export default function DepartmentsPage() {
                 <span className="text-sm text-muted-foreground">Χωρίς επικεφαλή</span>
               )}
 
-              {/* Member count */}
-              <Badge variant="secondary">
-                <Users className="h-3 w-3 mr-1" />
+              {/* Member count - clickable to manage */}
+              <Button
+                variant="secondary"
+                size="sm"
+                className="gap-1"
+                onClick={() => handleManageMembers(dept)}
+              >
+                <Users className="h-3 w-3" />
                 {dept.members_count} μέλη
-              </Badge>
+                {canManage && <UserPlus className="h-3 w-3 ml-1" />}
+              </Button>
 
               {/* Actions */}
               {canManage && (
@@ -564,6 +633,98 @@ export default function DepartmentsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Manage Members Dialog */}
+      <Dialog open={membersDialogOpen} onOpenChange={(open) => {
+        setMembersDialogOpen(open);
+        if (!open) {
+          setManagingDepartment(null);
+          setSelectedMembers([]);
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {managingDepartment && (
+                <div 
+                  className="w-6 h-6 rounded flex items-center justify-center"
+                  style={{ backgroundColor: managingDepartment.color }}
+                >
+                  <Users className="h-4 w-4 text-white" />
+                </div>
+              )}
+              Μέλη Τμήματος
+            </DialogTitle>
+            <DialogDescription>
+              {managingDepartment?.name} - Επιλέξτε τους χρήστες που ανήκουν σε αυτό το τμήμα
+            </DialogDescription>
+          </DialogHeader>
+
+          <ScrollArea className="h-80 pr-4">
+            <div className="space-y-1">
+              {profiles.map(profile => {
+                const isSelected = selectedMembers.includes(profile.id);
+                const currentDept = profile.department_id 
+                  ? getAllDepartments().find(d => d.id === profile.department_id)
+                  : null;
+                const isInOtherDept = currentDept && currentDept.id !== managingDepartment?.id;
+
+                return (
+                  <label 
+                    key={profile.id} 
+                    className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
+                      isSelected ? 'bg-primary/10' : 'hover:bg-secondary'
+                    }`}
+                  >
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={() => toggleMember(profile.id)}
+                    />
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={profile.avatar_url || undefined} />
+                      <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                        {getInitials(profile.full_name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {profile.full_name || profile.email}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {profile.email}
+                      </p>
+                    </div>
+                    {isInOtherDept && (
+                      <Badge variant="outline" className="text-xs shrink-0">
+                        {currentDept.name}
+                      </Badge>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          </ScrollArea>
+
+          <div className="flex items-center justify-between pt-2 border-t">
+            <span className="text-sm text-muted-foreground">
+              {selectedMembers.length} επιλεγμένα
+            </span>
+            <div className="flex gap-2">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setMembersDialogOpen(false)}
+              >
+                Ακύρωση
+              </Button>
+              <Button onClick={handleSaveMembers} disabled={saving}>
+                {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                Αποθήκευση
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -29,11 +29,17 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
-import { Loader2, Trash2, Shield, Crown, Briefcase, Users } from 'lucide-react';
+import { Loader2, Trash2, Shield, Crown, Briefcase, Users, Building2 } from 'lucide-react';
 import { CompanyRole, UserStatus } from '@/contexts/AuthContext';
 import { CompanyUser } from '@/hooks/useRBAC';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+
+interface Department {
+  id: string;
+  name: string;
+  color: string;
+}
 
 interface EditUserDialogProps {
   user: CompanyUser | null;
@@ -74,12 +80,39 @@ export function EditUserDialog({
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState<CompanyRole>('standard');
   const [status, setStatus] = useState<UserStatus>('active');
+  const [departmentId, setDepartmentId] = useState<string>('none');
+  const [departments, setDepartments] = useState<Department[]>([]);
 
+  // Fetch departments
   useEffect(() => {
+    const fetchDepartments = async () => {
+      if (!company?.id) return;
+      const { data } = await supabase
+        .from('departments')
+        .select('id, name, color')
+        .eq('company_id', company.id)
+        .order('name');
+      setDepartments(data || []);
+    };
+    if (open) fetchDepartments();
+  }, [open, company?.id]);
+
+  // Fetch user's current department
+  useEffect(() => {
+    const fetchUserDepartment = async () => {
+      if (!user?.user_id) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('department_id')
+        .eq('id', user.user_id)
+        .single();
+      setDepartmentId(data?.department_id || 'none');
+    };
     if (user) {
       setFullName(user.full_name || '');
       setRole(user.role);
       setStatus(user.status);
+      fetchUserDepartment();
     }
   }, [user]);
 
@@ -93,10 +126,13 @@ export function EditUserDialog({
     setSaving(true);
 
     try {
-      // Update profile name
+      // Update profile name and department
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({ full_name: fullName })
+        .update({ 
+          full_name: fullName,
+          department_id: departmentId === 'none' ? null : departmentId
+        })
         .eq('id', user.user_id);
 
       if (profileError) throw profileError;
@@ -236,6 +272,32 @@ export function EditUserDialog({
                   {STATUS_OPTIONS.map(option => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                Τμήμα
+              </Label>
+              <Select value={departmentId} onValueChange={setDepartmentId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Επιλέξτε τμήμα" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Κανένα τμήμα</SelectItem>
+                  {departments.map(dept => (
+                    <SelectItem key={dept.id} value={dept.id}>
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-3 h-3 rounded"
+                          style={{ backgroundColor: dept.color }}
+                        />
+                        {dept.name}
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>

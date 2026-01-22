@@ -8,14 +8,27 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { 
   ArrowLeft, User, Mail, Phone, Briefcase, Building2, Calendar, 
   FolderKanban, Users, Clock, Shield, CheckCircle2, Loader2, 
-  FileText, Target, MapPin
+  FileText, Target, MapPin, Edit2, Check, X
 } from 'lucide-react';
+
+interface Department {
+  id: string;
+  name: string;
+  color: string;
+}
 
 interface UserData {
   id: string;
@@ -24,6 +37,7 @@ interface UserData {
   avatar_url: string | null;
   job_title: string | null;
   department: string | null;
+  department_id: string | null;
   phone: string | null;
   hire_date: string | null;
   status: string;
@@ -92,7 +106,7 @@ const roleLabels: Record<string, string> = {
 export default function UserDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isCompanyAdmin, isManager } = useAuth();
+  const { isCompanyAdmin, isManager, company } = useAuth();
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<UserData | null>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
@@ -100,10 +114,29 @@ export default function UserDetailPage() {
   const [tenders, setTenders] = useState<Tender[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [editingDepartment, setEditingDepartment] = useState(false);
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('none');
+  const [savingDepartment, setSavingDepartment] = useState(false);
+
+  const canEdit = isCompanyAdmin || isManager;
 
   useEffect(() => {
     if (id) fetchUserData();
   }, [id]);
+
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      if (!company?.id) return;
+      const { data } = await supabase
+        .from('departments')
+        .select('id, name, color')
+        .eq('company_id', company.id)
+        .order('name');
+      setDepartments(data || []);
+    };
+    fetchDepartments();
+  }, [company?.id]);
 
   const fetchUserData = async () => {
     if (!id) return;
@@ -119,6 +152,7 @@ export default function UserDetailPage() {
       
       if (userError) throw userError;
       setUser(userData);
+      setSelectedDepartment(userData.department_id || 'none');
 
       // Fetch user role
       const { data: roleData } = await supabase
@@ -197,6 +231,34 @@ export default function UserDetailPage() {
     return email?.slice(0, 2).toUpperCase() || 'U';
   };
 
+  const getUserDepartment = () => {
+    if (!user?.department_id) return null;
+    return departments.find(d => d.id === user.department_id);
+  };
+
+  const handleSaveDepartment = async () => {
+    if (!user) return;
+    setSavingDepartment(true);
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ department_id: selectedDepartment === 'none' ? null : selectedDepartment })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      setUser({ ...user, department_id: selectedDepartment === 'none' ? null : selectedDepartment });
+      setEditingDepartment(false);
+      toast.success('Το τμήμα ενημερώθηκε');
+    } catch (error: any) {
+      console.error('Error updating department:', error);
+      toast.error('Σφάλμα κατά την ενημέρωση');
+    } finally {
+      setSavingDepartment(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -266,12 +328,82 @@ export default function UserDetailPage() {
                   <span>{user.job_title}</span>
                 </div>
               )}
-              {user.department && (
-                <div className="flex items-center gap-3">
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                  <span>{user.department}</span>
-                </div>
-              )}
+              
+              {/* Department - Editable */}
+              <div className="flex items-center gap-3">
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+                {editingDepartment ? (
+                  <div className="flex items-center gap-2 flex-1">
+                    <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                      <SelectTrigger className="h-8 flex-1">
+                        <SelectValue placeholder="Επιλέξτε τμήμα" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Κανένα τμήμα</SelectItem>
+                        {departments.map(dept => (
+                          <SelectItem key={dept.id} value={dept.id}>
+                            <div className="flex items-center gap-2">
+                              <div 
+                                className="w-2 h-2 rounded-full"
+                                style={{ backgroundColor: dept.color }}
+                              />
+                              {dept.name}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button 
+                      size="icon" 
+                      variant="ghost" 
+                      className="h-8 w-8"
+                      onClick={handleSaveDepartment}
+                      disabled={savingDepartment}
+                    >
+                      {savingDepartment ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Check className="h-4 w-4 text-green-600" />
+                      )}
+                    </Button>
+                    <Button 
+                      size="icon" 
+                      variant="ghost" 
+                      className="h-8 w-8"
+                      onClick={() => {
+                        setEditingDepartment(false);
+                        setSelectedDepartment(user.department_id || 'none');
+                      }}
+                    >
+                      <X className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 flex-1">
+                    {getUserDepartment() ? (
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-2 h-2 rounded-full"
+                          style={{ backgroundColor: getUserDepartment()?.color }}
+                        />
+                        <span>{getUserDepartment()?.name}</span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">Χωρίς τμήμα</span>
+                    )}
+                    {canEdit && (
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="h-6 w-6 ml-auto"
+                        onClick={() => setEditingDepartment(true)}
+                      >
+                        <Edit2 className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
               {user.phone && (
                 <div className="flex items-center gap-3">
                   <Phone className="h-4 w-4 text-muted-foreground" />

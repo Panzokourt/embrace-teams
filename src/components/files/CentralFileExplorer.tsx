@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { format, parseISO, isThisMonth, isThisWeek, isThisYear } from 'date-fns';
 import { el } from 'date-fns/locale';
+import { createProjectFilesObjectKey } from '@/utils/storageKeys';
 
 interface Client {
   id: string;
@@ -391,7 +392,10 @@ export function CentralFileExplorer() {
 
     try {
       for (const file of Array.from(selectedFiles)) {
-        const fileName = `${user.id}/${Date.now()}_${file.name}`;
+        const fileName = createProjectFilesObjectKey({
+          userId: user.id,
+          originalName: file.name,
+        });
 
         const { error: uploadError } = await supabase.storage
           .from('project-files')

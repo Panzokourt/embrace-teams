@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import { createProjectFilesObjectKey } from '@/utils/storageKeys';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
@@ -224,8 +225,18 @@ export function useDocumentParser(options: UseDocumentParserOptions = {}) {
       if (options.saveToStorage && (options.projectId || options.tenderId)) {
         const { data: userData } = await supabase.auth.getUser();
         if (userData.user) {
+          const prefix = options.projectId
+            ? `projects/${options.projectId}`
+            : options.tenderId
+              ? `tenders/${options.tenderId}`
+              : undefined;
+
           for (const file of fileArray) {
-            const fileName = `${userData.user.id}/${Date.now()}_${file.name}`;
+            const fileName = createProjectFilesObjectKey({
+              userId: userData.user.id,
+              originalName: file.name,
+              prefix,
+            });
             
             // Upload to storage
             const { error: uploadError } = await supabase.storage

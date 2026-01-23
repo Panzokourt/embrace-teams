@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { FolderTree, type FileFolder } from './FolderTree';
 import { FilesTableView, type FileAttachment } from './FilesTableView';
+import { createProjectFilesObjectKey } from '@/utils/storageKeys';
 
 interface FileExplorerProps {
   tenderId?: string;
@@ -197,7 +198,10 @@ export function FileExplorer({ tenderId, projectId }: FileExplorerProps) {
 
     try {
       for (const file of Array.from(selectedFiles)) {
-        const fileName = `${user.id}/${Date.now()}_${file.name}`;
+        const fileName = createProjectFilesObjectKey({
+          userId: user.id,
+          originalName: file.name,
+        });
 
         // Upload to storage
         const { error: uploadError } = await supabase.storage

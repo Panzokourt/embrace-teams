@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
+import { createProjectFilesObjectKey } from '@/utils/storageKeys';
 
 interface FileAttachment {
   id: string;
@@ -93,8 +94,12 @@ export function TenderFileAttachments({ tenderId }: TenderFileAttachmentsProps) 
 
     try {
       for (const file of Array.from(selectedFiles)) {
-        // Create unique file path
-        const fileName = `tenders/${tenderId}/${Date.now()}_${file.name}`;
+        // Keep userId as first folder segment for storage policies; keep tender context in prefix.
+        const fileName = createProjectFilesObjectKey({
+          userId: user.id,
+          originalName: file.name,
+          prefix: `tenders/${tenderId}`,
+        });
 
         // Upload to storage
         const { error: uploadError } = await supabase.storage

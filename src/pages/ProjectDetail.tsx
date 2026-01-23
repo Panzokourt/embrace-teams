@@ -40,6 +40,7 @@ import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { createProjectFilesObjectKey } from '@/utils/storageKeys';
 
 type ProjectStatus = 'tender' | 'active' | 'completed' | 'cancelled';
 type TaskStatus = 'todo' | 'in_progress' | 'review' | 'completed';
@@ -207,7 +208,11 @@ export default function ProjectDetailPage() {
 
     try {
       for (const file of aiRawFiles) {
-        const fileName = `${user.id}/${Date.now()}_${file.name}`;
+        const fileName = createProjectFilesObjectKey({
+          userId: user.id,
+          originalName: file.name,
+          prefix: `projects/${id}`,
+        });
 
         // Upload to storage
         const { error: uploadError } = await supabase.storage

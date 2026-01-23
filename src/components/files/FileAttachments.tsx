@@ -18,6 +18,7 @@ import {
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { createProjectFilesObjectKey } from '@/utils/storageKeys';
 
 interface FileAttachment {
   id: string;
@@ -102,9 +103,11 @@ export function FileAttachments({ projectId, taskId, deliverableId }: FileAttach
 
     try {
       for (const file of Array.from(selectedFiles)) {
-        // Create unique file path
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${user.id}/${Date.now()}_${file.name}`;
+        // Create unique, storage-safe file path (original name is stored in DB)
+        const fileName = createProjectFilesObjectKey({
+          userId: user.id,
+          originalName: file.name,
+        });
 
         // Upload to storage
         const { error: uploadError } = await supabase.storage

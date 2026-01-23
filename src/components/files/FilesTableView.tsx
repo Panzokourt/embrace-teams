@@ -374,15 +374,15 @@ export function FilesTableView({
     return <Badge variant="outline" className="text-xs">{type}</Badge>;
   };
 
-  // Build folder options for dropdown
+  // Build folder options for dropdown (use 'none' instead of empty string for Radix Select)
   const folderOptions = [
-    { value: '', label: 'Χωρίς φάκελο' },
+    { value: 'none', label: 'Χωρίς φάκελο' },
     ...folders.map(f => ({ value: f.id, label: f.name }))
   ];
 
-  // Build related entity options
+  // Build related entity options (use 'none' instead of empty string for Radix Select)
   const relatedOptions = [
-    { value: '', label: '-' },
+    { value: 'none', label: '-' },
     ...deliverables.map(d => ({ value: `deliverable:${d.id}`, label: `📦 ${d.name}` })),
     ...tasks.map(t => ({ value: `task:${t.id}`, label: `✓ ${t.name}` }))
   ];
@@ -390,11 +390,11 @@ export function FilesTableView({
   const getRelatedValue = (file: FileAttachment) => {
     if (file.deliverable_id) return `deliverable:${file.deliverable_id}`;
     if (file.task_id) return `task:${file.task_id}`;
-    return '';
+    return 'none';
   };
 
   const handleRelatedChange = async (fileId: string, value: string) => {
-    if (!value) {
+    if (!value || value === 'none') {
       await onUpdateFile(fileId, 'deliverable_id', null);
       await onUpdateFile(fileId, 'task_id', null);
     } else if (value.startsWith('deliverable:')) {
@@ -446,10 +446,10 @@ export function FilesTableView({
       {isColumnVisible('folder') && (
         <TableCell style={{ width: columnWidths['folder'] || 150 }}>
           <EnhancedInlineEditCell
-            value={file.folder_id || ''}
+            value={file.folder_id || 'none'}
             type="select"
             options={folderOptions}
-            onSave={async (val) => await onUpdateFile(file.id, 'folder_id', val as string || null)}
+            onSave={async (val) => await onUpdateFile(file.id, 'folder_id', val === 'none' ? null : val as string)}
             disabled={!canManage}
             placeholder="Επιλέξτε..."
           />

@@ -10,14 +10,10 @@ export default function AppLayout() {
   const { user, loading, isApproved } = useAuth();
 
   useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        navigate('/auth');
-      } else if (!isApproved) {
-        navigate('/auth');
-      }
+    if (!loading && !user) {
+      navigate('/auth');
     }
-  }, [user, loading, isApproved, navigate]);
+  }, [user, loading, navigate]);
 
   if (loading) {
     return (
@@ -27,7 +23,7 @@ export default function AppLayout() {
     );
   }
 
-  if (!user || !isApproved) {
+  if (!user) {
     return null;
   }
 

@@ -253,6 +253,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
+    // Prevent redirect races: while signing in, keep app in a loading state
+    // so AppLayout won't bounce back to /auth before the session/user state lands.
+    setLoading(true);
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
@@ -266,6 +270,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           fetchUserData(data.user!.id);
         }, 0);
       }
+    } else {
+      setLoading(false);
     }
 
     return { error };

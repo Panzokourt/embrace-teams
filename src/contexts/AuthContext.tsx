@@ -96,12 +96,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [legacyRoles, setLegacyRoles] = useState<LegacyRole[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const applySession = (nextSession: Session | null) => {
+    setSession(nextSession);
+    setUser(nextSession?.user ?? null);
+  };
+
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+        applySession(session);
         
         // Defer fetching profile data
         if (session?.user) {
@@ -117,8 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+      applySession(session);
       if (session?.user) {
         fetchUserData(session.user.id);
       } else {
@@ -250,10 +253,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
     });
+
+    // Ensure app state updates immediately even if auth state events are delayed.
+    if (!error) {
+      applySession(data.session ?? null);
+      if (data.user?.id) {
+        setTimeout(() => {
+          fetchUserData(data.user!.id);
+        }, 0);
+      }
+    }
 
     return { error };
   };

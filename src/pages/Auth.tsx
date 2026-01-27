@@ -29,7 +29,7 @@ export default function Auth() {
   useEffect(() => {
     if (!loading && user) {
       // User is logged in, redirect to homepage
-      navigate('/');
+      navigate('/', { replace: true });
     }
   }, [user, loading, navigate]);
 
@@ -72,6 +72,7 @@ export default function Auth() {
       }
     } else {
       toast.success('Επιτυχής σύνδεση!');
+      navigate('/', { replace: true });
     }
   };
 

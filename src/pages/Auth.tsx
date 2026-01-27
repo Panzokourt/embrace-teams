@@ -72,7 +72,13 @@ export default function Auth() {
       }
     } else {
       toast.success('Επιτυχής σύνδεση!');
+      // Prefer SPA navigation, but use a hard redirect fallback for reliability on custom domains.
       navigate('/', { replace: true });
+      setTimeout(() => {
+        if (window.location.pathname.startsWith('/auth')) {
+          window.location.replace('/');
+        }
+      }, 300);
     }
   };
 

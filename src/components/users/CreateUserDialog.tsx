@@ -62,7 +62,7 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
   const [jobTitle, setJobTitle] = useState('');
   const [department, setDepartment] = useState('');
   const [phone, setPhone] = useState('');
-  const [reportsTo, setReportsTo] = useState('');
+  const [reportsTo, setReportsTo] = useState('none');
   const [role, setRole] = useState<CompanyRole>('standard');
   const [accessScope, setAccessScope] = useState<AccessScope>('assigned');
   const [selectedPermissions, setSelectedPermissions] = useState<PermissionType[]>([]);
@@ -111,7 +111,7 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
     setJobTitle('');
     setDepartment('');
     setPhone('');
-    setReportsTo('');
+    setReportsTo('none');
     setRole('standard');
     setAccessScope('assigned');
     setSelectedPermissions(DEFAULT_ROLE_PERMISSIONS.standard);
@@ -139,7 +139,7 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
           job_title: jobTitle || null,
           department: department || null,
           phone: phone || null,
-          reports_to: reportsTo || null,
+          reports_to: reportsTo === 'none' ? null : reportsTo,
           hire_date: new Date().toISOString().split('T')[0],
           access_scope: accessScope,
           permissions: selectedPermissions
@@ -287,11 +287,11 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
                 <Label>Αναφέρεται σε</Label>
                 <Select value={reportsTo} onValueChange={setReportsTo}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Επιλέξτε..." />
+                    <SelectValue placeholder="Κανέναν" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Κανέναν</SelectItem>
-                    {users.map(u => (
+                    <SelectItem value="none">Κανέναν</SelectItem>
+                    {users.filter(u => u.id).map(u => (
                       <SelectItem key={u.id} value={u.id}>
                         {u.full_name || 'Χωρίς όνομα'}
                       </SelectItem>

@@ -289,7 +289,7 @@ export function EditUserDialog({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Κανένα τμήμα</SelectItem>
-                  {departments.map(dept => (
+                  {departments.filter(dept => dept.id).map(dept => (
                     <SelectItem key={dept.id} value={dept.id}>
                       <div className="flex items-center gap-2">
                         <div 

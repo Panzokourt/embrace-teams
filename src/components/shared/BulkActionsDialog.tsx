@@ -123,7 +123,7 @@ export function BulkActionsDialog({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">Χωρίς ανάθεση</SelectItem>
-              {users.map(user => (
+              {users.filter(user => user.id).map(user => (
                 <SelectItem key={user.id} value={user.id}>
                   <div className="flex items-center gap-2">
                     <Avatar className="h-5 w-5">

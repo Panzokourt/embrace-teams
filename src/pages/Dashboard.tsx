@@ -184,7 +184,7 @@ export default function Dashboard() {
   // Client Dashboard
   if (isClient && !isAdmin && !isManager) {
     return (
-      <div className="p-6 lg:p-8 space-y-8 max-w-7xl mx-auto">
+      <div className="p-6 lg:p-8 space-y-8">
         <div className="animate-fade-in">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Καλωσήρθατε, {profile?.full_name?.split(' ')[0] || 'Client'}
@@ -225,7 +225,7 @@ export default function Dashboard() {
 
   // Admin/Manager Dashboard
   return (
-    <div className="p-6 lg:p-8 space-y-8 max-w-7xl mx-auto">
+    <div className="p-6 lg:p-8 space-y-8">
       {/* Header */}
       <div className="animate-fade-in">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">

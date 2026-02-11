@@ -1,42 +1,36 @@
 
-## Full-Width Responsive Layout
+## Αναβαθμιση Πινακων σε Project Detail
 
-### Προβλημα
-Ολες οι σελιδες εχουν `max-w-7xl mx-auto` (1280px) η `max-w-6xl` (1152px) που περιοριζει το πλατος του περιεχομενου, αφηνοντας κενο στις μεγαλες οθονες.
+### Τρεχουσα Κατασταση
+- **Tender Detail**: Ηδη χρησιμοποιει enhanced tables (`TenderDeliverablesTable`, `TenderTasksTable`) με inline editing, sorting, resizable columns, toolbar, CSV/Excel export
+- **Project Detail**: Χρησιμοποιει παλια card/list components (`ProjectDeliverables`, `ProjectTasksManager`) χωρις τις παραπανω δυνατοτητες
 
-### Λυση
-Αφαιρεση των `max-w-*` και `mx-auto` περιορισμων απο ολα τα page containers, ωστε το περιεχομενο να καλυπτει ολο το διαθεσιμο πλατος.
+### Αλλαγες
 
-### Αλλαγες ανα αρχειο
+#### 1. Νεο αρχειο: `src/components/projects/ProjectDeliverablesTable.tsx`
+Δημιουργια enhanced table για τα Παραδοτεα του Project, ακολουθωντας το pattern του `TenderDeliverablesTable`:
+- Στηλες: Checkbox, Ονομα, Περιγραφη, Budget, Κοστος, Προθεσμια, Ολοκληρωθηκε, Ενεργειες
+- Inline editing μεσω `EnhancedInlineEditCell`
+- Sorting, column resizing, column visibility toggle
+- Toolbar με εξαγωγη CSV/Excel
+- Progress bar και budget summary
+- Dialog για δημιουργια/επεξεργασια
 
-Σε καθε σελιδα, η κυρια wrapper div αλλαζει απο:
-```text
-"p-6 lg:p-8 space-y-6 max-w-7xl mx-auto"
-```
-σε:
-```text
-"p-6 lg:p-8 space-y-6"
-```
+#### 2. Νεο αρχειο: `src/components/projects/ProjectTasksTable.tsx`
+Δημιουργια enhanced table για τα Tasks του Project, ακολουθωντας το pattern του `TenderTasksTable`:
+- Στηλες: Checkbox, Τιτλος, Υπευθυνος, Παραδοτεο, Προθεσμια, Κατασταση, Ενεργειες
+- Inline editing μεσω `EnhancedInlineEditCell`
+- Sorting, column resizing, column visibility toggle
+- Toolbar με εξαγωγη CSV/Excel
+- Dialog για δημιουργια/επεξεργασια
 
-Αρχεια που θα τροποποιηθουν:
-
-| Αρχειο | Τρεχον max-width |
-|--------|-----------------|
-| Dashboard.tsx | max-w-7xl (2 σημεια) |
-| Tasks.tsx | max-w-7xl |
-| Projects.tsx | max-w-7xl |
-| Tenders.tsx | max-w-7xl |
-| Clients.tsx | max-w-7xl |
-| Calendar.tsx | max-w-7xl |
-| UserDetail.tsx | max-w-6xl |
-| ClientDetail.tsx | max-w-6xl |
-| Settings.tsx | max-w-4xl |
-
-Τα υπολοιπα (OrgChart, Users, UsersAccess, Teams, Financials, Files, Departments) δεν εχουν max-width περιορισμο, αρα ειναι ηδη OK.
+#### 3. Τροποποιηση: `src/pages/ProjectDetail.tsx`
+- Αντικατασταση `ProjectDeliverables` με `ProjectDeliverablesTable`
+- Αντικατασταση `ProjectTasksManager` με `ProjectTasksTable`
+- Αφαιρεση των Card wrappers (τα νεα components ειναι αυτονομα)
 
 ### Τεχνικες Λεπτομερειες
-
-- Αφαιρουνται μονο τα `max-w-*` και `mx-auto` απο τα page-level containers
-- Τα εσωτερικα `max-w-` (π.χ. σε search inputs, dialogs, empty state text) παραμενουν ως εχουν
-- Η αλλαγη ειναι καθαρα CSS, χωρις αλλαγη λογικης
-- Ο `App.css` εχει `max-width: 1280px` στο `#root` που επισης πρεπει να αφαιρεθει
+- Τα νεα components χρησιμοποιουν τα ιδια shared components: `EnhancedInlineEditCell`, `TableToolbar`, `ResizableTableHeader`, `useTableViews`
+- Τα παλια αρχεια (`ProjectDeliverables.tsx`, `ProjectTasksManager.tsx`) παραμενουν στο project αλλα δεν χρησιμοποιουνται πλεον - μπορουν να αφαιρεθουν αργοτερα
+- Δεν απαιτουνται αλλαγες στη βαση δεδομενων - χρησιμοποιουνται οι ιδιοι πινακες `deliverables` και `tasks`
+- Storage keys: `project_deliverables_table` και `project_tasks_table` για αποθηκευση column widths/visibility

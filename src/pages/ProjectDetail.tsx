@@ -8,8 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ProjectDeliverables } from '@/components/projects/ProjectDeliverables';
-import { ProjectTasksManager } from '@/components/projects/ProjectTasksManager';
+import { ProjectDeliverablesTable } from '@/components/projects/ProjectDeliverablesTable';
+import { ProjectTasksTable } from '@/components/projects/ProjectTasksTable';
 import { ProjectFinancialsManager } from '@/components/projects/ProjectFinancialsManager';
 import { ProjectPLReport } from '@/components/projects/ProjectPLReport';
 import { ProjectMediaPlan } from '@/components/projects/ProjectMediaPlan';
@@ -571,28 +571,12 @@ export default function ProjectDetailPage() {
 
         {/* Deliverables Tab */}
         <TabsContent value="deliverables">
-          <Card>
-            <CardHeader>
-              <CardTitle>Παραδοτέα</CardTitle>
-              <CardDescription>Διαχείριση παραδοτέων του έργου</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ProjectDeliverables projectId={project.id} projectName={project.name} />
-            </CardContent>
-          </Card>
+          <ProjectDeliverablesTable projectId={project.id} projectName={project.name} />
         </TabsContent>
 
         {/* Tasks Tab */}
         <TabsContent value="tasks">
-          <Card>
-            <CardHeader>
-              <CardTitle>Tasks</CardTitle>
-              <CardDescription>Διαχείριση tasks του έργου</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ProjectTasksManager projectId={project.id} />
-            </CardContent>
-          </Card>
+          <ProjectTasksTable projectId={project.id} />
         </TabsContent>
 
         {/* Files Tab */}

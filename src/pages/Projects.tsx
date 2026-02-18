@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
+import { useActivityLogger } from '@/hooks/useActivityLogger';
 import { useProjectsRealtime } from '@/hooks/useRealtimeSubscription';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -102,6 +103,7 @@ interface FileContent {
 export default function ProjectsPage() {
   const navigate = useNavigate();
   const { isAdmin, isManager } = useAuth();
+  const { logCreate, logUpdate, logDelete, logStatusChange } = useActivityLogger();
   const [projects, setProjects] = useState<Project[]>([]);
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -287,6 +289,7 @@ export default function ProjectsPage() {
 
         setProjects(prev => prev.map(p => p.id === editingProject.id ? data : p));
         toast.success('Το έργο ενημερώθηκε!');
+        logUpdate('project', editingProject.id, formData.name);
         setDialogOpen(false);
         resetForm();
       } else {
@@ -312,6 +315,7 @@ export default function ProjectsPage() {
         }
 
         toast.success('Το έργο δημιουργήθηκε!');
+        logCreate('project', data.id, formData.name);
         
         // If we have uploaded files, set temp project ID for AI analysis
         if (uploadedFiles.length > 0) {
@@ -355,8 +359,10 @@ export default function ProjectsPage() {
 
       if (error) throw error;
 
+      const deletedProject = projects.find(p => p.id === projectId);
       setProjects(prev => prev.filter(p => p.id !== projectId));
       toast.success('Το έργο διαγράφηκε!');
+      logDelete('project', projectId, deletedProject?.name);
     } catch (error) {
       console.error('Error deleting project:', error);
       toast.error('Σφάλμα κατά τη διαγραφή. Ελέγξτε αν υπάρχουν συνδεδεμένα tasks ή invoices.');
@@ -497,6 +503,7 @@ export default function ProjectsPage() {
 
         if (error) throw error;
         toast.success('Η κατάσταση ενημερώθηκε!');
+        logStatusChange('project', activeId, draggedProject.name, draggedProject.status, targetStatus);
       } catch (error) {
         console.error('Error updating project:', error);
         fetchProjects();

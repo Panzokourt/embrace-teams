@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useActivityLogger } from '@/hooks/useActivityLogger';
 import { useTenderToProject } from '@/hooks/useTenderToProject';
 import { useDocumentParser } from '@/hooks/useDocumentParser';
 import { Button } from '@/components/ui/button';
@@ -85,6 +86,7 @@ export default function TenderDetailPage() {
   const navigate = useNavigate();
   const { isAdmin, isManager } = useAuth();
   const { handleStageChange } = useTenderToProject();
+  const { logUpdate, logStatusChange } = useActivityLogger();
   
   const [tender, setTender] = useState<Tender | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
@@ -214,6 +216,7 @@ export default function TenderDetailPage() {
       if (error) throw error;
       
       toast.success('Ο διαγωνισμός ενημερώθηκε!');
+      logUpdate('tender', id, formData.name);
       fetchTenderData();
     } catch (error) {
       console.error('Error updating tender:', error);
@@ -246,6 +249,7 @@ export default function TenderDetailPage() {
     if (success) {
       setFormData(prev => ({ ...prev, stage: newStage }));
       fetchTenderData();
+      logStatusChange('tender', tender.id, tender.name, tender.stage, newStage);
     }
   };
 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useActivityLogger } from '@/hooks/useActivityLogger';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -84,6 +85,7 @@ const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3
 
 export default function FinancialsPage() {
   const { isAdmin, isManager } = useAuth();
+  const { logCreate, logUpdate, logDelete } = useActivityLogger();
   const [projects, setProjects] = useState<Project[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -170,6 +172,7 @@ export default function FinancialsPage() {
         if (error) throw error;
         setInvoices(prev => prev.map(i => i.id === editingInvoice.id ? data : i));
         toast.success('Το τιμολόγιο ενημερώθηκε!');
+        logUpdate('invoice', editingInvoice.id, invoiceForm.invoice_number);
       } else {
         const { data, error } = await supabase
           .from('invoices')
@@ -180,6 +183,7 @@ export default function FinancialsPage() {
         if (error) throw error;
         setInvoices(prev => [data, ...prev]);
         toast.success('Το τιμολόγιο δημιουργήθηκε!');
+        logCreate('invoice', data.id, invoiceForm.invoice_number);
       }
 
       setInvoiceDialogOpen(false);
@@ -213,10 +217,12 @@ export default function FinancialsPage() {
 
   const handleDeleteInvoice = async (invoiceId: string) => {
     try {
+      const deletedInvoice = invoices.find(i => i.id === invoiceId);
       const { error } = await supabase.from('invoices').delete().eq('id', invoiceId);
       if (error) throw error;
       setInvoices(prev => prev.filter(i => i.id !== invoiceId));
       toast.success('Το τιμολόγιο διαγράφηκε!');
+      logDelete('invoice', invoiceId, deletedInvoice?.invoice_number);
     } catch (error) {
       console.error('Error deleting invoice:', error);
       toast.error('Σφάλμα κατά τη διαγραφή');
@@ -277,6 +283,7 @@ export default function FinancialsPage() {
         if (error) throw error;
         setExpenses(prev => prev.map(e => e.id === editingExpense.id ? data : e));
         toast.success('Το έξοδο ενημερώθηκε!');
+        logUpdate('expense', editingExpense.id, expenseForm.description);
       } else {
         const { data, error } = await supabase
           .from('expenses')
@@ -287,6 +294,7 @@ export default function FinancialsPage() {
         if (error) throw error;
         setExpenses(prev => [data, ...prev]);
         toast.success('Το έξοδο δημιουργήθηκε!');
+        logCreate('expense', data.id, expenseForm.description);
       }
 
       setExpenseDialogOpen(false);
@@ -301,10 +309,12 @@ export default function FinancialsPage() {
 
   const handleDeleteExpense = async (expenseId: string) => {
     try {
+      const deletedExpense = expenses.find(e => e.id === expenseId);
       const { error } = await supabase.from('expenses').delete().eq('id', expenseId);
       if (error) throw error;
       setExpenses(prev => prev.filter(e => e.id !== expenseId));
       toast.success('Το έξοδο διαγράφηκε!');
+      logDelete('expense', expenseId, deletedExpense?.description);
     } catch (error) {
       console.error('Error deleting expense:', error);
       toast.error('Σφάλμα κατά τη διαγραφή');

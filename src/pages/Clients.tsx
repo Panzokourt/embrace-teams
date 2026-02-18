@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useActivityLogger } from '@/hooks/useActivityLogger';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -36,6 +37,7 @@ interface Client {
 
 export default function ClientsPage() {
   const { isAdmin, isManager } = useAuth();
+  const { logCreate, logUpdate, logDelete } = useActivityLogger();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -116,6 +118,7 @@ export default function ClientsPage() {
 
         setClients(prev => prev.map(c => c.id === editingClient.id ? { ...data, projectCount: c.projectCount } : c));
         toast.success('Ο πελάτης ενημερώθηκε!');
+        logUpdate('client', editingClient.id, formData.name);
       } else {
         const { data, error } = await supabase
           .from('clients')
@@ -127,6 +130,7 @@ export default function ClientsPage() {
 
         setClients(prev => [...prev, { ...data, projectCount: 0 }].sort((a, b) => a.name.localeCompare(b.name)));
         toast.success('Ο πελάτης δημιουργήθηκε!');
+        logCreate('client', data.id, formData.name);
       }
 
       setDialogOpen(false);
@@ -155,6 +159,7 @@ export default function ClientsPage() {
     if (!confirm('Είστε σίγουροι ότι θέλετε να διαγράψετε αυτόν τον πελάτη;')) return;
     
     try {
+      const deletedClient = clients.find(c => c.id === clientId);
       const { error } = await supabase
         .from('clients')
         .delete()
@@ -164,6 +169,7 @@ export default function ClientsPage() {
 
       setClients(prev => prev.filter(c => c.id !== clientId));
       toast.success('Ο πελάτης διαγράφηκε!');
+      logDelete('client', clientId, deletedClient?.name);
     } catch (error) {
       console.error('Error deleting client:', error);
       toast.error('Σφάλμα κατά τη διαγραφή');

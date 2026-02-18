@@ -1,157 +1,156 @@
 
-# Λογιστήριο - Finance Section
+# Ενοποιημενο Section "Εργασιες" - Καταργηση Tenders, Ενισχυση Projects
 
-## Συνοπτική Περιγραφή
+## Συνοπτικη Περιγραφη
 
-Αναβάθμιση του υπάρχοντος "Οικονομικά & P&L" σε ένα πλήρες Finance Section (Λογιστήριο) με 6 tabs, νέους πίνακες για Services/Pricing και εμπλουτισμένα Expenses/Invoices. Στόχος: "τι πουλάμε, τι χρωστάνε, τι κοστίζει, ποια η εικόνα".
+Καταργουμε πληρως το concept "Tenders" ως ξεχωριστη οντοτητα. Τα leads/ευκαιριες γινονται απλα **Projects σε πρωιμο σταδιο** (pipeline statuses). Ολα ζουν κατω απο ενα ενιαιο section **"Εργασιες"** με 4 tabs: Εργα, Tasks, Ημερολογιο, Επισκοπηση.
 
-## Τρέχουσα Κατάσταση
+## Τι αλλαζει σε επιπεδο concept
 
-Υπάρχουν ήδη:
-- Πίνακας `invoices` (βασικό: amount, paid, issued_date, due_date)
-- Πίνακας `expenses` (βασικό: amount, category, project_id)
-- Πίνακας `contracts` (πλήρες: contract_type, billing_frequency, payment_terms, status, file_path)
-- `ProjectFinancialsManager` και `ProjectPLReport` components
-- `Reports.tsx` page με charts (revenue trend, expenses by category, client P&L)
-- Σελίδα `Financials.tsx` (909 γραμμές) με invoices + expenses CRUD + charts
+Σημερα εχουμε:
+- **Tenders** (ξεχωριστος πινακας) με stages: identification -> preparation -> submitted -> evaluation -> won -> lost
+- **Projects** με statuses: tender, active, completed, cancelled
+- Οταν ενα tender γινεται "won", δημιουργειται νεο project και μεταφερονται deliverables/tasks
 
-## Δομή Finance Section (6 Tabs)
+Μετα:
+- **Μονο Projects** με ενιαιο lifecycle: `lead` -> `proposal` -> `negotiation` -> `won` (αυτοματα γινεται `active`) -> `active` -> `completed` / `cancelled` / `lost`
+- Τα πρωιμα στaδια (lead, proposal, negotiation) ειναι ο "pipeline" -- αυτο που ηταν τα tenders
+- Οταν ενα project γινει "won", αλλαζει αυτοματα σε "active" (χωρις να δημιουργειται νεα εγγραφη)
+- Τα tender-specific πεδια (submission_deadline, probability, source_email, tender_type) μπαινουν στον πινακα projects
 
-### Tab 1: Dashboard (Επισκόπηση)
-KPI cards + γραφήματα - ενοποίηση αυτών που υπάρχουν στο Financials.tsx και Reports.tsx:
-- Revenue / Expenses / Net Profit / Outstanding
-- Monthly trend chart (area)
-- Expenses by category (pie)
-- Aging analysis (bar chart: 0-30, 31-60, 61-90, 90+ ημέρες)
-- Top 5 clients by revenue
+## Νεα Δομη Section "Εργασιες"
 
-### Tab 2: Services & Pricing (ΝΕΟ)
-Κατάλογος υπηρεσιών της εταιρείας ("τι πουλάμε"):
-- Κατηγορία (Retainer / Project / Add-on / Media fee)
-- Τιμή (list price) + Μονάδα χρέωσης (μήνας, ώρα, έργο, τεμάχιο)
-- Εσωτερικό κόστος: ώρες ανά ρόλο + rate ανά ρόλο
-- Target margin %
-- Link σε deliverable template
+### Tab 1: Εργα (Projects)
+- **Card / Table / Kanban views** (οπως τωρα)
+- Kanban columns: Lead | Proposal | Negotiation | Active | Completed
+- Φιλτρο "Pipeline" (δειχνει μονο lead/proposal/negotiation) vs "Active" vs "All"
+- Δημιουργια νεου εργου: μπορει να ξεκινησει ως Lead (pipeline) ή απευθειας ως Active
+- Click -> `/projects/:id` (detail page -- ενοποιημενο)
 
-### Tab 3: Contracts (υπάρχει ήδη πίνακας)
-Ενοποίηση: τα contracts υπάρχουν στη DB αλλά δεν έχουν κεντρική σελίδα.
-- Λίστα όλων των συμβάσεων (filterable ανά πελάτη/status)
-- Status: draft / active / ended / renewed
-- Auto-renewal flag + expiry alerts
-- Link σε PDF attachment
-- Quick view: πελάτης, πακέτο, μηνιαίο fee, payment terms
+### Tab 2: Tasks
+- Cross-project view ολων των tasks (οπως τωρα)
+- Card/Table/Kanban views
+- Filters: assignee, status, project, priority
 
-### Tab 4: Invoices & Collections (αναβάθμιση)
-Εμπλουτισμός υπάρχοντος:
-- Προσθήκη: client_id link, contract_id link, VAT fields, partial payments, attachment (PDF), σχόλια
-- Status: unpaid / partially_paid / paid / overdue / cancelled
-- Αυτόματος υπολογισμός: aging (ημέρες καθυστέρησης), outstanding balance ανά πελάτη
-- Filters: ανά πελάτη, ανά project, ανά status, ανά περίοδο
+### Tab 3: Ημερολογιο
+- Μετακινηση Calendar εδω (deadlines, milestones, task due dates)
+- Αφαιρεση τυπου "tender" απο events (γινονται projects)
 
-### Tab 5: Expenses (αναβάθμιση)
-Εμπλουτισμός υπάρχοντος:
-- Προσθήκη: vendor/supplier name, expense_type (vendor/media/overhead), client_id link, attachment, approval workflow (submitted/approved/paid)
-- Expenses μπορεί να μην συνδέονται με project (π.χ. overheads)
-- Filters: ανά κατηγορία, ανά vendor, ανά project/client
-
-### Tab 6: Reports / Profitability
-Ενοποίηση Reports.tsx + νέα views:
-- Client P&L: Revenue - Direct costs = Gross profit per client
-- Project P&L: ήδη υπάρχει (ProjectPLReport), θα εμφανίζεται εδώ σε list view
-- Monthly P&L statement
-- Budget vs Actual (αν υπάρχουν budgets)
+### Tab 4: Επισκοπηση (Dashboard)
+- KPI cards: Pipeline value, Active projects, Overdue tasks, Win rate
+- Pipeline funnel chart
+- Workload per person
+- Upcoming deadlines
 
 ## Database Changes
 
-### Νέος πίνακας: `services`
-```text
-id              uuid PK
-company_id      uuid FK -> companies
-name            text (π.χ. "Social Media Management")
-description     text
-category        text ('retainer','project','addon','media_fee')
-list_price      numeric
-pricing_unit    text ('month','hour','project','piece')
-internal_cost   numeric (target cost)
-target_margin   numeric (target margin %)
-role_hours      jsonb (π.χ. {"account": 10, "designer": 5, "copywriter": 3})
-role_rates      jsonb (π.χ. {"account": 50, "designer": 60, "copywriter": 45})
-template_id     uuid FK -> project_templates (optional)
-is_active       boolean default true
-sort_order      integer default 0
-created_at      timestamptz
-updated_at      timestamptz
-```
+### 1. Ενημερωση enum `project_status`
+Νεες τιμες: `lead`, `proposal`, `negotiation`, `won`, `active`, `completed`, `cancelled`, `lost`
+(Κρατουμε `tender` προσωρινα για backward compatibility, μετα data migration γινεται deprecate)
 
-### Αλλαγές στον πίνακα `invoices`
-Προσθήκη columns:
-- `contract_id` uuid (FK -> contracts, nullable)
-- `vat_rate` numeric default 24
-- `net_amount` numeric (ποσό χωρίς ΦΠΑ)
-- `vat_amount` numeric (ΦΠΑ)
-- `status` text ('unpaid','partially_paid','paid','overdue','cancelled') default 'unpaid'
-- `paid_amount` numeric default 0 (για partial payments)
-- `notes` text
-- `file_path` text (attachment)
+### 2. Νεα columns στον πινακα `projects`
+- `submission_deadline` date (απο tenders)
+- `probability` integer default 50 (πιθανοτητα επιτυχιας, pipeline)
+- `source` text (πηγη ευκαιριας: email, referral, website, direct)
+- `tender_type` text (public, private, direct κλπ -- απο tenders)
+- `won_date` date (ποτε κερδηθηκε)
+- `lost_reason` text (αν χαθηκε, γιατι)
 
-### Αλλαγές στον πίνακα `expenses`
-Προσθήκη columns:
-- `client_id` uuid (FK -> clients, nullable) -- για overhead expenses χωρίς project
-- `vendor_name` text
-- `expense_type` text ('vendor','media','overhead','subscription') default 'vendor'
-- `approval_status` text ('draft','submitted','approved','paid') default 'draft'
-- `approved_by` uuid (nullable)
-- `file_path` text (attachment)
-- `notes` text
+### 3. Data Migration
+- Μεταφορα 3 tenders -> projects (ως lead/proposal status)
+- Μεταφορα tender_deliverables -> deliverables
+- Μεταφορα tender_tasks -> tasks
+- Μεταφορα tender_team_access -> project_user_access
+- Μεταφορα file_attachments tender_id -> project_id
+- Μεταφορα tender_suggestions -> αποθηκευση στο project metadata (ή αγνοηση αν εχουν ηδη applied)
 
-Αλλαγή: `project_id` γίνεται nullable (overheads δεν έχουν project)
+### 4. Ενημερωση ProjectDetail
+- Οταν project ειναι σε pipeline stage (lead/proposal/negotiation), εμφανιζει τα pipeline-specific πεδια (probability, submission_deadline, source)
+- Οταν ειναι active/completed, εμφανιζει τα κλασικα project πεδια
+- Ενσωματωση AI suggestions (απο TenderAISuggestions) στο ProjectDetail
+- Ενσωματωση Team management (απο TenderTeamManager -- ηδη υπαρχει ProjectTeamManager)
 
-### RLS Policies
-- `services`: SELECT ολοι active users, ALL admin/manager
-- Invoices/expenses: ίδια πολιτική με τα υπάρχοντα (admin/manager full access)
-
-## Νέα Αρχεία
-
-### Pages
-- `src/pages/Financials.tsx` -- REWRITE: Γίνεται η κεντρική σελίδα Finance με 6 tabs
-
-### Components (νέα)
-- `src/components/finance/FinanceDashboard.tsx` -- KPI cards + charts (Tab 1)
-- `src/components/finance/ServicesCatalog.tsx` -- CRUD υπηρεσιών (Tab 2)
-- `src/components/finance/ContractsList.tsx` -- Λίστα συμβάσεων (Tab 3)
-- `src/components/finance/InvoicesManager.tsx` -- Αναβαθμισμένο invoices CRUD (Tab 4)
-- `src/components/finance/ExpensesManager.tsx` -- Αναβαθμισμένο expenses CRUD (Tab 5)
-- `src/components/finance/ProfitabilityReports.tsx` -- Client/Project/Monthly P&L (Tab 6)
-
-### Αλλαγές σε υπάρχοντα
-- `src/App.tsx`: Αφαίρεση `/reports` route (ενσωματώνεται στο Finance), redirect `/reports` -> `/financials`
-- `src/components/layout/AppSidebar.tsx`: Αλλαγή label "P&L" -> "Λογιστήριο", αφαίρεση Reports link αν υπάρχει
-- `src/pages/ClientDetail.tsx`: Προσθήκη "Financial Snapshot" tab (σύμβαση, invoices, outstanding, costs, margin)
+### 5. Αφαιρεση Tenders
+- Αφαιρεση `src/pages/Tenders.tsx` και `src/pages/TenderDetail.tsx`
+- Αφαιρεση `src/components/tenders/*` (10 αρχεια)
+- Αφαιρεση `src/hooks/useTenderToProject.ts` (η λογικη γινεται status change στο project)
+- Αφαιρεση routes `/tenders`, `/tenders/:id`
+- Redirect `/tenders` -> `/projects` (backward compat)
 
 ## UI Layout
 
 ```text
 +--------------------------------------------------+
-| Λογιστήριο                                       |
+| Εργασιες                                          |
 +--------------------------------------------------+
-| [Dashboard] [Υπηρεσίες] [Συμβάσεις]             |
-| [Τιμολόγια] [Έξοδα] [Αναφορές]                  |
+| [Εργα] [Tasks] [Ημερολογιο] [Επισκοπηση]        |
 +--------------------------------------------------+
 |                                                    |
-|  < Περιεχόμενο αντίστοιχου tab >                  |
+|  Tab "Εργα":                                       |
+|  [+ Νεο Εργο] [Pipeline | Active | All]           |
+|  [Card | Table | Kanban]                           |
+|                                                    |
+|  Kanban columns:                                   |
+|  | Lead | Proposal | Negotiation | Active | Done | |
 |                                                    |
 +--------------------------------------------------+
 ```
 
-## Σειρά Υλοποίησης
+## Project Detail - Ενοποιημενο
 
-1. Database migration (νέος πίνακας services + alter invoices + alter expenses + RLS)
-2. FinanceDashboard component (KPI + charts)
-3. ServicesCatalog component (CRUD)
-4. ContractsList component (list + filters)
-5. InvoicesManager component (αναβαθμισμένο CRUD)
-6. ExpensesManager component (αναβαθμισμένο CRUD)
-7. ProfitabilityReports component (P&L views)
-8. Κεντρική σελίδα Financials.tsx (tabs)
-9. Routing + Sidebar updates
-10. ClientDetail Financial Snapshot tab
+```text
++--------------------------------------------------+
+| <- Πισω στα Εργα                                  |
+| [Project Name]           Status: [Lead v]          |
+|                                                    |
+| -- Αν Pipeline (lead/proposal/negotiation): --     |
+| Πιθανοτητα: 70%  |  Deadline: 15/03  |  Πηγη: ... |
+| [AI Suggestions] [Upload Files for Analysis]       |
+|                                                    |
+| -- Αν Active/Completed: --                         |
+| Progress: 65%  |  Budget: 50.000  |  Period: ...   |
+|                                                    |
+| Tabs:                                              |
+| [Overview] [Deliverables] [Tasks] [Files]          |
+| [Financials] [Comments] [Media Plan]               |
++--------------------------------------------------+
+```
+
+## Αρχεια
+
+### Νεα
+- `src/pages/Work.tsx` -- Κεντρικη σελιδα "Εργασιες" με 4 tabs
+- `src/components/work/WorkOverview.tsx` -- Dashboard tab με KPIs
+
+### Τροποποιημενα
+- `src/pages/ProjectDetail.tsx` -- Προσθηκη pipeline-specific UI (probability, deadline, AI suggestions)
+- `src/pages/Projects.tsx` -- Εξαγωγη core content σε component για χρηση μεσα στο Work.tsx
+- `src/pages/Tasks.tsx` -- Εξαγωγη core content σε component
+- `src/pages/Calendar.tsx` -- Εξαγωγη core content + αφαιρεση tender references
+- `src/App.tsx` -- Νεες routes, redirects
+- `src/components/layout/AppSidebar.tsx` -- Ενα link "Εργασιες" αντι 3
+
+### Αφαιρουμενα
+- `src/pages/Tenders.tsx`
+- `src/pages/TenderDetail.tsx`
+- `src/components/tenders/*` (10 αρχεια)
+- `src/hooks/useTenderToProject.ts`
+
+## Σειρα Υλοποιησης
+
+1. **Database migration**: Νεα columns στο projects, νεες enum τιμες, data migration tenders -> projects, data migration tender_deliverables/tasks/files/team
+2. **ProjectDetail ενημερωση**: Pipeline-specific UI, AI suggestions ενσωματωση
+3. **Projects page update**: Νεα statuses, pipeline filter, kanban columns
+4. **Calendar update**: Αφαιρεση tender references
+5. **Work.tsx**: Κεντρικη σελιδα με tabs (Εργα, Tasks, Ημερολογιο, Επισκοπηση)
+6. **WorkOverview**: Dashboard tab
+7. **Routing + Sidebar**: Ενημερωση routes, redirects, sidebar
+8. **Cleanup**: Αφαιρεση tenders components/pages/hooks
+
+## Σημαντικες Σημειωσεις
+
+- Τα 3 υπαρχοντα tenders θα μεταφερθουν αυτοματα ως projects στη migration
+- Τα 29 tender_deliverables και 35 tender_tasks θα γινουν κανονικα deliverables/tasks
+- Η λογικη "won -> create project" αντικαθισταται απο "status change won -> active" (ιδιο project, απλα αλλαζει status)
+- Οι RLS policies του projects καλυπτουν ηδη ολα τα scenarios
+- Μετα την migration, οι tenders πινακες μπορουν να μεινουν (ως archive) ή να αφαιρεθουν

@@ -34,6 +34,7 @@ import {
   Network,
   FileArchive,
   Timer,
+  FileStack,
 } from 'lucide-react';
 
 import { PermissionType } from '@/contexts/AuthContext';
@@ -65,6 +66,7 @@ const adminNavItems: NavItem[] = [
   { title: 'Τμήματα', href: '/departments', icon: Building2, adminOnly: true },
   { title: 'Οργανόγραμμα', href: '/org-chart', icon: Network },
   { title: 'Πελάτες', href: '/clients', icon: Building2, permission: 'clients.view' },
+  { title: 'Προσχέδια', href: '/blueprints', icon: FileStack, permission: 'settings.company' },
   { title: 'Ρυθμίσεις', href: '/settings', icon: Settings, permission: 'settings.company' },
 ];
 

@@ -57,7 +57,7 @@ const navItems: NavItem[] = [
   { title: 'Ημερολόγιο', href: '/calendar', icon: CalendarDays },
   { title: 'Αρχείο', href: '/files', icon: FileArchive, permission: 'files.view' },
   { title: 'HR', href: '/hr', icon: UserCog },
-  { title: 'P&L', href: '/financials', icon: DollarSign, permission: 'financials.view' },
+  { title: 'Λογιστήριο', href: '/financials', icon: DollarSign, permission: 'financials.view' },
 ];
 
 const adminNavItems: NavItem[] = [

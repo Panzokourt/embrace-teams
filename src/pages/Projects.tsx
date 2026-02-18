@@ -39,6 +39,7 @@ import { ClientSelector } from '@/components/shared/ClientSelector';
 import { ProjectsTableView } from '@/components/projects/ProjectsTableView';
 import { FileAttachments } from '@/components/files/FileAttachments';
 import { ProjectAISuggestions } from '@/components/projects/ProjectAISuggestions';
+import { useProjectTemplates } from '@/hooks/useProjectTemplates';
 import { EditDeleteActions } from '@/components/dialogs/EditDeleteActions';
 import { toast } from 'sonner';
 import { 
@@ -111,7 +112,10 @@ export default function ProjectsPage() {
   const [uploadedFiles, setUploadedFiles] = useState<FileContent[]>([]);
   const [tempProjectId, setTempProjectId] = useState<string | null>(null);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
+  const [templates, setTemplates] = useState<Array<{ id: string; name: string; project_type: string; default_budget: number; default_agency_fee_percentage: number }>>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('none');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { applyTemplate, applying: applyingTemplate } = useProjectTemplates();
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -195,13 +199,23 @@ export default function ProjectsPage() {
     }
   };
 
+  const fetchTemplates = useCallback(async () => {
+    const { data } = await supabase
+      .from('project_templates')
+      .select('id, name, project_type, default_budget, default_agency_fee_percentage')
+      .eq('is_active', true)
+      .order('sort_order');
+    setTemplates(data || []);
+  }, []);
+
   // Subscribe to realtime updates
   useProjectsRealtime(fetchProjects);
 
   useEffect(() => {
     fetchProjects();
     fetchClients();
-  }, [fetchProjects]);
+    fetchTemplates();
+  }, [fetchProjects, fetchTemplates]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -276,6 +290,16 @@ export default function ProjectsPage() {
         if (error) throw error;
 
         setProjects(prev => [data, ...prev]);
+        
+        // Apply template if selected
+        if (selectedTemplateId && selectedTemplateId !== 'none') {
+          await applyTemplate({
+            projectId: data.id,
+            templateId: selectedTemplateId,
+            startDate: formData.start_date || undefined,
+          });
+        }
+
         toast.success('Το έργο δημιουργήθηκε!');
         
         // If we have uploaded files, set temp project ID for AI analysis
@@ -371,6 +395,7 @@ export default function ProjectsPage() {
     setUploadedFiles([]);
     setTempProjectId(null);
     setDialogTab('details');
+    setSelectedTemplateId('none');
   };
 
   const getStatusBadge = (status: ProjectStatus) => {
@@ -688,6 +713,41 @@ export default function ProjectsPage() {
 
                   <TabsContent value="details" className="mt-4">
                     <form onSubmit={handleSubmit} className="space-y-4">
+                      {/* Template Selector - only for new projects */}
+                      {!editingProject && templates.length > 0 && (
+                        <div className="space-y-2 p-3 rounded-lg border border-primary/20 bg-primary/5">
+                          <Label>Template Έργου</Label>
+                          <Select
+                            value={selectedTemplateId}
+                            onValueChange={(value) => {
+                              setSelectedTemplateId(value);
+                              if (value !== 'none') {
+                                const tpl = templates.find(t => t.id === value);
+                                if (tpl) {
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    budget: tpl.default_budget ? tpl.default_budget.toString() : prev.budget,
+                                    agency_fee_percentage: tpl.default_agency_fee_percentage ? tpl.default_agency_fee_percentage.toString() : prev.agency_fee_percentage,
+                                  }));
+                                }
+                              }
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Χωρίς template" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Χωρίς template</SelectItem>
+                              {templates.map(tpl => (
+                                <SelectItem key={tpl.id} value={tpl.id}>{tpl.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            Επιλέξτε template για αυτόματη δημιουργία παραδοτέων και tasks
+                          </p>
+                        </div>
+                      )}
                       <div className="space-y-2">
                         <Label htmlFor="name">Όνομα Έργου *</Label>
                         <Input

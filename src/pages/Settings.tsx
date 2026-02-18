@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { ProjectTemplatesManager } from '@/components/settings/ProjectTemplatesManager';
 import { 
   Settings as SettingsIcon, 
   User,
@@ -345,6 +346,9 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Project Templates - Admin Only */}
+      {isAdmin && <ProjectTemplatesManager />}
 
       {/* Security */}
       <Card>

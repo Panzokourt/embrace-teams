@@ -1,11 +1,14 @@
 import { useState, useCallback } from 'react';
+import { arrayMove } from '@dnd-kit/sortable';
 
 export type WidgetSize = 'small' | 'medium' | 'large';
+export type WidgetViewType = 'card' | 'table' | 'list';
 
 export interface WidgetConfig {
   id: string;
   visible: boolean;
   size: WidgetSize;
+  viewType?: WidgetViewType;
 }
 
 export interface DashboardFilters {
@@ -19,7 +22,13 @@ export interface DashboardConfig {
   filters: DashboardFilters;
 }
 
+export interface SavedLayout {
+  name: string;
+  config: DashboardConfig;
+}
+
 const STORAGE_KEY = 'dashboard_config_v1';
+const LAYOUTS_STORAGE_KEY = 'dashboard_saved_layouts_v1';
 
 const DEFAULT_WIDGETS: WidgetConfig[] = [
   { id: 'total_revenue', visible: true, size: 'small' },
@@ -32,12 +41,12 @@ const DEFAULT_WIDGETS: WidgetConfig[] = [
   { id: 'overdue', visible: true, size: 'small' },
   { id: 'today_hours', visible: true, size: 'small' },
   { id: 'utilization', visible: true, size: 'small' },
-  { id: 'pipeline', visible: true, size: 'large' },
-  { id: 'alerts', visible: true, size: 'medium' },
-  { id: 'deadlines', visible: true, size: 'medium' },
-  { id: 'recent_activity', visible: true, size: 'medium' },
+  { id: 'pipeline', visible: true, size: 'large', viewType: 'card' },
+  { id: 'alerts', visible: true, size: 'medium', viewType: 'card' },
+  { id: 'deadlines', visible: true, size: 'medium', viewType: 'card' },
+  { id: 'recent_activity', visible: true, size: 'medium', viewType: 'card' },
   { id: 'revenue_chart', visible: false, size: 'large' },
-  { id: 'project_progress', visible: false, size: 'medium' },
+  { id: 'project_progress', visible: false, size: 'medium', viewType: 'card' },
 ];
 
 const DEFAULT_FILTERS: DashboardFilters = {
@@ -51,7 +60,6 @@ function loadConfig(): DashboardConfig {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as DashboardConfig;
-      // Merge with defaults to handle new widgets added later
       const existingIds = new Set(parsed.widgets.map(w => w.id));
       const merged = [
         ...parsed.widgets,
@@ -67,8 +75,21 @@ function saveConfig(config: DashboardConfig) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
 }
 
+function loadLayouts(): Record<string, DashboardConfig> {
+  try {
+    const raw = localStorage.getItem(LAYOUTS_STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return {};
+}
+
+function saveLayouts(layouts: Record<string, DashboardConfig>) {
+  localStorage.setItem(LAYOUTS_STORAGE_KEY, JSON.stringify(layouts));
+}
+
 export function useDashboardConfig() {
   const [config, setConfigState] = useState<DashboardConfig>(loadConfig);
+  const [savedLayouts, setSavedLayoutsState] = useState<Record<string, DashboardConfig>>(loadLayouts);
 
   const setConfig = useCallback((updater: DashboardConfig | ((prev: DashboardConfig) => DashboardConfig)) => {
     setConfigState(prev => {
@@ -92,6 +113,13 @@ export function useDashboardConfig() {
     }));
   }, [setConfig]);
 
+  const setWidgetViewType = useCallback((id: string, viewType: WidgetViewType) => {
+    setConfig(prev => ({
+      ...prev,
+      widgets: prev.widgets.map(w => w.id === id ? { ...w, viewType } : w),
+    }));
+  }, [setConfig]);
+
   const setFilters = useCallback((filters: Partial<DashboardFilters>) => {
     setConfig(prev => ({
       ...prev,
@@ -99,9 +127,41 @@ export function useDashboardConfig() {
     }));
   }, [setConfig]);
 
+  const reorderWidgets = useCallback((activeId: string, overId: string) => {
+    setConfig(prev => {
+      const oldIndex = prev.widgets.findIndex(w => w.id === activeId);
+      const newIndex = prev.widgets.findIndex(w => w.id === overId);
+      if (oldIndex === -1 || newIndex === -1) return prev;
+      return { ...prev, widgets: arrayMove(prev.widgets, oldIndex, newIndex) };
+    });
+  }, [setConfig]);
+
   const getWidget = useCallback((id: string) => {
     return config.widgets.find(w => w.id === id);
   }, [config.widgets]);
+
+  // Saved layouts
+  const saveLayout = useCallback((name: string) => {
+    setSavedLayoutsState(prev => {
+      const next = { ...prev, [name]: structuredClone(config) };
+      saveLayouts(next);
+      return next;
+    });
+  }, [config]);
+
+  const loadLayout = useCallback((name: string) => {
+    const layout = savedLayouts[name];
+    if (layout) setConfig(layout);
+  }, [savedLayouts, setConfig]);
+
+  const deleteLayout = useCallback((name: string) => {
+    setSavedLayoutsState(prev => {
+      const next = { ...prev };
+      delete next[name];
+      saveLayouts(next);
+      return next;
+    });
+  }, []);
 
   const visibleWidgets = config.widgets.filter(w => w.visible);
 
@@ -110,8 +170,14 @@ export function useDashboardConfig() {
     visibleWidgets,
     toggleWidget,
     setWidgetSize,
+    setWidgetViewType,
     setFilters,
     getWidget,
+    reorderWidgets,
+    savedLayouts,
+    saveLayout,
+    loadLayout,
+    deleteLayout,
   };
 }
 

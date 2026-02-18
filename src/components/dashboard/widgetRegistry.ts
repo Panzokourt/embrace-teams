@@ -3,7 +3,7 @@ import {
   FolderKanban, AlertTriangle, Activity, Timer, LucideIcon,
   BarChart3, ListChecks
 } from 'lucide-react';
-import type { WidgetSize } from '@/hooks/useDashboardConfig';
+import type { WidgetSize, WidgetViewType } from '@/hooks/useDashboardConfig';
 
 export interface WidgetDefinition {
   id: string;
@@ -12,6 +12,7 @@ export interface WidgetDefinition {
   defaultVisible: boolean;
   icon: LucideIcon;
   category: 'financial' | 'project' | 'composite';
+  supportedViews?: WidgetViewType[];
 }
 
 export const WIDGET_REGISTRY: WidgetDefinition[] = [
@@ -25,12 +26,12 @@ export const WIDGET_REGISTRY: WidgetDefinition[] = [
   { id: 'overdue', label: 'Overdue Tasks', defaultSize: 'small', defaultVisible: true, icon: AlertTriangle, category: 'project' },
   { id: 'today_hours', label: 'Ώρες Σήμερα', defaultSize: 'small', defaultVisible: true, icon: Timer, category: 'project' },
   { id: 'utilization', label: 'Utilization', defaultSize: 'small', defaultVisible: true, icon: Activity, category: 'project' },
-  { id: 'pipeline', label: 'Pipeline', defaultSize: 'large', defaultVisible: true, icon: Activity, category: 'composite' },
-  { id: 'alerts', label: 'Alerts', defaultSize: 'medium', defaultVisible: true, icon: AlertTriangle, category: 'composite' },
-  { id: 'deadlines', label: 'Deadlines', defaultSize: 'medium', defaultVisible: true, icon: Timer, category: 'composite' },
-  { id: 'recent_activity', label: 'Πρόσφατη Δραστηριότητα', defaultSize: 'medium', defaultVisible: true, icon: Activity, category: 'composite' },
+  { id: 'pipeline', label: 'Pipeline', defaultSize: 'large', defaultVisible: true, icon: Activity, category: 'composite', supportedViews: ['card', 'table'] },
+  { id: 'alerts', label: 'Alerts', defaultSize: 'medium', defaultVisible: true, icon: AlertTriangle, category: 'composite', supportedViews: ['card', 'list'] },
+  { id: 'deadlines', label: 'Deadlines', defaultSize: 'medium', defaultVisible: true, icon: Timer, category: 'composite', supportedViews: ['card', 'table'] },
+  { id: 'recent_activity', label: 'Πρόσφατη Δραστηριότητα', defaultSize: 'medium', defaultVisible: true, icon: Activity, category: 'composite', supportedViews: ['card', 'list'] },
   { id: 'revenue_chart', label: 'Γράφημα Εσόδων', defaultSize: 'large', defaultVisible: false, icon: BarChart3, category: 'composite' },
-  { id: 'project_progress', label: 'Πρόοδος Έργων', defaultSize: 'medium', defaultVisible: false, icon: ListChecks, category: 'composite' },
+  { id: 'project_progress', label: 'Πρόοδος Έργων', defaultSize: 'medium', defaultVisible: false, icon: ListChecks, category: 'composite', supportedViews: ['card', 'table'] },
 ];
 
 export function getWidgetDef(id: string): WidgetDefinition | undefined {

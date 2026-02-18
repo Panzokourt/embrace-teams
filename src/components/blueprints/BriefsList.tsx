@@ -180,6 +180,9 @@ export function BriefsList() {
             definition={def}
             initialData={editBrief.data as Record<string, any>}
             briefId={editBrief.id}
+            initialClientId={editBrief.client_id || ''}
+            initialProjectId={editBrief.project_id || ''}
+            initialAssignedUsers={(editBrief.data as any)?.assigned_users || []}
             onSaved={fetchBriefs}
           />
         );

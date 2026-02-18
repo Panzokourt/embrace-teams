@@ -2,21 +2,23 @@ import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useDashboardRealtime } from '@/hooks/useRealtimeSubscription';
+import { useDashboardConfig, getFilterDateRange } from '@/hooks/useDashboardConfig';
+import { getColSpanClass } from '@/components/dashboard/widgetRegistry';
 import StatCard from '@/components/dashboard/StatCard';
 import PipelineCard, { getDefaultPipelineStages } from '@/components/dashboard/PipelineCard';
 import TaskList from '@/components/dashboard/TaskList';
+import DashboardFilters from '@/components/dashboard/DashboardFilters';
+import DashboardCustomizer from '@/components/dashboard/DashboardCustomizer';
+import RecentActivity from '@/components/dashboard/widgets/RecentActivity';
+import RevenueChart from '@/components/dashboard/widgets/RevenueChart';
+import ProjectProgress from '@/components/dashboard/widgets/ProjectProgress';
 import { 
-  DollarSign, 
-  Percent, 
-  TrendingUp, 
-  FileWarning,
-  Trophy,
-  FolderKanban,
-  AlertTriangle,
-  Activity,
-  Loader2,
-  Timer
+  DollarSign, Percent, TrendingUp, FileWarning,
+  Trophy, FolderKanban, AlertTriangle, Activity,
+  Loader2, Timer, Settings2
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface DashboardStats {
   totalRevenue: number;
@@ -42,17 +44,13 @@ interface Task {
 export default function Dashboard() {
   const { profile, isAdmin, isManager, isClient } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [customizerOpen, setCustomizerOpen] = useState(false);
+  const { config, visibleWidgets, toggleWidget, setWidgetSize, setFilters, getWidget } = useDashboardConfig();
+
   const [stats, setStats] = useState<DashboardStats>({
-    totalRevenue: 0,
-    agencyFee: 0,
-    netProfit: 0,
-    pendingInvoices: 0,
-    activeTenders: 0,
-    activeProjects: 0,
-    winRate: 0,
-    overdueCount: 0,
-    utilization: 0,
-    todayHours: 0,
+    totalRevenue: 0, agencyFee: 0, netProfit: 0, pendingInvoices: 0,
+    activeTenders: 0, activeProjects: 0, winRate: 0, overdueCount: 0,
+    utilization: 0, todayHours: 0,
   });
 
   const [pipelineStages, setPipelineStages] = useState(getDefaultPipelineStages());
@@ -60,92 +58,80 @@ export default function Dashboard() {
 
   const fetchDashboardData = useCallback(async () => {
     try {
-      // Fetch all data in parallel
-      const [
-        invoicesRes,
-        expensesRes,
-        projectsRes,
-        tendersRes,
-        tasksRes,
-        timeEntriesRes
-      ] = await Promise.all([
-        supabase.from('invoices').select('amount, paid'),
-        supabase.from('expenses').select('amount'),
-        supabase.from('projects').select('budget, agency_fee_percentage, status'),
-        supabase.from('tenders').select('id, name, budget, stage, client:clients(name)'),
-        supabase.from('tasks').select('id, title, due_date, status, project:projects(name)'),
-        supabase.from('time_entries').select('duration_minutes, start_time, is_running')
-          .gte('start_time', new Date(new Date().setHours(0,0,0,0)).toISOString())
-          .eq('is_running', false)
-      ]);
+      const periodStart = getFilterDateRange(config.filters.period).toISOString();
+      const { clientId, projectId } = config.filters;
 
-      // Calculate financial stats
+      // Build queries with filters
+      let invoicesQ = supabase.from('invoices').select('amount, paid, issued_date');
+      invoicesQ = invoicesQ.gte('issued_date', periodStart);
+      if (clientId) invoicesQ = invoicesQ.eq('client_id', clientId);
+      if (projectId) invoicesQ = invoicesQ.eq('project_id', projectId);
+
+      let expensesQ = supabase.from('expenses').select('amount, expense_date');
+      expensesQ = expensesQ.gte('expense_date', periodStart);
+      if (projectId) expensesQ = expensesQ.eq('project_id', projectId);
+
+      let projectsQ = supabase.from('projects').select('budget, agency_fee_percentage, status, client_id');
+      if (clientId) projectsQ = projectsQ.eq('client_id', clientId);
+
+      let tendersQ = supabase.from('tenders').select('id, name, budget, stage, client:clients(name)');
+
+      let tasksQ = supabase.from('tasks').select('id, title, due_date, status, project:projects(name)');
+      if (projectId) tasksQ = tasksQ.eq('project_id', projectId);
+
+      const timeEntriesQ = supabase.from('time_entries').select('duration_minutes, start_time, is_running')
+        .gte('start_time', new Date(new Date().setHours(0,0,0,0)).toISOString())
+        .eq('is_running', false);
+
+      const [invoicesRes, expensesRes, projectsRes, tendersRes, tasksRes, timeEntriesRes] =
+        await Promise.all([invoicesQ, expensesQ, projectsQ, tendersQ, tasksQ, timeEntriesQ]);
+
       const invoices = invoicesRes.data || [];
       const expenses = expensesRes.data || [];
       const projects = projectsRes.data || [];
       const tenders = tendersRes.data || [];
       const tasks = tasksRes.data || [];
 
-      const totalRevenue = invoices.reduce((sum, i) => sum + Number(i.amount), 0);
-      const totalPaid = invoices.filter(i => i.paid).reduce((sum, i) => sum + Number(i.amount), 0);
+      const totalRevenue = invoices.reduce((s, i) => s + Number(i.amount), 0);
+      const totalPaid = invoices.filter(i => i.paid).reduce((s, i) => s + Number(i.amount), 0);
       const pendingInvoices = totalRevenue - totalPaid;
-      const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+      const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
       const netProfit = totalRevenue - totalExpenses;
 
-      // Calculate agency fee from active projects
       const activeProjects = projects.filter(p => p.status === 'active');
-      const agencyFee = activeProjects.reduce((sum, p) => 
-        sum + (Number(p.budget || 0) * Number(p.agency_fee_percentage || 0) / 100), 0
-      );
+      const agencyFee = activeProjects.reduce((s, p) =>
+        s + (Number(p.budget || 0) * Number(p.agency_fee_percentage || 0) / 100), 0);
 
-      // Calculate tender stats
-      const activeTenders = tenders.filter(t => 
-        !['won', 'lost'].includes(t.stage)
-      ).length;
-
+      const activeTenders = tenders.filter(t => !['won', 'lost'].includes(t.stage)).length;
       const wonTenders = tenders.filter(t => t.stage === 'won').length;
       const lostTenders = tenders.filter(t => t.stage === 'lost').length;
       const completedTenders = wonTenders + lostTenders;
       const winRate = completedTenders > 0 ? Math.round((wonTenders / completedTenders) * 100) : 0;
 
-      // Calculate overdue tasks
       const now = new Date();
-      const overdueTasks = tasks.filter(t => 
-        t.due_date && 
-        new Date(t.due_date) < now && 
-        t.status !== 'completed'
-      );
+      const overdueTasks = tasks.filter(t => t.due_date && new Date(t.due_date) < now && t.status !== 'completed');
 
-      // Calculate utilization (active tasks / total capacity - simplified)
       const inProgressTasks = tasks.filter(t => t.status === 'in_progress').length;
-      const totalTasks = tasks.filter(t => t.status !== 'completed').length;
-      const utilization = totalTasks > 0 ? Math.round((inProgressTasks / Math.max(totalTasks, 1)) * 100) : 0;
+      const totalActiveTasks = tasks.filter(t => t.status !== 'completed').length;
+      const utilization = totalActiveTasks > 0 ? Math.round((inProgressTasks / totalActiveTasks) * 100) : 0;
 
-      // Calculate today's tracked hours
       const todayMinutes = (timeEntriesRes.data || []).reduce((s, e) => s + (e.duration_minutes || 0), 0);
-      const todayHours = Math.round((todayMinutes / 60) * 10) / 10;
 
       setStats({
-        totalRevenue,
-        agencyFee,
-        netProfit,
-        pendingInvoices,
-        activeTenders,
-        activeProjects: activeProjects.length,
-        winRate,
+        totalRevenue, agencyFee, netProfit, pendingInvoices,
+        activeTenders, activeProjects: activeProjects.length, winRate,
         overdueCount: overdueTasks.length,
         utilization: Math.min(utilization, 100),
-        todayHours,
+        todayHours: Math.round((todayMinutes / 60) * 10) / 10,
       });
 
-      // Build pipeline stages
+      // Pipeline
       const stages = getDefaultPipelineStages();
       tenders.forEach(tender => {
-        const stageIndex = stages.findIndex(s => s.id === tender.stage);
-        if (stageIndex !== -1) {
-          stages[stageIndex].items.push({
-            id: tender.id,
-            name: tender.name,
+        const idx = stages.findIndex(s => s.id === tender.stage);
+        if (idx !== -1) {
+          stages[idx].items.push({
+            id: tender.id, name: tender.name,
             client: tender.client?.name || 'Άγνωστος',
             budget: Number(tender.budget) || 0,
           });
@@ -153,34 +139,27 @@ export default function Dashboard() {
       });
       setPipelineStages(stages);
 
-      // Build upcoming tasks
+      // Upcoming tasks
       const upcoming = tasks
         .filter(t => t.due_date && t.status !== 'completed')
         .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime())
         .slice(0, 5)
         .map(t => ({
-          id: t.id,
-          title: t.title,
+          id: t.id, title: t.title,
           project: t.project?.name || 'Άγνωστο έργο',
           dueDate: new Date(t.due_date!),
           status: t.status as Task['status'],
         }));
       setUpcomingTasks(upcoming);
-
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [config.filters]);
 
-  // Subscribe to realtime updates
   useDashboardRealtime(fetchDashboardData);
-
-  useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
-
+  useEffect(() => { fetchDashboardData(); }, [fetchDashboardData]);
 
   if (loading) {
     return (
@@ -201,157 +180,113 @@ export default function Dashboard() {
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Καλωσήρθατε, {profile?.full_name?.split(' ')[0] || 'Client'}
           </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Παρακολουθήστε την πρόοδο των έργων σας
-          </p>
+          <p className="text-muted-foreground mt-1 text-sm">Παρακολουθήστε την πρόοδο των έργων σας</p>
         </div>
-
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <StatCard
-            title="Ενεργά Έργα"
-            value={stats.activeProjects}
-            icon={FolderKanban}
-            variant="primary"
-          />
-          <StatCard
-            title="Παραδοτέα σε Εξέλιξη"
-            value={upcomingTasks.length}
-            icon={Activity}
-            variant="success"
-          />
-          <StatCard
-            title="Εκκρεμή Τιμολόγια"
-            value={`€${stats.pendingInvoices.toLocaleString()}`}
-            icon={FileWarning}
-            variant="warning"
-          />
+          <StatCard title="Ενεργά Έργα" value={stats.activeProjects} icon={FolderKanban} variant="primary" />
+          <StatCard title="Παραδοτέα σε Εξέλιξη" value={upcomingTasks.length} icon={Activity} variant="success" />
+          <StatCard title="Εκκρεμή Τιμολόγια" value={`€${stats.pendingInvoices.toLocaleString()}`} icon={FileWarning} variant="warning" />
         </div>
-
-        <TaskList 
-          tasks={upcomingTasks} 
-          title="Επερχόμενα Παραδοτέα" 
-        />
+        <TaskList tasks={upcomingTasks} title="Επερχόμενα Παραδοτέα" />
       </div>
     );
   }
 
-  // Admin/Manager Dashboard
-  return (
-    <div className="p-6 lg:p-8 space-y-8">
-      {/* Header */}
-      <div className="animate-fade-in">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Dashboard
-        </h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Συνολική εικόνα εταιρίας
-        </p>
-      </div>
+  const isVisible = (id: string) => getWidget(id)?.visible ?? true;
+  const sizeClass = (id: string) => getColSpanClass(getWidget(id)?.size ?? 'small');
 
-      {/* Financial Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Συνολικά Έσοδα"
-          value={`€${stats.totalRevenue.toLocaleString()}`}
-          icon={DollarSign}
-          variant="primary"
-        />
-        <StatCard
-          title="Προμήθεια Agency"
-          value={`€${stats.agencyFee.toLocaleString()}`}
-          subtitle="από ενεργά έργα"
-          icon={Percent}
-          variant="default"
-        />
-        <StatCard
-          title="Καθαρό Κέρδος"
-          value={`€${stats.netProfit.toLocaleString()}`}
-          icon={TrendingUp}
-          variant={stats.netProfit >= 0 ? 'success' : 'destructive'}
-        />
-        <StatCard
-          title="Εκκρεμή Τιμολόγια"
-          value={`€${stats.pendingInvoices.toLocaleString()}`}
-          icon={FileWarning}
-          variant={stats.pendingInvoices > 0 ? 'warning' : 'default'}
-        />
-      </div>
+  // Stat widgets mapping
+  const statWidgets: Record<string, React.ReactNode> = {
+    total_revenue: <StatCard title="Συνολικά Έσοδα" value={`€${stats.totalRevenue.toLocaleString()}`} icon={DollarSign} variant="primary" />,
+    agency_fee: <StatCard title="Προμήθεια Agency" value={`€${stats.agencyFee.toLocaleString()}`} subtitle="από ενεργά έργα" icon={Percent} />,
+    net_profit: <StatCard title="Καθαρό Κέρδος" value={`€${stats.netProfit.toLocaleString()}`} icon={TrendingUp} variant={stats.netProfit >= 0 ? 'success' : 'destructive'} />,
+    pending_invoices: <StatCard title="Εκκρεμή Τιμολόγια" value={`€${stats.pendingInvoices.toLocaleString()}`} icon={FileWarning} variant={stats.pendingInvoices > 0 ? 'warning' : 'default'} />,
+    active_tenders: <StatCard title="Διαγωνισμοί" value={stats.activeTenders} icon={FileWarning} />,
+    active_projects: <StatCard title="Ενεργά Έργα" value={stats.activeProjects} icon={FolderKanban} />,
+    win_rate: <StatCard title="Win Rate" value={`${stats.winRate}%`} icon={Trophy} variant={stats.winRate >= 50 ? 'success' : 'default'} />,
+    overdue: <StatCard title="Overdue" value={stats.overdueCount} icon={AlertTriangle} variant={stats.overdueCount > 0 ? 'destructive' : 'default'} />,
+    today_hours: <StatCard title="Ώρες Σήμερα" value={`${stats.todayHours}h`} icon={Timer} variant="primary" />,
+    utilization: <StatCard title="Utilization" value={`${stats.utilization}%`} icon={Activity} />,
+  };
 
-      {/* Project Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        <StatCard
-          title="Διαγωνισμοί"
-          value={stats.activeTenders}
-          icon={FileWarning}
-        />
-        <StatCard
-          title="Ενεργά Έργα"
-          value={stats.activeProjects}
-          icon={FolderKanban}
-        />
-        <StatCard
-          title="Win Rate"
-          value={`${stats.winRate}%`}
-          icon={Trophy}
-          variant={stats.winRate >= 50 ? 'success' : 'default'}
-        />
-        <StatCard
-          title="Overdue"
-          value={stats.overdueCount}
-          icon={AlertTriangle}
-          variant={stats.overdueCount > 0 ? 'destructive' : 'default'}
-        />
-        <StatCard
-          title="Ώρες Σήμερα"
-          value={`${stats.todayHours}h`}
-          icon={Timer}
-          variant="primary"
-        />
-        <StatCard
-          title="Utilization"
-          value={`${stats.utilization}%`}
-          icon={Activity}
-        />
-      </div>
-
-      {/* Pipeline */}
-      {(isAdmin || isManager) && (
-        <PipelineCard stages={pipelineStages} />
-      )}
-
-      {/* Alerts and Deadlines */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-2xl border border-destructive/10 bg-destructive/[0.02] p-6 animate-fade-in shadow-soft">
-          <h3 className="text-base font-semibold flex items-center gap-2 mb-4 text-foreground">
-            <span className="h-8 w-8 rounded-lg bg-destructive/10 flex items-center justify-center">
+  // Composite widgets
+  const compositeWidgets: Record<string, React.ReactNode> = {
+    pipeline: (isAdmin || isManager) ? <PipelineCard stages={pipelineStages} /> : null,
+    alerts: (
+      <div className="rounded-2xl border border-destructive/10 bg-destructive/[0.02] p-6 animate-fade-in shadow-soft h-full">
+        <h3 className="text-base font-semibold flex items-center gap-2 mb-4 text-foreground">
+          <span className="h-8 w-8 rounded-lg bg-destructive/10 flex items-center justify-center">
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+          </span>
+          Alerts
+        </h3>
+        <div className="space-y-2">
+          {stats.overdueCount > 0 ? (
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-background/60 border border-destructive/10">
               <AlertTriangle className="h-4 w-4 text-destructive" />
-            </span>
-            Alerts
-          </h3>
-          <div className="space-y-2">
-            {stats.overdueCount > 0 ? (
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-background/60 border border-destructive/10">
-                <AlertTriangle className="h-4 w-4 text-destructive" />
-                <span className="text-sm text-foreground/80">
-                  {stats.overdueCount} task{stats.overdueCount > 1 ? 's' : ''} overdue
-                </span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-success/[0.03] border border-success/10">
-                <Activity className="h-4 w-4 text-success" />
-                <span className="text-sm text-success">
-                  Όλα τα tasks είναι εντός προθεσμίας
-                </span>
-              </div>
-            )}
-          </div>
+              <span className="text-sm text-foreground/80">
+                {stats.overdueCount} task{stats.overdueCount > 1 ? 's' : ''} overdue
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-success/[0.03] border border-success/10">
+              <Activity className="h-4 w-4 text-success" />
+              <span className="text-sm text-success">Όλα τα tasks είναι εντός προθεσμίας</span>
+            </div>
+          )}
         </div>
-
-        <TaskList 
-          tasks={upcomingTasks} 
-          title="Deadlines" 
-        />
       </div>
+    ),
+    deadlines: <TaskList tasks={upcomingTasks} title="Deadlines" />,
+    recent_activity: <RecentActivity />,
+    revenue_chart: <RevenueChart />,
+    project_progress: <ProjectProgress />,
+  };
+
+  const allWidgets = { ...statWidgets, ...compositeWidgets };
+
+  return (
+    <div className="p-6 lg:p-8 space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between animate-fade-in">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground mt-1 text-sm">Συνολική εικόνα εταιρίας</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <DashboardFilters filters={config.filters} onFiltersChange={setFilters} />
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            onClick={() => setCustomizerOpen(true)}
+          >
+            <Settings2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Widget grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {visibleWidgets.map(w => {
+          const content = allWidgets[w.id];
+          if (!content) return null;
+          return (
+            <div key={w.id} className={cn(sizeClass(w.id))}>
+              {content}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Customizer Sheet */}
+      <DashboardCustomizer
+        open={customizerOpen}
+        onOpenChange={setCustomizerOpen}
+        widgets={config.widgets}
+        onToggle={toggleWidget}
+        onResize={setWidgetSize}
+      />
     </div>
   );
 }

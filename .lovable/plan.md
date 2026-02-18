@@ -1,234 +1,157 @@
 
-# HR Section - Ενοποιημένη Διαχείριση Ανθρώπινου Δυναμικού
+# Λογιστήριο - Finance Section
 
 ## Συνοπτική Περιγραφή
 
-Δημιουργία ενός κεντρικού HR Section που ενοποιεί ολες τις σχετικές λειτουργίες (Χρήστες, Ομάδες, Τμήματα, Οργανόγραμμα, Timesheets) σε μία ενιαία σελίδα με tabs, και προσθέτει ολοκληρωμένο σύστημα αδειών/απουσιών και εμπλουτισμένο προφίλ εργαζομένου.
+Αναβάθμιση του υπάρχοντος "Οικονομικά & P&L" σε ένα πλήρες Finance Section (Λογιστήριο) με 6 tabs, νέους πίνακες για Services/Pricing και εμπλουτισμένα Expenses/Invoices. Στόχος: "τι πουλάμε, τι χρωστάνε, τι κοστίζει, ποια η εικόνα".
 
-## Τι αλλάζει
+## Τρέχουσα Κατάσταση
 
-### 1. Κεντρική σελίδα HR (`/hr`)
-Νέα σελίδα με tabs που ενοποιεί:
-- **Προσωπικό** (πρώην Users & Access) - Πίνακας χρηστών με ολες τις λειτουργίες
-- **Ομάδες** (πρώην /teams) - Διαχείριση ομάδων
-- **Τμήματα** (πρώην /departments) - Οργανωτική δομή
-- **Οργανόγραμμα** (πρώην /org-chart) - Οπτικό chart
-- **Timesheets** (πρώην /timesheets) - Καταγραφή χρόνου
-- **Άδειες & Απουσίες** (ΝΕΟ) - Σύστημα αδειών
+Υπάρχουν ήδη:
+- Πίνακας `invoices` (βασικό: amount, paid, issued_date, due_date)
+- Πίνακας `expenses` (βασικό: amount, category, project_id)
+- Πίνακας `contracts` (πλήρες: contract_type, billing_frequency, payment_terms, status, file_path)
+- `ProjectFinancialsManager` και `ProjectPLReport` components
+- `Reports.tsx` page με charts (revenue trend, expenses by category, client P&L)
+- Σελίδα `Financials.tsx` (909 γραμμές) με invoices + expenses CRUD + charts
 
-Οι παλιές routes (`/users`, `/teams`, `/departments`, `/org-chart`, `/timesheets`) θα ανακατευθύνονται στο `/hr` με το αντίστοιχο tab.
+## Δομή Finance Section (6 Tabs)
 
-### 2. Σύστημα Αδειών & Απουσιών (Leave Management)
-Πλήρες σύστημα με:
-- **Τύποι αδειών**: Κανονική, Ασθένεια, Άδεια χωρίς αποδοχές, Τηλεργασία, Εκπαίδευση, Γονική, Ειδική
-- **Workflow εγκρίσεων**: Αίτηση -> Εκκρεμεί -> Εγκρίθηκε/Απορρίφθηκε (ο manager/head εγκρίνει)
-- **Αυτόματος υπολογισμός**: Δικαιούμενες ημέρες ανά τύπο, υπόλοιπο, χρησιμοποιημένες
-- **Ημερολόγιο απουσιών**: Οπτική απεικόνιση ποιος λείπει πότε
-- **Ειδοποιήσεις**: Toast/notification στον manager οταν υποβληθεί αίτηση
+### Tab 1: Dashboard (Επισκόπηση)
+KPI cards + γραφήματα - ενοποίηση αυτών που υπάρχουν στο Financials.tsx και Reports.tsx:
+- Revenue / Expenses / Net Profit / Outstanding
+- Monthly trend chart (area)
+- Expenses by category (pie)
+- Aging analysis (bar chart: 0-30, 31-60, 61-90, 90+ ημέρες)
+- Top 5 clients by revenue
 
-### 3. Εμπλουτισμένο Προφίλ Εργαζομένου (`/hr/employee/:id`)
-Αναβαθμισμένο UserDetail σε στυλ social media profile:
-- **Cover photo + μεγάλο avatar** στην κορυφή
-- **Στοιχεία επικοινωνίας**: Email, τηλέφωνο, διεύθυνση, emergency contact
-- **Tabs** στο προφίλ:
-  - Επισκόπηση (γενικά στοιχεία, τμήμα, ομάδες, ρόλος)
-  - Έργα & Tasks (τρέχοντα + ιστορικό)
-  - Timesheets (ατομικά time entries)
-  - Άδειες (ιστορικό + υπόλοιπο)
-  - Έγγραφα HR (συμβόλαια, NDAs, μισθοδοσία κλπ)
-  - Activity Log (ατομικό ιστορικό ενεργειών)
+### Tab 2: Services & Pricing (ΝΕΟ)
+Κατάλογος υπηρεσιών της εταιρείας ("τι πουλάμε"):
+- Κατηγορία (Retainer / Project / Add-on / Media fee)
+- Τιμή (list price) + Μονάδα χρέωσης (μήνας, ώρα, έργο, τεμάχιο)
+- Εσωτερικό κόστος: ώρες ανά ρόλο + rate ανά ρόλο
+- Target margin %
+- Link σε deliverable template
 
-### 4. HR Documents (Έγγραφα Προσωπικού)
-Κάθε εργαζόμενος μπορεί να έχει συνημμένα HR documents:
-- Σύμβαση πρόσληψης
-- NDAs
-- Βεβαιώσεις μισθοδοσίας
-- Αξιολογήσεις
-- Βεβαιώσεις αποχώρησης
+### Tab 3: Contracts (υπάρχει ήδη πίνακας)
+Ενοποίηση: τα contracts υπάρχουν στη DB αλλά δεν έχουν κεντρική σελίδα.
+- Λίστα όλων των συμβάσεων (filterable ανά πελάτη/status)
+- Status: draft / active / ended / renewed
+- Auto-renewal flag + expiry alerts
+- Link σε PDF attachment
+- Quick view: πελάτης, πακέτο, μηνιαίο fee, payment terms
 
-Τα έγγραφα αποθηκεύονται στο storage bucket `hr-documents` με RLS.
+### Tab 4: Invoices & Collections (αναβάθμιση)
+Εμπλουτισμός υπάρχοντος:
+- Προσθήκη: client_id link, contract_id link, VAT fields, partial payments, attachment (PDF), σχόλια
+- Status: unpaid / partially_paid / paid / overdue / cancelled
+- Αυτόματος υπολογισμός: aging (ημέρες καθυστέρησης), outstanding balance ανά πελάτη
+- Filters: ανά πελάτη, ανά project, ανά status, ανά περίοδο
 
-### 5. Sidebar Αλλαγές
-Αντικατάσταση πολλαπλών links (Ομάδες, Χρήστες, Τμήματα, Οργανόγραμμα, Timesheets) με ένα μοναδικό "HR" link.
+### Tab 5: Expenses (αναβάθμιση)
+Εμπλουτισμός υπάρχοντος:
+- Προσθήκη: vendor/supplier name, expense_type (vendor/media/overhead), client_id link, attachment, approval workflow (submitted/approved/paid)
+- Expenses μπορεί να μην συνδέονται με project (π.χ. overheads)
+- Filters: ανά κατηγορία, ανά vendor, ανά project/client
 
-## Technical Details
+### Tab 6: Reports / Profitability
+Ενοποίηση Reports.tsx + νέα views:
+- Client P&L: Revenue - Direct costs = Gross profit per client
+- Project P&L: ήδη υπάρχει (ProjectPLReport), θα εμφανίζεται εδώ σε list view
+- Monthly P&L statement
+- Budget vs Actual (αν υπάρχουν budgets)
 
-### Database Migration
+## Database Changes
 
-Νέοι πίνακες:
-
-**`leave_types`** - Τύποι αδειών ανά εταιρεία
+### Νέος πίνακας: `services`
 ```text
 id              uuid PK
 company_id      uuid FK -> companies
-name            text (π.χ. "Κανονική", "Ασθένεια")
-code            text (π.χ. "annual", "sick")
-color           text
-default_days    integer (δικαιούμενες ημέρες/έτος)
-requires_approval boolean default true
+name            text (π.χ. "Social Media Management")
+description     text
+category        text ('retainer','project','addon','media_fee')
+list_price      numeric
+pricing_unit    text ('month','hour','project','piece')
+internal_cost   numeric (target cost)
+target_margin   numeric (target margin %)
+role_hours      jsonb (π.χ. {"account": 10, "designer": 5, "copywriter": 3})
+role_rates      jsonb (π.χ. {"account": 50, "designer": 60, "copywriter": 45})
+template_id     uuid FK -> project_templates (optional)
 is_active       boolean default true
-created_at      timestamptz
-```
-
-**`leave_balances`** - Υπόλοιπο αδειών ανά χρήστη/έτος
-```text
-id              uuid PK
-user_id         uuid FK -> profiles
-company_id      uuid FK -> companies
-leave_type_id   uuid FK -> leave_types
-year            integer
-entitled_days   numeric (δικαιούμενες)
-used_days       numeric (χρησιμοποιημένες)
-pending_days    numeric (σε αναμονή έγκρισης)
-carried_over    numeric (μεταφερόμενες)
-created_at      timestamptz
-updated_at      timestamptz
-UNIQUE(user_id, leave_type_id, year)
-```
-
-**`leave_requests`** - Αιτήσεις αδειών
-```text
-id              uuid PK
-user_id         uuid FK -> profiles
-company_id      uuid FK -> companies
-leave_type_id   uuid FK -> leave_types
-start_date      date
-end_date        date
-days_count      numeric
-half_day        boolean default false
-status          text ('pending','approved','rejected','cancelled')
-reason          text
-reviewer_id     uuid FK -> profiles (nullable)
-reviewed_at     timestamptz
-reviewer_notes  text
+sort_order      integer default 0
 created_at      timestamptz
 updated_at      timestamptz
 ```
 
-**`hr_documents`** - Έγγραφα HR ανά εργαζόμενο
-```text
-id              uuid PK
-user_id         uuid FK -> profiles
-company_id      uuid FK -> companies
-document_type   text ('contract','nda','payroll','evaluation','termination','other')
-file_name       text
-file_path       text (storage path)
-file_size       integer
-uploaded_by     uuid FK -> profiles
-notes           text
-valid_from      date
-valid_until     date
-created_at      timestamptz
-```
+### Αλλαγές στον πίνακα `invoices`
+Προσθήκη columns:
+- `contract_id` uuid (FK -> contracts, nullable)
+- `vat_rate` numeric default 24
+- `net_amount` numeric (ποσό χωρίς ΦΠΑ)
+- `vat_amount` numeric (ΦΠΑ)
+- `status` text ('unpaid','partially_paid','paid','overdue','cancelled') default 'unpaid'
+- `paid_amount` numeric default 0 (για partial payments)
+- `notes` text
+- `file_path` text (attachment)
 
-**Storage bucket**: `hr-documents` (private, με RLS - μόνο admins + ο ίδιος ο χρήστης)
+### Αλλαγές στον πίνακα `expenses`
+Προσθήκη columns:
+- `client_id` uuid (FK -> clients, nullable) -- για overhead expenses χωρίς project
+- `vendor_name` text
+- `expense_type` text ('vendor','media','overhead','subscription') default 'vendor'
+- `approval_status` text ('draft','submitted','approved','paid') default 'draft'
+- `approved_by` uuid (nullable)
+- `file_path` text (attachment)
+- `notes` text
 
-**RLS Policies:**
-- `leave_types`: SELECT για ολους, ALL για admin/manager
-- `leave_balances`: SELECT δικά τους + admin/manager βλέπει ολα, UPDATE μόνο admin
-- `leave_requests`: INSERT δικά τους, SELECT δικά τους + ιεραρχική πρόσβαση, UPDATE (approve/reject) για manager/admin
-- `hr_documents`: SELECT δικά τους + admin, INSERT/DELETE admin μόνο
+Αλλαγή: `project_id` γίνεται nullable (overheads δεν έχουν project)
 
-**Default leave types** (seed data):
-- Κανονική (annual) - 20 ημέρες
-- Ασθένεια (sick) - 15 ημέρες
-- Τηλεργασία (remote) - χωρίς όριο
-- Εκπαίδευση (training) - 5 ημέρες
-- Γονική (parental) - 10 ημέρες
-- Χωρίς αποδοχές (unpaid) - χωρίς όριο
+### RLS Policies
+- `services`: SELECT ολοι active users, ALL admin/manager
+- Invoices/expenses: ίδια πολιτική με τα υπάρχοντα (admin/manager full access)
 
-### Νέα αρχεία
+## Νέα Αρχεία
 
-**Σελίδες:**
-- `src/pages/HR.tsx` - Κεντρική σελίδα HR με tabs
-- `src/pages/EmployeeProfile.tsx` - Αναβαθμισμένο προφίλ εργαζομένου (αντικαθιστά UserDetail)
+### Pages
+- `src/pages/Financials.tsx` -- REWRITE: Γίνεται η κεντρική σελίδα Finance με 6 tabs
 
-**Components HR:**
-- `src/components/hr/LeaveRequestForm.tsx` - Φόρμα αίτησης άδειας
-- `src/components/hr/LeaveBalanceCard.tsx` - Κάρτα υπολοίπου αδειών
-- `src/components/hr/LeaveRequestsList.tsx` - Λίστα αιτήσεων (pending/approved/rejected)
-- `src/components/hr/LeaveCalendar.tsx` - Ημερολόγιο απουσιών ομάδας/εταιρείας
-- `src/components/hr/LeaveApprovalCard.tsx` - Κάρτα έγκρισης/απόρριψης
-- `src/components/hr/HRDocuments.tsx` - Διαχείριση εγγράφων HR
-- `src/components/hr/EmployeeHeader.tsx` - Social-media style header με cover+avatar
-
-**Hooks:**
-- `src/hooks/useLeaveManagement.ts` - Hook για CRUD αδειών, υπολογισμό υπολοίπου, εγκρίσεις
+### Components (νέα)
+- `src/components/finance/FinanceDashboard.tsx` -- KPI cards + charts (Tab 1)
+- `src/components/finance/ServicesCatalog.tsx` -- CRUD υπηρεσιών (Tab 2)
+- `src/components/finance/ContractsList.tsx` -- Λίστα συμβάσεων (Tab 3)
+- `src/components/finance/InvoicesManager.tsx` -- Αναβαθμισμένο invoices CRUD (Tab 4)
+- `src/components/finance/ExpensesManager.tsx` -- Αναβαθμισμένο expenses CRUD (Tab 5)
+- `src/components/finance/ProfitabilityReports.tsx` -- Client/Project/Monthly P&L (Tab 6)
 
 ### Αλλαγές σε υπάρχοντα
+- `src/App.tsx`: Αφαίρεση `/reports` route (ενσωματώνεται στο Finance), redirect `/reports` -> `/financials`
+- `src/components/layout/AppSidebar.tsx`: Αλλαγή label "P&L" -> "Λογιστήριο", αφαίρεση Reports link αν υπάρχει
+- `src/pages/ClientDetail.tsx`: Προσθήκη "Financial Snapshot" tab (σύμβαση, invoices, outstanding, costs, margin)
 
-**`src/App.tsx`:**
-- Νέες routes: `/hr`, `/hr/employee/:id`
-- Redirect routes: `/users` -> `/hr`, `/teams` -> `/hr`, `/departments` -> `/hr`, `/org-chart` -> `/hr`, `/timesheets` -> `/hr`
-- Αφαίρεση standalone routes για Users, Teams, Departments, OrgChart, Timesheets
-
-**`src/components/layout/AppSidebar.tsx`:**
-- Αντικατάσταση links (Ομάδες, Timesheets, Χρήστες, Τμήματα, Οργανόγραμμα) με ένα "HR" link
-- Νέο icon: `UserCog` ή `UsersRound`
-
-### HR Page Layout
+## UI Layout
 
 ```text
 +--------------------------------------------------+
-| HR - Ανθρώπινο Δυναμικό                          |
+| Λογιστήριο                                       |
 +--------------------------------------------------+
-| [Προσωπικό] [Ομάδες] [Τμήματα] [Οργανόγραμμα]  |
-| [Timesheets] [Άδειες]                            |
+| [Dashboard] [Υπηρεσίες] [Συμβάσεις]             |
+| [Τιμολόγια] [Έξοδα] [Αναφορές]                  |
 +--------------------------------------------------+
 |                                                    |
 |  < Περιεχόμενο αντίστοιχου tab >                  |
-|  (Κάθε tab φορτώνει τον αντίστοιχο content        |
-|   που ήταν πριν σε ξεχωριστή σελίδα)              |
 |                                                    |
 +--------------------------------------------------+
 ```
 
-### Employee Profile Layout
+## Σειρά Υλοποίησης
 
-```text
-+--------------------------------------------------+
-| [Cover Photo / Gradient Background]               |
-|    [Avatar]                                        |
-|    Ονοματεπώνυμο          [Edit Profile]           |
-|    job_title | department | status badge           |
-+--------------------------------------------------+
-| [Επισκόπηση] [Έργα] [Timesheets] [Άδειες]       |
-| [Έγγραφα] [Activity]                              |
-+--------------------------------------------------+
-|                                                    |
-|  Επισκόπηση:                                       |
-|  +----------------+  +------------------+          |
-|  | Στοιχεία       |  | Υπόλοιπο Αδειών |          |
-|  | Email, Phone   |  | Κανονική: 15/20  |          |
-|  | Hire date      |  | Ασθένεια: 2/15   |          |
-|  | Reports to     |  +------------------+          |
-|  +----------------+                                |
-|  +----------------+  +------------------+          |
-|  | Ομάδες         |  | Πρόσφατη Δρ/τα   |          |
-|  | Team A, Team B |  | activity items   |          |
-|  +----------------+  +------------------+          |
-+--------------------------------------------------+
-```
-
-### Leave Request Flow
-
-```text
-1. Εργαζόμενος -> Αίτηση Άδειας (τύπος, ημ/νίες, αιτιολογία)
-2. Σύστημα -> Υπολογισμός ημερών, έλεγχος υπολοίπου
-3. Σύστημα -> Ενημέρωση pending_days στο balance
-4. Manager/Admin -> Ειδοποίηση (notification + toast)
-5. Manager -> Έγκριση/Απόρριψη + σχόλια
-6. Σύστημα -> Ενημέρωση used_days ή αφαίρεση pending_days
-7. Εργαζόμενος -> Ειδοποίηση αποτελέσματος
-```
-
-### Σειρά Υλοποίησης
-
-1. Database migration (νέοι πίνακες + RLS + seed data + storage bucket)
-2. `useLeaveManagement` hook
-3. Leave components (form, balance, list, calendar, approval)
-4. HR Documents component
-5. Employee Profile page (αναβαθμισμένο)
-6. HR main page (tabs ενοποίηση)
-7. Routing updates (App.tsx redirects)
-8. Sidebar update (ένα HR link)
+1. Database migration (νέος πίνακας services + alter invoices + alter expenses + RLS)
+2. FinanceDashboard component (KPI + charts)
+3. ServicesCatalog component (CRUD)
+4. ContractsList component (list + filters)
+5. InvoicesManager component (αναβαθμισμένο CRUD)
+6. ExpensesManager component (αναβαθμισμένο CRUD)
+7. ProfitabilityReports component (P&L views)
+8. Κεντρική σελίδα Financials.tsx (tabs)
+9. Routing + Sidebar updates
+10. ClientDetail Financial Snapshot tab

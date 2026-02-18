@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { Loader2, Pencil, Save, X } from 'lucide-react';
 import { format } from 'date-fns';
 
-type ProjectStatus = 'tender' | 'active' | 'completed' | 'cancelled';
+type ProjectStatus = 'lead' | 'proposal' | 'negotiation' | 'won' | 'active' | 'completed' | 'cancelled' | 'lost' | 'tender';
 
 interface ProjectInfoEditorProps {
   project: {
@@ -88,10 +88,13 @@ export function ProjectInfoEditor({ project, canEdit, onUpdate }: ProjectInfoEdi
   };
 
   const statusOptions = [
-    { value: 'tender', label: 'Διαγωνισμός' },
+    { value: 'lead', label: 'Lead' },
+    { value: 'proposal', label: 'Πρόταση' },
+    { value: 'negotiation', label: 'Διαπραγμάτευση' },
     { value: 'active', label: 'Ενεργό' },
     { value: 'completed', label: 'Ολοκληρώθηκε' },
     { value: 'cancelled', label: 'Ακυρώθηκε' },
+    { value: 'lost', label: 'Χάθηκε' },
   ];
 
   if (!editing) {

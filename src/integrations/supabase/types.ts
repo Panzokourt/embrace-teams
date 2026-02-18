@@ -1599,12 +1599,18 @@ export type Database = {
           description: string | null
           end_date: string | null
           id: string
+          lost_reason: string | null
           metadata: Json | null
           name: string
+          probability: number | null
           progress: number | null
+          source: string | null
           start_date: string | null
           status: Database["public"]["Enums"]["project_status"]
+          submission_deadline: string | null
+          tender_type: string | null
           updated_at: string
+          won_date: string | null
         }
         Insert: {
           agency_fee_percentage?: number | null
@@ -1615,12 +1621,18 @@ export type Database = {
           description?: string | null
           end_date?: string | null
           id?: string
+          lost_reason?: string | null
           metadata?: Json | null
           name: string
+          probability?: number | null
           progress?: number | null
+          source?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["project_status"]
+          submission_deadline?: string | null
+          tender_type?: string | null
           updated_at?: string
+          won_date?: string | null
         }
         Update: {
           agency_fee_percentage?: number | null
@@ -1631,12 +1643,18 @@ export type Database = {
           description?: string | null
           end_date?: string | null
           id?: string
+          lost_reason?: string | null
           metadata?: Json | null
           name?: string
+          probability?: number | null
           progress?: number | null
+          source?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["project_status"]
+          submission_deadline?: string | null
+          tender_type?: string | null
           updated_at?: string
+          won_date?: string | null
         }
         Relationships: [
           {
@@ -2628,7 +2646,16 @@ export type Database = {
         | "settings.security"
         | "settings.integrations"
         | "audit.view"
-      project_status: "tender" | "active" | "completed" | "cancelled"
+      project_status:
+        | "tender"
+        | "active"
+        | "completed"
+        | "cancelled"
+        | "lead"
+        | "proposal"
+        | "negotiation"
+        | "won"
+        | "lost"
       task_status: "todo" | "in_progress" | "review" | "completed"
       tender_stage:
         | "identification"
@@ -2821,7 +2848,17 @@ export const Constants = {
         "settings.integrations",
         "audit.view",
       ],
-      project_status: ["tender", "active", "completed", "cancelled"],
+      project_status: [
+        "tender",
+        "active",
+        "completed",
+        "cancelled",
+        "lead",
+        "proposal",
+        "negotiation",
+        "won",
+        "lost",
+      ],
       task_status: ["todo", "in_progress", "review", "completed"],
       tender_stage: [
         "identification",

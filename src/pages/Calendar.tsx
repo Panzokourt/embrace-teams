@@ -12,7 +12,8 @@ import {
   Loader2,
   CheckSquare,
   FileText,
-  Package
+  Package,
+  FolderKanban
 } from 'lucide-react';
 import { 
   format, 
@@ -34,12 +35,16 @@ interface CalendarEvent {
   id: string;
   title: string;
   date: string;
-  type: 'task' | 'tender' | 'deliverable' | 'project';
+  type: 'task' | 'deliverable' | 'project';
   status?: string;
   projectName?: string;
 }
 
-export default function CalendarPage() {
+interface CalendarPageProps {
+  embedded?: boolean;
+}
+
+export default function CalendarPage({ embedded = false }: CalendarPageProps) {
   const { isAdmin, isManager } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -74,22 +79,24 @@ export default function CalendarPage() {
         }
       });
 
-      // Fetch tenders with submission deadlines
+      // Fetch projects with submission_deadline (pipeline items)
       if (isAdmin || isManager) {
-        const { data: tenders } = await supabase
-          .from('tenders')
-          .select('id, name, submission_deadline, stage')
+        const { data: pipelineProjects } = await supabase
+          .from('projects')
+          .select('id, name, submission_deadline, status')
+          .in('status', ['lead', 'proposal', 'negotiation'])
+          .not('submission_deadline', 'is', null)
           .gte('submission_deadline', startDate)
           .lte('submission_deadline', endDate);
 
-        (tenders || []).forEach(tender => {
-          if (tender.submission_deadline) {
+        (pipelineProjects || []).forEach(proj => {
+          if (proj.submission_deadline) {
             allEvents.push({
-              id: tender.id,
-              title: tender.name,
-              date: tender.submission_deadline,
-              type: 'tender',
-              status: tender.stage
+              id: proj.id + '-deadline',
+              title: `📋 ${proj.name}`,
+              date: proj.submission_deadline,
+              type: 'project',
+              status: proj.status
             });
           }
         });
@@ -178,8 +185,8 @@ export default function CalendarPage() {
   const getEventIcon = (type: CalendarEvent['type']) => {
     switch (type) {
       case 'task': return <CheckSquare className="h-3 w-3" />;
-      case 'tender': return <FileText className="h-3 w-3" />;
       case 'deliverable': return <Package className="h-3 w-3" />;
+      case 'project': return <FolderKanban className="h-3 w-3" />;
       default: return null;
     }
   };
@@ -190,9 +197,8 @@ export default function CalendarPage() {
     }
     switch (type) {
       case 'task': return 'bg-primary/15 text-primary border-primary/20';
-      case 'tender': return 'bg-warning/15 text-warning border-warning/20';
       case 'deliverable': return 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/20';
-      case 'project': return 'bg-secondary text-muted-foreground border-border/30';
+      case 'project': return 'bg-warning/15 text-warning border-warning/20';
       default: return 'bg-secondary';
     }
   };
@@ -355,8 +361,8 @@ export default function CalendarPage() {
                         )}
                         <Badge variant="outline" className="mt-2 text-[10px] border-current/20 bg-transparent">
                           {event.type === 'task' && 'Task'}
-                          {event.type === 'tender' && 'Διαγωνισμός'}
                           {event.type === 'deliverable' && 'Παραδοτέο'}
+                          {event.type === 'project' && 'Έργο'}
                           {event.type === 'project' && 'Έργο'}
                         </Badge>
                       </div>
@@ -377,7 +383,7 @@ export default function CalendarPage() {
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-md bg-warning/20 border border-warning/30" />
-          <span className="text-muted-foreground">Διαγωνισμοί</span>
+          <span className="text-muted-foreground">Pipeline</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-md bg-purple-500/20 border border-purple-500/30" />

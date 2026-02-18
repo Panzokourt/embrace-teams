@@ -1,109 +1,138 @@
 
-# Dashboard Enhancement - Per-widget Settings, Drag & Drop, Export, Saved Layouts
+# Realtime Status Updates & Activity Feed
 
 ## Τι αλλάζει
 
-### 1. Gear icon σε κάθε widget card
-Κάθε widget αποκτά ένα μικρό gear icon (top-right, εμφανίζεται στο hover) που ανοίγει inline popover με:
-- **Αλλαγή μεγέθους** (S/M/L)
-- **Απόκρυψη** widget
-- Για composite widgets: **Εναλλαγή view type** (card/table/list) οπου εφαρμόζεται
+### 1. Global Live Activity Feed (Sidebar Panel)
+Νέο collapsible panel στο layout (δεξιά πλευρά) που δείχνει live activity feed σε πραγματικό χρόνο:
+- Εμφανίζεται/κρύβεται με button στο top bar (δίπλα στο notification bell)
+- Δείχνει τις τελευταίες ενέργειες με avatar, χρήστη, action, timestamp
+- Νέες εγγραφές εμφανίζονται αυτόματα με animation (slide-in) χωρίς refresh
+- Subscribes στο `activity_log` table μέσω Supabase Realtime (ήδη enabled)
+- Clickable items: κλικ σε activity οδηγεί στη σχετική σελίδα (project, task, tender κλπ)
 
-Ένα νέο `WidgetWrapper` component τυλίγει κάθε widget και παρέχει αυτά τα controls.
+### 2. Automatic Activity Logging σε ολες τις CRUD operations
+Η συνάρτηση `logActivity()` υπάρχει αλλά δεν καλείται πουθενά. Θα ενσωματωθεί σε:
 
-### 2. Drag & Drop αναδιάταξη widgets
-Χρήση του ήδη εγκατεστημένου `@dnd-kit/sortable` (υπάρχει στο project) για drag-and-drop:
-- Κάθε widget γίνεται sortable μέσα στο grid
-- Η σειρά αποθηκεύεται στο config (localStorage)
-- Drag handle εμφανίζεται στο hover δίπλα στο gear icon
+- **Projects**: create, update, delete, status change
+- **Tasks**: create, update, delete, complete, assign
+- **Tenders**: create, update stage, delete
+- **Clients**: create, update, delete
+- **Invoices**: create, update, mark paid, delete
+- **Deliverables**: create, update, complete
+- **Teams**: create, update, delete members
 
-Αλλαγές στο `useDashboardConfig`:
-- Το `widgets` array γίνεται ordered (η σειρά στο array = η σειρά στο grid)
-- Προστίθεται `reorderWidgets(activeId, overId)` function
+### 3. Realtime Notifications Enhancement
+Αναβάθμιση του `NotificationBell` ωστε:
+- Να κάνει subscribe σε realtime changes στα `tasks` και `tenders` tables
+- Να ενημερώνεται αυτόματα (χωρίς manual refresh) οταν αλλάζει deadline ή status
+- Toast notification οταν ένα task γίνεται overdue ή πλησιάζει deadline
 
-### 3. Εξαγωγή Dashboard
-Προστίθεται export button στο header δίπλα στο gear icon, με dropdown:
-- **PDF**: `window.print()` με print-optimized styles
-- **PNG/Screenshot**: Χρήση html2canvas-like approach μέσω CSS print
-- **Excel**: Export ολων των visible stat values σε πίνακα
+### 4. Realtime Status Indicators
+- Στα task cards/rows: live status badge που ενημερώνεται αυτόματα
+- Στα project cards: live progress indicator
+- Animated transition οταν αλλάζει status (pulse effect)
 
-Νέο component `DashboardExport.tsx` με dropdown menu.
-
-### 4. Αποθήκευση πολλαπλών Dashboard layouts
-Ο χρήστης μπορεί να:
-- **Αποθηκεύσει** το τρέχον layout με όνομα (π.χ. "Financial Overview", "Project Focus")
-- **Φορτώσει** αποθηκευμένο layout από dropdown menu
-- **Διαγράψει** αποθηκευμένα layouts
-- Υπάρχει πάντα ένα "Default" layout
-
-Αποθήκευση σε localStorage με key `dashboard_saved_layouts_v1`.
-
-Νέο component `DashboardLayoutSelector.tsx` - dropdown στο header.
+### 5. Dashboard RecentActivity widget - Realtime
+Αναβάθμιση του RecentActivity widget στο dashboard ωστε να κάνει subscribe σε realtime updates αντί να φορτώνει μόνο μία φορά.
 
 ## Technical Details
 
 ### Νέα αρχεία
-- `src/components/dashboard/WidgetWrapper.tsx` - Wrapper με gear menu, drag handle, view toggle
-- `src/components/dashboard/DashboardExport.tsx` - Export dropdown (PDF/Excel)
-- `src/components/dashboard/DashboardLayoutSelector.tsx` - Saved layouts dropdown
+- `src/components/activity/GlobalActivityFeed.tsx` - Slide-over panel με live feed
+- `src/hooks/useActivityLogger.ts` - Hook που wraps logActivity με τον current user, επιστρέφει helper functions (logCreate, logUpdate, logDelete, logStatusChange)
 
 ### Αλλαγές σε υπάρχοντα
 
-**`src/hooks/useDashboardConfig.ts`**:
-- Προσθήκη `reorderWidgets(activeId, overId)` για drag reorder
-- Προσθήκη `savedLayouts` management: `saveLayout(name)`, `loadLayout(name)`, `deleteLayout(name)`, `getSavedLayouts()`
-- Αποθήκευση view type per widget: `viewType?: 'card' | 'table' | 'list'`
-- Νέο storage key `dashboard_saved_layouts_v1` για τα saved layouts
+**`src/components/layout/AppLayout.tsx`**:
+- Προσθήκη Activity icon button στο top bar
+- Προσθήκη `GlobalActivityFeed` component (Sheet panel)
 
-**`src/pages/Dashboard.tsx`**:
-- Wrap widget grid σε `DndContext` + `SortableContext` από @dnd-kit
-- Wrap κάθε widget σε `WidgetWrapper`
-- Προσθήκη `DashboardExport` και `DashboardLayoutSelector` στο header
-- Composite widgets (deadlines, recent_activity, pipeline) θα λαμβάνουν `viewType` prop για εναλλαγή card/table
+**`src/components/activity/ActivityLog.tsx`**:
+- Βελτίωση realtime subscription (ήδη υπάρχει, αλλά θα προστεθεί animated entry για νέα items)
 
-**`src/components/dashboard/widgetRegistry.ts`**:
-- Προσθήκη `supportedViews?: ('card' | 'table' | 'list')[]` στο `WidgetDefinition`
-- Composite widgets θα δηλώνουν ποια views υποστηρίζουν
+**`src/components/dashboard/widgets/RecentActivity.tsx`**:
+- Προσθήκη realtime subscription στο activity_log
+- Auto-refresh οταν έρχονται νέα events
 
-### WidgetWrapper component
+**`src/components/notifications/NotificationBell.tsx`**:
+- Προσθήκη realtime subscription σε tasks/tenders
+- Auto-refresh notifications χωρίς reload
+- Toast alerts για critical events (overdue tasks)
+
+**`src/pages/Projects.tsx`**:
+- Κλήση `logActivity` σε create/update/delete project
+
+**`src/pages/Tasks.tsx`**:
+- Κλήση `logActivity` σε create/update/delete/complete task
+
+**`src/pages/Tenders.tsx`**:
+- Κλήση `logActivity` σε create/update stage/delete tender
+
+**`src/pages/Clients.tsx`**:
+- Κλήση `logActivity` σε create/update/delete client
+
+**`src/pages/Financials.tsx`**:
+- Κλήση `logActivity` σε create/update/pay/delete invoice
+
+**`src/pages/ProjectDetail.tsx`**:
+- Κλήση `logActivity` σε update project info
+
+**`src/pages/TenderDetail.tsx`**:
+- Κλήση `logActivity` σε update tender
+
+### useActivityLogger hook
+
 ```text
-+--------------------------------------------+
-|  [drag handle]            [gear icon]       |
-|                                             |
-|   < actual widget content >                 |
-|                                             |
-+--------------------------------------------+
+const { logCreate, logUpdate, logDelete, logStatusChange } = useActivityLogger();
 
-Gear popover:
-- Size: [S] [M] [L]
-- View: [Card] [Table] (αν υποστηρίζεται)
-- [Απόκρυψη]
+// Usage:
+await logCreate('project', projectId, projectName);
+await logUpdate('task', taskId, taskName, { field: 'status', old: 'todo', new: 'completed' });
+await logDelete('client', clientId, clientName);
+await logStatusChange('task', taskId, taskName, 'todo', 'completed');
 ```
 
-### Drag & Drop implementation
-- `DndContext` + `SortableContext` wrap το grid
-- Κάθε widget χρησιμοποιεί `useSortable` μέσω `WidgetWrapper`
-- Στο `onDragEnd`: ανταλλαγή θέσεων στο widgets array via `arrayMove`
-- Η νέα σειρά αποθηκεύεται αυτόματα στο localStorage
+Ο hook παίρνει αυτόματα το `user.id` από το AuthContext, αποφεύγοντας manual passing.
 
-### Saved Layouts storage
+### GlobalActivityFeed component
+
 ```text
-localStorage key: dashboard_saved_layouts_v1
-{
-  "Financial Overview": { widgets: [...], filters: {...} },
-  "Project Focus": { widgets: [...], filters: {...} },
-  ...
-}
++-----------------------------------+
+| Δραστηριότητα           [X close] |
+|-----------------------------------|
+| [avatar] User created project X   |
+|          2 λεπτά πριν             |
+|-----------------------------------|
+| [avatar] User completed task Y    |  <-- νέο, slide-in animation
+|          5 λεπτά πριν             |
+|-----------------------------------|
+| [avatar] User updated tender Z    |
+|          10 λεπτά πριν            |
++-----------------------------------+
 ```
 
-### Export
-- **PDF**: Capture visible dashboard area via `window.print()` με `@media print` CSS
-- **Excel**: Collect visible stat widget values + labels σε table format, χρήση υπάρχοντος `exportToExcel`
+- Sheet component (right side)
+- ScrollArea με infinite-like loading (τα τελευταία 50 events)
+- Realtime subscription: νέα events εμφανίζονται στην κορυφή με fade-in animation
+- Entity icon + clickable link στη σχετική σελίδα
+
+### Realtime NotificationBell Enhancement
+
+```text
+Τρέχουσα κατάσταση: Fetch μόνο στο mount
+Νέα κατάσταση: Fetch στο mount + subscribe σε tasks/tenders changes
+  -> Οταν αλλάξει task status/due_date -> refetch notifications
+  -> Οταν task γίνει overdue -> toast alert
+```
+
+### Database
+Δεν χρειάζεται migration - ο πίνακας `activity_log` υπάρχει ήδη και το realtime είναι ήδη enabled.
 
 ### Σειρά υλοποίησης
-1. Επέκταση `useDashboardConfig` (reorder, viewType, saved layouts)
-2. Επέκταση `widgetRegistry.ts` (supportedViews)
-3. `WidgetWrapper.tsx` (gear menu + drag handle)
-4. `DashboardExport.tsx` (export dropdown)
-5. `DashboardLayoutSelector.tsx` (saved layouts UI)
-6. Refactor `Dashboard.tsx` (DndContext, wrappers, header components)
+1. `useActivityLogger` hook
+2. Ενσωμάτωση `logActivity` calls σε ολες τις CRUD σελίδες (Projects, Tasks, Tenders, Clients, Financials, ProjectDetail, TenderDetail)
+3. `GlobalActivityFeed` component
+4. Update `AppLayout` (activity feed button + panel)
+5. Αναβάθμιση `RecentActivity` widget (realtime)
+6. Αναβάθμιση `NotificationBell` (realtime + toasts)

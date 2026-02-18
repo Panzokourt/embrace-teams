@@ -29,7 +29,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
-type ProjectStatus = 'tender' | 'active' | 'completed' | 'cancelled';
+type ProjectStatus = 'lead' | 'proposal' | 'negotiation' | 'won' | 'active' | 'completed' | 'cancelled' | 'lost' | 'tender';
 
 interface Project {
   id: string;
@@ -62,10 +62,13 @@ interface ProjectsTableViewProps {
 }
 
 const STATUS_OPTIONS = [
-  { value: 'tender', label: 'Διαγωνισμός', color: 'hsl(var(--muted-foreground))' },
+  { value: 'lead', label: 'Lead', color: 'hsl(210 80% 55%)' },
+  { value: 'proposal', label: 'Πρόταση', color: 'hsl(var(--warning))' },
+  { value: 'negotiation', label: 'Διαπραγμάτευση', color: 'hsl(30 80% 55%)' },
   { value: 'active', label: 'Ενεργό', color: 'hsl(var(--primary))' },
   { value: 'completed', label: 'Ολοκληρωμένο', color: 'hsl(var(--success))' },
   { value: 'cancelled', label: 'Ακυρωμένο', color: 'hsl(var(--destructive))' },
+  { value: 'lost', label: 'Χάθηκε', color: 'hsl(var(--destructive))' },
 ];
 
 const DEFAULT_COLUMNS = [

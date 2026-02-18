@@ -102,7 +102,7 @@ const statusConfig: Record<TaskStatus, { icon: React.ReactNode; label: string; c
   completed: { icon: <CheckCircle2 className="h-4 w-4" />, label: 'Ολοκληρώθηκε', className: 'bg-success/10 text-success border-success/20' },
 };
 
-export default function TasksPage() {
+export default function TasksPage({ embedded = false }: { embedded?: boolean }) {
   const { isAdmin, isManager } = useAuth();
   const { logCreate, logUpdate, logDelete, logStatusChange } = useActivityLogger();
   const [tasks, setTasks] = useState<Task[]>([]);

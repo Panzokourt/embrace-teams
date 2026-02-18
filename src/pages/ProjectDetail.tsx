@@ -42,7 +42,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { createProjectFilesObjectKey } from '@/utils/storageKeys';
 
-type ProjectStatus = 'tender' | 'active' | 'completed' | 'cancelled';
+type ProjectStatus = 'lead' | 'proposal' | 'negotiation' | 'won' | 'active' | 'completed' | 'cancelled' | 'lost' | 'tender';
 type TaskStatus = 'todo' | 'in_progress' | 'review' | 'completed';
 
 interface Project {
@@ -281,13 +281,18 @@ export default function ProjectDetailPage() {
   const netProfit = totalPaid - totalExpenses;
 
   const getStatusBadge = (status: ProjectStatus) => {
-    const styles = {
-      tender: { className: 'bg-warning/10 text-warning border-warning/20', label: 'Διαγωνισμός' },
+    const styles: Record<string, { className: string; label: string }> = {
+      lead: { className: 'bg-blue-500/10 text-blue-500 border-blue-500/20', label: 'Lead' },
+      proposal: { className: 'bg-warning/10 text-warning border-warning/20', label: 'Πρόταση' },
+      negotiation: { className: 'bg-orange-500/10 text-orange-500 border-orange-500/20', label: 'Διαπραγμάτευση' },
+      won: { className: 'bg-success/10 text-success border-success/20', label: 'Κερδήθηκε' },
       active: { className: 'bg-success/10 text-success border-success/20', label: 'Ενεργό' },
       completed: { className: 'bg-primary/10 text-primary border-primary/20', label: 'Ολοκληρώθηκε' },
       cancelled: { className: 'bg-muted text-muted-foreground', label: 'Ακυρώθηκε' },
+      lost: { className: 'bg-destructive/10 text-destructive border-destructive/20', label: 'Χάθηκε' },
+      tender: { className: 'bg-warning/10 text-warning border-warning/20', label: 'Διαγωνισμός' },
     };
-    const style = styles[status];
+    const style = styles[status] || styles.lead;
     return <Badge variant="outline" className={style.className}>{style.label}</Badge>;
   };
 

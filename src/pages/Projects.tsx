@@ -77,7 +77,7 @@ import { cn } from '@/lib/utils';
 import { GripVertical, Pencil, Trash2 } from 'lucide-react';
 import { el } from 'date-fns/locale';
 
-type ProjectStatus = 'tender' | 'active' | 'completed' | 'cancelled';
+type ProjectStatus = 'lead' | 'proposal' | 'negotiation' | 'won' | 'active' | 'completed' | 'cancelled' | 'lost' | 'tender';
 
 interface Project {
   id: string;
@@ -100,7 +100,7 @@ interface FileContent {
   content: string;
 }
 
-export default function ProjectsPage() {
+export default function ProjectsPage({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
   const { isAdmin, isManager } = useAuth();
   const { logCreate, logUpdate, logDelete, logStatusChange } = useActivityLogger();
@@ -138,7 +138,7 @@ export default function ProjectsPage() {
     })
   );
 
-  const statuses: ProjectStatus[] = ['tender', 'active', 'completed', 'cancelled'];
+  const statuses: ProjectStatus[] = ['lead', 'proposal', 'negotiation', 'active', 'completed'];
 
   const [formData, setFormData] = useState({
     name: '',
@@ -421,13 +421,18 @@ export default function ProjectsPage() {
   };
 
   const getStatusBadge = (status: ProjectStatus) => {
-    const styles = {
-      tender: { className: 'bg-warning/10 text-warning border-warning/20', label: 'Διαγωνισμός' },
+    const styles: Record<string, { className: string; label: string }> = {
+      lead: { className: 'bg-blue-500/10 text-blue-500 border-blue-500/20', label: 'Lead' },
+      proposal: { className: 'bg-warning/10 text-warning border-warning/20', label: 'Πρόταση' },
+      negotiation: { className: 'bg-orange-500/10 text-orange-500 border-orange-500/20', label: 'Διαπραγμάτευση' },
+      won: { className: 'bg-success/10 text-success border-success/20', label: 'Κερδήθηκε' },
       active: { className: 'bg-success/10 text-success border-success/20', label: 'Ενεργό' },
       completed: { className: 'bg-primary/10 text-primary border-primary/20', label: 'Ολοκληρώθηκε' },
       cancelled: { className: 'bg-muted text-muted-foreground', label: 'Ακυρώθηκε' },
+      lost: { className: 'bg-destructive/10 text-destructive border-destructive/20', label: 'Χάθηκε' },
+      tender: { className: 'bg-warning/10 text-warning border-warning/20', label: 'Διαγωνισμός' },
     };
-    const style = styles[status];
+    const style = styles[status] || styles.lead;
     return <Badge variant="outline" className={style.className}>{style.label}</Badge>;
   };
 
@@ -626,11 +631,16 @@ export default function ProjectsPage() {
     />
   );
 
-  const statusLabels: Record<ProjectStatus, string> = {
-    tender: 'Διαγωνισμοί',
+  const statusLabels: Record<string, string> = {
+    lead: 'Leads',
+    proposal: 'Προτάσεις',
+    negotiation: 'Διαπραγμάτευση',
     active: 'Ενεργά',
     completed: 'Ολοκληρωμένα',
-    cancelled: 'Ακυρωμένα'
+    cancelled: 'Ακυρωμένα',
+    lost: 'Χαμένα',
+    won: 'Κερδήθηκαν',
+    tender: 'Διαγωνισμοί',
   };
 
   const renderKanbanView = () => (
@@ -684,20 +694,22 @@ export default function ProjectsPage() {
   );
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
+    <div className={embedded ? 'space-y-6' : 'p-6 lg:p-8 space-y-6'}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-3">
-            <span className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <FolderKanban className="h-5 w-5 text-primary" />
-            </span>
-            Έργα
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm ml-[52px]">
-            Διαχείριση και παρακολούθηση έργων
-          </p>
-        </div>
+        {!embedded && (
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-3">
+              <span className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <FolderKanban className="h-5 w-5 text-primary" />
+              </span>
+              Έργα
+            </h1>
+            <p className="text-muted-foreground mt-1 text-sm ml-[52px]">
+              Διαχείριση και παρακολούθηση έργων
+            </p>
+          </div>
+        )}
 
         <div className="flex items-center gap-3">
           <UnifiedViewToggle 
@@ -865,8 +877,10 @@ export default function ProjectsPage() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
+                              <SelectItem value="lead">Lead</SelectItem>
+                              <SelectItem value="proposal">Πρόταση</SelectItem>
+                              <SelectItem value="negotiation">Διαπραγμάτευση</SelectItem>
                               <SelectItem value="active">Ενεργό</SelectItem>
-                              <SelectItem value="tender">Διαγωνισμός</SelectItem>
                               <SelectItem value="completed">Ολοκληρώθηκε</SelectItem>
                               <SelectItem value="cancelled">Ακυρώθηκε</SelectItem>
                             </SelectContent>

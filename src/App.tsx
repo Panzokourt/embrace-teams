@@ -8,11 +8,10 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import AppLayout from "@/components/layout/AppLayout";
 import Auth from "@/pages/Auth";
 import Dashboard from "@/pages/Dashboard";
+import Work from "@/pages/Work";
 import Projects from "@/pages/Projects";
 import ProjectDetail from "@/pages/ProjectDetail";
 import Tasks from "@/pages/Tasks";
-import Tenders from "@/pages/Tenders";
-import TenderDetail from "@/pages/TenderDetail";
 import Financials from "@/pages/Financials";
 import Clients from "@/pages/Clients";
 import ClientDetail from "@/pages/ClientDetail";
@@ -43,19 +42,21 @@ const App = () => (
               <Route path="/auth" element={<Auth />} />
               <Route element={<AppLayout />}>
                 <Route path="/" element={<Dashboard />} />
-                <Route path="/projects" element={<Projects />} />
+                <Route path="/work" element={<Work />} />
+                <Route path="/projects" element={<Navigate to="/work?tab=projects" replace />} />
                 <Route path="/projects/:id" element={<ProjectDetail />} />
-                <Route path="/tasks" element={<Tasks />} />
-                <Route path="/tenders" element={<Tenders />} />
-                <Route path="/tenders/:id" element={<TenderDetail />} />
+                <Route path="/tasks" element={<Navigate to="/work?tab=tasks" replace />} />
+                <Route path="/tenders" element={<Navigate to="/work?tab=projects" replace />} />
+                <Route path="/tenders/:id" element={<Navigate to="/work?tab=projects" replace />} />
                 <Route path="/financials" element={<Financials />} />
                 <Route path="/clients" element={<Clients />} />
                 <Route path="/clients/:id" element={<ClientDetail />} />
                 <Route path="/hr" element={<HR />} />
                 <Route path="/hr/employee/:id" element={<EmployeeProfile />} />
                 <Route path="/settings" element={<Settings />} />
-                <Route path="/calendar" element={<Calendar />} />
+                <Route path="/calendar" element={<Navigate to="/work?tab=calendar" replace />} />
                 <Route path="/files" element={<Files />} />
+                <Route path="/blueprints" element={<Blueprints />} />
                 <Route path="/blueprints" element={<Blueprints />} />
                 {/* Redirects from old routes */}
                 <Route path="/users" element={<Navigate to="/hr?tab=staff" replace />} />

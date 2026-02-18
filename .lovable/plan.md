@@ -1,67 +1,51 @@
 
+# Προ-συμπληρωμένα Project Templates & Αφαίρεση Budget/Fee
 
-# Ενισχυμένο Project Creation Wizard
+## Αλλαγές
 
-## Τι αλλάζει
+### 1. Αφαίρεση Budget και Fee από template form
+Αφαιρούνται τα πεδία "Default Budget" και "Default Fee (%)" από το dialog δημιουργίας/επεξεργασίας template στο `ProjectTemplatesManager.tsx`.
 
-Οταν ο χρήστης επιλέγει template στο wizard δημιουργίας project, το παράθυρο θα γίνεται δυναμικό:
+### 2. Seed data - Δημιουργία 7 έτοιμων templates
+Θα δημιουργηθούν μέσω database migration τα παρακάτω templates με ρεαλιστικά deliverables και tasks:
 
-### 1. Preview παραδοτέων και tasks με checkboxes
-- Οταν επιλεγεί template, φορτώνονται τα deliverables και tasks του
-- Εμφανίζονται ως λίστα με checkboxes (ολα pre-selected)
-- Ο χρήστης μπορεί να αποεπιλέξει οτι δεν χρειάζεται πριν πατήσει "Δημιουργία"
-- Εμφάνιση budget ανά deliverable και estimated hours ανά task
+**Digital Campaign**
+- Deliverables: Campaign Strategy, Creative Assets, Landing Page, Ad Setup & Management, Performance Report
+- Tasks: Brief analysis, Target audience research, Creative concept, Copywriting, Design banners/visuals, Landing page development, Ad account setup, Campaign launch, A/B testing, Weekly optimization, Performance report
 
-### 2. Δυναμικά πεδία ανά τύπο έργου
-- Ανάλογα με το `project_type` του template, εμφανίζονται extra πεδία:
-  - **Event**: Τοποθεσία, Αριθμός ατόμων, Ημ/νία Event
-  - **Digital Campaign**: Target Audience, Platforms (multi-select checkboxes: Facebook, Instagram, Google, LinkedIn, TikTok)
-  - **PR**: Target Media, Key Messages
-  - **Social Media**: Platforms, Posting Frequency
-  - **Branding**: Brand Elements (Logo, Guidelines, Identity)
-  - **Production**: Format, Duration
-- Αυτά τα πεδία αποθηκεύονται σε ενα `metadata` jsonb column στον πίνακα projects
+**Event**
+- Deliverables: Event Planning, Venue & Logistics, Content & Communication, On-site Production, Post-event Report
+- Tasks: Event concept & brief, Venue research & booking, Timeline & run of show, Supplier coordination, Invitations & RSVP management, Press release, Social media promotion, On-site setup, Photography/videography, Post-event report & analytics
 
-### 3. Βελτιωμένο UI wizard
-- Το template selector section γίνεται πιο prominent (Step 1)
-- Κατω από τα βασικά πεδία εμφανίζεται collapsible section "Template Preview" με deliverables/tasks
-- Τα δυναμικά πεδία εμφανίζονται σε ξεχωριστό section με τίτλο ανάλογο του τύπου
+**PR / Δημόσιες Σχέσεις**
+- Deliverables: PR Strategy, Media Kit, Press Coverage, Media Monitoring Report
+- Tasks: Stakeholder analysis, Key messages development, Media list compilation, Press release writing, Media kit creation, Journalist outreach, Press conference/event coordination, Media monitoring, Coverage report, Crisis communication plan
+
+**Branding**
+- Deliverables: Brand Research, Brand Identity, Brand Guidelines, Brand Collateral
+- Tasks: Market & competitor analysis, Brand audit, Logo concepts & design, Color palette & typography, Brand guidelines document, Business cards & stationery, Templates (presentations, documents), Brand launch plan
+
+**Social Media**
+- Deliverables: Social Media Strategy, Content Calendar, Content Production, Monthly Report
+- Tasks: Audience & competitor analysis, Platform strategy, Content calendar creation, Copywriting, Visual content creation, Community management setup, Posting & scheduling, Engagement & community management, Monthly analytics report, Strategy optimization
+
+**Production**
+- Deliverables: Pre-production, Production, Post-production, Final Delivery
+- Tasks: Concept & script development, Storyboard, Casting & location scouting, Equipment & crew planning, Shooting schedule, Filming/recording, Editing & color grading, Sound design & music, Review & revisions, Final export & delivery
+
+**Consulting**
+- Deliverables: Discovery & Analysis, Strategy Document, Implementation Plan, Review & Optimization
+- Tasks: Stakeholder interviews, Current state analysis, Market/industry research, SWOT analysis, Strategy development, Recommendations document, Implementation roadmap, Training/workshop, Progress review, Final report & next steps
+
+### 3. Σημεία αλλαγής
+
+**Migration SQL**: Insert τα 7 templates + deliverables + tasks. Χωρίς company_id ωστε να είναι global.
+
+**`ProjectTemplatesManager.tsx`**: Αφαίρεση πεδίων default_budget και default_agency_fee_percentage από form state και UI.
 
 ## Technical Details
 
-### Database Migration
-Προσθήκη `metadata` jsonb column στον πίνακα `projects`:
-```sql
-ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS metadata jsonb DEFAULT '{}';
-```
-
-### Αλλαγές αρχείων
-
-**`src/pages/Projects.tsx`**:
-- Οταν αλλάζει template, fetch deliverables + tasks και αποθήκευσή τους σε state
-- Render checkboxes για deliverables και tasks (pre-checked)
-- Render δυναμικά πεδία βάσει `project_type` του template
-- Κατά τη δημιουργία, πέρασμα μόνο selected items στο `applyTemplate`
-- Αποθήκευση δυναμικών πεδίων στο `metadata`
-
-**`src/hooks/useProjectTemplates.ts`**:
-- Τροποποίηση `applyTemplate` ωστε να δέχεται `selectedDeliverableIndices` και `selectedTaskIndices`
-- Δημιουργεί μόνο τα επιλεγμένα items
-
-**Νέο component `src/components/projects/TemplatePreview.tsx`**:
-- Δέχεται deliverables/tasks arrays + selection state
-- Εμφανίζει checkboxes με ονόματα, budgets, hours
-- Σύνοψη (π.χ. "5/8 παραδοτέα, 12/15 tasks")
-
-**Νέο component `src/components/projects/DynamicProjectFields.tsx`**:
-- Δέχεται `projectType` string
-- Render τα κατάλληλα πεδία ανάλογα τον τύπο
-- Επιστρέφει values ως `metadata` object
-
-### Σειρά υλοποίησης
-1. Database migration (metadata column)
-2. DynamicProjectFields component
-3. TemplatePreview component
-4. Ενημέρωση useProjectTemplates hook
-5. Ενημέρωση Projects.tsx wizard
-
+- Τα templates θα εισαχθούν με `company_id = NULL` ωστε να είναι διαθέσιμα σε ολους
+- Κάθε task θα έχει λογικά `days_offset_start` / `days_offset_due` για αυτόματο scheduling
+- Τα tasks θα έχουν `deliverable_ref_order` που αντιστοιχεί στο `sort_order` του deliverable στο οποίο ανήκουν
+- Αφαίρεση budget/fee μόνο από το UI template editor - τα columns παραμένουν στη βάση για backward compatibility

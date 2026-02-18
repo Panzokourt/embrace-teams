@@ -1,50 +1,72 @@
 
 
+# Αναβάθμιση My Work - 6 Features
 
-# Fix "Tasks Σήμερα" Logic + Richer Task Rows
+## 1. Εμφάνιση ημερομηνιών (start_date & due_date) στα task rows
 
-## Προβλήματα
+Προσθήκη στο `TaskRow` component: εμφάνιση start_date -> due_date σε μορφή `d/MM - d/MM` δίπλα στο project name ή σε ξεχωριστή στήλη.
 
-1. **Query λογική**: Τώρα φιλτράρει μόνο με `due_date <= today`, αγνοώντας το `start_date`. Επίσης εμφανίζει tasks από projects του χρήστη ακόμα κι αν δεν είναι assignee.
-2. **Λίγες πληροφορίες**: Οι γραμμές δείχνουν μόνο τίτλο, project name, priority badge και play button.
+## 2. Drag & Drop σειρά εργασιών σήμερα
 
-## Αλλαγές
+Μετατροπή του "Tasks Σήμερα" σε reorderable λίστα:
+- Χρήση `@dnd-kit/sortable` (ήδη εγκατεστημένο) για drag & drop μεταξύ γραμμών
+- Αποθήκευση σειράς τοπικά σε `localStorage` (key: `my-work-task-order-{userId}-{date}`) ώστε να μην χρειάζεται DB migration
+- Drag handle (GripVertical icon) στην αρχή κάθε γραμμής
+- Η σειρά καθορίζει πώς ο χρήστης σκοπεύει να δουλέψει, ανεξάρτητα από ημερομηνίες
 
-### 1. Διόρθωση query "Tasks Σήμερα"
+## 3. Section εγκρίσεων tasks (νέο πεδίο `approver`)
 
-Αντί για σύνθετο `.or()` με project access, η query γίνεται:
-- **Μόνο tasks assigned στον χρήστη** (`.eq('assigned_to', user.id)`)
-- **Φέρνει ΟΛΑ τα μη-ολοκληρωμένα** tasks του χρήστη και μετά φιλτράρει client-side:
-  - `due_date <= today` (overdue + σήμερα)
-  - `start_date = today` (ξεκινάνε σήμερα)
-  - `due_date = today` (λήγουν σήμερα)
+### Database Migration
+- Προσθήκη στήλης `approver` (uuid, nullable) στον πίνακα `tasks`
+- RLS: ο approver μπορεί να βλέπει tasks που του έχουν ανατεθεί για έγκριση
 
-Επίσης select περισσότερα πεδία: `start_date, estimated_hours, actual_hours, progress, task_type, task_category, assigned_to`
+### UI
+- Νέο section "Εκκρεμείς Εγκρίσεις Tasks" στο My Work
+- Fetch tasks όπου `approver = user.id` και `status = 'review'`
+- Κουμπιά Approve (αλλαγή status σε completed) / Reject (αλλαγή status πίσω σε in_progress)
+- Εμφανίζεται μόνο αν υπάρχουν εκκρεμή
 
-### 2. Πιο πλούσιες γραμμές tasks
+## 4. Task Sidebar (Sheet) αντί navigation
 
-Κάθε task row θα δείχνει:
-- Checkbox + Τίτλος (link στο task detail, όχι στο project)
-- Project name (μικρό, κάτω από τον τίτλο)
-- **Status badge** (todo, in_progress κλπ)
-- **Due date** (formatted, κόκκινο αν overdue)
-- **Priority badge**
-- **Estimated hours** (αν υπάρχουν)
-- Play/Stop button
+- Κλικ σε task ανοίγει Sheet (δεξιά πλαϊνή μπάρα) με τις βασικές πληροφορίες του task
+- Μέσα στο Sheet: τίτλος, status, priority, dates, project, assignee, description, progress
+- Κουμπί "Άνοιγμα σελίδας" μέσα στο Sheet που κάνει navigate στο `/tasks/:id`
+- Χρήση του υπάρχοντος Sheet component (`@/components/ui/sheet`)
 
-Ίδια λογική και για week + upcoming rows: προσθήκη priority, due date, estimated hours.
+## 5. Πλήρη Quick Links
 
-### 3. Task links
+Προσθήκη στο Quick Links grid (ίδιες επιλογές με το QuickActionButton):
+- Νέο Έργο, Νέο Task (υπάρχουν ήδη)
+- Χρόνος, Άδεια, Ημερολόγιο (υπάρχουν ήδη)
+- Creative Brief, Digital Campaign Brief, Contact Report, Website Brief, Event Brief, Communication Brief
+- Αναφορές, Αρχεία
 
-Τα links στα tasks θα πηγαίνουν στο `/tasks/:id` αντί `/projects/:id`.
+## 6. AI Chat Agent
 
-## Αρχείο
+- Νέο collapsible/expandable chat widget στο κάτω μέρος ή ως floating panel
+- Edge function `my-work-ai-chat` που χρησιμοποιεί Lovable AI (google/gemini-3-flash-preview)
+- Streaming responses
+- System prompt: ο agent γνωρίζει τα tasks, projects και δεδομένα του χρήστη
+- Δυνατότητες: αναζήτηση, δημιουργία tasks, σύνοψη εργασιών
+- Floating chat button δίπλα στο FAB
 
-- `src/pages/MyWork.tsx` -- Αλλαγή query, interface, UI rows
+## Τεχνικές λεπτομέρειες
 
-## Σειρά υλοποίησης
+### Αρχεία
 
-1. Ενημέρωση interface `TaskWithProject` με νέα πεδία
-2. Αλλαγή query: fetch assigned tasks, client-side filter για today
-3. Ενημέρωση UI rows σε όλα τα sections (Today, Week, Upcoming)
-4. Fix links -> `/tasks/:id`
+| Αρχείο | Ενέργεια |
+|--------|----------|
+| `src/pages/MyWork.tsx` | Πλήρης αναβάθμιση (drag & drop, sidebar, approvals, dates, quick links) |
+| `supabase/functions/my-work-ai-chat/index.ts` | Νέο edge function για AI chat |
+| DB Migration | Προσθήκη `approver` στον πίνακα `tasks` |
+
+### Σειρά υλοποίησης
+
+1. DB Migration: προσθήκη `approver` column
+2. Ενημέρωση `TaskRow` με ημερομηνίες + drag handle
+3. Drag & drop στο "Tasks Σήμερα" με localStorage
+4. Task Sheet sidebar
+5. Section εγκρίσεων
+6. Πλήρη Quick Links
+7. AI Chat edge function + widget
+

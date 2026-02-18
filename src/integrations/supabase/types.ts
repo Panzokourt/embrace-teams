@@ -1857,6 +1857,7 @@ export type Database = {
       tasks: {
         Row: {
           actual_hours: number | null
+          approver: string | null
           assigned_to: string | null
           created_at: string
           created_by: string | null
@@ -1883,6 +1884,7 @@ export type Database = {
         }
         Insert: {
           actual_hours?: number | null
+          approver?: string | null
           assigned_to?: string | null
           created_at?: string
           created_by?: string | null
@@ -1909,6 +1911,7 @@ export type Database = {
         }
         Update: {
           actual_hours?: number | null
+          approver?: string | null
           assigned_to?: string | null
           created_at?: string
           created_by?: string | null

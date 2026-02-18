@@ -1,36 +1,89 @@
 
-## Αναβαθμιση Πινακων σε Project Detail
+# Time Tracking Module
 
-### Τρεχουσα Κατασταση
-- **Tender Detail**: Ηδη χρησιμοποιει enhanced tables (`TenderDeliverablesTable`, `TenderTasksTable`) με inline editing, sorting, resizable columns, toolbar, CSV/Excel export
-- **Project Detail**: Χρησιμοποιει παλια card/list components (`ProjectDeliverables`, `ProjectTasksManager`) χωρις τις παραπανω δυνατοτητες
+## Overview
+Προσθηκη πληρους συστηματος καταγραφης χρονου εργασιας (time tracking) με timer per task, timesheets, και αναφορες.
 
-### Αλλαγες
+## Τι περιλαμβανει
 
-#### 1. Νεο αρχειο: `src/components/projects/ProjectDeliverablesTable.tsx`
-Δημιουργια enhanced table για τα Παραδοτεα του Project, ακολουθωντας το pattern του `TenderDeliverablesTable`:
-- Στηλες: Checkbox, Ονομα, Περιγραφη, Budget, Κοστος, Προθεσμια, Ολοκληρωθηκε, Ενεργειες
-- Inline editing μεσω `EnhancedInlineEditCell`
-- Sorting, column resizing, column visibility toggle
-- Toolbar με εξαγωγη CSV/Excel
-- Progress bar και budget summary
-- Dialog για δημιουργια/επεξεργασια
+### 1. Database - Νεος πινακας `time_entries`
+- `id`, `user_id`, `task_id`, `project_id`
+- `start_time` (timestamp), `end_time` (timestamp)
+- `duration_minutes` (integer, υπολογισμενο)
+- `description` (text, σημειωσεις)
+- `is_running` (boolean, αν τρεχει ακομα ο timer)
+- `created_at`, `updated_at`
+- RLS policies: χρηστες βλεπουν/διαχειριζονται τα δικα τους, admin/manager βλεπουν ολα
+- Realtime enabled
 
-#### 2. Νεο αρχειο: `src/components/projects/ProjectTasksTable.tsx`
-Δημιουργια enhanced table για τα Tasks του Project, ακολουθωντας το pattern του `TenderTasksTable`:
-- Στηλες: Checkbox, Τιτλος, Υπευθυνος, Παραδοτεο, Προθεσμια, Κατασταση, Ενεργειες
-- Inline editing μεσω `EnhancedInlineEditCell`
-- Sorting, column resizing, column visibility toggle
-- Toolbar με εξαγωγη CSV/Excel
-- Dialog για δημιουργια/επεξεργασια
+### 2. Timer Component (`TaskTimer`)
+- Κουμπι Play/Stop σε καθε task (στον πινακα Tasks και στο Task detail)
+- Live χρονομετρο που τρεχει real-time
+- Δυνατοτητα προσθηκης description μετα το stop
+- Εμφανιση τρεχοντος timer στο header/sidebar ως indicator
 
-#### 3. Τροποποιηση: `src/pages/ProjectDetail.tsx`
-- Αντικατασταση `ProjectDeliverables` με `ProjectDeliverablesTable`
-- Αντικατασταση `ProjectTasksManager` με `ProjectTasksTable`
-- Αφαιρεση των Card wrappers (τα νεα components ειναι αυτονομα)
+### 3. Σελιδα Timesheets (`/timesheets`)
+- Νεα σελιδα στο sidebar με εικονιδιο `Timer`
+- Πινακας με ολες τις καταχωρησεις χρονου
+- Φιλτρα: ανα χρηστη, project, ημερομηνια
+- Ημερησια/εβδομαδιαια/μηνιαια προβολη
+- Manual entry (προσθηκη χρονου χωρις timer)
+- Συνολα ωρων ανα ημερα/project/χρηστη
+- Export σε CSV/Excel
 
-### Τεχνικες Λεπτομερειες
-- Τα νεα components χρησιμοποιουν τα ιδια shared components: `EnhancedInlineEditCell`, `TableToolbar`, `ResizableTableHeader`, `useTableViews`
-- Τα παλια αρχεια (`ProjectDeliverables.tsx`, `ProjectTasksManager.tsx`) παραμενουν στο project αλλα δεν χρησιμοποιουνται πλεον - μπορουν να αφαιρεθουν αργοτερα
-- Δεν απαιτουνται αλλαγες στη βαση δεδομενων - χρησιμοποιουνται οι ιδιοι πινακες `deliverables` και `tasks`
-- Storage keys: `project_deliverables_table` και `project_tasks_table` για αποθηκευση column widths/visibility
+### 4. Ενσωματωση στα Tasks
+- Νεα στηλη "Tracked Time" στον πινακα tasks
+- Συγκριση estimated vs actual (tracked) hours
+- Progress bar: tracked / estimated
+- Ενημερωση `actual_hours` στον πινακα tasks αυτοματα
+
+### 5. Dashboard Widget
+- Προσθηκη "Ωρες Σημερα" stat card στο Dashboard
+- Τρεχον timer indicator
+
+## Technical Details
+
+### Database Migration
+```sql
+CREATE TABLE public.time_entries (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid NOT NULL REFERENCES auth.users(id),
+  task_id uuid REFERENCES public.tasks(id) ON DELETE SET NULL,
+  project_id uuid NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+  start_time timestamptz NOT NULL DEFAULT now(),
+  end_time timestamptz,
+  duration_minutes integer DEFAULT 0,
+  description text,
+  is_running boolean DEFAULT false,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- RLS policies
+-- Users manage own entries, admin/manager see all
+-- Realtime enabled
+```
+
+### Νεα αρχεια
+- `src/pages/Timesheets.tsx` - κεντρικη σελιδα
+- `src/components/time-tracking/TaskTimer.tsx` - timer component
+- `src/components/time-tracking/TimeEntryForm.tsx` - manual entry form
+- `src/components/time-tracking/TimesheetTable.tsx` - πινακας entries
+- `src/components/time-tracking/ActiveTimerIndicator.tsx` - global indicator
+- `src/hooks/useTimeTracking.ts` - hook για timer logic
+
+### Τροποποιησεις υπαρχοντων αρχειων
+- `src/App.tsx` - route `/timesheets`
+- `src/components/layout/AppSidebar.tsx` - nav item "Timesheets" με εικονιδιο Timer
+- `src/components/tasks/TasksTableView.tsx` - στηλη tracked time + timer button
+- `src/pages/Tasks.tsx` - timer integration στο kanban view
+- `src/pages/Dashboard.tsx` - "Ωρες Σημερα" widget
+
+### Σειρα υλοποιησης
+1. Database migration (time_entries + RLS + realtime)
+2. useTimeTracking hook (start/stop/manual entry logic)
+3. TaskTimer component
+4. Timesheets page + table
+5. Integration στο Tasks table
+6. Dashboard widget
+7. Active timer indicator στο sidebar

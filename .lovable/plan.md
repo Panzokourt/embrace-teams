@@ -1,93 +1,98 @@
 
-# Task Detail Page + Βελτιωσεις Tasks & Projects
 
-## Προβληματα που εντοπιστηκαν
+# Αναδιάρθρωση Task Detail Page - Clean Two-Column Layout
 
-1. **Δεν υπαρχει Task Detail Page** -- τα tasks ανοιγουν μονο σε dialog, δεν εχουν δικη τους σελιδα-καρτελα οπως τα projects
-2. **Dropdown υπευθυνου αδειο** -- η query φιλτραρει `status = 'active'` αλλα οι 2 απο τους 3 χρηστες εχουν `status = 'pending'`. Πρεπει να εμφανιζονται ολοι οι χρηστες (ή τουλαχιστον active + pending)
-3. **Table rows δεν ειναι clickable** -- χρειαζεται να πατησεις το μικρο ExternalLink icon αντι να κανεις click στη γραμμη
-4. **Cards/Kanban ανοιγουν dialog αντι σελιδα** -- πρεπει να πηγαινουν στη Task Detail page
+## Τρεχουσα κατασταση
 
-## Αλλαγες
+Η σελίδα έχει:
+- Header με τίτλο + badges
+- 5 info cards σε grid (Υπεύθυνος, Προθεσμία, Εκτίμηση, Πραγματικός, Πρόοδος)
+- Status bar
+- Tabs κάτω (Overview, Σχόλια, Αρχεία, Χρόνος, Ιστορικό)
 
-### 1. Νεα σελιδα: Task Detail (`/tasks/:id`)
+Στο Overview tab: 2 cards (Περιγραφή + Λεπτομέρειες) και Subtasks
 
-Δομη παρομοια με ProjectDetail:
-- **Header**: Πισω button, τιτλος task, status badge, priority badge
-- **Info Section**: Project link, assignee, due date, start date, estimated/actual hours, progress, category, type
-- **Tabs**:
-  - **Overview**: Περιγραφη, inline editing ολων των πεδιων, subtasks list, dependencies
-  - **Comments**: CommentsSection (υπαρχει ηδη)
-  - **Files**: FileExplorer/FileAttachments (υπαρχει ηδη)
-  - **Time Tracking**: Timer + time entries για αυτο το task
+## Προτεινομενη δομη (εμπνευσμενη απο reference)
 
-### 2. Fix Assignee Dropdown
-
-Αλλαγη query σε ολα τα σημεια (Tasks.tsx, ProjectTasksTable.tsx, ProjectTasksManager.tsx):
-- Αντι `.eq('status', 'active')` -> `.in('status', ['active', 'pending'])` ωστε να εμφανιζονται ολοι οι χρηστες που εχουν λογαριασμο
-
-### 3. Clickable Table Rows
-
-Στο `TasksTableView.tsx`:
-- Ολοκληρη η TableRow γινεται clickable με `onClick={() => navigate('/tasks/' + task.id)}`
-- Cursor pointer στη γραμμη
-- Αφαιρεση του μικρου ExternalLink icon (ή αντικατασταση: το icon πηγαινει στο project, η γραμμη στο task)
-- Εξαιρεση click propagation στα inline edit cells, checkboxes, actions
-
-### 4. Cards & Kanban -> Navigate αντι Dialog
-
-Στο `Tasks.tsx`:
-- Card view: onClick πηγαινει στο `/tasks/:id` αντι `handleEdit(task)`
-- Kanban TaskCard: onClick πηγαινει στο `/tasks/:id` αντι `handleEdit(task)`
-- Κρατουμε edit/delete μεσα στο card ως secondary actions (hover)
-
-### 5. Projects: Ιδια λογικη στο clickable
-
-Στο `ProjectsTableView.tsx`: Η γραμμη γινεται clickable (navigate στο project detail)
-
-## Νεα αρχεια
-
-- `src/pages/TaskDetail.tsx` -- Σελιδα λεπτομερειων task
-
-## Τροποποιημενα αρχεια
-
-- `src/App.tsx` -- Νεα route `/tasks/:id`
-- `src/pages/Tasks.tsx` -- Cards/Kanban navigate αντι dialog, fix fetchUsers query
-- `src/components/tasks/TasksTableView.tsx` -- Clickable rows navigate, αφαιρεση/αντικατασταση ExternalLink
-- `src/components/projects/ProjectTasksTable.tsx` -- Fix fetchProfiles query, clickable rows
-- `src/components/projects/ProjectTasksManager.tsx` -- Fix fetchProfiles query
-
-## Task Detail Page Layout
+Αντί για cards πάνω + tabs κάτω, γίνεται **two-column layout**:
 
 ```text
-+--------------------------------------------------+
-| <- Πισω στα Tasks                                |
-| [Task Title]              [Status: In Progress]  |
-|                           [Priority: High]        |
-+--------------------------------------------------+
-| Project: Project A (link)  |  Assignee: John Doe |
-| Due: 25 Feb               |  Start: 20 Feb       |
-| Est: 8h  |  Actual: 5.5h  |  Progress: 65%      |
-+--------------------------------------------------+
-| [Overview] [Comments] [Files] [Time Tracking]     |
-+--------------------------------------------------+
-|                                                    |
-| Περιγραφη:                                        |
-| Lorem ipsum dolor sit amet...                     |
-|                                                    |
-| Subtasks:                                          |
-| [x] Research competitors                          |
-| [ ] Draft proposal                                |
-| [ ] Review with client                            |
-|                                                    |
-+--------------------------------------------------+
++------------------------------------------------------+---------------------------+
+| Task Title (editable)                                 | Activity                  |
+| Project link                                          |                           |
+|                                                       |                           |
+| Status    [ON GOING >]  |  Assignee   [Avatar(s)]    |                           |
+| Dates     Start -> Due  |  Priority   [Medium]       |                           |
+| Estimate  [8h]          |  Track time [Start]        |                           |
+| Category  [Design]      |  Type       [Task]         |                           |
+| Deliverable [X]         |  Progress   [65%]          |                           |
+|                                                       |                           |
+| ---------------------------------------------------- |  * User created task      |
+| Add description...                                    |    Feb 4, 13:39           |
+|                                                       |                           |
+| ---------------------------------------------------- |  * Status changed         |
+| Subtasks (3)                                          |    Todo -> In Progress    |
+| [x] Research competitors                              |    Feb 11, 15:41          |
+| [ ] Draft proposal                                    |                           |
+| [ ] Review with client                                |                           |
+|                                                       |                           |
+| ---------------------------------------------------- | ------------------------- |
+| [Σχόλια] [Αρχεία] [Χρόνος]  <- tabs μονο για αυτα   | Write a comment...        |
++------------------------------------------------------+---------------------------+
 ```
 
-## Σειρα Υλοποιησης
+## Αλλαγες αναλυτικα
 
-1. Δημιουργια `TaskDetail.tsx` με ολα τα sections και inline editing
-2. Route `/tasks/:id` στο App.tsx
-3. Fix assignee dropdown (αλλαγη query σε 3 αρχεια)
-4. Clickable table rows στο TasksTableView + ProjectTasksTable
-5. Cards/Kanban navigate στο Tasks.tsx
-6. Clickable rows στο ProjectsTableView (αν δεν ειναι ηδη)
+### 1. Two-column layout
+- **Αριστερα (~70%)**: Ολες οι πληροφοριες του task
+- **Δεξια (~30%)**: Activity feed (always visible, not in tab) + mini comment input
+
+### 2. Properties Grid (αντι info cards)
+Αντι 5 ξεχωριστες Card components, ενα clean grid 2 στηλων μεσα στη σελιδα:
+
+| Label | Value (inline editable) |
+|-------|------------------------|
+| Κατασταση | Status badge + quick change |
+| Υπευθυνος | Select dropdown |
+| Ημερομηνιες | Start -> Due (2 date pickers) |
+| Προτεραιοτητα | Select with color dots |
+| Εκτιμηση | Number input |
+| Πραγματικος | Display only |
+| Προοδος | Progress slider |
+| Τυπος | Select |
+| Κατηγορια | Select |
+| Παραδοτεο | Select |
+
+Ολα inline-editable χωρις Cards, απλα rows με label-value.
+
+### 3. Description section
+- Κατω απο το properties grid, separator, μετα description area
+- Κλικ για edit (οπως τωρα)
+
+### 4. Subtasks section
+- Κατω απο description
+- Compact checklist style
+
+### 5. Bottom tabs (simplified)
+- Μονο 3 tabs: Σχολια, Αρχεια, Χρονος
+- Activity και Overview δεν ειναι tabs πλεον (ειναι στο main layout)
+
+### 6. Activity Sidebar (δεξια)
+- Always-visible sidebar με timeline
+- Scrollable
+- Compact entries: user + action + timestamp
+- Mini comment input στο κατω μερος
+
+## Αρχεια
+
+### Τροποποιημενα
+- `src/pages/TaskDetail.tsx` -- Πληρης αναδιαρθρωση layout
+
+## Σειρα υλοποιησης
+
+1. Αλλαγη layout σε 2 στηλες (flex/grid)
+2. Αντικατασταση info cards με properties grid (clean rows)
+3. Μεταφορα activity σε δεξια sidebar (always visible)
+4. Αφαιρεση Overview + Activity tabs, κρατημα μονο Σχολια/Αρχεια/Χρονος
+5. Polish: spacing, separators, hover states
+

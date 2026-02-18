@@ -56,15 +56,11 @@ const navItems: NavItem[] = [
   { title: 'Tasks', href: '/tasks', icon: CheckSquare, permission: 'tasks.view' },
   { title: 'Ημερολόγιο', href: '/calendar', icon: CalendarDays },
   { title: 'Αρχείο', href: '/files', icon: FileArchive, permission: 'files.view' },
-  { title: 'Ομάδες', href: '/teams', icon: Users, adminOnly: true },
+  { title: 'HR', href: '/hr', icon: UserCog },
   { title: 'P&L', href: '/financials', icon: DollarSign, permission: 'financials.view' },
-  { title: 'Timesheets', href: '/timesheets', icon: Timer },
 ];
 
 const adminNavItems: NavItem[] = [
-  { title: 'Χρήστες', href: '/users', icon: UserCog, permission: 'users.view' },
-  { title: 'Τμήματα', href: '/departments', icon: Building2, adminOnly: true },
-  { title: 'Οργανόγραμμα', href: '/org-chart', icon: Network },
   { title: 'Πελάτες', href: '/clients', icon: Building2, permission: 'clients.view' },
   { title: 'Προσχέδια', href: '/blueprints', icon: FileStack, permission: 'settings.company' },
   { title: 'Ρυθμίσεις', href: '/settings', icon: Settings, permission: 'settings.company' },

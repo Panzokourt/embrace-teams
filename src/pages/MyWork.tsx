@@ -72,12 +72,22 @@ export default function MyWork() {
     const weekEnd = format(endOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd');
     const tomorrowISO = format(startOfTomorrow(), 'yyyy-MM-dd');
 
+    // First get user's project IDs
+    const { data: accessData } = await supabase
+      .from('project_user_access')
+      .select('project_id')
+      .eq('user_id', user.id);
+
+    const myProjectIds = (accessData || []).map((a: any) => a.project_id);
+
     const [tasksToday, tasksWeek, projects, timeEntries] = await Promise.all([
-      // Today tasks + overdue
+      // Today tasks + overdue: assigned to user OR in user's projects
       supabase
         .from('tasks')
         .select('id, title, status, priority, due_date, project_id, project:projects(name)')
-        .eq('assigned_to', user.id)
+        .or(myProjectIds.length > 0
+          ? `assigned_to.eq.${user.id},project_id.in.(${myProjectIds.join(',')})`
+          : `assigned_to.eq.${user.id}`)
         .lte('due_date', todayISO)
         .neq('status', 'completed')
         .order('due_date', { ascending: true }),
@@ -86,13 +96,15 @@ export default function MyWork() {
       supabase
         .from('tasks')
         .select('id, title, status, priority, due_date, project_id, project:projects(name)')
-        .eq('assigned_to', user.id)
+        .or(myProjectIds.length > 0
+          ? `assigned_to.eq.${user.id},project_id.in.(${myProjectIds.join(',')})`
+          : `assigned_to.eq.${user.id}`)
         .gte('due_date', tomorrowISO)
         .lte('due_date', weekEnd)
         .neq('status', 'completed')
         .order('due_date', { ascending: true }),
 
-      // My projects
+      // My projects (full details)
       supabase
         .from('project_user_access')
         .select('project:projects(id, name, status, progress, client:clients(name))')
@@ -168,7 +180,7 @@ export default function MyWork() {
   }
 
   return (
-    <div className="flex-1 p-4 md:p-6 space-y-6 max-w-6xl mx-auto">
+    <div className="flex-1 p-4 md:p-6 lg:p-8 space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>

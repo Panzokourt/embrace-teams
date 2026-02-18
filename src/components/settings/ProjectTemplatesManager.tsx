@@ -102,8 +102,6 @@ export function ProjectTemplatesManager() {
     name: '',
     description: '',
     project_type: 'digital_campaign',
-    default_budget: '',
-    default_agency_fee_percentage: '30',
     is_active: true,
   });
   const [deliverables, setDeliverables] = useState<TemplateDeliverable[]>([]);
@@ -144,8 +142,6 @@ export function ProjectTemplatesManager() {
       name: template.name,
       description: template.description || '',
       project_type: template.project_type,
-      default_budget: template.default_budget?.toString() || '',
-      default_agency_fee_percentage: template.default_agency_fee_percentage?.toString() || '30',
       is_active: template.is_active,
     });
     setDeliverables(details.deliverables);
@@ -230,8 +226,6 @@ export function ProjectTemplatesManager() {
       name: '',
       description: '',
       project_type: 'digital_campaign',
-      default_budget: '',
-      default_agency_fee_percentage: '30',
       is_active: true,
     });
     setDeliverables([]);
@@ -274,8 +268,6 @@ export function ProjectTemplatesManager() {
         name: formData.name,
         description: formData.description || null,
         project_type: formData.project_type,
-        default_budget: parseFloat(formData.default_budget) || 0,
-        default_agency_fee_percentage: parseFloat(formData.default_agency_fee_percentage) || 0,
         is_active: formData.is_active,
       };
 
@@ -465,32 +457,12 @@ export function ProjectTemplatesManager() {
               />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="space-y-2">
-                <Label>Default Budget (€)</Label>
-                <Input
-                  type="number"
-                  value={formData.default_budget}
-                  onChange={(e) => setFormData(prev => ({ ...prev, default_budget: e.target.value }))}
-                  placeholder="0"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Default Fee (%)</Label>
-                <Input
-                  type="number"
-                  value={formData.default_agency_fee_percentage}
-                  onChange={(e) => setFormData(prev => ({ ...prev, default_agency_fee_percentage: e.target.value }))}
-                  placeholder="30"
-                />
-              </div>
-              <div className="flex items-center gap-3 pt-6">
-                <Switch
-                  checked={formData.is_active}
-                  onCheckedChange={(v) => setFormData(prev => ({ ...prev, is_active: v }))}
-                />
-                <Label>Ενεργό</Label>
-              </div>
+            <div className="flex items-center gap-3">
+              <Switch
+                checked={formData.is_active}
+                onCheckedChange={(v) => setFormData(prev => ({ ...prev, is_active: v }))}
+              />
+              <Label>Ενεργό</Label>
             </div>
 
             <Separator />

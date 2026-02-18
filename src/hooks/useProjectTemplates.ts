@@ -7,14 +7,16 @@ import { addDays, format } from 'date-fns';
 interface ApplyTemplateOptions {
   projectId: string;
   templateId: string;
-  startDate?: string; // project start date for offset calculations
+  startDate?: string;
+  selectedDeliverableIds?: Set<string>;
+  selectedTaskIds?: Set<string>;
 }
 
 export function useProjectTemplates() {
   const { user } = useAuth();
   const [applying, setApplying] = useState(false);
 
-  const applyTemplate = async ({ projectId, templateId, startDate }: ApplyTemplateOptions) => {
+  const applyTemplate = async ({ projectId, templateId, startDate, selectedDeliverableIds, selectedTaskIds }: ApplyTemplateOptions) => {
     if (!user) return;
 
     setApplying(true);
@@ -35,13 +37,22 @@ export function useProjectTemplates() {
 
       const baseDate = startDate ? new Date(startDate) : new Date();
 
+      // Filter by selection if provided
+      const filteredDeliverables = selectedDeliverableIds
+        ? (templateDeliverables || []).filter(d => selectedDeliverableIds.has(d.id))
+        : (templateDeliverables || []);
+      
+      const filteredTasks = selectedTaskIds
+        ? (templateTasks || []).filter(t => selectedTaskIds.has(t.id))
+        : (templateTasks || []);
+
       // Create deliverables and map sort_order -> new id
       const deliverableMap: Record<number, string> = {};
-      if (templateDeliverables && templateDeliverables.length > 0) {
+      if (filteredDeliverables.length > 0) {
         const { data: createdDeliverables, error: delError } = await supabase
           .from('deliverables')
           .insert(
-            templateDeliverables.map(d => ({
+            filteredDeliverables.map(d => ({
               project_id: projectId,
               name: d.name,
               description: d.description,
@@ -53,18 +64,17 @@ export function useProjectTemplates() {
 
         if (delError) throw delError;
 
-        // Map sort_order to deliverable id
         createdDeliverables?.forEach((del, idx) => {
-          deliverableMap[templateDeliverables[idx].sort_order] = del.id;
+          deliverableMap[filteredDeliverables[idx].sort_order ?? idx] = del.id;
         });
       }
 
       // Create tasks
-      if (templateTasks && templateTasks.length > 0) {
+      if (filteredTasks.length > 0) {
         const { error: taskError } = await supabase
           .from('tasks')
           .insert(
-            templateTasks.map(t => ({
+            filteredTasks.map(t => ({
               project_id: projectId,
               title: t.title,
               description: t.description,
@@ -83,7 +93,7 @@ export function useProjectTemplates() {
         if (taskError) throw taskError;
       }
 
-      const totalItems = (templateDeliverables?.length || 0) + (templateTasks?.length || 0);
+      const totalItems = filteredDeliverables.length + filteredTasks.length;
       toast.success(`Template εφαρμόστηκε! ${totalItems} στοιχεία δημιουργήθηκαν.`);
       return true;
     } catch (error) {

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 import { useProjectsRealtime } from '@/hooks/useRealtimeSubscription';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,6 +41,8 @@ import { ProjectsTableView } from '@/components/projects/ProjectsTableView';
 import { FileAttachments } from '@/components/files/FileAttachments';
 import { ProjectAISuggestions } from '@/components/projects/ProjectAISuggestions';
 import { useProjectTemplates } from '@/hooks/useProjectTemplates';
+import { TemplatePreview } from '@/components/projects/TemplatePreview';
+import { DynamicProjectFields } from '@/components/projects/DynamicProjectFields';
 import { EditDeleteActions } from '@/components/dialogs/EditDeleteActions';
 import { toast } from 'sonner';
 import { 
@@ -114,6 +117,11 @@ export default function ProjectsPage() {
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   const [templates, setTemplates] = useState<Array<{ id: string; name: string; project_type: string; default_budget: number; default_agency_fee_percentage: number }>>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('none');
+  const [templateDeliverables, setTemplateDeliverables] = useState<any[]>([]);
+  const [templateTasks, setTemplateTasks] = useState<any[]>([]);
+  const [selectedDeliverableIds, setSelectedDeliverableIds] = useState<Set<string>>(new Set());
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
+  const [projectMetadata, setProjectMetadata] = useState<Record<string, unknown>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { applyTemplate, applying: applyingTemplate } = useProjectTemplates();
 
@@ -259,11 +267,12 @@ export default function ProjectsPage() {
         name: formData.name,
         description: formData.description || null,
         client_id: formData.client_id || null,
-        status: formData.status,
+        status: formData.status as 'active' | 'tender' | 'completed' | 'cancelled',
         budget: parseFloat(formData.budget) || 0,
         agency_fee_percentage: parseFloat(formData.agency_fee_percentage) || 0,
         start_date: formData.start_date || null,
         end_date: formData.end_date || null,
+        metadata: (Object.keys(projectMetadata).length > 0 ? projectMetadata : {}) as Json,
       };
 
       if (editingProject) {
@@ -297,6 +306,8 @@ export default function ProjectsPage() {
             projectId: data.id,
             templateId: selectedTemplateId,
             startDate: formData.start_date || undefined,
+            selectedDeliverableIds: selectedDeliverableIds.size > 0 ? selectedDeliverableIds : undefined,
+            selectedTaskIds: selectedTaskIds.size > 0 ? selectedTaskIds : undefined,
           });
         }
 
@@ -396,6 +407,11 @@ export default function ProjectsPage() {
     setTempProjectId(null);
     setDialogTab('details');
     setSelectedTemplateId('none');
+    setTemplateDeliverables([]);
+    setTemplateTasks([]);
+    setSelectedDeliverableIds(new Set());
+    setSelectedTaskIds(new Set());
+    setProjectMetadata({});
   };
 
   const getStatusBadge = (status: ProjectStatus) => {
@@ -715,11 +731,11 @@ export default function ProjectsPage() {
                     <form onSubmit={handleSubmit} className="space-y-4">
                       {/* Template Selector - only for new projects */}
                       {!editingProject && templates.length > 0 && (
-                        <div className="space-y-2 p-3 rounded-lg border border-primary/20 bg-primary/5">
+                        <div className="space-y-3 p-3 rounded-lg border border-primary/20 bg-primary/5">
                           <Label>Template Έργου</Label>
                           <Select
                             value={selectedTemplateId}
-                            onValueChange={(value) => {
+                            onValueChange={async (value) => {
                               setSelectedTemplateId(value);
                               if (value !== 'none') {
                                 const tpl = templates.find(t => t.id === value);
@@ -729,7 +745,22 @@ export default function ProjectsPage() {
                                     budget: tpl.default_budget ? tpl.default_budget.toString() : prev.budget,
                                     agency_fee_percentage: tpl.default_agency_fee_percentage ? tpl.default_agency_fee_percentage.toString() : prev.agency_fee_percentage,
                                   }));
+                                  // Fetch template content
+                                  const [{ data: dels }, { data: tsks }] = await Promise.all([
+                                    supabase.from('project_template_deliverables').select('*').eq('template_id', value).order('sort_order'),
+                                    supabase.from('project_template_tasks').select('*').eq('template_id', value).order('sort_order'),
+                                  ]);
+                                  setTemplateDeliverables(dels || []);
+                                  setTemplateTasks(tsks || []);
+                                  setSelectedDeliverableIds(new Set((dels || []).map((d: any) => d.id)));
+                                  setSelectedTaskIds(new Set((tsks || []).map((t: any) => t.id)));
                                 }
+                              } else {
+                                setTemplateDeliverables([]);
+                                setTemplateTasks([]);
+                                setSelectedDeliverableIds(new Set());
+                                setSelectedTaskIds(new Set());
+                                setProjectMetadata({});
                               }
                             }}
                           >
@@ -743,9 +774,42 @@ export default function ProjectsPage() {
                               ))}
                             </SelectContent>
                           </Select>
-                          <p className="text-xs text-muted-foreground">
-                            Επιλέξτε template για αυτόματη δημιουργία παραδοτέων και tasks
-                          </p>
+
+                          {/* Template Preview */}
+                          {selectedTemplateId !== 'none' && (templateDeliverables.length > 0 || templateTasks.length > 0) && (
+                            <TemplatePreview
+                              deliverables={templateDeliverables}
+                              tasks={templateTasks}
+                              selectedDeliverableIds={selectedDeliverableIds}
+                              selectedTaskIds={selectedTaskIds}
+                              onToggleDeliverable={(id) => {
+                                setSelectedDeliverableIds(prev => {
+                                  const next = new Set(prev);
+                                  next.has(id) ? next.delete(id) : next.add(id);
+                                  return next;
+                                });
+                              }}
+                              onToggleTask={(id) => {
+                                setSelectedTaskIds(prev => {
+                                  const next = new Set(prev);
+                                  next.has(id) ? next.delete(id) : next.add(id);
+                                  return next;
+                                });
+                              }}
+                            />
+                          )}
+
+                          {/* Dynamic Fields */}
+                          {selectedTemplateId !== 'none' && (() => {
+                            const tpl = templates.find(t => t.id === selectedTemplateId);
+                            return tpl ? (
+                              <DynamicProjectFields
+                                projectType={tpl.project_type}
+                                metadata={projectMetadata}
+                                onChange={setProjectMetadata}
+                              />
+                            ) : null;
+                          })()}
                         </div>
                       )}
                       <div className="space-y-2">

@@ -15,7 +15,7 @@ import {
   Plus, CalendarDays, Timer, FileText, FolderKanban,
   ChevronRight, Palmtree, Check, X,
 } from 'lucide-react';
-import { format, isToday, isBefore, startOfDay, endOfWeek, startOfTomorrow, isThisWeek, startOfWeek } from 'date-fns';
+import { format, isBefore, startOfDay, endOfWeek, startOfTomorrow, isAfter } from 'date-fns';
 import { el } from 'date-fns/locale';
 
 interface TaskWithProject {
@@ -24,6 +24,12 @@ interface TaskWithProject {
   status: string;
   priority: string;
   due_date: string | null;
+  start_date: string | null;
+  estimated_hours: number | null;
+  actual_hours: number | null;
+  progress: number | null;
+  task_type: string | null;
+  task_category: string | null;
   project_id: string;
   project?: { name: string } | null;
 }
@@ -34,6 +40,27 @@ interface MyProject {
   status: string;
   progress: number | null;
   client?: { name: string } | null;
+}
+
+const TASK_SELECT = 'id, title, status, priority, due_date, start_date, estimated_hours, actual_hours, progress, task_type, task_category, project_id, project:projects(name)';
+
+function getStatusLabel(status: string) {
+  switch (status) {
+    case 'todo': return 'To Do';
+    case 'in_progress': return 'In Progress';
+    case 'in_review': return 'In Review';
+    case 'completed': return 'Done';
+    default: return status;
+  }
+}
+
+function getStatusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
+  switch (status) {
+    case 'in_progress': return 'default';
+    case 'in_review': return 'secondary';
+    case 'completed': return 'outline';
+    default: return 'outline';
+  }
 }
 
 export default function MyWork() {
@@ -73,57 +100,20 @@ export default function MyWork() {
     const weekEnd = format(endOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd');
     const tomorrowISO = format(startOfTomorrow(), 'yyyy-MM-dd');
 
-    // First get user's project IDs
-    const { data: accessData } = await supabase
-      .from('project_user_access')
-      .select('project_id')
-      .eq('user_id', user.id);
-
-    const myProjectIds = (accessData || []).map((a: any) => a.project_id);
-
-    const [tasksToday, tasksWeek, tasksUpcoming, projects, timeEntries] = await Promise.all([
-      // Today tasks + overdue: assigned to user OR in user's projects
+    // Fetch ALL non-completed tasks assigned to this user
+    const [allMyTasks, projects, timeEntries] = await Promise.all([
       supabase
         .from('tasks')
-        .select('id, title, status, priority, due_date, project_id, project:projects(name)')
-        .or(myProjectIds.length > 0
-          ? `assigned_to.eq.${user.id},project_id.in.(${myProjectIds.join(',')})`
-          : `assigned_to.eq.${user.id}`)
-        .lte('due_date', todayISO)
+        .select(TASK_SELECT)
+        .eq('assigned_to', user.id)
         .neq('status', 'completed')
         .order('due_date', { ascending: true }),
 
-      // This week (after today)
-      supabase
-        .from('tasks')
-        .select('id, title, status, priority, due_date, project_id, project:projects(name)')
-        .or(myProjectIds.length > 0
-          ? `assigned_to.eq.${user.id},project_id.in.(${myProjectIds.join(',')})`
-          : `assigned_to.eq.${user.id}`)
-        .gte('due_date', tomorrowISO)
-        .lte('due_date', weekEnd)
-        .neq('status', 'completed')
-        .order('due_date', { ascending: true }),
-
-      // Upcoming (after this week)
-      supabase
-        .from('tasks')
-        .select('id, title, status, priority, due_date, project_id, project:projects(name)')
-        .or(myProjectIds.length > 0
-          ? `assigned_to.eq.${user.id},project_id.in.(${myProjectIds.join(',')})`
-          : `assigned_to.eq.${user.id}`)
-        .gt('due_date', weekEnd)
-        .neq('status', 'completed')
-        .order('due_date', { ascending: true })
-        .limit(20),
-
-      // My projects (full details)
       supabase
         .from('project_user_access')
         .select('project:projects(id, name, status, progress, client:clients(name))')
         .eq('user_id', user.id),
 
-      // Today hours
       supabase
         .from('time_entries')
         .select('duration_minutes')
@@ -132,9 +122,50 @@ export default function MyWork() {
         .eq('is_running', false),
     ]);
 
-    setTodayTasks((tasksToday.data || []) as TaskWithProject[]);
-    setWeekTasks((tasksWeek.data || []) as TaskWithProject[]);
-    setUpcomingTasks((tasksUpcoming.data || []) as TaskWithProject[]);
+    const allTasks = (allMyTasks.data || []) as TaskWithProject[];
+
+    // Client-side filtering for Today:
+    // - due_date <= today (overdue + due today)
+    // - start_date = today
+    // - due_date = today
+    const todayFiltered = allTasks.filter(t => {
+      const dueDate = t.due_date ? startOfDay(new Date(t.due_date)) : null;
+      const startDate = t.start_date ? startOfDay(new Date(t.start_date)) : null;
+
+      // Overdue: due_date < today
+      if (dueDate && isBefore(dueDate, today)) return true;
+      // Due today
+      if (dueDate && dueDate.getTime() === today.getTime()) return true;
+      // Starts today
+      if (startDate && startDate.getTime() === today.getTime()) return true;
+
+      return false;
+    });
+
+    // Week: due after today, within this week, not already in today
+    const todayIds = new Set(todayFiltered.map(t => t.id));
+    const weekFiltered = allTasks.filter(t => {
+      if (todayIds.has(t.id)) return false;
+      const dueDate = t.due_date ? startOfDay(new Date(t.due_date)) : null;
+      if (!dueDate) return false;
+      const tomorrow = startOfDay(new Date(tomorrowISO));
+      const weekEndDate = startOfDay(new Date(weekEnd));
+      return (dueDate >= tomorrow && dueDate <= weekEndDate);
+    });
+
+    // Upcoming: due after this week
+    const weekIds = new Set(weekFiltered.map(t => t.id));
+    const upcomingFiltered = allTasks.filter(t => {
+      if (todayIds.has(t.id) || weekIds.has(t.id)) return false;
+      const dueDate = t.due_date ? startOfDay(new Date(t.due_date)) : null;
+      if (!dueDate) return false;
+      const weekEndDate = startOfDay(new Date(weekEnd));
+      return isAfter(dueDate, weekEndDate);
+    });
+
+    setTodayTasks(todayFiltered);
+    setWeekTasks(weekFiltered);
+    setUpcomingTasks(upcomingFiltered.slice(0, 20));
 
     const activeProjects = (projects.data || [])
       .map((p: any) => p.project)
@@ -166,6 +197,65 @@ export default function MyWork() {
       case 'medium': return 'secondary';
       default: return 'outline';
     }
+  }
+
+  // Reusable task row component
+  function TaskRow({ task, showDate = false }: { task: TaskWithProject; showDate?: boolean }) {
+    const isOverdue = task.due_date && isBefore(new Date(task.due_date), today);
+    return (
+      <div className="flex items-center gap-3 px-4 md:px-6 py-3 hover:bg-muted/30 transition-colors">
+        <Checkbox
+          className="h-5 w-5 shrink-0"
+          onCheckedChange={() => toggleTaskComplete(task)}
+        />
+        <div className="flex-1 min-w-0">
+          <Link to={`/tasks/${task.id}`} className="text-sm font-medium text-foreground hover:text-primary truncate block">
+            {task.title}
+          </Link>
+          <p className="text-xs text-muted-foreground truncate">
+            {(task.project as any)?.name}
+          </p>
+        </div>
+        <Badge variant={getStatusVariant(task.status)} className="text-[10px] shrink-0">
+          {getStatusLabel(task.status)}
+        </Badge>
+        {(showDate || isOverdue) && task.due_date && (
+          <span className={`text-xs shrink-0 ${isOverdue ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+            {format(new Date(task.due_date), 'd MMM', { locale: el })}
+          </span>
+        )}
+        <Badge variant={getPriorityColor(task.priority)} className="text-[10px] shrink-0">
+          {task.priority}
+        </Badge>
+        {task.estimated_hours ? (
+          <span className="text-xs text-muted-foreground shrink-0 hidden sm:inline font-mono">
+            {task.estimated_hours}h
+          </span>
+        ) : null}
+        {isOverdue && (
+          <Badge variant="destructive" className="text-[10px] shrink-0">overdue</Badge>
+        )}
+        {!activeTimer?.is_running || activeTimer.task_id !== task.id ? (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 shrink-0 text-muted-foreground hover:text-primary"
+            onClick={() => startTimer(task.id, task.project_id)}
+          >
+            <Play className="h-3.5 w-3.5" />
+          </Button>
+        ) : (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 shrink-0 text-primary"
+            onClick={() => stopTimer()}
+          >
+            <Square className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
+    );
   }
 
   // Group week tasks by day
@@ -269,50 +359,9 @@ export default function MyWork() {
             <p className="text-sm text-muted-foreground px-6 pb-4">Κανένα task για σήμερα 🎉</p>
           ) : (
             <div className="divide-y divide-border/50">
-              {todayTasks.map(task => {
-                const isOverdue = task.due_date && isBefore(new Date(task.due_date), today);
-                return (
-                  <div key={task.id} className="flex items-center gap-3 px-4 md:px-6 py-3 hover:bg-muted/30 transition-colors">
-                    <Checkbox
-                      className="h-5 w-5"
-                      onCheckedChange={() => toggleTaskComplete(task)}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <Link to={`/projects/${task.project_id}`} className="text-sm font-medium text-foreground hover:text-primary truncate block">
-                        {task.title}
-                      </Link>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {(task.project as any)?.name}
-                      </p>
-                    </div>
-                    <Badge variant={getPriorityColor(task.priority)} className="text-[10px] shrink-0">
-                      {task.priority}
-                    </Badge>
-                    {isOverdue && (
-                      <Badge variant="destructive" className="text-[10px] shrink-0">overdue</Badge>
-                    )}
-                    {!activeTimer?.is_running || activeTimer.task_id !== task.id ? (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-primary"
-                        onClick={() => startTimer(task.id, task.project_id)}
-                      >
-                        <Play className="h-3.5 w-3.5" />
-                      </Button>
-                    ) : (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7 shrink-0 text-primary"
-                        onClick={() => stopTimer()}
-                      >
-                        <Square className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
+              {todayTasks.map(task => (
+                <TaskRow key={task.id} task={task} />
+              ))}
             </div>
           )}
         </CardContent>
@@ -332,15 +381,7 @@ export default function MyWork() {
                 </div>
                 <div className="divide-y divide-border/50">
                   {tasks.map(task => (
-                    <div key={task.id} className="flex items-center gap-3 px-4 md:px-6 py-2.5">
-                      <div className="flex-1 min-w-0">
-                        <Link to={`/projects/${task.project_id}`} className="text-sm text-foreground hover:text-primary truncate block">
-                          {task.title}
-                        </Link>
-                        <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
-                      </div>
-                      <Badge variant="outline" className="text-[10px] shrink-0">{task.status}</Badge>
-                    </div>
+                    <TaskRow key={task.id} task={task} showDate />
                   ))}
                 </div>
               </div>
@@ -358,20 +399,7 @@ export default function MyWork() {
           <CardContent className="p-0">
             <div className="divide-y divide-border/50">
               {upcomingTasks.map(task => (
-                <div key={task.id} className="flex items-center gap-3 px-4 md:px-6 py-2.5">
-                  <div className="flex-1 min-w-0">
-                    <Link to={`/projects/${task.project_id}`} className="text-sm text-foreground hover:text-primary truncate block">
-                      {task.title}
-                    </Link>
-                    <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
-                  </div>
-                  {task.due_date && (
-                    <span className="text-xs text-muted-foreground shrink-0">
-                      {format(new Date(task.due_date), 'd MMM', { locale: el })}
-                    </span>
-                  )}
-                  <Badge variant="outline" className="text-[10px] shrink-0">{task.status}</Badge>
-                </div>
+                <TaskRow key={task.id} task={task} showDate />
               ))}
             </div>
           </CardContent>

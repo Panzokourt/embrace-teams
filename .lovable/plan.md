@@ -1,156 +1,138 @@
 
-# Ενοποιημενο Section "Εργασιες" - Καταργηση Tenders, Ενισχυση Projects
+# Σελίδα "My Work" - Προσωπικός Χώρος Παραγωγικότητας
 
-## Συνοπτικη Περιγραφη
+## Ιδέα
 
-Καταργουμε πληρως το concept "Tenders" ως ξεχωριστη οντοτητα. Τα leads/ευκαιριες γινονται απλα **Projects σε πρωιμο σταδιο** (pipeline statuses). Ολα ζουν κατω απο ενα ενιαιο section **"Εργασιες"** με 4 tabs: Εργα, Tasks, Ημερολογιο, Επισκοπηση.
+Μία focused σελίδα `/my-work` που δείχνει **μόνο ό,τι αφορά τον συνδεδεμένο χρήστη** -- τα tasks του, τα projects του, τα deadlines του, τις εκκρεμότητες και τις άδειές του. Σχεδιασμένη για **σήμερα** και **αυτή την εβδομάδα**, χωρίς θόρυβο.
 
-## Τι αλλαζει σε επιπεδο concept
-
-Σημερα εχουμε:
-- **Tenders** (ξεχωριστος πινακας) με stages: identification -> preparation -> submitted -> evaluation -> won -> lost
-- **Projects** με statuses: tender, active, completed, cancelled
-- Οταν ενα tender γινεται "won", δημιουργειται νεο project και μεταφερονται deliverables/tasks
-
-Μετα:
-- **Μονο Projects** με ενιαιο lifecycle: `lead` -> `proposal` -> `negotiation` -> `won` (αυτοματα γινεται `active`) -> `active` -> `completed` / `cancelled` / `lost`
-- Τα πρωιμα στaδια (lead, proposal, negotiation) ειναι ο "pipeline" -- αυτο που ηταν τα tenders
-- Οταν ενα project γινει "won", αλλαζει αυτοματα σε "active" (χωρις να δημιουργειται νεα εγγραφη)
-- Τα tender-specific πεδια (submission_deadline, probability, source_email, tender_type) μπαινουν στον πινακα projects
-
-## Νεα Δομη Section "Εργασιες"
-
-### Tab 1: Εργα (Projects)
-- **Card / Table / Kanban views** (οπως τωρα)
-- Kanban columns: Lead | Proposal | Negotiation | Active | Completed
-- Φιλτρο "Pipeline" (δειχνει μονο lead/proposal/negotiation) vs "Active" vs "All"
-- Δημιουργια νεου εργου: μπορει να ξεκινησει ως Lead (pipeline) ή απευθειας ως Active
-- Click -> `/projects/:id` (detail page -- ενοποιημενο)
-
-### Tab 2: Tasks
-- Cross-project view ολων των tasks (οπως τωρα)
-- Card/Table/Kanban views
-- Filters: assignee, status, project, priority
-
-### Tab 3: Ημερολογιο
-- Μετακινηση Calendar εδω (deadlines, milestones, task due dates)
-- Αφαιρεση τυπου "tender" απο events (γινονται projects)
-
-### Tab 4: Επισκοπηση (Dashboard)
-- KPI cards: Pipeline value, Active projects, Overdue tasks, Win rate
-- Pipeline funnel chart
-- Workload per person
-- Upcoming deadlines
-
-## Database Changes
-
-### 1. Ενημερωση enum `project_status`
-Νεες τιμες: `lead`, `proposal`, `negotiation`, `won`, `active`, `completed`, `cancelled`, `lost`
-(Κρατουμε `tender` προσωρινα για backward compatibility, μετα data migration γινεται deprecate)
-
-### 2. Νεα columns στον πινακα `projects`
-- `submission_deadline` date (απο tenders)
-- `probability` integer default 50 (πιθανοτητα επιτυχιας, pipeline)
-- `source` text (πηγη ευκαιριας: email, referral, website, direct)
-- `tender_type` text (public, private, direct κλπ -- απο tenders)
-- `won_date` date (ποτε κερδηθηκε)
-- `lost_reason` text (αν χαθηκε, γιατι)
-
-### 3. Data Migration
-- Μεταφορα 3 tenders -> projects (ως lead/proposal status)
-- Μεταφορα tender_deliverables -> deliverables
-- Μεταφορα tender_tasks -> tasks
-- Μεταφορα tender_team_access -> project_user_access
-- Μεταφορα file_attachments tender_id -> project_id
-- Μεταφορα tender_suggestions -> αποθηκευση στο project metadata (ή αγνοηση αν εχουν ηδη applied)
-
-### 4. Ενημερωση ProjectDetail
-- Οταν project ειναι σε pipeline stage (lead/proposal/negotiation), εμφανιζει τα pipeline-specific πεδια (probability, submission_deadline, source)
-- Οταν ειναι active/completed, εμφανιζει τα κλασικα project πεδια
-- Ενσωματωση AI suggestions (απο TenderAISuggestions) στο ProjectDetail
-- Ενσωματωση Team management (απο TenderTeamManager -- ηδη υπαρχει ProjectTeamManager)
-
-### 5. Αφαιρεση Tenders
-- Αφαιρεση `src/pages/Tenders.tsx` και `src/pages/TenderDetail.tsx`
-- Αφαιρεση `src/components/tenders/*` (10 αρχεια)
-- Αφαιρεση `src/hooks/useTenderToProject.ts` (η λογικη γινεται status change στο project)
-- Αφαιρεση routes `/tenders`, `/tenders/:id`
-- Redirect `/tenders` -> `/projects` (backward compat)
-
-## UI Layout
+## Layout
 
 ```text
-+--------------------------------------------------+
-| Εργασιες                                          |
-+--------------------------------------------------+
-| [Εργα] [Tasks] [Ημερολογιο] [Επισκοπηση]        |
-+--------------------------------------------------+
-|                                                    |
-|  Tab "Εργα":                                       |
-|  [+ Νεο Εργο] [Pipeline | Active | All]           |
-|  [Card | Table | Kanban]                           |
-|                                                    |
-|  Kanban columns:                                   |
-|  | Lead | Proposal | Negotiation | Active | Done | |
-|                                                    |
-+--------------------------------------------------+
++------------------------------------------------------------------+
+| Καλημέρα, Γιώργο                        [Timer: 01:23:45] [Stop] |
+| Δευτέρα 18 Φεβρουαρίου 2026                                      |
++------------------------------------------------------------------+
+|                                                                    |
+| -- ΣΗΜΕΡΑ --                                                       |
+| +-------------------+  +-------------------+  +------------------+ |
+| | Tasks Σήμερα: 5   |  | Ωρες Σήμερα: 3.5h |  | Overdue: 2      | |
+| +-------------------+  +-------------------+  +------------------+ |
+|                                                                    |
+| [My Tasks - Σήμερα]                              [Δες ολα ->]     |
+| +----------------------------------------------------------------+ |
+| | # | Task              | Project    | Priority | Due    | Timer | |
+| | 1 | Σχεδίαση banner   | Project A  | High     | Today  | [>]  | |
+| | 2 | Review copy       | Project B  | Medium   | Today  | [>]  | |
+| | 3 | Send report       | Project C  | Low      | Today  |      | |
+| +----------------------------------------------------------------+ |
+|                                                                    |
+| -- ΑΥΤΗ ΤΗΝ ΕΒΔΟΜΑΔΑ --                                           |
+| [Upcoming Tasks]                                                   |
+| +----------------------------------------------------------------+ |
+| | Task              | Project    | Due      | Status             | |
+| | Approve visuals   | Project A  | Wed      | todo               | |
+| | Final delivery    | Project D  | Fri      | in_progress        | |
+| +----------------------------------------------------------------+ |
+|                                                                    |
+| +---------------------------+  +-------------------------------+   |
+| | Τα Εργα μου (active)      |  | Quick Links                   |  |
+| | - Project A (65%)         |  | [+ Νεο Task]                  |  |
+| | - Project B (30%)         |  | [+ Καταχωρηση Χρονου]         |  |
+| | - Project C (80%)         |  | [+ Αιτηση Αδειας]             |  |
+| +---------------------------+  | [Ημερολογιο]                  |  |
+|                                | [Timesheets]                   |  |
+| +---------------------------+  +-------------------------------+   |
+| | Αδειες & Απουσιες        |                                      |
+| | Κανονικη: 12/20 ημερες   |                                      |
+| | Ασθενεια: 1/15            |                                      |
+| | Pending: 1 αιτηση         |                                      |
+| +---------------------------+                                      |
++------------------------------------------------------------------+
 ```
 
-## Project Detail - Ενοποιημενο
+## Sections αναλυτικα
+
+### 1. Header με χαιρετισμο + Active Timer
+- "Καλημερα/Καλησπερα, [Ονομα]" -- context-aware (ωρα ημερας)
+- Ημερομηνια σημερα
+- Active timer: αν τρεχει timer, εμφανιζεται inline με elapsed + stop button + task name
+
+### 2. KPI Strip (3 μικρες καρτες)
+- **Tasks σημερα**: πλήθος tasks με due_date = today + overdue
+- **Ωρες σημερα**: απο time_entries σημερα
+- **Overdue**: tasks που εχουν περασει due_date και δεν ειναι completed
+
+### 3. My Tasks - Today (κυρια ενοτητα)
+- Tasks assigned στον χρηστη με due_date = today ΚΑΙ overdue
+- Inline status change (checkbox click -> completed)
+- Timer button: ξεκιναει timer για το task
+- Priority badges (high = κοκκινο, medium = κιτρινο, low = γκρι)
+- Link "Δες ολα" -> `/work?tab=tasks`
+
+### 4. Upcoming Tasks - This Week
+- Tasks assigned στον χρηστη με due_date αυτη την εβδομαδα (εκτος σημερα)
+- Ομαδοποιηση ανα ημερα (Τριτη, Τεταρτη...)
+- Compact list view
+
+### 5. My Projects (compact cards)
+- Projects οπου ο χρηστης ειναι στο team (project_user_access)
+- Μονο active projects
+- Progress bar + status
+- Click -> `/projects/:id`
+
+### 6. Quick Links
+- "+ Νεο Task" -> `/work?tab=tasks&new=true`
+- "+ Καταχωρηση Χρονου" -> `/hr?tab=timesheets`
+- "+ Αιτηση Αδειας" -> `/hr?tab=leaves`
+- "Ημερολογιο" -> `/work?tab=calendar`
+- "Timesheets μου" -> `/hr?tab=timesheets`
+
+### 7. Leave Balance (μικρη καρτα)
+- Υπολοιπο αδειων ανα τυπο (κανονικη, ασθενεια κλπ)
+- Αριθμος pending αιτησεων
+- Link "Δες ολα" -> `/hr?tab=leaves`
+
+## Νεα Αρχεια
+
+- `src/pages/MyWork.tsx` -- Κυρια σελιδα
+
+## Αλλαγες σε υπαρχοντα
+
+- `src/App.tsx` -- Νεα route `/my-work`
+- `src/components/layout/AppSidebar.tsx` -- Προσθηκη link "My Work" στην κορυφη (πανω απο Dashboard), icon: `CircleUser` ή `LayoutList`
+
+## Technical Details
+
+### Data Queries (ολα filtered by `auth.uid()`)
+
+1. **Tasks σημερα + overdue**: `tasks` where `assigned_to = user.id` AND (`due_date <= today` AND `status != completed`)
+2. **Tasks εβδομαδας**: `tasks` where `assigned_to = user.id` AND `due_date` μεταξυ αυριο - τελος εβδομαδας
+3. **My projects**: `projects` JOIN `project_user_access` where `user_id = user.id` AND `status = active`
+4. **Ωρες σημερα**: `time_entries` where `user_id = user.id` AND `start_time >= today 00:00`
+5. **Leave balances**: `leave_balances` where `user_id = user.id` AND `year = current year`
+6. **Active timer**: ηδη υπαρχει στο `useTimeTracking` hook
+
+### Pending Leave Approvals (αν ο χρηστης ειναι manager)
+Αν ο χρηστης ειναι manager/admin, εμφανιζεται επιπλεον section:
+- "Εκκρεμεις εγκρισεις αδειων" με approve/reject buttons
+- Compact list, μονο pending requests
+
+### Component Structure
 
 ```text
-+--------------------------------------------------+
-| <- Πισω στα Εργα                                  |
-| [Project Name]           Status: [Lead v]          |
-|                                                    |
-| -- Αν Pipeline (lead/proposal/negotiation): --     |
-| Πιθανοτητα: 70%  |  Deadline: 15/03  |  Πηγη: ... |
-| [AI Suggestions] [Upload Files for Analysis]       |
-|                                                    |
-| -- Αν Active/Completed: --                         |
-| Progress: 65%  |  Budget: 50.000  |  Period: ...   |
-|                                                    |
-| Tabs:                                              |
-| [Overview] [Deliverables] [Tasks] [Files]          |
-| [Financials] [Comments] [Media Plan]               |
-+--------------------------------------------------+
+MyWork.tsx
+  ├── GreetingHeader (ονομα + ημ/νια + active timer)
+  ├── KPI Strip (3 stat cards)
+  ├── TodayTasks (table/list με timer buttons)
+  ├── WeekTasks (grouped by day)
+  ├── MyProjects (compact card grid)
+  ├── QuickLinks (button grid)
+  ├── LeaveBalanceMini (compact card)
+  └── PendingApprovals (αν manager, compact list)
 ```
 
-## Αρχεια
+### Σειρα Υλοποιησης
 
-### Νεα
-- `src/pages/Work.tsx` -- Κεντρικη σελιδα "Εργασιες" με 4 tabs
-- `src/components/work/WorkOverview.tsx` -- Dashboard tab με KPIs
-
-### Τροποποιημενα
-- `src/pages/ProjectDetail.tsx` -- Προσθηκη pipeline-specific UI (probability, deadline, AI suggestions)
-- `src/pages/Projects.tsx` -- Εξαγωγη core content σε component για χρηση μεσα στο Work.tsx
-- `src/pages/Tasks.tsx` -- Εξαγωγη core content σε component
-- `src/pages/Calendar.tsx` -- Εξαγωγη core content + αφαιρεση tender references
-- `src/App.tsx` -- Νεες routes, redirects
-- `src/components/layout/AppSidebar.tsx` -- Ενα link "Εργασιες" αντι 3
-
-### Αφαιρουμενα
-- `src/pages/Tenders.tsx`
-- `src/pages/TenderDetail.tsx`
-- `src/components/tenders/*` (10 αρχεια)
-- `src/hooks/useTenderToProject.ts`
-
-## Σειρα Υλοποιησης
-
-1. **Database migration**: Νεα columns στο projects, νεες enum τιμες, data migration tenders -> projects, data migration tender_deliverables/tasks/files/team
-2. **ProjectDetail ενημερωση**: Pipeline-specific UI, AI suggestions ενσωματωση
-3. **Projects page update**: Νεα statuses, pipeline filter, kanban columns
-4. **Calendar update**: Αφαιρεση tender references
-5. **Work.tsx**: Κεντρικη σελιδα με tabs (Εργα, Tasks, Ημερολογιο, Επισκοπηση)
-6. **WorkOverview**: Dashboard tab
-7. **Routing + Sidebar**: Ενημερωση routes, redirects, sidebar
-8. **Cleanup**: Αφαιρεση tenders components/pages/hooks
-
-## Σημαντικες Σημειωσεις
-
-- Τα 3 υπαρχοντα tenders θα μεταφερθουν αυτοματα ως projects στη migration
-- Τα 29 tender_deliverables και 35 tender_tasks θα γινουν κανονικα deliverables/tasks
-- Η λογικη "won -> create project" αντικαθισταται απο "status change won -> active" (ιδιο project, απλα αλλαζει status)
-- Οι RLS policies του projects καλυπτουν ηδη ολα τα scenarios
-- Μετα την migration, οι tenders πινακες μπορουν να μεινουν (ως archive) ή να αφαιρεθουν
+1. Δημιουργια `MyWork.tsx` με ολα τα sections
+2. Route + Sidebar update
+3. Ολα τα data queries σε ενα `useEffect` με `Promise.all`

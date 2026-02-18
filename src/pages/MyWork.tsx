@@ -717,17 +717,52 @@ export default function MyWork() {
                 <SheetDescription>{(selectedTask.project as any)?.name || 'Χωρίς project'}</SheetDescription>
               </SheetHeader>
               <div className="mt-6 space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div><p className="text-xs text-muted-foreground mb-1">Status</p><Badge variant={getStatusVariant(selectedTask.status)}>{getStatusLabel(selectedTask.status)}</Badge></div>
-                  <div><p className="text-xs text-muted-foreground mb-1">Priority</p><Badge variant={getPriorityColor(selectedTask.priority)}>{selectedTask.priority}</Badge></div>
-                  <div><p className="text-xs text-muted-foreground mb-1">Έναρξη</p><p className="text-sm">{selectedTask.start_date ? format(new Date(selectedTask.start_date), 'd MMM yyyy', { locale: el }) : '-'}</p></div>
-                  <div><p className="text-xs text-muted-foreground mb-1">Λήξη</p><p className={`text-sm ${selectedTask.due_date && isBefore(new Date(selectedTask.due_date), today) ? 'text-destructive font-medium' : ''}`}>{selectedTask.due_date ? format(new Date(selectedTask.due_date), 'd MMM yyyy', { locale: el }) : '-'}</p></div>
-                  <div><p className="text-xs text-muted-foreground mb-1">Εκτ. Ώρες</p><p className="text-sm">{selectedTask.estimated_hours || '-'}h</p></div>
-                  <div><p className="text-xs text-muted-foreground mb-1">Πρόοδος</p><div className="flex items-center gap-2"><Progress value={selectedTask.progress || 0} className="w-20 h-1.5" /><span className="text-xs">{selectedTask.progress || 0}%</span></div></div>
-                </div>
-                {selectedTask.description && (
-                  <div><p className="text-xs text-muted-foreground mb-1">Περιγραφή</p><p className="text-sm text-foreground whitespace-pre-wrap">{selectedTask.description}</p></div>
-                )}
+                <table className="w-full text-sm">
+                  <tbody className="divide-y divide-border/50">
+                    <tr>
+                      <td className="py-2.5 pr-4 text-muted-foreground whitespace-nowrap w-28">Status</td>
+                      <td className="py-2.5"><Badge variant={getStatusVariant(selectedTask.status)}>{getStatusLabel(selectedTask.status)}</Badge></td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 pr-4 text-muted-foreground whitespace-nowrap">Priority</td>
+                      <td className="py-2.5"><Badge variant={getPriorityColor(selectedTask.priority)}>{selectedTask.priority}</Badge></td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 pr-4 text-muted-foreground whitespace-nowrap">Έναρξη</td>
+                      <td className="py-2.5">{selectedTask.start_date ? format(new Date(selectedTask.start_date), 'd MMM yyyy', { locale: el }) : '-'}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 pr-4 text-muted-foreground whitespace-nowrap">Λήξη</td>
+                      <td className={`py-2.5 ${selectedTask.due_date && isBefore(new Date(selectedTask.due_date), today) ? 'text-destructive font-medium' : ''}`}>{selectedTask.due_date ? format(new Date(selectedTask.due_date), 'd MMM yyyy', { locale: el }) : '-'}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 pr-4 text-muted-foreground whitespace-nowrap">Εκτ. Ώρες</td>
+                      <td className="py-2.5">{selectedTask.estimated_hours || '-'}h</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 pr-4 text-muted-foreground whitespace-nowrap">Πρόοδος</td>
+                      <td className="py-2.5"><div className="flex items-center gap-2"><Progress value={selectedTask.progress || 0} className="w-24 h-1.5" /><span className="text-xs text-muted-foreground">{selectedTask.progress || 0}%</span></div></td>
+                    </tr>
+                    {selectedTask.task_type && (
+                      <tr>
+                        <td className="py-2.5 pr-4 text-muted-foreground whitespace-nowrap">Τύπος</td>
+                        <td className="py-2.5">{selectedTask.task_type}</td>
+                      </tr>
+                    )}
+                    {selectedTask.task_category && (
+                      <tr>
+                        <td className="py-2.5 pr-4 text-muted-foreground whitespace-nowrap">Κατηγορία</td>
+                        <td className="py-2.5">{selectedTask.task_category}</td>
+                      </tr>
+                    )}
+                    {selectedTask.description && (
+                      <tr>
+                        <td className="py-2.5 pr-4 text-muted-foreground whitespace-nowrap align-top">Περιγραφή</td>
+                        <td className="py-2.5 whitespace-pre-wrap">{selectedTask.description}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
                 <Button className="w-full gap-2" onClick={() => { setSelectedTask(null); navigate(`/tasks/${selectedTask.id}`); }}>
                   <ExternalLink className="h-4 w-4" /> Άνοιγμα σελίδας Task
                 </Button>

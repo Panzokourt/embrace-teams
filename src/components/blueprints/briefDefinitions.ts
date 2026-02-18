@@ -24,7 +24,6 @@ export const briefDefinitions: BriefDefinition[] = [
     description: 'Σύνοψη δημιουργικού project',
     fields: [
       { key: 'project_name', label: 'Όνομα Project', type: 'text', required: true },
-      { key: 'client', label: 'Πελάτης', type: 'text', required: true },
       { key: 'background', label: 'Background / Context', type: 'textarea', placeholder: 'Περιγράψτε το πλαίσιο του project...' },
       { key: 'objective', label: 'Στόχος', type: 'textarea', required: true },
       { key: 'target_audience', label: 'Target Audience', type: 'textarea' },
@@ -49,7 +48,6 @@ export const briefDefinitions: BriefDefinition[] = [
     description: 'Briefing ψηφιακής καμπάνιας',
     fields: [
       { key: 'campaign_name', label: 'Όνομα Καμπάνιας', type: 'text', required: true },
-      { key: 'client', label: 'Πελάτης', type: 'text', required: true },
       { key: 'objective', label: 'Στόχος Καμπάνιας', type: 'textarea', required: true },
       { key: 'target_audience', label: 'Target Audience', type: 'textarea' },
       {
@@ -74,7 +72,6 @@ export const briefDefinitions: BriefDefinition[] = [
     description: 'Αναφορά συνάντησης / επικοινωνίας',
     fields: [
       { key: 'meeting_date', label: 'Ημερομηνία Συνάντησης', type: 'date', required: true },
-      { key: 'client', label: 'Πελάτης', type: 'text', required: true },
       { key: 'attendees_agency', label: 'Παρόντες (Agency)', type: 'textarea', placeholder: 'Ονόματα, ρόλοι...' },
       { key: 'attendees_client', label: 'Παρόντες (Πελάτης)', type: 'textarea', placeholder: 'Ονόματα, ρόλοι...' },
       {
@@ -107,7 +104,6 @@ export const briefDefinitions: BriefDefinition[] = [
     description: 'Briefing ανάπτυξης website',
     fields: [
       { key: 'project_name', label: 'Όνομα Project', type: 'text', required: true },
-      { key: 'client', label: 'Πελάτης', type: 'text', required: true },
       {
         key: 'website_type',
         label: 'Τύπος Website',
@@ -142,7 +138,6 @@ export const briefDefinitions: BriefDefinition[] = [
     description: 'Briefing εκδήλωσης / event',
     fields: [
       { key: 'event_name', label: 'Όνομα Εκδήλωσης', type: 'text', required: true },
-      { key: 'client', label: 'Πελάτης', type: 'text', required: true },
       {
         key: 'event_type',
         label: 'Τύπος Εκδήλωσης',
@@ -171,7 +166,6 @@ export const briefDefinitions: BriefDefinition[] = [
     description: 'Γενικό briefing επικοινωνίας',
     fields: [
       { key: 'project_name', label: 'Όνομα Project', type: 'text', required: true },
-      { key: 'client', label: 'Πελάτης', type: 'text', required: true },
       { key: 'objective', label: 'Στόχος Επικοινωνίας', type: 'textarea', required: true },
       { key: 'target_audience', label: 'Target Audience', type: 'textarea' },
       { key: 'key_messages', label: 'Key Messages', type: 'textarea' },

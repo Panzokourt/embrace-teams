@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BriefDefinition, BriefFieldConfig } from './briefDefinitions';
 import { exportBriefToPdf, exportBriefToWord, exportBriefToExcel } from './BriefExport';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { ClientSelector } from '@/components/shared/ClientSelector';
 import {
   Dialog,
   DialogContent,
@@ -30,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { Save, Download, Plus, Trash2, Loader2 } from 'lucide-react';
 
@@ -39,6 +41,9 @@ interface BriefFormDialogProps {
   definition: BriefDefinition;
   initialData?: Record<string, any>;
   briefId?: string;
+  initialClientId?: string;
+  initialProjectId?: string;
+  initialAssignedUsers?: string[];
   onSaved?: () => void;
 }
 
@@ -48,11 +53,41 @@ export function BriefFormDialog({
   definition,
   initialData,
   briefId,
+  initialClientId,
+  initialProjectId,
+  initialAssignedUsers,
   onSaved,
 }: BriefFormDialogProps) {
-  const { user, profile } = useAuth();
+  const { user, profile, company } = useAuth();
   const [formData, setFormData] = useState<Record<string, any>>(initialData || {});
   const [saving, setSaving] = useState(false);
+
+  // Meta fields
+  const [selectedClientId, setSelectedClientId] = useState(initialClientId || '');
+  const [selectedProjectId, setSelectedProjectId] = useState(initialProjectId || '');
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>(initialAssignedUsers || []);
+
+  // Lookup data
+  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [companyUsers, setCompanyUsers] = useState<{ id: string; full_name: string | null; email: string }[]>([]);
+
+  useEffect(() => {
+    if (open) {
+      fetchLookups();
+    }
+  }, [open]);
+
+  const fetchLookups = async () => {
+    const [clientsRes, projectsRes, usersRes] = await Promise.all([
+      supabase.from('clients').select('id, name').order('name'),
+      supabase.from('projects').select('id, name').order('name'),
+      supabase.from('profiles').select('id, full_name, email').eq('status', 'active').order('full_name'),
+    ]);
+    if (clientsRes.data) setClients(clientsRes.data);
+    if (projectsRes.data) setProjects(projectsRes.data);
+    if (usersRes.data) setCompanyUsers(usersRes.data);
+  };
 
   const handleFieldChange = (key: string, value: any) => {
     setFormData(prev => ({ ...prev, [key]: value }));
@@ -88,8 +123,14 @@ export function BriefFormDialog({
     handleFieldChange(key, current);
   };
 
+  const toggleUser = (userId: string) => {
+    setSelectedUserIds(prev =>
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    );
+  };
+
   const getTitle = (): string => {
-    const nameField = definition.fields.find(f => 
+    const nameField = definition.fields.find(f =>
       f.key === 'project_name' || f.key === 'campaign_name' || f.key === 'event_name'
     );
     return (nameField ? formData[nameField.key] : '') || `${definition.label} - ${new Date().toLocaleDateString('el-GR')}`;
@@ -100,12 +141,15 @@ export function BriefFormDialog({
     setSaving(true);
     try {
       const title = getTitle();
+      const dataWithUsers = { ...formData, assigned_users: selectedUserIds };
       const payload = {
         brief_type: definition.type,
         title,
-        data: formData as any,
+        data: dataWithUsers as any,
         status,
         created_by: user.id,
+        client_id: selectedClientId || null,
+        project_id: selectedProjectId || null,
       };
 
       if (briefId) {
@@ -264,6 +308,59 @@ export function BriefFormDialog({
         </DialogHeader>
         <ScrollArea className="flex-1 -mx-6 px-6">
           <div className="space-y-5 py-2">
+            {/* Common meta fields: Client, Project, Users */}
+            <div className="space-y-4 p-4 rounded-lg border border-border/50 bg-muted/20">
+              <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Γενικά Στοιχεία</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">Πελάτης</Label>
+                  <ClientSelector
+                    value={selectedClientId}
+                    onValueChange={setSelectedClientId}
+                    clients={clients}
+                    onClientCreated={(c) => setClients(prev => [...prev, c])}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">Έργο</Label>
+                  <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Επιλέξτε έργο..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projects.map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Αφορά χρήστες</Label>
+                <div className="flex flex-wrap gap-2">
+                  {companyUsers.map(u => {
+                    const selected = selectedUserIds.includes(u.id);
+                    return (
+                      <Badge
+                        key={u.id}
+                        variant={selected ? 'default' : 'outline'}
+                        className="cursor-pointer transition-colors"
+                        onClick={() => toggleUser(u.id)}
+                      >
+                        {u.full_name || u.email}
+                      </Badge>
+                    );
+                  })}
+                  {companyUsers.length === 0 && (
+                    <span className="text-xs text-muted-foreground">Δεν βρέθηκαν χρήστες</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Dynamic brief fields */}
             {definition.fields.map(field => (
               <div key={field.key} className="space-y-1.5">
                 <Label className="text-sm font-medium">

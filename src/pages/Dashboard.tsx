@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useDashboardRealtime } from '@/hooks/useRealtimeSubscription';
@@ -9,9 +9,17 @@ import PipelineCard, { getDefaultPipelineStages } from '@/components/dashboard/P
 import TaskList from '@/components/dashboard/TaskList';
 import DashboardFilters from '@/components/dashboard/DashboardFilters';
 import DashboardCustomizer from '@/components/dashboard/DashboardCustomizer';
+import DashboardExport from '@/components/dashboard/DashboardExport';
+import DashboardLayoutSelector from '@/components/dashboard/DashboardLayoutSelector';
+import WidgetWrapper from '@/components/dashboard/WidgetWrapper';
 import RecentActivity from '@/components/dashboard/widgets/RecentActivity';
 import RevenueChart from '@/components/dashboard/widgets/RevenueChart';
 import ProjectProgress from '@/components/dashboard/widgets/ProjectProgress';
+import {
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 import { 
   DollarSign, Percent, TrendingUp, FileWarning,
   Trophy, FolderKanban, AlertTriangle, Activity,
@@ -45,7 +53,11 @@ export default function Dashboard() {
   const { profile, isAdmin, isManager, isClient } = useAuth();
   const [loading, setLoading] = useState(true);
   const [customizerOpen, setCustomizerOpen] = useState(false);
-  const { config, visibleWidgets, toggleWidget, setWidgetSize, setFilters, getWidget } = useDashboardConfig();
+  const {
+    config, visibleWidgets, toggleWidget, setWidgetSize, setWidgetViewType,
+    setFilters, getWidget, reorderWidgets,
+    savedLayouts, saveLayout, loadLayout, deleteLayout,
+  } = useDashboardConfig();
 
   const [stats, setStats] = useState<DashboardStats>({
     totalRevenue: 0, agencyFee: 0, netProfit: 0, pendingInvoices: 0,
@@ -56,12 +68,23 @@ export default function Dashboard() {
   const [pipelineStages, setPipelineStages] = useState(getDefaultPipelineStages());
   const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([]);
 
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      reorderWidgets(String(active.id), String(over.id));
+    }
+  }, [reorderWidgets]);
+
   const fetchDashboardData = useCallback(async () => {
     try {
       const periodStart = getFilterDateRange(config.filters.period).toISOString();
       const { clientId, projectId } = config.filters;
 
-      // Build queries with filters
       let invoicesQ = supabase.from('invoices').select('amount, paid, issued_date');
       invoicesQ = invoicesQ.gte('issued_date', periodStart);
       if (clientId) invoicesQ = invoicesQ.eq('client_id', clientId);
@@ -161,6 +184,20 @@ export default function Dashboard() {
   useDashboardRealtime(fetchDashboardData);
   useEffect(() => { fetchDashboardData(); }, [fetchDashboardData]);
 
+  // Stats snapshot for export
+  const statsSnapshot = useMemo<Record<string, string | number>>(() => ({
+    total_revenue: `€${stats.totalRevenue.toLocaleString()}`,
+    agency_fee: `€${stats.agencyFee.toLocaleString()}`,
+    net_profit: `€${stats.netProfit.toLocaleString()}`,
+    pending_invoices: `€${stats.pendingInvoices.toLocaleString()}`,
+    active_tenders: stats.activeTenders,
+    active_projects: stats.activeProjects,
+    win_rate: `${stats.winRate}%`,
+    overdue: stats.overdueCount,
+    today_hours: `${stats.todayHours}h`,
+    utilization: `${stats.utilization}%`,
+  }), [stats]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
@@ -192,7 +229,6 @@ export default function Dashboard() {
     );
   }
 
-  const isVisible = (id: string) => getWidget(id)?.visible ?? true;
   const sizeClass = (id: string) => getColSpanClass(getWidget(id)?.size ?? 'small');
 
   // Stat widgets mapping
@@ -255,6 +291,13 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center gap-2">
           <DashboardFilters filters={config.filters} onFiltersChange={setFilters} />
+          <DashboardLayoutSelector
+            savedLayouts={savedLayouts}
+            onSave={saveLayout}
+            onLoad={loadLayout}
+            onDelete={deleteLayout}
+          />
+          <DashboardExport widgets={config.widgets} statsSnapshot={statsSnapshot} />
           <Button
             variant="outline"
             size="icon"
@@ -266,18 +309,31 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Widget grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {visibleWidgets.map(w => {
-          const content = allWidgets[w.id];
-          if (!content) return null;
-          return (
-            <div key={w.id} className={cn(sizeClass(w.id))}>
-              {content}
-            </div>
-          );
-        })}
-      </div>
+      {/* Widget grid with DnD */}
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={visibleWidgets.map(w => w.id)} strategy={rectSortingStrategy}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {visibleWidgets.map(w => {
+              const content = allWidgets[w.id];
+              if (!content) return null;
+              return (
+                <WidgetWrapper
+                  key={w.id}
+                  id={w.id}
+                  size={w.size}
+                  viewType={w.viewType}
+                  onResize={(size) => setWidgetSize(w.id, size)}
+                  onHide={() => toggleWidget(w.id)}
+                  onViewTypeChange={(vt) => setWidgetViewType(w.id, vt)}
+                  className={sizeClass(w.id)}
+                >
+                  {content}
+                </WidgetWrapper>
+              );
+            })}
+          </div>
+        </SortableContext>
+      </DndContext>
 
       {/* Customizer Sheet */}
       <DashboardCustomizer

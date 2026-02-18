@@ -1721,6 +1721,63 @@ export type Database = {
           },
         ]
       }
+      time_entries: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          duration_minutes: number | null
+          end_time: string | null
+          id: string
+          is_running: boolean | null
+          project_id: string
+          start_time: string
+          task_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          duration_minutes?: number | null
+          end_time?: string | null
+          id?: string
+          is_running?: boolean | null
+          project_id: string
+          start_time?: string
+          task_id?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          duration_minutes?: number | null
+          end_time?: string | null
+          id?: string
+          is_running?: boolean | null
+          project_id?: string
+          start_time?: string
+          task_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_entries_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_access_assignments: {
         Row: {
           client_id: string | null

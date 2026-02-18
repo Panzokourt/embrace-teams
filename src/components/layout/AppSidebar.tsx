@@ -33,10 +33,12 @@ import {
   CalendarDays,
   Network,
   FileArchive,
+  Timer,
 } from 'lucide-react';
 
 import { PermissionType } from '@/contexts/AuthContext';
 import mscommLogo from '@/assets/mscomm-logo.png';
+import { ActiveTimerIndicator } from '@/components/time-tracking/ActiveTimerIndicator';
 
 interface NavItem {
   title: string;
@@ -55,6 +57,7 @@ const navItems: NavItem[] = [
   { title: 'Αρχείο', href: '/files', icon: FileArchive, permission: 'files.view' },
   { title: 'Ομάδες', href: '/teams', icon: Users, adminOnly: true },
   { title: 'P&L', href: '/financials', icon: DollarSign, permission: 'financials.view' },
+  { title: 'Timesheets', href: '/timesheets', icon: Timer },
 ];
 
 const adminNavItems: NavItem[] = [
@@ -123,6 +126,9 @@ export default function AppSidebar() {
           </Button>
         )}
       </div>
+
+      {/* Active Timer Indicator */}
+      <ActiveTimerIndicator collapsed={collapsed && !isMobile} />
 
       {/* Main Navigation */}
       <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">

@@ -3,6 +3,7 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import AppSidebar from './AppSidebar';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { QuickActionButton } from '@/components/layout/QuickActionButton';
 import { Loader2 } from 'lucide-react';
 
 export default function AppLayout() {
@@ -41,6 +42,7 @@ export default function AppLayout() {
         </div>
         <Outlet />
       </main>
+      <QuickActionButton />
     </div>
   );
 }

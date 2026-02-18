@@ -137,6 +137,70 @@ export type Database = {
           },
         ]
       }
+      briefs: {
+        Row: {
+          brief_type: string
+          client_id: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string
+          data: Json
+          id: string
+          project_id: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          brief_type: string
+          client_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by: string
+          data?: Json
+          id?: string
+          project_id?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          brief_type?: string
+          client_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string
+          data?: Json
+          id?: string
+          project_id?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "briefs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "briefs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "briefs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_user_access: {
         Row: {
           client_id: string

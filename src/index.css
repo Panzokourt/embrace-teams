@@ -63,7 +63,7 @@
     --ring: 257 4% 70.4%;
 
     /* Generous radius for softness */
-    --radius: 3rem;
+    --radius: 1.5rem;
 
     /* Sidebar - light and airy to match */
     --sidebar-background: 0 0% 100%;

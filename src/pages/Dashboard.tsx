@@ -14,7 +14,8 @@ import {
   FolderKanban,
   AlertTriangle,
   Activity,
-  Loader2
+  Loader2,
+  Timer
 } from 'lucide-react';
 
 interface DashboardStats {
@@ -27,6 +28,7 @@ interface DashboardStats {
   winRate: number;
   overdueCount: number;
   utilization: number;
+  todayHours: number;
 }
 
 interface Task {
@@ -50,6 +52,7 @@ export default function Dashboard() {
     winRate: 0,
     overdueCount: 0,
     utilization: 0,
+    todayHours: 0,
   });
 
   const [pipelineStages, setPipelineStages] = useState(getDefaultPipelineStages());
@@ -63,13 +66,17 @@ export default function Dashboard() {
         expensesRes,
         projectsRes,
         tendersRes,
-        tasksRes
+        tasksRes,
+        timeEntriesRes
       ] = await Promise.all([
         supabase.from('invoices').select('amount, paid'),
         supabase.from('expenses').select('amount'),
         supabase.from('projects').select('budget, agency_fee_percentage, status'),
         supabase.from('tenders').select('id, name, budget, stage, client:clients(name)'),
-        supabase.from('tasks').select('id, title, due_date, status, project:projects(name)')
+        supabase.from('tasks').select('id, title, due_date, status, project:projects(name)'),
+        supabase.from('time_entries').select('duration_minutes, start_time, is_running')
+          .gte('start_time', new Date(new Date().setHours(0,0,0,0)).toISOString())
+          .eq('is_running', false)
       ]);
 
       // Calculate financial stats
@@ -114,6 +121,10 @@ export default function Dashboard() {
       const totalTasks = tasks.filter(t => t.status !== 'completed').length;
       const utilization = totalTasks > 0 ? Math.round((inProgressTasks / Math.max(totalTasks, 1)) * 100) : 0;
 
+      // Calculate today's tracked hours
+      const todayMinutes = (timeEntriesRes.data || []).reduce((s, e) => s + (e.duration_minutes || 0), 0);
+      const todayHours = Math.round((todayMinutes / 60) * 10) / 10;
+
       setStats({
         totalRevenue,
         agencyFee,
@@ -124,6 +135,7 @@ export default function Dashboard() {
         winRate,
         overdueCount: overdueTasks.length,
         utilization: Math.min(utilization, 100),
+        todayHours,
       });
 
       // Build pipeline stages
@@ -288,6 +300,12 @@ export default function Dashboard() {
           value={stats.overdueCount}
           icon={AlertTriangle}
           variant={stats.overdueCount > 0 ? 'destructive' : 'default'}
+        />
+        <StatCard
+          title="Ώρες Σήμερα"
+          value={`${stats.todayHours}h`}
+          icon={Timer}
+          variant="primary"
         />
         <StatCard
           title="Utilization"

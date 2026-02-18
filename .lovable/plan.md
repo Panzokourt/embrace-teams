@@ -1,138 +1,93 @@
 
-# Σελίδα "My Work" - Προσωπικός Χώρος Παραγωγικότητας
+# Task Detail Page + Βελτιωσεις Tasks & Projects
 
-## Ιδέα
+## Προβληματα που εντοπιστηκαν
 
-Μία focused σελίδα `/my-work` που δείχνει **μόνο ό,τι αφορά τον συνδεδεμένο χρήστη** -- τα tasks του, τα projects του, τα deadlines του, τις εκκρεμότητες και τις άδειές του. Σχεδιασμένη για **σήμερα** και **αυτή την εβδομάδα**, χωρίς θόρυβο.
+1. **Δεν υπαρχει Task Detail Page** -- τα tasks ανοιγουν μονο σε dialog, δεν εχουν δικη τους σελιδα-καρτελα οπως τα projects
+2. **Dropdown υπευθυνου αδειο** -- η query φιλτραρει `status = 'active'` αλλα οι 2 απο τους 3 χρηστες εχουν `status = 'pending'`. Πρεπει να εμφανιζονται ολοι οι χρηστες (ή τουλαχιστον active + pending)
+3. **Table rows δεν ειναι clickable** -- χρειαζεται να πατησεις το μικρο ExternalLink icon αντι να κανεις click στη γραμμη
+4. **Cards/Kanban ανοιγουν dialog αντι σελιδα** -- πρεπει να πηγαινουν στη Task Detail page
 
-## Layout
+## Αλλαγες
 
-```text
-+------------------------------------------------------------------+
-| Καλημέρα, Γιώργο                        [Timer: 01:23:45] [Stop] |
-| Δευτέρα 18 Φεβρουαρίου 2026                                      |
-+------------------------------------------------------------------+
-|                                                                    |
-| -- ΣΗΜΕΡΑ --                                                       |
-| +-------------------+  +-------------------+  +------------------+ |
-| | Tasks Σήμερα: 5   |  | Ωρες Σήμερα: 3.5h |  | Overdue: 2      | |
-| +-------------------+  +-------------------+  +------------------+ |
-|                                                                    |
-| [My Tasks - Σήμερα]                              [Δες ολα ->]     |
-| +----------------------------------------------------------------+ |
-| | # | Task              | Project    | Priority | Due    | Timer | |
-| | 1 | Σχεδίαση banner   | Project A  | High     | Today  | [>]  | |
-| | 2 | Review copy       | Project B  | Medium   | Today  | [>]  | |
-| | 3 | Send report       | Project C  | Low      | Today  |      | |
-| +----------------------------------------------------------------+ |
-|                                                                    |
-| -- ΑΥΤΗ ΤΗΝ ΕΒΔΟΜΑΔΑ --                                           |
-| [Upcoming Tasks]                                                   |
-| +----------------------------------------------------------------+ |
-| | Task              | Project    | Due      | Status             | |
-| | Approve visuals   | Project A  | Wed      | todo               | |
-| | Final delivery    | Project D  | Fri      | in_progress        | |
-| +----------------------------------------------------------------+ |
-|                                                                    |
-| +---------------------------+  +-------------------------------+   |
-| | Τα Εργα μου (active)      |  | Quick Links                   |  |
-| | - Project A (65%)         |  | [+ Νεο Task]                  |  |
-| | - Project B (30%)         |  | [+ Καταχωρηση Χρονου]         |  |
-| | - Project C (80%)         |  | [+ Αιτηση Αδειας]             |  |
-| +---------------------------+  | [Ημερολογιο]                  |  |
-|                                | [Timesheets]                   |  |
-| +---------------------------+  +-------------------------------+   |
-| | Αδειες & Απουσιες        |                                      |
-| | Κανονικη: 12/20 ημερες   |                                      |
-| | Ασθενεια: 1/15            |                                      |
-| | Pending: 1 αιτηση         |                                      |
-| +---------------------------+                                      |
-+------------------------------------------------------------------+
-```
+### 1. Νεα σελιδα: Task Detail (`/tasks/:id`)
 
-## Sections αναλυτικα
+Δομη παρομοια με ProjectDetail:
+- **Header**: Πισω button, τιτλος task, status badge, priority badge
+- **Info Section**: Project link, assignee, due date, start date, estimated/actual hours, progress, category, type
+- **Tabs**:
+  - **Overview**: Περιγραφη, inline editing ολων των πεδιων, subtasks list, dependencies
+  - **Comments**: CommentsSection (υπαρχει ηδη)
+  - **Files**: FileExplorer/FileAttachments (υπαρχει ηδη)
+  - **Time Tracking**: Timer + time entries για αυτο το task
 
-### 1. Header με χαιρετισμο + Active Timer
-- "Καλημερα/Καλησπερα, [Ονομα]" -- context-aware (ωρα ημερας)
-- Ημερομηνια σημερα
-- Active timer: αν τρεχει timer, εμφανιζεται inline με elapsed + stop button + task name
+### 2. Fix Assignee Dropdown
 
-### 2. KPI Strip (3 μικρες καρτες)
-- **Tasks σημερα**: πλήθος tasks με due_date = today + overdue
-- **Ωρες σημερα**: απο time_entries σημερα
-- **Overdue**: tasks που εχουν περασει due_date και δεν ειναι completed
+Αλλαγη query σε ολα τα σημεια (Tasks.tsx, ProjectTasksTable.tsx, ProjectTasksManager.tsx):
+- Αντι `.eq('status', 'active')` -> `.in('status', ['active', 'pending'])` ωστε να εμφανιζονται ολοι οι χρηστες που εχουν λογαριασμο
 
-### 3. My Tasks - Today (κυρια ενοτητα)
-- Tasks assigned στον χρηστη με due_date = today ΚΑΙ overdue
-- Inline status change (checkbox click -> completed)
-- Timer button: ξεκιναει timer για το task
-- Priority badges (high = κοκκινο, medium = κιτρινο, low = γκρι)
-- Link "Δες ολα" -> `/work?tab=tasks`
+### 3. Clickable Table Rows
 
-### 4. Upcoming Tasks - This Week
-- Tasks assigned στον χρηστη με due_date αυτη την εβδομαδα (εκτος σημερα)
-- Ομαδοποιηση ανα ημερα (Τριτη, Τεταρτη...)
-- Compact list view
+Στο `TasksTableView.tsx`:
+- Ολοκληρη η TableRow γινεται clickable με `onClick={() => navigate('/tasks/' + task.id)}`
+- Cursor pointer στη γραμμη
+- Αφαιρεση του μικρου ExternalLink icon (ή αντικατασταση: το icon πηγαινει στο project, η γραμμη στο task)
+- Εξαιρεση click propagation στα inline edit cells, checkboxes, actions
 
-### 5. My Projects (compact cards)
-- Projects οπου ο χρηστης ειναι στο team (project_user_access)
-- Μονο active projects
-- Progress bar + status
-- Click -> `/projects/:id`
+### 4. Cards & Kanban -> Navigate αντι Dialog
 
-### 6. Quick Links
-- "+ Νεο Task" -> `/work?tab=tasks&new=true`
-- "+ Καταχωρηση Χρονου" -> `/hr?tab=timesheets`
-- "+ Αιτηση Αδειας" -> `/hr?tab=leaves`
-- "Ημερολογιο" -> `/work?tab=calendar`
-- "Timesheets μου" -> `/hr?tab=timesheets`
+Στο `Tasks.tsx`:
+- Card view: onClick πηγαινει στο `/tasks/:id` αντι `handleEdit(task)`
+- Kanban TaskCard: onClick πηγαινει στο `/tasks/:id` αντι `handleEdit(task)`
+- Κρατουμε edit/delete μεσα στο card ως secondary actions (hover)
 
-### 7. Leave Balance (μικρη καρτα)
-- Υπολοιπο αδειων ανα τυπο (κανονικη, ασθενεια κλπ)
-- Αριθμος pending αιτησεων
-- Link "Δες ολα" -> `/hr?tab=leaves`
+### 5. Projects: Ιδια λογικη στο clickable
 
-## Νεα Αρχεια
+Στο `ProjectsTableView.tsx`: Η γραμμη γινεται clickable (navigate στο project detail)
 
-- `src/pages/MyWork.tsx` -- Κυρια σελιδα
+## Νεα αρχεια
 
-## Αλλαγες σε υπαρχοντα
+- `src/pages/TaskDetail.tsx` -- Σελιδα λεπτομερειων task
 
-- `src/App.tsx` -- Νεα route `/my-work`
-- `src/components/layout/AppSidebar.tsx` -- Προσθηκη link "My Work" στην κορυφη (πανω απο Dashboard), icon: `CircleUser` ή `LayoutList`
+## Τροποποιημενα αρχεια
 
-## Technical Details
+- `src/App.tsx` -- Νεα route `/tasks/:id`
+- `src/pages/Tasks.tsx` -- Cards/Kanban navigate αντι dialog, fix fetchUsers query
+- `src/components/tasks/TasksTableView.tsx` -- Clickable rows navigate, αφαιρεση/αντικατασταση ExternalLink
+- `src/components/projects/ProjectTasksTable.tsx` -- Fix fetchProfiles query, clickable rows
+- `src/components/projects/ProjectTasksManager.tsx` -- Fix fetchProfiles query
 
-### Data Queries (ολα filtered by `auth.uid()`)
-
-1. **Tasks σημερα + overdue**: `tasks` where `assigned_to = user.id` AND (`due_date <= today` AND `status != completed`)
-2. **Tasks εβδομαδας**: `tasks` where `assigned_to = user.id` AND `due_date` μεταξυ αυριο - τελος εβδομαδας
-3. **My projects**: `projects` JOIN `project_user_access` where `user_id = user.id` AND `status = active`
-4. **Ωρες σημερα**: `time_entries` where `user_id = user.id` AND `start_time >= today 00:00`
-5. **Leave balances**: `leave_balances` where `user_id = user.id` AND `year = current year`
-6. **Active timer**: ηδη υπαρχει στο `useTimeTracking` hook
-
-### Pending Leave Approvals (αν ο χρηστης ειναι manager)
-Αν ο χρηστης ειναι manager/admin, εμφανιζεται επιπλεον section:
-- "Εκκρεμεις εγκρισεις αδειων" με approve/reject buttons
-- Compact list, μονο pending requests
-
-### Component Structure
+## Task Detail Page Layout
 
 ```text
-MyWork.tsx
-  ├── GreetingHeader (ονομα + ημ/νια + active timer)
-  ├── KPI Strip (3 stat cards)
-  ├── TodayTasks (table/list με timer buttons)
-  ├── WeekTasks (grouped by day)
-  ├── MyProjects (compact card grid)
-  ├── QuickLinks (button grid)
-  ├── LeaveBalanceMini (compact card)
-  └── PendingApprovals (αν manager, compact list)
++--------------------------------------------------+
+| <- Πισω στα Tasks                                |
+| [Task Title]              [Status: In Progress]  |
+|                           [Priority: High]        |
++--------------------------------------------------+
+| Project: Project A (link)  |  Assignee: John Doe |
+| Due: 25 Feb               |  Start: 20 Feb       |
+| Est: 8h  |  Actual: 5.5h  |  Progress: 65%      |
++--------------------------------------------------+
+| [Overview] [Comments] [Files] [Time Tracking]     |
++--------------------------------------------------+
+|                                                    |
+| Περιγραφη:                                        |
+| Lorem ipsum dolor sit amet...                     |
+|                                                    |
+| Subtasks:                                          |
+| [x] Research competitors                          |
+| [ ] Draft proposal                                |
+| [ ] Review with client                            |
+|                                                    |
++--------------------------------------------------+
 ```
 
-### Σειρα Υλοποιησης
+## Σειρα Υλοποιησης
 
-1. Δημιουργια `MyWork.tsx` με ολα τα sections
-2. Route + Sidebar update
-3. Ολα τα data queries σε ενα `useEffect` με `Promise.all`
+1. Δημιουργια `TaskDetail.tsx` με ολα τα sections και inline editing
+2. Route `/tasks/:id` στο App.tsx
+3. Fix assignee dropdown (αλλαγη query σε 3 αρχεια)
+4. Clickable table rows στο TasksTableView + ProjectTasksTable
+5. Cards/Kanban navigate στο Tasks.tsx
+6. Clickable rows στο ProjectsTableView (αν δεν ειναι ηδη)

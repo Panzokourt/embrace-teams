@@ -44,6 +44,7 @@ export default function MyWork() {
 
   const [todayTasks, setTodayTasks] = useState<TaskWithProject[]>([]);
   const [weekTasks, setWeekTasks] = useState<TaskWithProject[]>([]);
+  const [upcomingTasks, setUpcomingTasks] = useState<TaskWithProject[]>([]);
   const [myProjects, setMyProjects] = useState<MyProject[]>([]);
   const [todayHours, setTodayHours] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -80,7 +81,7 @@ export default function MyWork() {
 
     const myProjectIds = (accessData || []).map((a: any) => a.project_id);
 
-    const [tasksToday, tasksWeek, projects, timeEntries] = await Promise.all([
+    const [tasksToday, tasksWeek, tasksUpcoming, projects, timeEntries] = await Promise.all([
       // Today tasks + overdue: assigned to user OR in user's projects
       supabase
         .from('tasks')
@@ -104,6 +105,18 @@ export default function MyWork() {
         .neq('status', 'completed')
         .order('due_date', { ascending: true }),
 
+      // Upcoming (after this week)
+      supabase
+        .from('tasks')
+        .select('id, title, status, priority, due_date, project_id, project:projects(name)')
+        .or(myProjectIds.length > 0
+          ? `assigned_to.eq.${user.id},project_id.in.(${myProjectIds.join(',')})`
+          : `assigned_to.eq.${user.id}`)
+        .gt('due_date', weekEnd)
+        .neq('status', 'completed')
+        .order('due_date', { ascending: true })
+        .limit(20),
+
       // My projects (full details)
       supabase
         .from('project_user_access')
@@ -121,6 +134,7 @@ export default function MyWork() {
 
     setTodayTasks((tasksToday.data || []) as TaskWithProject[]);
     setWeekTasks((tasksWeek.data || []) as TaskWithProject[]);
+    setUpcomingTasks((tasksUpcoming.data || []) as TaskWithProject[]);
 
     const activeProjects = (projects.data || [])
       .map((p: any) => p.project)
@@ -335,7 +349,35 @@ export default function MyWork() {
         </Card>
       )}
 
-      {/* Bottom Grid: Projects + Quick Links */}
+      {/* Upcoming Tasks */}
+      {upcomingTasks.length > 0 && (
+        <Card className="border-border/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold">Επερχόμενα</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-border/50">
+              {upcomingTasks.map(task => (
+                <div key={task.id} className="flex items-center gap-3 px-4 md:px-6 py-2.5">
+                  <div className="flex-1 min-w-0">
+                    <Link to={`/projects/${task.project_id}`} className="text-sm text-foreground hover:text-primary truncate block">
+                      {task.title}
+                    </Link>
+                    <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
+                  </div>
+                  {task.due_date && (
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {format(new Date(task.due_date), 'd MMM', { locale: el })}
+                    </span>
+                  )}
+                  <Badge variant="outline" className="text-[10px] shrink-0">{task.status}</Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* My Projects */}
         <Card className="border-border/50">

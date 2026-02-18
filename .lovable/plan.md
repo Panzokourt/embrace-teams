@@ -1,109 +1,109 @@
 
-# Executive Dashboard - Customizable Cards & Filters
+# Dashboard Enhancement - Per-widget Settings, Drag & Drop, Export, Saved Layouts
 
 ## Τι αλλάζει
 
-### 1. Customizable Dashboard Cards
-Κάθε card/widget στο dashboard γίνεται configurable:
-- Ο χρήστης μπορεί να **προσθέσει/αφαιρέσει** cards μέσω ενός "Customize" button στο header
-- Κάθε card μπορεί να αλλάξει **μέγεθος** (small/medium/large) που αντιστοιχεί σε grid column spans (1, 2, 3 cols)
-- Η διαμόρφωση αποθηκεύεται σε `localStorage` ωστε να διατηρείται μεταξύ sessions
+### 1. Gear icon σε κάθε widget card
+Κάθε widget αποκτά ένα μικρό gear icon (top-right, εμφανίζεται στο hover) που ανοίγει inline popover με:
+- **Αλλαγή μεγέθους** (S/M/L)
+- **Απόκρυψη** widget
+- Για composite widgets: **Εναλλαγή view type** (card/table/list) οπου εφαρμόζεται
 
-### 2. Dashboard Filters
-Στο header του dashboard προστίθεται toolbar με:
-- **Χρονικό φίλτρο**: Σήμερα, Εβδομάδα, Μήνας, Τρίμηνο, Ετος
-- **Φίλτρο Πελάτη**: Dropdown με τους πελάτες
-- **Φίλτρο Έργου**: Dropdown με τα ενεργά έργα
+Ένα νέο `WidgetWrapper` component τυλίγει κάθε widget και παρέχει αυτά τα controls.
 
-Τα φίλτρα εφαρμόζονται στα data queries (tasks, invoices, expenses, time entries).
+### 2. Drag & Drop αναδιάταξη widgets
+Χρήση του ήδη εγκατεστημένου `@dnd-kit/sortable` (υπάρχει στο project) για drag-and-drop:
+- Κάθε widget γίνεται sortable μέσα στο grid
+- Η σειρά αποθηκεύεται στο config (localStorage)
+- Drag handle εμφανίζεται στο hover δίπλα στο gear icon
 
-### 3. Νέα widgets
-Πέρα από τα υπάρχοντα, προστίθενται:
-- **Recent Activity**: Τελευταίες ενέργειες από το activity_log
-- **Revenue Chart**: Mini γράφημα εσόδων (recharts, ήδη installed)
-- **Project Progress**: Επισκόπηση προόδου ενεργών έργων (progress bar per project)
+Αλλαγές στο `useDashboardConfig`:
+- Το `widgets` array γίνεται ordered (η σειρά στο array = η σειρά στο grid)
+- Προστίθεται `reorderWidgets(activeId, overId)` function
 
-### 4. Widget Registry
-Ορίζεται ένα registry με ολα τα διαθέσιμα widgets:
+### 3. Εξαγωγή Dashboard
+Προστίθεται export button στο header δίπλα στο gear icon, με dropdown:
+- **PDF**: `window.print()` με print-optimized styles
+- **PNG/Screenshot**: Χρήση html2canvas-like approach μέσω CSS print
+- **Excel**: Export ολων των visible stat values σε πίνακα
 
-```text
-ID                  | Τίτλος              | Default Size | Default Visible
---------------------|----------------------|--------------|----------------
-total_revenue       | Συνολικά Έσοδα       | small        | yes
-agency_fee          | Προμήθεια Agency     | small        | yes
-net_profit          | Καθαρό Κέρδος        | small        | yes
-pending_invoices    | Εκκρεμή Τιμολόγια    | small        | yes
-active_tenders      | Διαγωνισμοί          | small        | yes
-active_projects     | Ενεργά Έργα          | small        | yes
-win_rate            | Win Rate             | small        | yes
-overdue             | Overdue Tasks        | small        | yes
-today_hours         | Ώρες Σήμερα          | small        | yes
-utilization         | Utilization          | small        | yes
-pipeline            | Pipeline             | large        | yes
-alerts              | Alerts               | medium       | yes
-deadlines           | Deadlines            | medium       | yes
-recent_activity     | Πρόσφατη Δραστηριότητα| medium      | yes
-revenue_chart       | Γράφημα Εσόδων       | large        | no
-project_progress    | Πρόοδος Έργων        | medium       | no
-```
+Νέο component `DashboardExport.tsx` με dropdown menu.
 
-## Αρχιτεκτονική
+### 4. Αποθήκευση πολλαπλών Dashboard layouts
+Ο χρήστης μπορεί να:
+- **Αποθηκεύσει** το τρέχον layout με όνομα (π.χ. "Financial Overview", "Project Focus")
+- **Φορτώσει** αποθηκευμένο layout από dropdown menu
+- **Διαγράψει** αποθηκευμένα layouts
+- Υπάρχει πάντα ένα "Default" layout
 
-### Νέα αρχεία
-- `src/components/dashboard/DashboardCustomizer.tsx` - Dialog για add/remove widgets και αλλαγή μεγέθους
-- `src/components/dashboard/DashboardFilters.tsx` - Toolbar με χρονικά/πελάτη/έργο φίλτρα
-- `src/components/dashboard/widgetRegistry.ts` - Registry ορισμού widgets (id, label, defaultSize, component ref)
-- `src/components/dashboard/widgets/RecentActivity.tsx` - Widget πρόσφατης δραστηριότητας
-- `src/components/dashboard/widgets/RevenueChart.tsx` - Mini revenue chart
-- `src/components/dashboard/widgets/ProjectProgress.tsx` - Progress bars ενεργών έργων
-- `src/hooks/useDashboardConfig.ts` - Hook για localStorage persistence της dashboard config
+Αποθήκευση σε localStorage με key `dashboard_saved_layouts_v1`.
 
-### Αλλαγές σε υπάρχοντα
-- `src/pages/Dashboard.tsx` - Refactor για widget-based rendering, filters state, customizer integration
+Νέο component `DashboardLayoutSelector.tsx` - dropdown στο header.
 
 ## Technical Details
 
-### Dashboard Config (localStorage)
+### Νέα αρχεία
+- `src/components/dashboard/WidgetWrapper.tsx` - Wrapper με gear menu, drag handle, view toggle
+- `src/components/dashboard/DashboardExport.tsx` - Export dropdown (PDF/Excel)
+- `src/components/dashboard/DashboardLayoutSelector.tsx` - Saved layouts dropdown
+
+### Αλλαγές σε υπάρχοντα
+
+**`src/hooks/useDashboardConfig.ts`**:
+- Προσθήκη `reorderWidgets(activeId, overId)` για drag reorder
+- Προσθήκη `savedLayouts` management: `saveLayout(name)`, `loadLayout(name)`, `deleteLayout(name)`, `getSavedLayouts()`
+- Αποθήκευση view type per widget: `viewType?: 'card' | 'table' | 'list'`
+- Νέο storage key `dashboard_saved_layouts_v1` για τα saved layouts
+
+**`src/pages/Dashboard.tsx`**:
+- Wrap widget grid σε `DndContext` + `SortableContext` από @dnd-kit
+- Wrap κάθε widget σε `WidgetWrapper`
+- Προσθήκη `DashboardExport` και `DashboardLayoutSelector` στο header
+- Composite widgets (deadlines, recent_activity, pipeline) θα λαμβάνουν `viewType` prop για εναλλαγή card/table
+
+**`src/components/dashboard/widgetRegistry.ts`**:
+- Προσθήκη `supportedViews?: ('card' | 'table' | 'list')[]` στο `WidgetDefinition`
+- Composite widgets θα δηλώνουν ποια views υποστηρίζουν
+
+### WidgetWrapper component
 ```text
++--------------------------------------------+
+|  [drag handle]            [gear icon]       |
+|                                             |
+|   < actual widget content >                 |
+|                                             |
++--------------------------------------------+
+
+Gear popover:
+- Size: [S] [M] [L]
+- View: [Card] [Table] (αν υποστηρίζεται)
+- [Απόκρυψη]
+```
+
+### Drag & Drop implementation
+- `DndContext` + `SortableContext` wrap το grid
+- Κάθε widget χρησιμοποιεί `useSortable` μέσω `WidgetWrapper`
+- Στο `onDragEnd`: ανταλλαγή θέσεων στο widgets array via `arrayMove`
+- Η νέα σειρά αποθηκεύεται αυτόματα στο localStorage
+
+### Saved Layouts storage
+```text
+localStorage key: dashboard_saved_layouts_v1
 {
-  widgets: [
-    { id: "total_revenue", visible: true, size: "small" },
-    { id: "pipeline", visible: true, size: "large" },
-    ...
-  ],
-  filters: {
-    period: "month",
-    clientId: null,
-    projectId: null
-  }
+  "Financial Overview": { widgets: [...], filters: {...} },
+  "Project Focus": { widgets: [...], filters: {...} },
+  ...
 }
 ```
 
-### Widget Sizing
-- **small**: `col-span-1` (1/4 σε desktop)
-- **medium**: `col-span-2` (2/4 σε desktop)
-- **large**: `col-span-4` (full width)
-
-Το grid είναι `grid-cols-1 md:grid-cols-2 lg:grid-cols-4` οπότε τα sizes αντιστοιχούν ομαλά.
-
-### Customizer UI
-- Gear icon button στο dashboard header
-- Ανοίγει Sheet (sidebar panel) με checklist ολων των widgets
-- Κάθε widget έχει toggle visibility + size selector (S/M/L buttons)
-- Drag handles ΔΕΝ χρειάζονται (τα widgets κάνουν auto-flow στο grid)
-
-### Filters Logic
-- Τα φίλτρα εφαρμόζονται στα Supabase queries:
-  - **Period**: `.gte('created_at', startDate)` ή `.gte('due_date', startDate)` ανά πίνακα
-  - **Client**: `.eq('client_id', clientId)` στα invoices/projects
-  - **Project**: `.eq('project_id', projectId)` στα tasks/expenses
-- Τα financial stats (revenue, expenses) φιλτράρονται χρονικά
-- Τα task stats φιλτράρονται ανά έργο/πελάτη
+### Export
+- **PDF**: Capture visible dashboard area via `window.print()` με `@media print` CSS
+- **Excel**: Collect visible stat widget values + labels σε table format, χρήση υπάρχοντος `exportToExcel`
 
 ### Σειρά υλοποίησης
-1. `useDashboardConfig` hook (config persistence)
-2. `widgetRegistry.ts` (widget definitions)
-3. `DashboardFilters.tsx` (filter toolbar)
-4. `DashboardCustomizer.tsx` (add/remove/resize UI)
-5. New widget components (RecentActivity, RevenueChart, ProjectProgress)
-6. Refactor `Dashboard.tsx` (integrate all above)
+1. Επέκταση `useDashboardConfig` (reorder, viewType, saved layouts)
+2. Επέκταση `widgetRegistry.ts` (supportedViews)
+3. `WidgetWrapper.tsx` (gear menu + drag handle)
+4. `DashboardExport.tsx` (export dropdown)
+5. `DashboardLayoutSelector.tsx` (saved layouts UI)
+6. Refactor `Dashboard.tsx` (DndContext, wrappers, header components)

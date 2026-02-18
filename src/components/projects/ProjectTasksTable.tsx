@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -76,6 +77,7 @@ type SortField = 'title' | 'due_date' | 'status' | 'assignee';
 type SortDirection = 'asc' | 'desc' | null;
 
 export function ProjectTasksTable({ projectId }: ProjectTasksTableProps) {
+  const navigate = useNavigate();
   const { isAdmin, isManager, hasPermission } = useAuth();
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
   const [deliverables, setDeliverables] = useState<ProjectDeliverable[]>([]);
@@ -133,7 +135,7 @@ export function ProjectTasksTable({ projectId }: ProjectTasksTableProps) {
   };
 
   const fetchProfiles = async () => {
-    const { data } = await supabase.from('profiles').select('id, full_name, email, avatar_url').eq('status', 'active').order('full_name');
+    const { data } = await supabase.from('profiles').select('id, full_name, email, avatar_url').in('status', ['active', 'pending']).order('full_name');
     setProfiles(data || []);
   };
 
@@ -386,7 +388,12 @@ export function ProjectTasksTable({ projectId }: ProjectTasksTableProps) {
               {sortedTasks.map(task => (
                 <TableRow
                   key={task.id}
-                  className={cn("group hover:bg-muted/50", selectedItems.has(task.id) && "bg-primary/5")}
+                  className={cn("group hover:bg-muted/50 cursor-pointer", selectedItems.has(task.id) && "bg-primary/5")}
+                  onClick={(e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.closest('button, input, select, [role="checkbox"], [data-inline-edit]')) return;
+                    navigate(`/tasks/${task.id}`);
+                  }}
                 >
                   {isColumnVisible('select') && (
                     <TableCell>

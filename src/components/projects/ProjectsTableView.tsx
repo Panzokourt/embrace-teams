@@ -266,7 +266,12 @@ export function ProjectsTableView({
   const renderProjectRow = (project: Project) => (
     <TableRow 
       key={project.id} 
-      className="group hover:bg-muted/50"
+      className="group hover:bg-muted/50 cursor-pointer"
+      onClick={(e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('button, input, select, [role="checkbox"], [data-inline-edit]')) return;
+        navigate(`/projects/${project.id}`);
+      }}
     >
       {/* Name */}
       <TableCell className="font-medium" style={{ width: getColumnWidth('name') }}>

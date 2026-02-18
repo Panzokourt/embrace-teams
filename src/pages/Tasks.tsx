@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useTasksRealtime } from '@/hooks/useRealtimeSubscription';
@@ -103,6 +104,7 @@ const statusConfig: Record<TaskStatus, { icon: React.ReactNode; label: string; c
 };
 
 export default function TasksPage({ embedded = false }: { embedded?: boolean }) {
+  const navigate = useNavigate();
   const { isAdmin, isManager } = useAuth();
   const { logCreate, logUpdate, logDelete, logStatusChange } = useActivityLogger();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -197,7 +199,7 @@ export default function TasksPage({ embedded = false }: { embedded?: boolean }) 
       const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name, email, avatar_url')
-        .eq('status', 'active')
+        .in('status', ['active', 'pending'])
         .order('full_name');
 
       if (error) throw error;
@@ -523,7 +525,7 @@ export default function TasksPage({ embedded = false }: { embedded?: boolean }) 
           isOverdue && "border-destructive/30 bg-destructive/[0.02]",
           isDragOverlay && "shadow-soft-xl rotate-1 scale-105"
         )}
-        onClick={() => !isDragOverlay && handleEdit(task)}
+        onClick={() => !isDragOverlay && navigate(`/tasks/${task.id}`)}
       >
         <div className="flex items-start gap-3">
           <GripVertical className="h-4 w-4 text-muted-foreground/30 mt-0.5 flex-shrink-0 cursor-grab transition-colors group-hover:text-muted-foreground/50" />
@@ -592,7 +594,7 @@ export default function TasksPage({ embedded = false }: { embedded?: boolean }) 
         <Card 
           key={task.id} 
           className="hover:shadow-lg transition-shadow cursor-pointer"
-          onClick={() => handleEdit(task)}
+          onClick={() => navigate(`/tasks/${task.id}`)}
         >
           <CardContent className="p-4">
             <div className="flex items-start justify-between mb-3">

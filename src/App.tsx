@@ -22,6 +22,7 @@ import Files from "@/pages/Files";
 import Blueprints from "@/pages/Blueprints";
 import HR from "@/pages/HR";
 import EmployeeProfile from "@/pages/EmployeeProfile";
+import TaskDetail from "@/pages/TaskDetail";
 import NotFound from "./pages/NotFound";
 
 function RedirectUserToEmployee() {
@@ -47,6 +48,7 @@ const App = () => (
                 <Route path="/work" element={<Work />} />
                 <Route path="/projects" element={<Navigate to="/work?tab=projects" replace />} />
                 <Route path="/projects/:id" element={<ProjectDetail />} />
+                <Route path="/tasks/:id" element={<TaskDetail />} />
                 <Route path="/tasks" element={<Navigate to="/work?tab=tasks" replace />} />
                 <Route path="/tenders" element={<Navigate to="/work?tab=projects" replace />} />
                 <Route path="/tenders/:id" element={<Navigate to="/work?tab=projects" replace />} />

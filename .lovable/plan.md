@@ -1,120 +1,109 @@
 
-# Σελίδα "Προσχέδια" + Προ-φόρμες + Quick Action Button
+# Executive Dashboard - Customizable Cards & Filters
 
 ## Τι αλλάζει
 
-### 1. Νέα σελίδα "Προσχέδια" (`/blueprints`)
-Η σελίδα θα περιέχει δύο tabs:
-- **Project Templates**: Μεταφορά του υπάρχοντος `ProjectTemplatesManager` από τις Ρυθμίσεις
-- **Προ-φόρμες (Briefs)**: Νέα section με 6 έτοιμες φόρμες
+### 1. Customizable Dashboard Cards
+Κάθε card/widget στο dashboard γίνεται configurable:
+- Ο χρήστης μπορεί να **προσθέσει/αφαιρέσει** cards μέσω ενός "Customize" button στο header
+- Κάθε card μπορεί να αλλάξει **μέγεθος** (small/medium/large) που αντιστοιχεί σε grid column spans (1, 2, 3 cols)
+- Η διαμόρφωση αποθηκεύεται σε `localStorage` ωστε να διατηρείται μεταξύ sessions
 
-Η σελίδα προστίθεται στο sidebar κάτω από τα admin items με εικονίδιο `FileStack`.
+### 2. Dashboard Filters
+Στο header του dashboard προστίθεται toolbar με:
+- **Χρονικό φίλτρο**: Σήμερα, Εβδομάδα, Μήνας, Τρίμηνο, Ετος
+- **Φίλτρο Πελάτη**: Dropdown με τους πελάτες
+- **Φίλτρο Έργου**: Dropdown με τα ενεργά έργα
 
-### 2. Έξι έτοιμες Προ-φόρμες
-Κάθε φόρμα ανοίγει σε dialog με τα κατάλληλα πεδία:
+Τα φίλτρα εφαρμόζονται στα data queries (tasks, invoices, expenses, time entries).
 
-**Creative Brief**
-- Project Name, Client, Background/Context, Objective, Target Audience, Key Message, Tone of Voice, Mandatory Elements, Budget Range, Timeline, Deliverables (checkboxes), Additional Notes
+### 3. Νέα widgets
+Πέρα από τα υπάρχοντα, προστίθενται:
+- **Recent Activity**: Τελευταίες ενέργειες από το activity_log
+- **Revenue Chart**: Mini γράφημα εσόδων (recharts, ήδη installed)
+- **Project Progress**: Επισκόπηση προόδου ενεργών έργων (progress bar per project)
 
-**Digital Campaign Brief**
-- Campaign Name, Client, Campaign Objective, Target Audience, Platforms (multi-select: Facebook, Instagram, Google Ads, LinkedIn, TikTok, YouTube), Budget, KPIs, Start/End Date, Landing Page URL, Creative Requirements, Tracking/Analytics Notes
+### 4. Widget Registry
+Ορίζεται ένα registry με ολα τα διαθέσιμα widgets:
 
-**Contact Report**
-- Meeting Date, Client, Attendees (Agency), Attendees (Client), Meeting Type (dropdown: Call, Video Call, In-person, Email), Agenda, Discussion Points, Decisions Made, Action Items (repeatable: action, responsible, deadline), Next Meeting Date, Notes
+```text
+ID                  | Τίτλος              | Default Size | Default Visible
+--------------------|----------------------|--------------|----------------
+total_revenue       | Συνολικά Έσοδα       | small        | yes
+agency_fee          | Προμήθεια Agency     | small        | yes
+net_profit          | Καθαρό Κέρδος        | small        | yes
+pending_invoices    | Εκκρεμή Τιμολόγια    | small        | yes
+active_tenders      | Διαγωνισμοί          | small        | yes
+active_projects     | Ενεργά Έργα          | small        | yes
+win_rate            | Win Rate             | small        | yes
+overdue             | Overdue Tasks        | small        | yes
+today_hours         | Ώρες Σήμερα          | small        | yes
+utilization         | Utilization          | small        | yes
+pipeline            | Pipeline             | large        | yes
+alerts              | Alerts               | medium       | yes
+deadlines           | Deadlines            | medium       | yes
+recent_activity     | Πρόσφατη Δραστηριότητα| medium      | yes
+revenue_chart       | Γράφημα Εσόδων       | large        | no
+project_progress    | Πρόοδος Έργων        | medium       | no
+```
 
-**Website Brief**
-- Project Name, Client, Website Type (dropdown: Corporate, E-commerce, Landing Page, Microsite, Redesign), Pages (repeatable list), Target Audience, Key Features, CMS Preference, SEO Requirements, Integrations Needed, Content Status, Design References, Timeline, Budget
+## Αρχιτεκτονική
 
-**Event Brief**
-- Event Name, Client, Event Type (dropdown: Conference, Launch, Exhibition, Gala, Workshop, Corporate), Date, Venue/Location, Expected Attendees, Objective, Theme/Concept, Program Outline, Catering Requirements, AV/Technical Requirements, Speakers/Guests, Budget, Branding Needs, Notes
+### Νέα αρχεία
+- `src/components/dashboard/DashboardCustomizer.tsx` - Dialog για add/remove widgets και αλλαγή μεγέθους
+- `src/components/dashboard/DashboardFilters.tsx` - Toolbar με χρονικά/πελάτη/έργο φίλτρα
+- `src/components/dashboard/widgetRegistry.ts` - Registry ορισμού widgets (id, label, defaultSize, component ref)
+- `src/components/dashboard/widgets/RecentActivity.tsx` - Widget πρόσφατης δραστηριότητας
+- `src/components/dashboard/widgets/RevenueChart.tsx` - Mini revenue chart
+- `src/components/dashboard/widgets/ProjectProgress.tsx` - Progress bars ενεργών έργων
+- `src/hooks/useDashboardConfig.ts` - Hook για localStorage persistence της dashboard config
 
-**Generic Communication Brief**
-- Project Name, Client, Communication Objective, Target Audience, Key Messages, Channels, Timeline, Budget, Success Metrics, Competitors/References, Brand Guidelines Link, Additional Notes
-
-### 3. Εξαγωγή φορμών
-Κάθε συμπληρωμένη φόρμα μπορεί να εξαχθεί σε:
-- **PDF**: Μέσω `window.print()` με print-friendly CSS styling
-- **Word (.doc)**: HTML table export (ίδια μέθοδος με το υπάρχον Excel export)
-- **Excel (.xls)**: Μέσω του υπάρχοντος `exportToExcel`
-
-### 4. Quick Action Button (FAB)
-Στρογγυλό floating "+" button κάτω-δεξιά, μόνιμα ορατό σε όλες τις σελίδες. Πατώντας το εμφανίζει popover/menu με:
-- Νέο Έργο (link στο /projects με auto-open dialog)
-- Νέο Task
-- Creative Brief
-- Digital Campaign Brief
-- Contact Report
-- Website Brief
-- Event Brief
-- Communication Brief
+### Αλλαγές σε υπάρχοντα
+- `src/pages/Dashboard.tsx` - Refactor για widget-based rendering, filters state, customizer integration
 
 ## Technical Details
 
-### Νέα αρχεία
-- `src/pages/Blueprints.tsx` - Η σελίδα με tabs (Templates + Briefs)
-- `src/components/blueprints/BriefFormDialog.tsx` - Generic dialog component για briefs
-- `src/components/blueprints/briefDefinitions.ts` - Ορισμοί πεδίων για κάθε brief type
-- `src/components/blueprints/BriefExport.ts` - Export utilities (PDF/Word/Excel)
-- `src/components/layout/QuickActionButton.tsx` - Το floating "+" button
-
-### Αλλαγές σε υπάρχοντα αρχεία
-- `src/App.tsx` - Προσθήκη route `/blueprints`
-- `src/components/layout/AppSidebar.tsx` - Προσθήκη "Προσχέδια" στα admin nav items
-- `src/components/layout/AppLayout.tsx` - Προσθήκη `QuickActionButton` component
-- `src/pages/Settings.tsx` - Αφαίρεση `ProjectTemplatesManager` (μεταφέρεται)
-
-### Database
-- Νέος πίνακας `briefs` για αποθήκευση συμπληρωμένων φορμών:
-
-```text
-briefs
-  id          uuid PK
-  company_id  uuid FK
-  project_id  uuid FK (nullable)
-  client_id   uuid FK (nullable)
-  created_by  uuid FK
-  brief_type  text (creative, digital_campaign, contact_report, website, event, communication)
-  title       text
-  data        jsonb (τα πεδία της φόρμας)
-  status      text (draft, final)
-  created_at  timestamptz
-  updated_at  timestamptz
-```
-
-- RLS: Admin/Manager full access, active users can create/view own briefs
-
-### Brief data structure
-Τα πεδία κάθε brief ορίζονται declaratively σε `briefDefinitions.ts` ως array of field configs:
-
+### Dashboard Config (localStorage)
 ```text
 {
-  key: string,
-  label: string,
-  type: 'text' | 'textarea' | 'date' | 'number' | 'select' | 'multiselect' | 'repeater',
-  options?: string[],        // για select/multiselect
-  required?: boolean,
-  repeaterFields?: field[]   // για repeater (π.χ. action items)
+  widgets: [
+    { id: "total_revenue", visible: true, size: "small" },
+    { id: "pipeline", visible: true, size: "large" },
+    ...
+  ],
+  filters: {
+    period: "month",
+    clientId: null,
+    projectId: null
+  }
 }
 ```
 
-Αυτό επιτρέπει ένα μόνο `BriefFormDialog` component να render-άρει δυναμικά οποιαδήποτε φόρμα.
+### Widget Sizing
+- **small**: `col-span-1` (1/4 σε desktop)
+- **medium**: `col-span-2` (2/4 σε desktop)
+- **large**: `col-span-4` (full width)
 
-### Export approach
-- **PDF**: Δημιουργία HTML representation -> `window.print()` με `@media print` styles
-- **Word**: HTML table -> Blob download ως `.doc` (ίδια τεχνική με exportToExcel)
-- **Excel**: Χρήση υπάρχοντος `exportToExcel` utility
+Το grid είναι `grid-cols-1 md:grid-cols-2 lg:grid-cols-4` οπότε τα sizes αντιστοιχούν ομαλά.
 
-### Quick Action Button
-- Positioned `fixed bottom-6 right-6 z-50`
-- Animated rotation on click
-- Popover menu με icon + label ανά action
-- Links: Έργο/Task πηγαίνουν στις αντίστοιχες σελίδες, Briefs ανοίγουν απευθείας το dialog
+### Customizer UI
+- Gear icon button στο dashboard header
+- Ανοίγει Sheet (sidebar panel) με checklist ολων των widgets
+- Κάθε widget έχει toggle visibility + size selector (S/M/L buttons)
+- Drag handles ΔΕΝ χρειάζονται (τα widgets κάνουν auto-flow στο grid)
+
+### Filters Logic
+- Τα φίλτρα εφαρμόζονται στα Supabase queries:
+  - **Period**: `.gte('created_at', startDate)` ή `.gte('due_date', startDate)` ανά πίνακα
+  - **Client**: `.eq('client_id', clientId)` στα invoices/projects
+  - **Project**: `.eq('project_id', projectId)` στα tasks/expenses
+- Τα financial stats (revenue, expenses) φιλτράρονται χρονικά
+- Τα task stats φιλτράρονται ανά έργο/πελάτη
 
 ### Σειρά υλοποίησης
-1. Database migration (briefs table)
-2. Brief definitions + export utilities
-3. BriefFormDialog component
-4. Blueprints page (templates tab + briefs tab)
-5. QuickActionButton component
-6. Route, sidebar, layout updates
-7. Αφαίρεση templates από Settings
+1. `useDashboardConfig` hook (config persistence)
+2. `widgetRegistry.ts` (widget definitions)
+3. `DashboardFilters.tsx` (filter toolbar)
+4. `DashboardCustomizer.tsx` (add/remove/resize UI)
+5. New widget components (RecentActivity, RevenueChart, ProjectProgress)
+6. Refactor `Dashboard.tsx` (integrate all above)

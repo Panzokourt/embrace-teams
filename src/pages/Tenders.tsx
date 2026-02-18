@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useTendersRealtime } from '@/hooks/useRealtimeSubscription';
 import { useTenderToProject } from '@/hooks/useTenderToProject';
+import { useActivityLogger } from '@/hooks/useActivityLogger';
 import { TenderCreationWizard } from '@/components/tenders/TenderCreationWizard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -101,6 +102,7 @@ export default function TendersPage() {
   const navigate = useNavigate();
   const { isAdmin, isManager } = useAuth();
   const { handleStageChange } = useTenderToProject();
+  const { logCreate, logUpdate, logDelete, logStatusChange } = useActivityLogger();
   const [tenders, setTenders] = useState<Tender[]>([]);
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
   const [profiles, setProfiles] = useState<{ id: string; full_name: string | null; email: string }[]>([]);
@@ -237,6 +239,7 @@ export default function TendersPage() {
         if (error) throw error;
         setTenders(prev => prev.map(t => t.id === editingTender.id ? data : t));
         toast.success('Ο διαγωνισμός ενημερώθηκε!');
+        logUpdate('tender', editingTender.id, formData.name);
       } else {
         const { data, error } = await supabase
           .from('tenders')
@@ -247,6 +250,7 @@ export default function TendersPage() {
         if (error) throw error;
         setTenders(prev => [data, ...prev]);
         toast.success('Ο διαγωνισμός δημιουργήθηκε!');
+        logCreate('tender', data.id, formData.name);
       }
 
       setDialogOpen(false);
@@ -274,10 +278,12 @@ export default function TendersPage() {
 
   const handleDelete = async (tenderId: string) => {
     try {
+      const deletedTender = tenders.find(t => t.id === tenderId);
       const { error } = await supabase.from('tenders').delete().eq('id', tenderId);
       if (error) throw error;
       setTenders(prev => prev.filter(t => t.id !== tenderId));
       toast.success('Ο διαγωνισμός διαγράφηκε!');
+      logDelete('tender', tenderId, deletedTender?.name);
     } catch (error) {
       console.error('Error deleting tender:', error);
       toast.error('Σφάλμα κατά τη διαγραφή');

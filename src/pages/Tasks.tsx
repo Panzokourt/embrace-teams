@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useTasksRealtime } from '@/hooks/useRealtimeSubscription';
+import { useActivityLogger } from '@/hooks/useActivityLogger';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -103,6 +104,7 @@ const statusConfig: Record<TaskStatus, { icon: React.ReactNode; label: string; c
 
 export default function TasksPage() {
   const { isAdmin, isManager } = useAuth();
+  const { logCreate, logUpdate, logDelete, logStatusChange } = useActivityLogger();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [users, setUsers] = useState<Profile[]>([]);
@@ -249,6 +251,7 @@ export default function TasksPage() {
         const assignee = formData.assigned_to ? users.find(u => u.id === formData.assigned_to) : null;
         setTasks(prev => prev.map(t => t.id === editingTask.id ? { ...data, assignee: assignee ? { full_name: assignee.full_name } : null } as Task : t));
         toast.success('Το task ενημερώθηκε!');
+        logUpdate('task', editingTask.id, formData.title);
       } else {
         const { data, error } = await supabase
           .from('tasks')
@@ -260,6 +263,7 @@ export default function TasksPage() {
         const assignee = formData.assigned_to ? users.find(u => u.id === formData.assigned_to) : null;
         setTasks(prev => [{ ...data, assignee: assignee ? { full_name: assignee.full_name } : null } as Task, ...prev]);
         toast.success('Το task δημιουργήθηκε!');
+        logCreate('task', data.id, formData.title);
       }
 
       setDialogOpen(false);
@@ -377,6 +381,7 @@ export default function TasksPage() {
 
         if (error) throw error;
         toast.success('Το task μετακινήθηκε!');
+        logStatusChange('task', activeId, draggedTask.title, draggedTask.status, targetStatus);
       } catch (error) {
         console.error('Error updating task:', error);
         fetchTasks();
@@ -405,10 +410,12 @@ export default function TasksPage() {
 
   const handleDelete = async (taskId: string) => {
     try {
+      const deletedTask = tasks.find(t => t.id === taskId);
       const { error } = await supabase.from('tasks').delete().eq('id', taskId);
       if (error) throw error;
       setTasks(prev => prev.filter(t => t.id !== taskId));
       toast.success('Το task διαγράφηκε!');
+      logDelete('task', taskId, deletedTask?.title);
     } catch (error) {
       console.error('Error deleting task:', error);
       toast.error('Σφάλμα κατά τη διαγραφή');

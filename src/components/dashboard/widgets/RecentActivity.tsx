@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { format } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { Activity } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface ActivityItem {
   id: string;
@@ -14,17 +15,44 @@ interface ActivityItem {
 
 export default function RecentActivity() {
   const [items, setItems] = useState<ActivityItem[]>([]);
+  const [newIds, setNewIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    supabase
+    fetchItems();
+
+    const channel = supabase
+      .channel('dashboard-recent-activity')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'activity_log' },
+        (payload) => {
+          const newItem = payload.new as ActivityItem;
+          setItems(prev => [newItem, ...prev].slice(0, 10));
+          setNewIds(prev => new Set(prev).add(newItem.id));
+          setTimeout(() => {
+            setNewIds(prev => {
+              const next = new Set(prev);
+              next.delete(newItem.id);
+              return next;
+            });
+          }, 2000);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const fetchItems = async () => {
+    const { data } = await supabase
       .from('activity_log')
       .select('id, action, entity_type, entity_name, created_at')
       .order('created_at', { ascending: false })
-      .limit(10)
-      .then(({ data }) => {
-        if (data) setItems(data);
-      });
-  }, []);
+      .limit(10);
+    if (data) setItems(data);
+  };
 
   const getActionLabel = (action: string) => {
     const map: Record<string, string> = {
@@ -67,9 +95,15 @@ export default function RecentActivity() {
           items.map(item => (
             <div
               key={item.id}
-              className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-secondary/50 transition-colors"
+              className={cn(
+                "flex items-start gap-3 p-2.5 rounded-xl hover:bg-secondary/50 transition-all duration-300",
+                newIds.has(item.id) && "animate-fade-in bg-primary/5"
+              )}
             >
-              <div className="h-2 w-2 rounded-full bg-primary/50 mt-1.5 shrink-0" />
+              <div className={cn(
+                "h-2 w-2 rounded-full mt-1.5 shrink-0 transition-colors",
+                newIds.has(item.id) ? "bg-primary animate-pulse" : "bg-primary/50"
+              )} />
               <div className="min-w-0 flex-1">
                 <p className="text-sm text-foreground/90 truncate">
                   <span className="font-medium">{getActionLabel(item.action)}</span>
@@ -80,7 +114,7 @@ export default function RecentActivity() {
                   )}
                 </p>
                 <p className="text-[11px] text-muted-foreground/60 mt-0.5">
-                  {format(new Date(item.created_at), 'd MMM, HH:mm', { locale: el })}
+                  {formatDistanceToNow(new Date(item.created_at), { addSuffix: true, locale: el })}
                 </p>
               </div>
             </div>

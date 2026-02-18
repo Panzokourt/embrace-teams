@@ -144,7 +144,7 @@ export function ProjectTasksManager({ projectId }: ProjectTasksManagerProps) {
     const { data } = await supabase
       .from('profiles')
       .select('id, full_name, email')
-      .eq('status', 'active')
+      .in('status', ['active', 'pending'])
       .order('full_name');
     setProfiles(data || []);
   };

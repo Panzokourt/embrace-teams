@@ -461,7 +461,16 @@ export function TasksTableView({
 
     return (
       <>
-        <TableRow key={task.id} className={cn("group hover:bg-muted/50", isSelected && "bg-primary/5")}>
+        <TableRow 
+          key={task.id} 
+          className={cn("group hover:bg-muted/50 cursor-pointer", isSelected && "bg-primary/5")}
+          onClick={(e) => {
+            // Don't navigate if clicking on interactive elements
+            const target = e.target as HTMLElement;
+            if (target.closest('button, input, select, [role="checkbox"], [data-inline-edit]')) return;
+            navigate(`/tasks/${task.id}`);
+          }}
+        >
           {/* Checkbox */}
           {isColumnVisible('select') && (
             <TableCell className="w-[40px]" style={{ width: getColumnWidth('select') }}>

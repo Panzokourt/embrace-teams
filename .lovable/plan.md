@@ -1,98 +1,49 @@
 
 
-# Αναδιάρθρωση Task Detail Page - Clean Two-Column Layout
+# Fix "Tasks Σήμερα" Logic + Richer Task Rows
 
-## Τρεχουσα κατασταση
+## Προβλήματα
 
-Η σελίδα έχει:
-- Header με τίτλο + badges
-- 5 info cards σε grid (Υπεύθυνος, Προθεσμία, Εκτίμηση, Πραγματικός, Πρόοδος)
-- Status bar
-- Tabs κάτω (Overview, Σχόλια, Αρχεία, Χρόνος, Ιστορικό)
+1. **Query λογική**: Τώρα φιλτράρει μόνο με `due_date <= today`, αγνοώντας το `start_date`. Επίσης εμφανίζει tasks από projects του χρήστη ακόμα κι αν δεν είναι assignee.
+2. **Λίγες πληροφορίες**: Οι γραμμές δείχνουν μόνο τίτλο, project name, priority badge και play button.
 
-Στο Overview tab: 2 cards (Περιγραφή + Λεπτομέρειες) και Subtasks
+## Αλλαγές
 
-## Προτεινομενη δομη (εμπνευσμενη απο reference)
+### 1. Διόρθωση query "Tasks Σήμερα"
 
-Αντί για cards πάνω + tabs κάτω, γίνεται **two-column layout**:
+Αντί για σύνθετο `.or()` με project access, η query γίνεται:
+- **Μόνο tasks assigned στον χρήστη** (`.eq('assigned_to', user.id)`)
+- **Φέρνει ΟΛΑ τα μη-ολοκληρωμένα** tasks του χρήστη και μετά φιλτράρει client-side:
+  - `due_date <= today` (overdue + σήμερα)
+  - `start_date = today` (ξεκινάνε σήμερα)
+  - `due_date = today` (λήγουν σήμερα)
 
-```text
-+------------------------------------------------------+---------------------------+
-| Task Title (editable)                                 | Activity                  |
-| Project link                                          |                           |
-|                                                       |                           |
-| Status    [ON GOING >]  |  Assignee   [Avatar(s)]    |                           |
-| Dates     Start -> Due  |  Priority   [Medium]       |                           |
-| Estimate  [8h]          |  Track time [Start]        |                           |
-| Category  [Design]      |  Type       [Task]         |                           |
-| Deliverable [X]         |  Progress   [65%]          |                           |
-|                                                       |                           |
-| ---------------------------------------------------- |  * User created task      |
-| Add description...                                    |    Feb 4, 13:39           |
-|                                                       |                           |
-| ---------------------------------------------------- |  * Status changed         |
-| Subtasks (3)                                          |    Todo -> In Progress    |
-| [x] Research competitors                              |    Feb 11, 15:41          |
-| [ ] Draft proposal                                    |                           |
-| [ ] Review with client                                |                           |
-|                                                       |                           |
-| ---------------------------------------------------- | ------------------------- |
-| [Σχόλια] [Αρχεία] [Χρόνος]  <- tabs μονο για αυτα   | Write a comment...        |
-+------------------------------------------------------+---------------------------+
-```
+Επίσης select περισσότερα πεδία: `start_date, estimated_hours, actual_hours, progress, task_type, task_category, assigned_to`
 
-## Αλλαγες αναλυτικα
+### 2. Πιο πλούσιες γραμμές tasks
 
-### 1. Two-column layout
-- **Αριστερα (~70%)**: Ολες οι πληροφοριες του task
-- **Δεξια (~30%)**: Activity feed (always visible, not in tab) + mini comment input
+Κάθε task row θα δείχνει:
+- Checkbox + Τίτλος (link στο task detail, όχι στο project)
+- Project name (μικρό, κάτω από τον τίτλο)
+- **Status badge** (todo, in_progress κλπ)
+- **Due date** (formatted, κόκκινο αν overdue)
+- **Priority badge**
+- **Estimated hours** (αν υπάρχουν)
+- Play/Stop button
 
-### 2. Properties Grid (αντι info cards)
-Αντι 5 ξεχωριστες Card components, ενα clean grid 2 στηλων μεσα στη σελιδα:
+Ίδια λογική και για week + upcoming rows: προσθήκη priority, due date, estimated hours.
 
-| Label | Value (inline editable) |
-|-------|------------------------|
-| Κατασταση | Status badge + quick change |
-| Υπευθυνος | Select dropdown |
-| Ημερομηνιες | Start -> Due (2 date pickers) |
-| Προτεραιοτητα | Select with color dots |
-| Εκτιμηση | Number input |
-| Πραγματικος | Display only |
-| Προοδος | Progress slider |
-| Τυπος | Select |
-| Κατηγορια | Select |
-| Παραδοτεο | Select |
+### 3. Task links
 
-Ολα inline-editable χωρις Cards, απλα rows με label-value.
+Τα links στα tasks θα πηγαίνουν στο `/tasks/:id` αντί `/projects/:id`.
 
-### 3. Description section
-- Κατω απο το properties grid, separator, μετα description area
-- Κλικ για edit (οπως τωρα)
+## Αρχείο
 
-### 4. Subtasks section
-- Κατω απο description
-- Compact checklist style
+- `src/pages/MyWork.tsx` -- Αλλαγή query, interface, UI rows
 
-### 5. Bottom tabs (simplified)
-- Μονο 3 tabs: Σχολια, Αρχεια, Χρονος
-- Activity και Overview δεν ειναι tabs πλεον (ειναι στο main layout)
+## Σειρά υλοποίησης
 
-### 6. Activity Sidebar (δεξια)
-- Always-visible sidebar με timeline
-- Scrollable
-- Compact entries: user + action + timestamp
-- Mini comment input στο κατω μερος
-
-## Αρχεια
-
-### Τροποποιημενα
-- `src/pages/TaskDetail.tsx` -- Πληρης αναδιαρθρωση layout
-
-## Σειρα υλοποιησης
-
-1. Αλλαγη layout σε 2 στηλες (flex/grid)
-2. Αντικατασταση info cards με properties grid (clean rows)
-3. Μεταφορα activity σε δεξια sidebar (always visible)
-4. Αφαιρεση Overview + Activity tabs, κρατημα μονο Σχολια/Αρχεια/Χρονος
-5. Polish: spacing, separators, hover states
-
+1. Ενημέρωση interface `TaskWithProject` με νέα πεδία
+2. Αλλαγή query: fetch assigned tasks, client-side filter για today
+3. Ενημέρωση UI rows σε όλα τα sections (Today, Week, Upcoming)
+4. Fix links -> `/tasks/:id`

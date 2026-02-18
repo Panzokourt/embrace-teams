@@ -93,6 +93,25 @@ function getOrderKey(userId: string) {
   return `my-work-task-order-${userId}-${format(new Date(), 'yyyy-MM-dd')}`;
 }
 
+// ── Task Table Header ──────────────────────────────
+function TaskTableHeader({ draggable = false }: { draggable?: boolean }) {
+  return (
+    <thead>
+      <tr className="border-b border-border/50 text-xs text-muted-foreground">
+        {draggable && <th className="w-8 py-2 px-2" />}
+        <th className="w-8 py-2 px-2" />
+        <th className="py-2 px-2 text-left font-medium">Task</th>
+        <th className="py-2 px-2 text-left font-medium hidden md:table-cell">Έργο</th>
+        <th className="py-2 px-2 text-left font-medium hidden sm:table-cell">Έναρξη</th>
+        <th className="py-2 px-2 text-left font-medium hidden sm:table-cell">Λήξη</th>
+        <th className="py-2 px-2 text-left font-medium">Status</th>
+        <th className="py-2 px-2 text-left font-medium hidden sm:table-cell">Priority</th>
+        <th className="w-10 py-2 px-2" />
+      </tr>
+    </thead>
+  );
+}
+
 // ── Sortable Task Row ──────────────────────────────
 function SortableTaskRow({
   task, today, onComplete, onOpenSheet, activeTimer, startTimer, stopTimer, showDate = false, draggable = false,
@@ -106,49 +125,53 @@ function SortableTaskRow({
   const isOverdue = task.due_date && isBefore(new Date(task.due_date), today);
 
   return (
-    <div
+    <tr
       ref={draggable ? setNodeRef : undefined}
       style={style}
-      className={`flex items-center gap-2 px-4 md:px-6 py-3 hover:bg-muted/30 transition-colors ${isDragging ? 'opacity-50 z-50' : ''}`}
+      className={`border-b border-border/50 hover:bg-muted/30 transition-colors ${isDragging ? 'opacity-50 z-50' : ''}`}
     >
       {draggable && (
-        <button {...attributes} {...listeners} className="cursor-grab touch-none shrink-0 text-muted-foreground hover:text-foreground">
-          <GripVertical className="h-4 w-4" />
-        </button>
+        <td className="py-2.5 px-2 w-8">
+          <button {...attributes} {...listeners} className="cursor-grab touch-none text-muted-foreground hover:text-foreground">
+            <GripVertical className="h-4 w-4" />
+          </button>
+        </td>
       )}
-      <Checkbox className="h-5 w-5 shrink-0" onCheckedChange={() => onComplete(task)} />
-      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onOpenSheet(task)}>
-        <span className="text-sm font-medium text-foreground hover:text-primary truncate block">{task.title}</span>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="truncate">{(task.project as any)?.name}</span>
-          {(task.start_date || task.due_date) && (
-            <span className="shrink-0">
-              {task.start_date ? format(new Date(task.start_date), 'd/MM') : ''}
-              {task.start_date && task.due_date ? ' → ' : ''}
-              {task.due_date ? format(new Date(task.due_date), 'd/MM') : ''}
-            </span>
-          )}
-        </div>
-      </div>
-      <Badge variant={getStatusVariant(task.status)} className="text-[10px] shrink-0 hidden sm:inline-flex">
-        {getStatusLabel(task.status)}
-      </Badge>
-      {isOverdue && <Badge variant="destructive" className="text-[10px] shrink-0">overdue</Badge>}
-      {showDate && task.due_date && !isOverdue && (
-        <span className="text-xs text-muted-foreground shrink-0">{format(new Date(task.due_date), 'd MMM', { locale: el })}</span>
-      )}
-      <Badge variant={getPriorityColor(task.priority)} className="text-[10px] shrink-0">{task.priority}</Badge>
-      {task.estimated_hours ? <span className="text-xs text-muted-foreground shrink-0 hidden sm:inline font-mono">{task.estimated_hours}h</span> : null}
-      {!activeTimer?.is_running || activeTimer.task_id !== task.id ? (
-        <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-primary" onClick={() => startTimer(task.id, task.project_id)}>
-          <Play className="h-3.5 w-3.5" />
-        </Button>
-      ) : (
-        <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 text-primary" onClick={() => stopTimer()}>
-          <Square className="h-3.5 w-3.5" />
-        </Button>
-      )}
-    </div>
+      <td className="py-2.5 px-2 w-8">
+        <Checkbox className="h-4 w-4" onCheckedChange={() => onComplete(task)} />
+      </td>
+      <td className="py-2.5 px-2 cursor-pointer" onClick={() => onOpenSheet(task)}>
+        <span className="text-sm font-medium text-foreground hover:text-primary">{task.title}</span>
+      </td>
+      <td className="py-2.5 px-2 hidden md:table-cell">
+        <span className="text-xs text-muted-foreground truncate">{(task.project as any)?.name || '-'}</span>
+      </td>
+      <td className="py-2.5 px-2 hidden sm:table-cell">
+        <span className="text-xs text-muted-foreground">{task.start_date ? format(new Date(task.start_date), 'd/MM') : '-'}</span>
+      </td>
+      <td className="py-2.5 px-2 hidden sm:table-cell">
+        <span className={`text-xs ${isOverdue ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
+          {task.due_date ? format(new Date(task.due_date), 'd/MM') : '-'}
+        </span>
+      </td>
+      <td className="py-2.5 px-2">
+        <Badge variant={getStatusVariant(task.status)} className="text-[10px]">{getStatusLabel(task.status)}</Badge>
+      </td>
+      <td className="py-2.5 px-2 hidden sm:table-cell">
+        <Badge variant={getPriorityColor(task.priority)} className="text-[10px]">{task.priority}</Badge>
+      </td>
+      <td className="py-2.5 px-2 w-10">
+        {!activeTimer?.is_running || activeTimer.task_id !== task.id ? (
+          <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => startTimer(task.id, task.project_id)}>
+            <Play className="h-3.5 w-3.5" />
+          </Button>
+        ) : (
+          <Button size="icon" variant="ghost" className="h-7 w-7 text-primary" onClick={() => stopTimer()}>
+            <Square className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </td>
+    </tr>
   );
 }
 
@@ -533,21 +556,24 @@ export default function MyWork() {
           <CardTitle className="text-base font-semibold">Tasks Σήμερα</CardTitle>
           <Link to="/work?tab=tasks" className="text-xs text-primary hover:underline flex items-center gap-1">Δες όλα <ArrowRight className="h-3 w-3" /></Link>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="p-0 overflow-x-auto">
           {orderedTodayTasks.length === 0 ? (
             <p className="text-sm text-muted-foreground px-6 pb-4">Κανένα task για σήμερα 🎉</p>
           ) : (
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
-                <div className="divide-y divide-border/50">
-                  {orderedTodayTasks.map(task => (
-                    <SortableTaskRow
-                      key={task.id} task={task} today={today} draggable
-                      onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
-                      activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
-                    />
-                  ))}
-                </div>
+                <table className="w-full text-sm">
+                  <TaskTableHeader draggable />
+                  <tbody>
+                    {orderedTodayTasks.map(task => (
+                      <SortableTaskRow
+                        key={task.id} task={task} today={today} draggable
+                        onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
+                        activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
+                      />
+                    ))}
+                  </tbody>
+                </table>
               </SortableContext>
             </DndContext>
           )}
@@ -558,19 +584,22 @@ export default function MyWork() {
       {Object.keys(weekTasksByDay).length > 0 && (
         <Card className="border-border/50">
           <CardHeader className="pb-3"><CardTitle className="text-base font-semibold">Αυτή την εβδομάδα</CardTitle></CardHeader>
-          <CardContent className="p-0">
+          <CardContent className="p-0 overflow-x-auto">
             {Object.entries(weekTasksByDay).map(([day, tasks]) => (
               <div key={day}>
                 <div className="px-4 md:px-6 py-2 bg-muted/30"><p className="text-xs font-medium text-muted-foreground capitalize">{day}</p></div>
-                <div className="divide-y divide-border/50">
-                  {tasks.map(task => (
-                    <SortableTaskRow
-                      key={task.id} task={task} today={today} showDate
-                      onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
-                      activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
-                    />
-                  ))}
-                </div>
+                <table className="w-full text-sm">
+                  <TaskTableHeader />
+                  <tbody>
+                    {tasks.map(task => (
+                      <SortableTaskRow
+                        key={task.id} task={task} today={today} showDate
+                        onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
+                        activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
+                      />
+                    ))}
+                  </tbody>
+                </table>
               </div>
             ))}
           </CardContent>
@@ -581,16 +610,19 @@ export default function MyWork() {
       {upcomingTasks.length > 0 && (
         <Card className="border-border/50">
           <CardHeader className="pb-3"><CardTitle className="text-base font-semibold">Επερχόμενα</CardTitle></CardHeader>
-          <CardContent className="p-0">
-            <div className="divide-y divide-border/50">
-              {upcomingTasks.map(task => (
-                <SortableTaskRow
-                  key={task.id} task={task} today={today} showDate
-                  onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
-                  activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
-                />
-              ))}
-            </div>
+          <CardContent className="p-0 overflow-x-auto">
+            <table className="w-full text-sm">
+              <TaskTableHeader />
+              <tbody>
+                {upcomingTasks.map(task => (
+                  <SortableTaskRow
+                    key={task.id} task={task} today={today} showDate
+                    onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
+                    activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
+                  />
+                ))}
+              </tbody>
+            </table>
           </CardContent>
         </Card>
       )}

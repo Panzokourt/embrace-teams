@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
   LayoutDashboard,
+  LayoutList,
   FileText,
   FolderKanban,
   CheckSquare,
@@ -50,6 +51,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
+  { title: 'My Work', href: '/my-work', icon: LayoutList },
   { title: 'Dashboard', href: '/', icon: LayoutDashboard },
   { title: 'Εργασίες', href: '/work', icon: FolderKanban, permission: 'projects.view' },
   { title: 'Αρχείο', href: '/files', icon: FileArchive, permission: 'files.view' },

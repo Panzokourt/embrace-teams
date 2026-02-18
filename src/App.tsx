@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import AppLayout from "@/components/layout/AppLayout";
 import Auth from "@/pages/Auth";
 import Dashboard from "@/pages/Dashboard";
+import MyWork from "@/pages/MyWork";
 import Work from "@/pages/Work";
 import Projects from "@/pages/Projects";
 import ProjectDetail from "@/pages/ProjectDetail";
@@ -42,6 +43,7 @@ const App = () => (
               <Route path="/auth" element={<Auth />} />
               <Route element={<AppLayout />}>
                 <Route path="/" element={<Dashboard />} />
+                <Route path="/my-work" element={<MyWork />} />
                 <Route path="/work" element={<Work />} />
                 <Route path="/projects" element={<Navigate to="/work?tab=projects" replace />} />
                 <Route path="/projects/:id" element={<ProjectDetail />} />

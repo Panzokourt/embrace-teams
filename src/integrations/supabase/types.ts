@@ -542,32 +542,60 @@ export type Database = {
       expenses: {
         Row: {
           amount: number
+          approval_status: string
+          approved_by: string | null
           category: string | null
+          client_id: string | null
           created_at: string
           description: string
           expense_date: string
+          expense_type: string
+          file_path: string | null
           id: string
-          project_id: string
+          notes: string | null
+          project_id: string | null
+          vendor_name: string | null
         }
         Insert: {
           amount: number
+          approval_status?: string
+          approved_by?: string | null
           category?: string | null
+          client_id?: string | null
           created_at?: string
           description: string
           expense_date?: string
+          expense_type?: string
+          file_path?: string | null
           id?: string
-          project_id: string
+          notes?: string | null
+          project_id?: string | null
+          vendor_name?: string | null
         }
         Update: {
           amount?: number
+          approval_status?: string
+          approved_by?: string | null
           category?: string | null
+          client_id?: string | null
           created_at?: string
           description?: string
           expense_date?: string
+          expense_type?: string
+          file_path?: string | null
           id?: string
-          project_id?: string
+          notes?: string | null
+          project_id?: string | null
+          vendor_name?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "expenses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "expenses_project_id_fkey"
             columns: ["project_id"]
@@ -846,41 +874,65 @@ export type Database = {
         Row: {
           amount: number
           client_id: string | null
+          contract_id: string | null
           created_at: string
           due_date: string | null
+          file_path: string | null
           id: string
           invoice_number: string
           issued_date: string
+          net_amount: number | null
+          notes: string | null
           paid: boolean | null
+          paid_amount: number | null
           paid_date: string | null
           project_id: string
+          status: string
           updated_at: string
+          vat_amount: number | null
+          vat_rate: number | null
         }
         Insert: {
           amount: number
           client_id?: string | null
+          contract_id?: string | null
           created_at?: string
           due_date?: string | null
+          file_path?: string | null
           id?: string
           invoice_number: string
           issued_date?: string
+          net_amount?: number | null
+          notes?: string | null
           paid?: boolean | null
+          paid_amount?: number | null
           paid_date?: string | null
           project_id: string
+          status?: string
           updated_at?: string
+          vat_amount?: number | null
+          vat_rate?: number | null
         }
         Update: {
           amount?: number
           client_id?: string | null
+          contract_id?: string | null
           created_at?: string
           due_date?: string | null
+          file_path?: string | null
           id?: string
           invoice_number?: string
           issued_date?: string
+          net_amount?: number | null
+          notes?: string | null
           paid?: boolean | null
+          paid_amount?: number | null
           paid_date?: string | null
           project_id?: string
+          status?: string
           updated_at?: string
+          vat_amount?: number | null
+          vat_rate?: number | null
         }
         Relationships: [
           {
@@ -888,6 +940,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
             referencedColumns: ["id"]
           },
           {
@@ -1642,6 +1701,78 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      services: {
+        Row: {
+          category: string
+          company_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          internal_cost: number | null
+          is_active: boolean
+          list_price: number
+          name: string
+          pricing_unit: string
+          role_hours: Json | null
+          role_rates: Json | null
+          sort_order: number
+          target_margin: number | null
+          template_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          company_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          internal_cost?: number | null
+          is_active?: boolean
+          list_price?: number
+          name: string
+          pricing_unit?: string
+          role_hours?: Json | null
+          role_rates?: Json | null
+          sort_order?: number
+          target_margin?: number | null
+          template_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          company_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          internal_cost?: number | null
+          is_active?: boolean
+          list_price?: number
+          name?: string
+          pricing_unit?: string
+          role_hours?: Json | null
+          role_rates?: Json | null
+          sort_order?: number
+          target_margin?: number | null
+          template_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "services_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "services_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "project_templates"
             referencedColumns: ["id"]
           },
         ]

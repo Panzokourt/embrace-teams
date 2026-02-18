@@ -2,11 +2,10 @@ import { useEffect, useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import AppSidebar from './AppSidebar';
-import { NotificationBell } from '@/components/notifications/NotificationBell';
+import TopBar from './TopBar';
 import { QuickActionButton } from '@/components/layout/QuickActionButton';
 import { GlobalActivityFeed } from '@/components/activity/GlobalActivityFeed';
-import { Button } from '@/components/ui/button';
-import { Loader2, Activity } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 export default function AppLayout() {
   const navigate = useNavigate();
@@ -34,22 +33,11 @@ export default function AppLayout() {
   return (
     <div className="flex h-screen bg-background">
       <AppSidebar />
-      <main className="flex-1 overflow-auto pt-16 md:pt-0 relative">
-        {/* Top bar with notifications (visible on desktop) */}
-        <div className="hidden md:flex absolute top-4 right-6 z-10 gap-1">
-          <Button variant="ghost" size="icon" onClick={() => setActivityOpen(true)} className="relative">
-            <Activity className="h-5 w-5" />
-          </Button>
-          <NotificationBell />
+      <main className="flex-1 overflow-auto flex flex-col">
+        <TopBar onActivityToggle={() => setActivityOpen(true)} />
+        <div className="flex-1">
+          <Outlet />
         </div>
-        {/* Mobile notification bell */}
-        <div className="fixed top-4 right-4 z-50 md:hidden flex gap-1">
-          <Button variant="ghost" size="icon" onClick={() => setActivityOpen(true)} className="relative">
-            <Activity className="h-5 w-5" />
-          </Button>
-          <NotificationBell />
-        </div>
-        <Outlet />
       </main>
       <QuickActionButton />
       <GlobalActivityFeed open={activityOpen} onOpenChange={setActivityOpen} />

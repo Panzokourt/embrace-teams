@@ -36,6 +36,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { TaskTimer } from '@/components/time-tracking/TaskTimer';
 import { format, isPast, isToday, isTomorrow, parseISO } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -134,6 +135,7 @@ const DEFAULT_COLUMNS = [
   { id: 'actual_hours', label: 'Πραγματικός', visible: false },
   { id: 'task_type', label: 'Τύπος', visible: false },
   { id: 'category', label: 'Κατηγορία', visible: false },
+  { id: 'timer', label: 'Timer', visible: true },
   { id: 'actions', label: 'Ενέργειες', visible: true, locked: true },
 ];
 
@@ -673,6 +675,13 @@ export function TasksTableView({
             </TableCell>
           )}
 
+          {/* Timer */}
+          {isColumnVisible('timer') && (
+            <TableCell style={{ width: getColumnWidth('timer') }}>
+              <TaskTimer taskId={task.id} projectId={task.project_id} compact />
+            </TableCell>
+          )}
+
           {/* Actions */}
           <TableCell style={{ width: getColumnWidth('actions') }}>
             {canManage && (
@@ -901,6 +910,16 @@ export function TasksTableView({
                   minWidth={100}
                 >
                   Κατηγορία
+                </ResizableTableHeader>
+              )}
+              
+              {isColumnVisible('timer') && (
+                <ResizableTableHeader 
+                  width={getColumnWidth('timer')}
+                  onWidthChange={(w) => setColumnWidth('timer', w)}
+                  minWidth={80}
+                >
+                  Timer
                 </ResizableTableHeader>
               )}
               

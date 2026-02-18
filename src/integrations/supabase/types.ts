@@ -1035,6 +1035,150 @@ export type Database = {
           },
         ]
       }
+      project_template_deliverables: {
+        Row: {
+          created_at: string | null
+          default_budget: number | null
+          description: string | null
+          id: string
+          name: string
+          sort_order: number | null
+          template_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          default_budget?: number | null
+          description?: string | null
+          id?: string
+          name: string
+          sort_order?: number | null
+          template_id: string
+        }
+        Update: {
+          created_at?: string | null
+          default_budget?: number | null
+          description?: string | null
+          id?: string
+          name?: string
+          sort_order?: number | null
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_template_deliverables_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "project_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_template_tasks: {
+        Row: {
+          created_at: string | null
+          days_offset_due: number | null
+          days_offset_start: number | null
+          deliverable_ref_order: number | null
+          description: string | null
+          estimated_hours: number | null
+          id: string
+          priority: string | null
+          sort_order: number | null
+          task_category: string | null
+          task_type: string | null
+          template_id: string
+          title: string
+        }
+        Insert: {
+          created_at?: string | null
+          days_offset_due?: number | null
+          days_offset_start?: number | null
+          deliverable_ref_order?: number | null
+          description?: string | null
+          estimated_hours?: number | null
+          id?: string
+          priority?: string | null
+          sort_order?: number | null
+          task_category?: string | null
+          task_type?: string | null
+          template_id: string
+          title: string
+        }
+        Update: {
+          created_at?: string | null
+          days_offset_due?: number | null
+          days_offset_start?: number | null
+          deliverable_ref_order?: number | null
+          description?: string | null
+          estimated_hours?: number | null
+          id?: string
+          priority?: string | null
+          sort_order?: number | null
+          task_category?: string | null
+          task_type?: string | null
+          template_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_template_tasks_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "project_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_templates: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          default_agency_fee_percentage: number | null
+          default_budget: number | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          project_type: string
+          sort_order: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          default_agency_fee_percentage?: number | null
+          default_budget?: number | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          project_type: string
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          default_agency_fee_percentage?: number | null
+          default_budget?: number | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          project_type?: string
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_user_access: {
         Row: {
           created_at: string

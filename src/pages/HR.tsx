@@ -6,7 +6,6 @@ import { Users, Building2, Network, Timer, Calendar, UsersRound } from 'lucide-r
 
 // Lazy load existing page content
 import UsersAccessPage from '@/pages/UsersAccess';
-import TeamsPage from '@/pages/Teams';
 import DepartmentsPage from '@/pages/Departments';
 import OrgChartPage from '@/pages/OrgChart';
 import TimesheetsPage from '@/pages/Timesheets';
@@ -18,7 +17,6 @@ import { useLeaveManagement } from '@/hooks/useLeaveManagement';
 
 const TAB_MAP: Record<string, string> = {
   'users': 'staff',
-  'teams': 'teams',
   'departments': 'departments',
   'org-chart': 'orgchart',
   'timesheets': 'timesheets',
@@ -56,10 +54,6 @@ export default function HRPage() {
             <Users className="h-4 w-4" />
             Προσωπικό
           </TabsTrigger>
-          <TabsTrigger value="teams" className="gap-2">
-            <UsersRound className="h-4 w-4" />
-            Ομάδες
-          </TabsTrigger>
           <TabsTrigger value="departments" className="gap-2">
             <Building2 className="h-4 w-4" />
             Τμήματα
@@ -80,10 +74,6 @@ export default function HRPage() {
 
         <TabsContent value="staff">
           <UsersAccessContent />
-        </TabsContent>
-
-        <TabsContent value="teams">
-          <TeamsContent />
         </TabsContent>
 
         <TabsContent value="departments">
@@ -110,10 +100,6 @@ export default function HRPage() {
 function UsersAccessContent() {
   // Re-use the existing page but it renders inside the tab
   return <div className="-m-6 lg:-m-8"><UsersAccessPage /></div>;
-}
-
-function TeamsContent() {
-  return <div className="-m-6 lg:-m-8"><TeamsPage /></div>;
 }
 
 function DepartmentsContent() {

@@ -74,7 +74,7 @@ const App = () => (
                 {/* Redirects from old routes */}
                 <Route path="/users" element={<Navigate to="/hr?tab=staff" replace />} />
                 <Route path="/users/:id" element={<RedirectUserToEmployee />} />
-                <Route path="/teams" element={<Navigate to="/hr?tab=teams" replace />} />
+                <Route path="/teams" element={<Navigate to="/hr?tab=staff" replace />} />
                 <Route path="/departments" element={<Navigate to="/hr?tab=departments" replace />} />
                 <Route path="/org-chart" element={<Navigate to="/hr?tab=orgchart" replace />} />
                 <Route path="/timesheets" element={<Navigate to="/hr?tab=timesheets" replace />} />

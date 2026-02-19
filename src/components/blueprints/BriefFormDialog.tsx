@@ -306,7 +306,7 @@ export function BriefFormDialog({
         <DialogHeader>
           <DialogTitle>{definition.label}</DialogTitle>
         </DialogHeader>
-        <ScrollArea className="flex-1 -mx-6 px-6">
+        <ScrollArea className="flex-1 -mx-6 px-6 min-h-0">
           <div className="space-y-5 py-2">
             {/* Common meta fields: Client, Project, Users */}
             <div className="space-y-4 p-4 rounded-lg border border-border/50 bg-muted/20">

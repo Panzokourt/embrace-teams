@@ -190,7 +190,7 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 pr-4">
+        <ScrollArea className="flex-1 pr-4 min-h-0">
           <div className="space-y-6 pb-4">
             {/* Basic Info */}
             <div className="grid grid-cols-2 gap-4">

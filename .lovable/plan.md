@@ -1,49 +1,95 @@
 
+# Αναδιάρθρωση Καρτέλας Έργου — Νέο Compact Layout
 
-# Προσθήκη Tab "Εργασίες" και Φίλτρων Τμήματος/Ατόμου στις Αναφορές
+## Τι είναι τώρα (πρόβλημα)
 
-## Τι αλλάζει
+Το Overview tab έχει 6 ξεχωριστά blocks που "τεντώνουν" τη σελίδα κατακόρυφα:
+1. **ProjectInfoEditor** (μία κάρτα ολόκληρη — μόνο read/edit mode)
+2. **ProjectTeamManager** (μια κάρτα ολόκληρη — grid 2 columns με avatars)
+3. **Πρόοδος Έργου** (αριστερό grid)
+4. **Σύνοψη** (δεξί grid — επαναλαμβάνει Budget που ήδη φαίνεται στο Quick Stats header)
+5. **AI Analysis** (κάρτα)
+6. **Πρόσφατα Tasks** (κάρτα)
 
-### 1. Νέο Tab "Εργασίες"
+Επίσης τα Quick Stats cards 4 επαναλαμβάνουν πληροφορίες που φαίνονται και κάτω.
 
-Προστίθεται 6ο tab στις Αναφορές με αναλυτική προβολή tasks:
+---
 
-- **KPI Cards**: Σύνολο tasks, σε εξέλιξη, ολοκληρωμένα, overdue/critical
-- **Critical Deadline Table**: Πίνακας με tasks που πλησιάζουν ή έχουν ξεπεράσει deadline, ταξινομημένα κατά urgency (overdue πρώτα, μετά τα επόμενα 7 ημέρες)
-- **Status Pie Chart**: Κατανομή tasks ανά status (todo, in_progress, done, blocked)
-- **Priority Bar Chart**: Κατανομή ανά priority (critical, high, medium, low)
-- **Αναλυτικός πίνακας**: Όλα τα tasks με στήλες: Τίτλος, Έργο, Ανατεθειμένο σε, Προτεραιότητα, Status, Due Date, Πρόοδος
-- **Export support**: CSV/Excel εξαγωγή του πίνακα tasks
+## Νέο Layout — Compact Two-Column Overview
 
-### 2. Νέα Φίλτρα: Τμήμα και Άτομο
+### Αλλαγή 1: Header με inline status badge + key info
 
-Προστίθενται 2 νέα global φίλτρα δίπλα στα υπάρχοντα:
+Το header θα γίνει πιο πλούσιο — θα δείχνει επιπλέον Client, Dates, Progress bar — έτσι ώστε να μην χρειάζεται ξεχωριστή "Σύνοψη" κάρτα.
 
-- **Τμήμα**: Dropdown με τα departments -- φιλτράρει tasks/profiles βάσει department_id του assigned_to
-- **Άτομο**: Dropdown με τα profiles -- φιλτράρει tasks βάσει assigned_to
+### Αλλαγή 2: Quick Stats — μειώνουμε σε 3 πιο στρατηγικά KPIs
 
-Τα φίλτρα εφαρμόζονται σε ΟΛΑ τα tabs (tasks, team, projects κλπ).
+Αφαιρείται η επανάληψη. Τα Stats γίνονται: **Budget**, **Πρόοδος (%)**, **Λήξη** + **Κατάσταση** inline στο header.
+
+### Αλλαγή 3: Overview Tab — Two-column grid
+
+```text
+┌─────────────────────────────┬──────────────────────────┐
+│  Πληροφορίες Έργου          │  Ομάδα Έργου             │
+│  (ProjectInfoEditor)        │  (compact avatar strip)  │
+│  — Όνομα, Περιγραφή         │  — Avatars inline        │
+│  — Budget, Agency Fee       │  — +Προσθήκη button      │
+│  — Ημ/νίες                  │                          │
+│  — Κατάσταση                │  Πρόοδος                 │
+│                             │  — Deliverables %        │
+│                             │  — Tasks %               │
+└─────────────────────────────┴──────────────────────────┘
+┌─────────────────────────────┬──────────────────────────┐
+│  Πρόσφατα Tasks (5)         │  AI Ανάλυση              │
+│  — Mini list                │  — Compact               │
+└─────────────────────────────┴──────────────────────────┘
+```
+
+### Αλλαγή 4: Compact Team Section
+
+Αντί για grid cards για κάθε μέλος, η Ομάδα θα εμφανίζεται ως **avatar stack** με tooltip — compact, ελάχιστος χώρος. Ένα κουμπί "Προβολή Όλων/Επεξεργασία" ανοίγει το υπάρχον dialog.
+
+### Αλλαγή 5: Αφαίρεση Σύνοψης κάρτας
+
+Η κάρτα "Σύνοψη" (Budget + Agency Fee + Εκτιμώμενη Αμοιβή) αφαιρείται — αυτές οι τιμές ήδη φαίνονται στο ProjectInfoEditor και στα Quick Stats.
+
+---
 
 ## Τεχνικές Αλλαγές
 
 | Αρχείο | Αλλαγή |
 |--------|--------|
-| `src/hooks/useReportsData.ts` | Προσθήκη `departments` στο fetch, νέα πεδία `departmentId` και `userId` στο `ReportsFilters`, φιλτράρισμα tasks/profiles βάσει αυτών |
-| `src/components/reports/ReportFilters.tsx` | Προσθήκη 2 νέων Select dropdowns (Τμήμα, Άτομο), νέα props `departments` και `profiles` |
-| `src/components/reports/ReportsTasks.tsx` | **Νέο αρχείο** -- Πλήρες tab component με KPIs, critical deadline πίνακα, charts, αναλυτικό πίνακα |
-| `src/pages/Reports.tsx` | Προσθήκη tab "Εργασίες", import ReportsTasks, export handlers για tasks, περνάει departments/profiles στο ReportFilters |
+| `src/pages/ProjectDetail.tsx` | Αναδιάρθρωση του Overview tab σε 2-column grid layout, αφαίρεση επαναλαμβανόμενων sections |
+| `src/components/projects/ProjectTeamManager.tsx` | Προσθήκη compact mode prop — εμφανίζει avatar stack αντί για grid cards |
+| `src/pages/ProjectDetail.tsx` | Quick Stats: 4 → 3 cards, αφαίρεση επανάληψης Budget |
 
-### Data Flow για φίλτρα
+### Λεπτομέρειες ProjectTeamManager compact mode
 
-- Το `useReportsData` κάνει fetch departments από Supabase
-- Όταν επιλέγεται Τμήμα, φιλτράρονται tasks που ο assigned_to ανήκει σε αυτό το department (μέσω profiles.department_id)
-- Όταν επιλέγεται Άτομο, φιλτράρονται tasks με assigned_to === userId
-- Τα φίλτρα λειτουργούν σωρευτικά με τα υπάρχοντα (περίοδος, πελάτης, έργο)
+Νέο prop `compact?: boolean`. Όταν `compact=true`:
+- Εμφανίζει avatars σε οριζόντιο stack (overlap style) με tooltip on hover
+- Δείχνει badge "+N" αν πάνω από 4 μέλη
+- Κουμπί "Διαχείριση Ομάδας" ανοίγει dialog για full management
+- Κουμπί "+ Προσθήκη" για άμεση πρόσθεση
 
-### Critical Deadline Logic
+### Λεπτομέρειες Quick Stats
 
-Ένα task θεωρείται "critical" αν:
-- **Overdue**: `due_date < today` και status !== done/completed
-- **Κρίσιμο**: `due_date` εντός 3 ημερών και status !== done/completed  
-- **Σύντομα**: `due_date` εντός 7 ημερών και status !== done/completed
+Αφαιρείται η κάρτα "Budget" (επανάληψη) και αντικαθίσταται με card **"Πρόοδος"** που δείχνει το συνολικό % progress από tasks+deliverables.
 
+### Νέα δομή Overview:
+
+```text
+ROW 1 (lg:grid-cols-3):
+- col-span-2: Πληροφορίες Έργου (ProjectInfoEditor, full width)
+- col-span-1: Ομάδα (compact avatars) + Πρόοδος (progress bars)
+
+ROW 2 (lg:grid-cols-3):
+- col-span-2: Πρόσφατα Tasks
+- col-span-1: AI Ανάλυση (collapsed/compact)
+```
+
+---
+
+## Bonus Βελτιώσεις
+
+1. **Sticky Tab Bar**: Τα tabs "κολλάνε" στο top όταν scrollάρεις
+2. **Status Badge** στο header γίνεται κλικάρισιμο — αλλάζεις status άμεσα (quick inline edit)
+3. **Due Date countdown**: Αν υπάρχει end_date, το header δείχνει "σε X ημέρες" ή "Εκπρόθεσμο" με χρώμα

@@ -24,6 +24,10 @@ import HR from "@/pages/HR";
 import EmployeeProfile from "@/pages/EmployeeProfile";
 import TaskDetail from "@/pages/TaskDetail";
 import NotFound from "./pages/NotFound";
+import Onboarding from "@/pages/Onboarding";
+import WorkspaceSelector from "@/pages/WorkspaceSelector";
+import AcceptInvite from "@/pages/AcceptInvite";
+import OrganizationSettings from "@/pages/OrganizationSettings";
 
 function RedirectUserToEmployee() {
   const { id } = useParams();
@@ -42,6 +46,10 @@ const App = () => (
           <AuthProvider>
             <Routes>
               <Route path="/auth" element={<Auth />} />
+              <Route path="/onboarding" element={<Onboarding />} />
+              <Route path="/select-workspace" element={<WorkspaceSelector />} />
+              <Route path="/accept-invite/:token" element={<AcceptInvite />} />
+              <Route path="/accept-invite" element={<AcceptInvite />} />
               <Route element={<AppLayout />}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/my-work" element={<MyWork />} />
@@ -58,6 +66,7 @@ const App = () => (
                 <Route path="/hr" element={<HR />} />
                 <Route path="/hr/employee/:id" element={<EmployeeProfile />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/settings/organization" element={<OrganizationSettings />} />
                 <Route path="/calendar" element={<Navigate to="/work?tab=calendar" replace />} />
                 <Route path="/files" element={<Files />} />
                 <Route path="/blueprints" element={<Blueprints />} />

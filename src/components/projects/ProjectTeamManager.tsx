@@ -210,13 +210,14 @@ export function ProjectTeamManager({ projectId, canEdit }: ProjectTeamManagerPro
 
   const getRoleBadge = (role?: string) => {
     const roleLabels: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' }> = {
-      super_admin: { label: 'Super Admin', variant: 'default' },
+      owner: { label: 'Owner', variant: 'default' },
       admin: { label: 'Admin', variant: 'default' },
       manager: { label: 'Manager', variant: 'secondary' },
-      standard: { label: 'Standard', variant: 'outline' },
-      client: { label: 'Client', variant: 'outline' },
+      member: { label: 'Member', variant: 'outline' },
+      viewer: { label: 'Viewer', variant: 'outline' },
+      billing: { label: 'Billing', variant: 'outline' },
     };
-    const config = roleLabels[role || 'standard'] || roleLabels.standard;
+    const config = roleLabels[role || 'member'] || roleLabels.member;
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 

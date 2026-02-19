@@ -309,11 +309,11 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
                 {isSuperAdmin && (
                   <Button
                     type="button"
-                    variant={role === 'super_admin' ? 'default' : 'outline'}
+                    variant={role === 'owner' ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => setRole('super_admin')}
+                    onClick={() => setRole('owner')}
                   >
-                    Super Admin
+                    Owner
                   </Button>
                 )}
                 {ROLE_OPTIONS.map(option => (

@@ -320,8 +320,8 @@ export function useRBAC() {
 
     // Prevent changing super_admin if not super_admin
     const targetUser = users.find(u => u.user_id === userId);
-    if (targetUser?.role === 'super_admin' && !isSuperAdmin) {
-      throw new Error('Cannot modify Super Admin');
+    if (targetUser?.role === 'owner' && !isSuperAdmin) {
+      throw new Error('Cannot modify Owner');
     }
 
     const { error } = await supabase
@@ -350,8 +350,8 @@ export function useRBAC() {
     if (!company) throw new Error('No company');
 
     const targetUser = users.find(u => u.user_id === userId);
-    if (targetUser?.role === 'super_admin' && !isSuperAdmin) {
-      throw new Error('Cannot modify Super Admin');
+    if (targetUser?.role === 'owner' && !isSuperAdmin) {
+      throw new Error('Cannot modify Owner');
     }
 
     const { error } = await supabase
@@ -386,8 +386,8 @@ export function useRBAC() {
     if (!company) throw new Error('No company');
 
     const targetUser = users.find(u => u.user_id === userId);
-    if (targetUser?.role === 'super_admin') {
-      throw new Error('Cannot modify Super Admin permissions');
+    if (targetUser?.role === 'owner') {
+      throw new Error('Cannot modify Owner permissions');
     }
 
     // Delete existing permissions

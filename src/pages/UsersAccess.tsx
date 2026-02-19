@@ -207,7 +207,7 @@ export default function UsersAccessPage() {
                 <Crown className="h-6 w-6 text-amber-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{users.filter(u => u.role === 'super_admin' || u.role === 'admin').length}</p>
+                <p className="text-2xl font-bold">{users.filter(u => u.role === 'owner' || u.role === 'admin').length}</p>
                 <p className="text-sm text-muted-foreground">Admins</p>
               </div>
             </div>

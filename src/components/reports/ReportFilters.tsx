@@ -6,9 +6,11 @@ interface Props {
   onChange: (f: ReportsFilters) => void;
   clients: any[];
   projects: any[];
+  departments: any[];
+  profiles: any[];
 }
 
-export function ReportFilters({ filters, onChange, clients, projects }: Props) {
+export function ReportFilters({ filters, onChange, clients, projects, departments, profiles }: Props) {
   return (
     <div className="flex flex-wrap gap-3">
       <Select value={filters.period} onValueChange={(v) => onChange({ ...filters, period: v as PeriodFilter })}>
@@ -43,6 +45,30 @@ export function ReportFilters({ filters, onChange, clients, projects }: Props) {
           <SelectItem value="all">Όλα τα έργα</SelectItem>
           {projects.map(p => (
             <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select value={filters.departmentId || 'all'} onValueChange={(v) => onChange({ ...filters, departmentId: v === 'all' ? null : v })}>
+        <SelectTrigger className="w-[180px]">
+          <SelectValue placeholder="Τμήμα" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Όλα τα τμήματα</SelectItem>
+          {departments.map(d => (
+            <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select value={filters.userId || 'all'} onValueChange={(v) => onChange({ ...filters, userId: v === 'all' ? null : v })}>
+        <SelectTrigger className="w-[200px]">
+          <SelectValue placeholder="Άτομο" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Όλα τα μέλη</SelectItem>
+          {profiles.map(p => (
+            <SelectItem key={p.id} value={p.id}>{p.full_name || p.email}</SelectItem>
           ))}
         </SelectContent>
       </Select>

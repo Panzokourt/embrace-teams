@@ -9,6 +9,8 @@ export interface ReportsFilters {
   period: PeriodFilter;
   clientId: string | null;
   projectId: string | null;
+  departmentId: string | null;
+  userId: string | null;
 }
 
 export interface ReportsData {
@@ -19,6 +21,7 @@ export interface ReportsData {
   clients: any[];
   timeEntries: any[];
   profiles: any[];
+  departments: any[];
   loading: boolean;
 }
 
@@ -31,6 +34,7 @@ export function useReportsData(filters: ReportsFilters): ReportsData {
   const [clients, setClients] = useState<any[]>([]);
   const [timeEntries, setTimeEntries] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -38,14 +42,15 @@ export function useReportsData(filters: ReportsFilters): ReportsData {
     
     const fetchAll = async () => {
       setLoading(true);
-      const [projRes, invRes, expRes, taskRes, clientRes, timeRes, profRes] = await Promise.all([
+      const [projRes, invRes, expRes, taskRes, clientRes, timeRes, profRes, deptRes] = await Promise.all([
         supabase.from('projects').select('*, clients(id, name)'),
         supabase.from('invoices').select('*, clients(id, name), projects(id, name)'),
         supabase.from('expenses').select('*, projects(id, name)'),
         supabase.from('tasks').select('*, projects(id, name)'),
         supabase.from('clients').select('*'),
         supabase.from('time_entries').select('*') as any,
-        supabase.from('profiles').select('id, full_name, email, department, job_title'),
+        supabase.from('profiles').select('id, full_name, email, department, job_title, department_id'),
+        supabase.from('departments').select('id, name'),
       ]);
 
       setProjects(projRes.data || []);
@@ -55,6 +60,7 @@ export function useReportsData(filters: ReportsFilters): ReportsData {
       setClients(clientRes.data || []);
       setTimeEntries(timeRes.data || []);
       setProfiles(profRes.data || []);
+      setDepartments(deptRes.data || []);
       setLoading(false);
     };
 
@@ -100,19 +106,37 @@ export function useReportsData(filters: ReportsFilters): ReportsData {
       return inRange(e.expense_date);
     });
 
+    // Build a set of profile IDs matching department/user filters
+    const filteredProfileIds = new Set(
+      profiles
+        .filter(p => {
+          if (filters.departmentId && p.department_id !== filters.departmentId) return false;
+          if (filters.userId && p.id !== filters.userId) return false;
+          return true;
+        })
+        .map(p => p.id)
+    );
+    const hasPersonFilter = !!(filters.departmentId || filters.userId);
+
     const ft = tasks.filter(t => {
       if (filters.projectId && t.project_id !== filters.projectId) return false;
       if (filters.clientId) {
         const proj = projects.find(p => p.id === t.project_id);
         if (!proj || proj.client_id !== filters.clientId) return false;
       }
+      if (hasPersonFilter && !filteredProfileIds.has(t.assigned_to)) return false;
       return inRange(t.created_at);
     });
 
     const fte = timeEntries.filter((te: any) => {
       if (filters.projectId && te.project_id !== filters.projectId) return false;
+      if (hasPersonFilter && !filteredProfileIds.has(te.user_id)) return false;
       return inRange(te.start_time);
     });
+
+    const filteredProfiles = hasPersonFilter
+      ? profiles.filter(p => filteredProfileIds.has(p.id))
+      : profiles;
 
     return {
       projects: fp,
@@ -121,9 +145,10 @@ export function useReportsData(filters: ReportsFilters): ReportsData {
       tasks: ft,
       timeEntries: fte,
       clients,
-      profiles,
+      profiles: filteredProfiles,
+      departments,
     };
-  }, [projects, invoices, expenses, tasks, timeEntries, clients, profiles, filters, dateRange]);
+  }, [projects, invoices, expenses, tasks, timeEntries, clients, profiles, departments, filters, dateRange]);
 
   return { ...filtered, loading };
 }

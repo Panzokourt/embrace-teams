@@ -101,7 +101,7 @@ export default function TopBar({ onActivityToggle }: TopBarProps) {
         <Popover open={searchOpen} onOpenChange={setSearchOpen}>
           <PopoverTrigger asChild>
             <button
-              className="flex h-9 w-full items-center gap-2 rounded-lg border border-border/60 bg-secondary/30 px-3 text-sm text-muted-foreground transition-colors hover:bg-secondary/50 focus:outline-none"
+              className="flex h-9 w-full items-center gap-2 rounded-lg border border-border/60 px-3 text-sm text-muted-foreground transition-colors focus:outline-none bg-secondary-foreground"
               onClick={() => setSearchOpen(true)}>
 
               <Search className="h-4 w-4 shrink-0" />

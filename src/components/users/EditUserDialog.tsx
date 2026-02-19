@@ -51,11 +51,12 @@ interface EditUserDialogProps {
 }
 
 const ROLE_OPTIONS: { value: CompanyRole; label: string; icon: React.ReactNode }[] = [
-  { value: 'super_admin', label: 'Super Admin', icon: <Crown className="h-4 w-4" /> },
+  { value: 'owner', label: 'Owner', icon: <Crown className="h-4 w-4" /> },
   { value: 'admin', label: 'Admin', icon: <Shield className="h-4 w-4" /> },
   { value: 'manager', label: 'Manager', icon: <Briefcase className="h-4 w-4" /> },
-  { value: 'standard', label: 'Standard', icon: <Users className="h-4 w-4" /> },
-  { value: 'client', label: 'Client', icon: <Users className="h-4 w-4" /> },
+  { value: 'member', label: 'Member', icon: <Users className="h-4 w-4" /> },
+  { value: 'viewer', label: 'Viewer', icon: <Users className="h-4 w-4" /> },
+  { value: 'billing', label: 'Billing', icon: <Users className="h-4 w-4" /> },
 ];
 
 const STATUS_OPTIONS: { value: UserStatus; label: string }[] = [
@@ -78,7 +79,7 @@ export function EditUserDialog({
   const [deleting, setDeleting] = useState(false);
   
   const [fullName, setFullName] = useState('');
-  const [role, setRole] = useState<CompanyRole>('standard');
+  const [role, setRole] = useState<CompanyRole>('member');
   const [status, setStatus] = useState<UserStatus>('active');
   const [departmentId, setDepartmentId] = useState<string>('none');
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -117,7 +118,7 @@ export function EditUserDialog({
   }, [user]);
 
   const isCurrentUser = currentUser?.id === user?.user_id;
-  const isSuperAdminUser = user?.role === 'super_admin';
+  const isSuperAdminUser = user?.role === 'owner';
   const canModifyRole = isSuperAdmin || !isSuperAdminUser;
   const canDelete = (isSuperAdmin || !isSuperAdminUser) && !isCurrentUser;
 

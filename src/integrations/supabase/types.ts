@@ -331,30 +331,39 @@ export type Database = {
       }
       companies: {
         Row: {
+          allow_domain_requests: boolean
           created_at: string
           domain: string
+          domain_verified: boolean
           id: string
           logo_url: string | null
           name: string
           settings: Json | null
+          sso_enforced: boolean
           updated_at: string
         }
         Insert: {
+          allow_domain_requests?: boolean
           created_at?: string
           domain: string
+          domain_verified?: boolean
           id?: string
           logo_url?: string | null
           name: string
           settings?: Json | null
+          sso_enforced?: boolean
           updated_at?: string
         }
         Update: {
+          allow_domain_requests?: boolean
           created_at?: string
           domain?: string
+          domain_verified?: boolean
           id?: string
           logo_url?: string | null
           name?: string
           settings?: Json | null
+          sso_enforced?: boolean
           updated_at?: string
         }
         Relationships: []
@@ -954,6 +963,44 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      join_requests: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "join_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -2551,6 +2598,19 @@ export type Database = {
     }
     Functions: {
       accept_invitation: { Args: { _token: string }; Returns: Json }
+      create_company_with_owner: {
+        Args: { _domain: string; _name: string }
+        Returns: string
+      }
+      find_companies_by_domain: {
+        Args: { _domain: string }
+        Returns: {
+          allow_domain_requests: boolean
+          id: string
+          logo_url: string
+          name: string
+        }[]
+      }
       get_department_users: { Args: { dept_id: string }; Returns: string[] }
       get_subordinate_users: { Args: { manager_id: string }; Returns: string[] }
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
@@ -2601,7 +2661,16 @@ export type Database = {
     Enums: {
       access_scope: "company" | "assigned" | "department" | "team"
       app_role: "admin" | "manager" | "employee" | "client"
-      company_role: "super_admin" | "admin" | "manager" | "standard" | "client"
+      company_role:
+        | "super_admin"
+        | "admin"
+        | "manager"
+        | "standard"
+        | "client"
+        | "owner"
+        | "viewer"
+        | "billing"
+        | "member"
       invitation_status: "pending" | "accepted" | "expired" | "cancelled"
       permission_type:
         | "users.view"
@@ -2802,7 +2871,17 @@ export const Constants = {
     Enums: {
       access_scope: ["company", "assigned", "department", "team"],
       app_role: ["admin", "manager", "employee", "client"],
-      company_role: ["super_admin", "admin", "manager", "standard", "client"],
+      company_role: [
+        "super_admin",
+        "admin",
+        "manager",
+        "standard",
+        "client",
+        "owner",
+        "viewer",
+        "billing",
+        "member",
+      ],
       invitation_status: ["pending", "accepted", "expired", "cancelled"],
       permission_type: [
         "users.view",

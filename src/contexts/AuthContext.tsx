@@ -2,11 +2,8 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
-// Legacy roles (for backwards compatibility)
-type LegacyRole = 'admin' | 'manager' | 'employee' | 'client';
-
-// New RBAC types
-export type CompanyRole = 'super_admin' | 'admin' | 'manager' | 'standard' | 'client';
+// New role types
+export type CompanyRole = 'owner' | 'admin' | 'manager' | 'member' | 'viewer' | 'billing';
 export type UserStatus = 'invited' | 'pending' | 'active' | 'suspended' | 'deactivated';
 export type AccessScope = 'company' | 'department' | 'team' | 'assigned';
 
@@ -55,22 +52,26 @@ interface AuthContextType {
   profile: Profile | null;
   company: Company | null;
   companyRole: UserCompanyRole | null;
+  allCompanyRoles: UserCompanyRole[];
+  allCompanies: Company[];
   permissions: PermissionType[];
   loading: boolean;
   
-  // Role checks (new RBAC)
+  // Role checks
+  isOwner: boolean;
   isSuperAdmin: boolean;
   isCompanyAdmin: boolean;
   isManager: boolean;
-  isStandard: boolean;
-  isClientRole: boolean;
+  isMember: boolean;
+  isViewer: boolean;
+  isBillingRole: boolean;
   isApproved: boolean;
   
-  // Legacy role checks (backwards compatibility)
+  // Legacy compatibility
   isAdmin: boolean;
   isEmployee: boolean;
   isClient: boolean;
-  roles: LegacyRole[];
+  roles: string[];
   
   // Permission check helper
   hasPermission: (permission: PermissionType) => boolean;
@@ -80,8 +81,12 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   
-  // Refresh data
+  // Multi-org
+  switchCompany: (companyId: string) => void;
   refreshUserData: () => Promise<void>;
+  
+  // Post-login routing
+  postLoginRoute: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -92,9 +97,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
   const [companyRole, setCompanyRole] = useState<UserCompanyRole | null>(null);
+  const [allCompanyRoles, setAllCompanyRoles] = useState<UserCompanyRole[]>([]);
+  const [allCompanies, setAllCompanies] = useState<Company[]>([]);
   const [permissions, setPermissions] = useState<PermissionType[]>([]);
-  const [legacyRoles, setLegacyRoles] = useState<LegacyRole[]>([]);
+  const [legacyRoles, setLegacyRoles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [postLoginRoute, setPostLoginRoute] = useState<string | null>(null);
 
   const applySession = (nextSession: Session | null) => {
     setSession(nextSession);
@@ -102,16 +110,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         applySession(session);
-        
-        // Defer fetching profile data
         if (session?.user) {
-          setTimeout(() => {
-            fetchUserData(session.user.id);
-          }, 0);
+          setTimeout(() => fetchUserData(session.user.id), 0);
         } else {
           resetState();
           setLoading(false);
@@ -119,7 +122,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     );
 
-    // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       applySession(session);
       if (session?.user) {
@@ -136,22 +138,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile(null);
     setCompany(null);
     setCompanyRole(null);
+    setAllCompanyRoles([]);
+    setAllCompanies([]);
     setPermissions([]);
     setLegacyRoles([]);
+    setPostLoginRoute(null);
   };
 
   const fetchUserData = async (userId: string) => {
     try {
       // Fetch profile
-      const { data: profileData, error: profileError } = await supabase
+      const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
 
-      if (profileError && profileError.code !== 'PGRST116') {
-        console.error('Error fetching profile:', profileError);
-      } else if (profileData) {
+      if (profileData) {
         setProfile({
           id: profileData.id,
           email: profileData.email,
@@ -161,71 +164,113 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
       }
 
-      // Fetch company role (new RBAC)
-      const { data: companyRoleData, error: companyRoleError } = await supabase
+      // Fetch ALL company roles (multi-org support)
+      const { data: companyRolesData } = await supabase
         .from('user_company_roles')
         .select('*, companies(*)')
-        .eq('user_id', userId)
-        .maybeSingle();
+        .eq('user_id', userId);
 
-      if (companyRoleError && companyRoleError.code !== 'PGRST116') {
-        console.error('Error fetching company role:', companyRoleError);
-      } else if (companyRoleData) {
-        setCompanyRole({
-          id: companyRoleData.id,
-          user_id: companyRoleData.user_id,
-          company_id: companyRoleData.company_id,
-          role: companyRoleData.role as CompanyRole,
-          status: companyRoleData.status as UserStatus,
-          access_scope: companyRoleData.access_scope as AccessScope,
-          last_login_at: companyRoleData.last_login_at
+      const roles: UserCompanyRole[] = [];
+      const companies: Company[] = [];
+
+      (companyRolesData || []).forEach((cr: any) => {
+        // Map legacy role names
+        let role = cr.role as CompanyRole;
+        if (role === 'super_admin' as any) role = 'owner';
+        if (role === 'standard' as any) role = 'member';
+
+        roles.push({
+          id: cr.id,
+          user_id: cr.user_id,
+          company_id: cr.company_id,
+          role,
+          status: cr.status as UserStatus,
+          access_scope: cr.access_scope as AccessScope,
+          last_login_at: cr.last_login_at
         });
-        
-        if (companyRoleData.companies) {
-          const companyData = companyRoleData.companies as any;
-          setCompany({
-            id: companyData.id,
-            name: companyData.name,
-            domain: companyData.domain,
-            logo_url: companyData.logo_url
+
+        if (cr.companies) {
+          const c = cr.companies as any;
+          companies.push({
+            id: c.id,
+            name: c.name,
+            domain: c.domain,
+            logo_url: c.logo_url
           });
         }
+      });
 
-        // Update last login
-        await supabase
-          .from('user_company_roles')
-          .update({ last_login_at: new Date().toISOString() })
-          .eq('id', companyRoleData.id);
+      setAllCompanyRoles(roles);
+      setAllCompanies(companies);
+
+      // Determine post-login route
+      const activeRoles = roles.filter(r => r.status === 'active');
+      if (activeRoles.length === 0) {
+        setPostLoginRoute('/onboarding');
+        setCompanyRole(null);
+        setCompany(null);
+      } else if (activeRoles.length === 1) {
+        setPostLoginRoute('/');
+        selectCompany(activeRoles[0], companies);
+      } else {
+        // Check if we have a saved preference
+        const savedCompanyId = localStorage.getItem('activeCompanyId');
+        const savedRole = savedCompanyId ? activeRoles.find(r => r.company_id === savedCompanyId) : null;
+        if (savedRole) {
+          setPostLoginRoute('/');
+          selectCompany(savedRole, companies);
+        } else {
+          setPostLoginRoute('/select-workspace');
+          // Default to first
+          selectCompany(activeRoles[0], companies);
+        }
       }
 
       // Fetch permissions
-      const { data: permissionsData, error: permissionsError } = await supabase
+      const { data: permissionsData } = await supabase
         .from('user_permissions')
         .select('permission, granted')
         .eq('user_id', userId)
         .eq('granted', true);
 
-      if (permissionsError) {
-        console.error('Error fetching permissions:', permissionsError);
-      } else if (permissionsData) {
+      if (permissionsData) {
         setPermissions(permissionsData.map(p => p.permission as PermissionType));
       }
 
-      // Fetch legacy roles (backwards compatibility)
-      const { data: rolesData, error: rolesError } = await supabase
+      // Fetch legacy roles
+      const { data: rolesData } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', userId);
 
-      if (rolesError) {
-        console.error('Error fetching legacy roles:', rolesError);
-      } else if (rolesData) {
-        setLegacyRoles(rolesData.map(r => r.role as LegacyRole));
+      if (rolesData) {
+        setLegacyRoles(rolesData.map(r => r.role));
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const selectCompany = (role: UserCompanyRole, companies: Company[]) => {
+    setCompanyRole(role);
+    const comp = companies.find(c => c.id === role.company_id);
+    setCompany(comp || null);
+    localStorage.setItem('activeCompanyId', role.company_id);
+
+    // Update last login
+    supabase
+      .from('user_company_roles')
+      .update({ last_login_at: new Date().toISOString() })
+      .eq('id', role.id)
+      .then(() => {});
+  };
+
+  const switchCompany = (companyId: string) => {
+    const role = allCompanyRoles.find(r => r.company_id === companyId);
+    if (role) {
+      selectCompany(role, allCompanies);
     }
   };
 
@@ -237,100 +282,70 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, fullName: string) => {
     const redirectUrl = `${window.location.origin}/`;
-    
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: redirectUrl,
-        data: {
-          full_name: fullName
-        }
+        data: { full_name: fullName }
       }
     });
-
     return { error };
   };
 
   const signIn = async (email: string, password: string) => {
-    // Prevent redirect races: while signing in, keep app in a loading state
-    // so AppLayout won't bounce back to /auth before the session/user state lands.
     setLoading(true);
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-
-    // Ensure app state updates immediately even if auth state events are delayed.
     if (!error) {
       applySession(data.session ?? null);
       if (data.user?.id) {
-        setTimeout(() => {
-          fetchUserData(data.user!.id);
-        }, 0);
+        setTimeout(() => fetchUserData(data.user!.id), 0);
       }
     } else {
       setLoading(false);
     }
-
     return { error };
   };
 
   const signOut = async () => {
+    localStorage.removeItem('activeCompanyId');
     await supabase.auth.signOut();
     resetState();
   };
 
-  // Permission check helper
   const hasPermission = (permission: PermissionType): boolean => {
-    // Super admin has all permissions
-    if (companyRole?.role === 'super_admin') return true;
-    // Admin has most permissions except billing/security settings
-    if (companyRole?.role === 'admin' && !permission.startsWith('settings.billing') && !permission.startsWith('settings.security')) {
-      return true;
-    }
+    const role = companyRole?.role;
+    if (role === 'owner') return true;
+    if (role === 'admin' && !permission.startsWith('settings.billing') && !permission.startsWith('settings.security')) return true;
+    if (role === 'billing' && (permission === 'settings.billing' || permission === 'financials.view')) return true;
+    if (role === 'viewer' && permission.endsWith('.view')) return true;
     return permissions.includes(permission);
   };
 
-  // New RBAC role checks
-  const isSuperAdmin = companyRole?.role === 'super_admin';
-  const isCompanyAdmin = companyRole?.role === 'super_admin' || companyRole?.role === 'admin';
-  const isManager = companyRole?.role === 'manager';
-  const isStandard = companyRole?.role === 'standard';
-  const isClientRole = companyRole?.role === 'client';
+  const role = companyRole?.role;
+  const isOwner = role === 'owner';
+  const isSuperAdmin = role === 'owner'; // backward compat
+  const isCompanyAdmin = role === 'owner' || role === 'admin';
+  const isManager = role === 'manager';
+  const isMember = role === 'member';
+  const isViewer = role === 'viewer';
+  const isBillingRole = role === 'billing';
   const isApproved = companyRole?.status === 'active' || profile?.status === 'active';
-
-  // Legacy role checks (backwards compatibility)
-  const isAdmin = legacyRoles.includes('admin') || isSuperAdmin || companyRole?.role === 'admin';
-  const isLegacyManager = legacyRoles.includes('manager') || isManager;
-  const isEmployee = legacyRoles.includes('employee') || isStandard;
-  const isClient = legacyRoles.includes('client') || isClientRole;
+  
+  // Legacy
+  const isAdmin = legacyRoles.includes('admin') || isOwner || role === 'admin';
+  const isEmployee = legacyRoles.includes('employee') || isMember;
+  const isClient = legacyRoles.includes('client');
 
   return (
     <AuthContext.Provider value={{
-      user,
-      session,
-      profile,
-      company,
-      companyRole,
-      permissions,
-      loading,
-      isSuperAdmin,
-      isCompanyAdmin,
-      isManager: isLegacyManager,
-      isStandard,
-      isClientRole,
-      isApproved,
-      isAdmin,
-      isEmployee,
-      isClient,
+      user, session, profile, company, companyRole, allCompanyRoles, allCompanies,
+      permissions, loading,
+      isOwner, isSuperAdmin, isCompanyAdmin, isManager, isMember, isViewer, isBillingRole, isApproved,
+      isAdmin, isEmployee, isClient,
       roles: legacyRoles,
-      hasPermission,
-      signUp,
-      signIn,
-      signOut,
-      refreshUserData
+      hasPermission, signUp, signIn, signOut, switchCompany, refreshUserData, postLoginRoute
     }}>
       {children}
     </AuthContext.Provider>

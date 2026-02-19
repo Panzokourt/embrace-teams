@@ -41,11 +41,12 @@ import { CompanyRole, UserStatus } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
 const roleLabels: Record<CompanyRole, string> = {
-  super_admin: 'Super Admin',
+  owner: 'Owner',
   admin: 'Admin',
   manager: 'Manager',
-  standard: 'Standard',
-  client: 'Client'
+  member: 'Member',
+  viewer: 'Viewer',
+  billing: 'Billing'
 };
 
 const statusLabels: Record<UserStatus, string> = {

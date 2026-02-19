@@ -1,164 +1,152 @@
 
-# Gantt / Timeline View στην Καρτέλα Έργου
+# Comments Section με @Mentions & Activity History στην Καρτέλα Έργου
 
-## Τι θα προσθέσουμε
+## Τι υπάρχει ήδη
 
-Ένα νέο tab **"Timeline"** στην καρτέλα κάθε έργου που εμφανίζει tasks και deliverables σε Gantt chart — οριζόντιες μπάρες σε χρονολογικό άξονα, χωρισμένες ανά Deliverable (grouping).
+Υπάρχει ένα `CommentsSection` component (`src/components/comments/CommentsSection.tsx`) που:
+- Φέρνει σχόλια από τον πίνακα `comments` (project_id / task_id / deliverable_id)
+- Εμφανίζει avatar, όνομα, χρόνο, edit/delete για τον συγγραφέα
+- **Δεν υποστηρίζει**: @mentions, rendering highlights, history/activity log, full-page tab
 
-Δεν χρειάζεται εξωτερική βιβλιοθήκη Gantt — θα υλοποιηθεί **custom με pure CSS/Tailwind + Recharts** (ήδη εγκατεστημένο) χρησιμοποιώντας `recharts` για το χρονολογικό άξονα και SVG bars για τα items.
-
----
-
-## Αρχιτεκτονική Gantt (Pure Custom — χωρίς εξωτερική βιβλιοθήκη)
-
-Το Gantt θα είναι ένα **scrollable grid** με:
-
-- **Αριστερά (fixed, ~240px)**: Λίστα με όνομα task/deliverable + badge κατάστασης
-- **Δεξιά (scrollable)**: Οριζόντιο grid ημερών/εβδομάδων με μπάρες
-
-```text
-┌──────────────────────────┬────────────────────────────────────────────────┐
-│  ΕΡΓΑΣΙΑ / ΠΑΡΑΔΟΤΕΟ     │  Ιαν │ Φεβ │ Μαρ │ Απρ │ Μαι │ Ιουν │ ...  │
-├──────────────────────────┼────────────────────────────────────────────────┤
-│  📦 Deliverable Α        │  ██████████████████████                       │
-│    └ Task 1              │     ████████████                               │
-│    └ Task 2              │              ████████████████                  │
-│  📦 Deliverable Β        │                       ██████████████████       │
-│    └ Task 3              │                       ██████                   │
-│  ⚡ Tasks χωρίς deliverable│                                  ████████   │
-└──────────────────────────┴────────────────────────────────────────────────┘
-```
+Το `ProjectDetail.tsx` **δεν έχει** ακόμα tab "Comments" — αυτό θα προσθέσουμε.
 
 ---
 
-## Νέο Component: `ProjectGanttView.tsx`
+## Τι θα φτιάξουμε
 
-**Νέο αρχείο**: `src/components/projects/ProjectGanttView.tsx`
+### 1. Αναβαθμισμένο `CommentsSection` με @Mentions
 
-### Props
-```typescript
-interface ProjectGanttViewProps {
-  projectId: string;
-  projectStartDate?: string | null;
-  projectEndDate?: string | null;
-}
-```
+**Textarea με mention detection**: Όταν ο χρήστης γράψει `@`, εμφανίζεται floating dropdown με λίστα χρηστών που έχουν πρόσβαση στο έργο. Επιλογή χρήστη → εισάγεται `@full_name` στο κείμενο.
 
-### Data Fetching
-- Tasks: `id, title, status, priority, start_date, due_date, deliverable_id, assigned_to` + assignee profile
-- Deliverables: `id, name, due_date, completed`
-- Grouping: Tasks ομαδοποιούνται κάτω από το deliverable τους, τα unassigned σε ξεχωριστή ομάδα
+**Rendering των mentions**: Το κείμενο του σχολίου αναλύεται για patterns `@Όνομα Χρήστη` και τα mentions εμφανίζονται ως χρωματιστά badges/chips (π.χ. `@Γιώργος Παπαδόπουλος` → μπλε badge).
 
-### Χρονολογικό Εύρος (Timeline Range)
-- **Αρχή**: `min(project.start_date, earliest task.start_date || task.due_date)` 
-- **Τέλος**: `max(project.end_date, latest task.due_date)` + buffer 2 εβδομάδες
-- Αν δεν υπάρχουν ημερομηνίες, default ±3 μήνες από σήμερα
-- **Granularity toggle**: Εβδομάδες (default) ή Μήνες (για μεγάλα έργα)
-
-### Οπτικά στοιχεία κάθε μπάρας
-
-| Τύπος | Χρώμα | Ύψος | Εικονίδιο |
-|-------|-------|------|-----------|
-| Deliverable | `bg-primary` | 6px | 📦 |
-| Task `todo` | `bg-muted-foreground/40` | 16px | ○ |
-| Task `in_progress` | `bg-primary` | 16px | ⟳ |
-| Task `review` | `bg-warning` | 16px | ! |
-| Task `internal_review` | `bg-violet-500` | 16px | 🏢 |
-| Task `client_review` | `bg-orange-500` | 16px | 🤝 |
-| Task `completed` | `bg-success` | 16px | ✓ |
-| Task overdue | `bg-destructive` | 16px | ⚠ |
-
-### Σήμανση "Σήμερα"
-Μια κατακόρυφη κόκκινη γραμμή που δείχνει πού βρισκόμαστε στο timeline.
-
-### Tooltip on hover
-Κάθε μπάρα δείχνει tooltip με:
-- Τίτλος
-- Start date → Due date
-- Status badge
-- Assignee (για tasks)
-- Progress %
-
----
-
-## Controls (φίλτρα πάνω από το Gantt)
+**Αποθήκευση**: Το `content` αποθηκεύεται ως plain text με `@full_name` — δεν χρειάζεται αλλαγή στη βάση.
 
 ```text
 ┌─────────────────────────────────────────────────────┐
-│ [Εβδομάδες | Μήνες]  [Φίλτρο Status ▼]  [Zoom ←→] │
+│  Γράψτε ένα σχόλιο...                               │
+│                                                     │
+│  @Γιώ...                                            │
+│  ┌────────────────────────────┐                     │
+│  │ 👤 Γιώργος Παπαδόπουλος  │  ← floating popup   │
+│  │ 👤 Γιώτα Νικολάου         │                     │
+│  └────────────────────────────┘                     │
 └─────────────────────────────────────────────────────┘
 ```
 
-- **Granularity toggle**: Εβδομάδες / Μήνες
-- **Status filter**: Checkbox multi-select για φιλτράρισμα tasks
-- **Scroll navigation**: Κουμπιά "< Πριν" / "Μετά >" ή scroll με mouse
-- **Κουμπί "Σήμερα"**: Κεντράρει το view στη σημερινή ημερομηνία
+### 2. History/Activity Tab στο panel
 
----
+Το νέο tab "Comments & Activity" θα έχει 2 sub-views:
+- **Σχόλια** (CommentsSection αναβαθμισμένο)
+- **Ιστορικό** (Activity Log — υπάρχουσες εγγραφές από `activity_log` για το project)
 
-## Τεχνική Υλοποίηση
-
-### Layout με CSS Grid
 ```text
-Το Gantt είναι ένα div με overflow-x:scroll
-  Header row: sticky top με τους μήνες/εβδομάδες  
-  Body rows: flex row με fixed αριστερό panel + scrolling bars area
-  Κάθε μπάρα: position:absolute, left% + width% βάσει ημερομηνιών
+┌─────────────────────────────────────────────────────┐
+│  [💬 Σχόλια (3)]  [📋 Ιστορικό]                     │
+│  ─────────────────────────────────────────────────  │
+│  Σχόλια view:                                        │
+│  👤 Γιώργης • 14 Φεβ, 14:32                         │
+│  Ελέγξτε @Μαρία Παπαδοπούλου το deliverable Α       │
+│  → @Μαρία γίνεται μπλε badge                        │
+│  [✎] [🗑]                                            │
+│  ─────────────────────────────────────────────────  │
+│  Ιστορικό view:                                      │
+│  ⚡ Task "Σχεδιασμός" → "Ολοκληρώθηκε" • Γ.Π.       │
+│  ⚡ Deliverable "Καμπάνια" δημιουργήθηκε • Μ.Ν.      │
+│  ⚡ Προϋπολογισμός άλλαξε σε €15,000 • Γ.Π.          │
+└─────────────────────────────────────────────────────┘
 ```
-
-### Υπολογισμός θέσης μπάρας
-```typescript
-// left% = (startDate - timelineStart) / totalDays * 100
-// width% = (endDate - startDate) / totalDays * 100
-const getBarStyle = (startDate: Date, endDate: Date) => ({
-  left: `${((startDate - timelineStart) / totalMs) * 100}%`,
-  width: `${((endDate - startDate) / totalMs) * 100}%`,
-  minWidth: '4px' // για tasks χωρίς start_date (μόνο due_date = 1 ημέρα)
-});
-```
-
-### Χειρισμός tasks χωρίς start_date
-Αν task έχει μόνο `due_date` (κοινή περίπτωση), εμφανίζεται ως **διαμαντένιο milestone marker** (◆) στο due_date αντί για μπάρα.
 
 ---
 
-## Αλλαγές στο `ProjectDetail.tsx`
+## Τεχνικές Αλλαγές
 
-Προσθήκη νέου tab "Timeline":
+### Αρχείο 1: `src/components/comments/CommentsSection.tsx` — Πλήρης αναβάθμιση
+
+**Νέο state & logic**:
+```typescript
+const [mentionQuery, setMentionQuery] = useState('');        // το string μετά το @
+const [mentionAnchor, setMentionAnchor] = useState<number>(-1); // cursor position
+const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+const [projectUsers, setProjectUsers] = useState<Profile[]>([]); // για το dropdown
+```
+
+**`handleTextChange`**: Ανιχνεύει αν ο cursor βρίσκεται μετά από `@` (χωρίς space) και ενεργοποιεί το dropdown.
+
+**`insertMention(user)`**: Αντικαθιστά το `@query` με `@full_name ` στο textarea.
+
+**`renderCommentContent(content)`**: 
+```typescript
+// Splits text on @mentions, wraps them in styled spans
+const parts = content.split(/(@[\w\sΆ-ώά-ω]+)/g);
+return parts.map(part => 
+  part.startsWith('@') 
+    ? <span className="text-primary font-medium bg-primary/10 px-1 rounded">{part}</span>
+    : part
+);
+```
+
+**Mention Dropdown**: Absolute-positioned div κάτω από το textarea, φιλτράρει `projectUsers` βάσει `mentionQuery`.
+
+**Fetch project users**: Νέο prop `projectId` (ήδη υπάρχει) → query `project_user_access + profiles` για να φέρει τους χρήστες με πρόσβαση στο project.
+
+### Αρχείο 2: `src/pages/ProjectDetail.tsx` — Νέο Tab
+
+Προσθήκη tab "Σχόλια & Ιστορικό" με δύο sub-tabs (Radix Tabs εσωτερικά):
 
 ```typescript
 // Στο TabsList:
-<TabsTrigger value="timeline">
-  <GanttChartSquare className="h-4 w-4 mr-1.5" />
-  Timeline
+<TabsTrigger value="comments">
+  <MessageSquare className="h-4 w-4 mr-1.5" />
+  Σχόλια
 </TabsTrigger>
 
 // Νέο TabsContent:
-<TabsContent value="timeline">
-  <ProjectGanttView
-    projectId={project.id}
-    projectStartDate={project.start_date}
-    projectEndDate={project.end_date}
-  />
+<TabsContent value="comments">
+  <ProjectCommentsAndHistory projectId={project.id} />
 </TabsContent>
 ```
+
+### Αρχείο 3: Νέο `src/components/projects/ProjectCommentsAndHistory.tsx`
+
+Wrapper component με εσωτερικά tabs:
+- **Tab "Σχόλια"**: `<CommentsSection projectId={projectId} />` (αναβαθμισμένο)
+- **Tab "Ιστορικό"**: Query `activity_log` φιλτραρισμένο με `entity_id = projectId` + activity logs για tasks/deliverables του project
+
+```typescript
+// Activity log query:
+const { data } = await supabase
+  .from('activity_log')
+  .select('*, profiles:user_id(full_name, email)')
+  .or(`entity_id.eq.${projectId},and(entity_type.eq.task,...)`)
+  .order('created_at', { ascending: false })
+  .limit(50);
+```
+
+**Εμφάνιση activity**:
+- Εικονίδιο ανά `entity_type` (task → CheckSquare, deliverable → Package, project → FolderOpen)
+- Verb ανά `action` (created → "δημιουργήθηκε", updated → "ενημερώθηκε", deleted → "διαγράφηκε")
+- Timestamp σχετικός (π.χ. "πριν 2 ώρες")
 
 ---
 
 ## Αρχεία που αλλάζουν
 
-| Αρχείο | Αλλαγή |
-|--------|--------|
-| `src/components/projects/ProjectGanttView.tsx` | **Νέο αρχείο** — πλήρες Gantt component |
-| `src/pages/ProjectDetail.tsx` | Προσθήκη tab "Timeline" + import |
+| Αρχείο | Τύπος αλλαγής |
+|--------|---------------|
+| `src/components/comments/CommentsSection.tsx` | Αναβάθμιση: @mentions detection, dropdown, render highlights, fetch project users |
+| `src/components/projects/ProjectCommentsAndHistory.tsx` | **Νέο αρχείο** — wrapper με tabs: Comments + Activity History |
+| `src/pages/ProjectDetail.tsx` | Προσθήκη tab "Σχόλια" + import |
+
+**Δεν χρειάζεται migration** — το `content` text field στα `comments` χωράει ήδη @mentions ως plain text.
 
 ---
 
 ## UX Λεπτομέρειες
 
-- **Empty state**: Αν δεν υπάρχουν tasks/deliverables με ημερομηνίες, εμφανίζεται friendly message
-- **Loading skeleton**: Animated rows ενώ φορτώνει
-- **Horizontal scroll**: Smooth, με scrollbar εμφανή
-- **Mobile**: Σε κινητό εμφανίζει μόνο τη λίστα tasks ταξινομημένη κατά due_date (fallback)
-- **Task click**: Ανοίγει το task detail page (navigate `/tasks/:id`)
-
+- **Mentions**: Πατώντας `Escape` ή `space` κλείνει το dropdown χωρίς εισαγωγή
+- **Keyboard navigation**: ↑↓ για navigation στο dropdown, `Enter` για επιλογή
+- **Edit mode**: Το edit textarea υποστηρίζει κι αυτό @mentions
+- **History**: Εμφανίζεται ιστορικό μόνο για αλλαγές που σχετίζονται με το έργο (project + tasks + deliverables)
+- **Relative time**: "πριν 2 ώρες", "χθες", "14 Φεβ" (χρησιμοποιώντας `formatDistanceToNow` από date-fns)
+- **Realtime**: Το history ενημερώνεται και αυτό σε realtime (υπάρχει ήδη το `activity_log` realtime subscription)

@@ -159,7 +159,7 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-hidden flex flex-col">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-hidden flex flex-col min-h-0">
           <ScrollArea className="flex-1 pr-4">
             <div className="space-y-6 pb-4">
               {/* Email */}

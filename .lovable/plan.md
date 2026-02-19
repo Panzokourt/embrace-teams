@@ -1,80 +1,79 @@
 
 
-# Fix: Google OAuth Onboarding Bypass (Robust Solution)
+# Reports Section -- Κεντρικό Hub Αναφορών
 
-## Root Cause
+## Επισκόπηση
 
-The `<Navigate to="/onboarding" />` component in `AppLayout` is being interrupted by re-renders from concurrent `fetchUserData` calls. When Google OAuth completes:
-1. `onAuthStateChange` fires and calls `fetchUserData` via `setTimeout`
-2. `getSession` also fires and calls `fetchUserData` directly
-3. These concurrent state updates cause re-renders that can interrupt React Router's programmatic navigation before it completes
+Νέο ανεξάρτητο section "Αναφορές" (`/reports`) στο sidebar, με πλήρες σύστημα reporting που καλύπτει όλους τους τομείς της εφαρμογής. Ο χρήστης θα μπορεί να βλέπει live dashboards και να εξάγει αναφορές σε PDF, Excel και CSV.
 
-The `<Navigate>` component schedules navigation internally via `useEffect`, but a re-render can cancel it before it takes effect.
+## Δομή Tabs
 
-## Solution: 3 Layers of Protection
+| Tab | Περιεχόμενο |
+|-----|-------------|
+| **Επισκόπηση** | Executive summary με KPIs, γραφήματα τάσεων, top-level μετρικές |
+| **Οικονομικά** | P&L ανά πελάτη/έργο/μήνα, aging analysis, revenue trends, expense breakdown |
+| **Έργα** | Project status breakdown, progress tracking, budget vs actual, timeline adherence |
+| **Πελάτες** | Revenue ανά πελάτη, project count, profitability ranking |
+| **Ομάδα** | Task completion rates, workload distribution, time tracking summaries |
 
-### 1. AppLayout.tsx - Hard redirect instead of Navigate
+## Features
 
-Replace `<Navigate to="/onboarding" />` with `window.location.replace('/onboarding')` which is an immediate browser-level redirect that cannot be interrupted by React re-renders.
+- **Global Filters**: Περίοδος (3/6/12 μήνες, custom range), Πελάτης, Έργο
+- **Live Dashboards**: Recharts γραφήματα (Area, Bar, Pie, Line) σε κάθε tab
+- **Export σε πολλαπλά formats**:
+  - **Excel** (.xls) -- μέσω του υπάρχοντος `exportToExcel`
+  - **CSV** -- μέσω του υπάρχοντος `exportToCSV`
+  - **PDF** -- μέσω `window.print()` με print-optimized CSS
+- **Saved Reports**: Δυνατότητα αποθήκευσης report configurations στο localStorage
+- **Responsive**: Πλήρης υποστήριξη mobile/tablet
 
-```typescript
-// Instead of <Navigate to="/onboarding" replace />
-if (!companyRole) {
-  window.location.replace('/onboarding');
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-    </div>
-  );
-}
-```
+## Τεχνικές Αλλαγές
 
-### 2. AuthContext.tsx - Prevent double fetchUserData
+### Νέα Αρχεία
 
-Add a guard to prevent concurrent `fetchUserData` calls from `onAuthStateChange` and `getSession`:
+| Αρχείο | Περιγραφή |
+|--------|-----------|
+| `src/pages/Reports.tsx` | Ανανεωμένη κεντρική σελίδα -- wrapper με tabs, global filters, export menu |
+| `src/components/reports/ReportsOverview.tsx` | Tab: Executive summary KPIs & trends |
+| `src/components/reports/ReportsFinancial.tsx` | Tab: Οικονομικά -- P&L, aging, revenue/expense charts |
+| `src/components/reports/ReportsProjects.tsx` | Tab: Έργα -- status, budget vs actual, timeline |
+| `src/components/reports/ReportsClients.tsx` | Tab: Πελάτες -- revenue ranking, profitability |
+| `src/components/reports/ReportsTeam.tsx` | Tab: Ομάδα -- workload, task completion, time tracking |
+| `src/components/reports/ReportExportMenu.tsx` | Dropdown menu εξαγωγής (PDF/Excel/CSV) |
+| `src/components/reports/ReportFilters.tsx` | Global filters component (period, client, project) |
+| `src/hooks/useReportsData.ts` | Custom hook -- single data fetch για όλα τα report tabs |
 
-```typescript
-const fetchingRef = useRef(false);
+### Τροποποιήσεις Υπαρχόντων
 
-const fetchUserData = async (userId: string) => {
-  if (fetchingRef.current) return;
-  fetchingRef.current = true;
-  try {
-    // ... existing fetch logic
-  } finally {
-    fetchingRef.current = false;
-    setLoading(false);
-  }
-};
-```
+| Αρχείο | Αλλαγή |
+|--------|--------|
+| `src/components/layout/AppSidebar.tsx` | Προσθήκη "Αναφορές" link με εικονίδιο `BarChart3` στο sidebar |
+| `src/App.tsx` | Αφαίρεση redirect `/reports` -> `/financials`, νέο route `/reports` -> Reports page |
+| `src/index.css` | Print-specific CSS (`@media print`) για καθαρή εξαγωγή PDF |
 
-### 3. Auth.tsx - Google OAuth redirect_uri
+### Data Flow
 
-Change the Google OAuth `redirect_uri` from `window.location.origin` (root `/`) to `window.location.origin + '/onboarding'`. This sends new users directly to the onboarding page, bypassing AppLayout entirely.
+Ο hook `useReportsData` θα κάνει ένα batch fetch από:
+- `projects` (με client join)
+- `invoices` (με client & project joins)
+- `expenses` (με project join)
+- `tasks` (με assignee & project joins)
+- `clients`
+- `time_entries` (για team reporting)
+- `profiles` (για team member names)
 
-The Onboarding page already handles existing users via `auto_onboard_user` returning `already_member`, which redirects to `/`.
+Τα δεδομένα φιλτράρονται client-side βάσει των global filters (period, client, project) και περνάνε σε κάθε tab component.
 
-### 4. Database - Clean up test user
+### Export Functionality
 
-Delete the existing test user `advize.kourt@gmail.com` entries so a fresh test can be performed.
+Το `ReportExportMenu` θα προσφέρει 3 επιλογές:
+1. **PDF**: `window.print()` με print-optimized layout (ήδη υποστηρίζεται, θα προστεθεί print CSS)
+2. **Excel**: Χρήση `exportToExcel` από `src/utils/exportUtils.ts` -- δημιουργεί HTML table που ανοίγει στο Excel
+3. **CSV**: Χρήση `exportToCSV` από `src/utils/exportUtils.ts` -- με BOM για ελληνικούς χαρακτήρες
 
----
+Κάθε tab θα εκθέτει μια `getExportData()` function που επιστρέφει τα relevant δεδομένα σε tabular format για export.
 
-## Technical Changes
+### Sidebar Position
 
-| File | Change |
-|------|--------|
-| `src/components/layout/AppLayout.tsx` | Replace `<Navigate>` with `window.location.replace()` for the `!companyRole` case |
-| `src/contexts/AuthContext.tsx` | Add `useRef` guard to prevent concurrent `fetchUserData` calls |
-| `src/pages/Auth.tsx` | Change Google OAuth `redirect_uri` to `window.location.origin + '/onboarding'` |
-| Database | Clean up `advize.kourt@gmail.com` profile, roles, requests for fresh test |
-
-## Testing
-
-After implementation:
-1. Sign out completely
-2. Clear localStorage
-3. Go to `/auth`
-4. Click "Google sign in" with `advize.kourt@gmail.com`
-5. Should land on `/onboarding`, auto_onboard runs, and since it's a gmail.com address, shows the manual onboarding options
+Η "Αναφορές" θα τοποθετηθεί μετά το "Λογιστήριο" στο κύριο navigation, με permission `financials.view` (ίδιο με Λογιστήριο, καθώς τα reports αφορούν κυρίως οικονομικά & project data).
 

@@ -1,72 +1,49 @@
 
-# Αυτοματοποίηση Εγγραφής & Διαχείριση Join Requests
 
-## Πώς θα λειτουργεί
+# Fix: Google Sign-up Onboarding Not Triggering
 
-### Ροή εγγραφής (αυτόματη)
+## Πρόβλημα
 
-```text
-Νέος χρήστης εγγράφεται
-       |
-       v
-  Είναι εταιρικό email; (όχι gmail/yahoo κλπ)
-      / \
-    Ναι  Όχι --> Onboarding (manual: create org ή invite)
-     |
-     v
-  Υπάρχει εταιρεία με αυτό το domain;
-      / \
-    Ναι  Όχι --> Auto-create εταιρεία, χρήστης = Owner
-     |
-     v
-  Auto-create Join Request
-  --> Μήνυμα "Σε αναμονή έγκρισης"
-```
+Μετά την εγγραφή με Google, ο χρήστης επιστρέφει στο `/` (Dashboard) αντί να περάσει από το `/onboarding`. Το `AppLayout` δεν ελέγχει αν ο χρήστης χρειάζεται onboarding, οπότε η `auto_onboard_user` δεν καλείται ποτέ.
 
-### Στο HR: Tab "Αιτήματα Ένταξης"
-- Εμφανίζει join_requests με status = pending
-- Ο Admin/Owner μπορεί να Εγκρίνει (δημιουργεί user_company_roles με member) ή Απορρίψει
-- Ειδοποίηση στο NotificationBell για νέα αιτήματα
+## Λύση
+
+Δύο αλλαγές:
+
+### 1. AppLayout: Redirect σε onboarding αν δεν υπάρχει company role
+
+Στο `AppLayout.tsx`, θα προστεθεί έλεγχος `postLoginRoute`. Αν ο χρήστης χρειάζεται onboarding ή workspace selection, θα γίνεται redirect αντί να δείχνει το Dashboard.
+
+### 2. Fix info@advize.gr: Επαναφορά κατάστασης
+
+Ο χρήστης `info@advize.gr` υπάρχει ήδη στη βάση χωρίς company role. Θα τρέξουμε SQL για να καθαρίσουμε την κατάσταση ώστε το onboarding να τρέξει σωστά στο επόμενο login.
 
 ---
 
 ## Τεχνικές Αλλαγές
 
-### 1. Database: Νέα function `auto_onboard_user`
-Νέα SQL function (security definer) που καλείται κατά το onboarding:
-- Δέχεται user_id
-- Ελέγχει domain του email
-- Αν δεν υπάρχει εταιρεία: δημιουργεί εταιρεία + owner role
-- Αν υπάρχει: δημιουργεί join_request
-- Επιστρέφει jsonb με `action: 'created_company' | 'join_requested' | 'personal_email'`
+| Αρχείο | Αλλαγή |
+|--------|--------|
+| `src/components/layout/AppLayout.tsx` | Προσθήκη ελέγχου `postLoginRoute` -- αν είναι `/onboarding` ή `/select-workspace`, redirect εκεί αντί να δείξει το Dashboard |
+| Database SQL | UPDATE profiles SET status = 'pending' WHERE email = 'info@advize.gr' (ώστε το auto_onboard να τρέξει σωστά) |
 
-### 2. Onboarding.tsx: Auto-trigger
-- Κατά το mount, αν ο χρήστης δεν έχει εταιρεία, καλεί `auto_onboard_user`
-- Αν `action = created_company`: redirect στο `/`
-- Αν `action = join_requested`: δείχνει pending screen
-- Αν `action = personal_email`: δείχνει τις manual επιλογές (όπως σήμερα)
+### Αλλαγή στο AppLayout.tsx
 
-### 3. HR Page: Ενότητα Join Requests
-- Νέο component `JoinRequestsManager.tsx`
-- Πίνακας με: Ονοματεπώνυμο, Email, Ημερομηνία αιτήματος, Status
-- Κουμπιά: Έγκριση (insert user_company_roles + update status approved) / Απόρριψη (update status rejected)
-- Εμφάνιση μόνο σε Admin/Owner
-- Badge στο HR tab αν υπάρχουν pending requests
+```typescript
+export default function AppLayout() {
+  const navigate = useNavigate();
+  const { user, loading, isApproved, postLoginRoute } = useAuth();
+  // ...
 
-### 4. AuthContext update
-- Μετά το login, αν δεν υπάρχουν company roles ΑΛΛΑ υπάρχει pending join_request, redirect σε pending screen αντί onboarding
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/auth');
+    }
+    // Redirect to onboarding/workspace if needed
+    if (!loading && user && postLoginRoute && postLoginRoute !== '/') {
+      navigate(postLoginRoute, { replace: true });
+    }
+  }, [user, loading, navigate, postLoginRoute]);
+```
 
-### Αρχεία
-
-| Αρχείο | Ενέργεια |
-|--------|----------|
-| Migration SQL | Νέα function `auto_onboard_user` |
-| `src/pages/Onboarding.tsx` | Auto-trigger logic κατά mount |
-| `src/contexts/AuthContext.tsx` | Check pending join requests |
-| `src/components/hr/JoinRequestsManager.tsx` | Νέο - πίνακας αιτημάτων |
-| `src/pages/HR.tsx` | Προσθήκη tab/section join requests |
-
-### Ασφάλεια
-- Η `auto_onboard_user` είναι security definer -- δεν χρειάζεται service role
-- Τα join_requests έχουν ήδη RLS policies (users create own, admins view/manage)
-- Η έγκριση γίνεται μόνο μέσω admin check στο component + RLS στη βάση
+Αυτό εξασφαλίζει ότι ακόμα και αν ο χρήστης επιστρέψει στο `/` μετά από Google OAuth, θα ανακατευθυνθεί στο `/onboarding` όπου θα τρέξει η `auto_onboard_user` αυτόματα.

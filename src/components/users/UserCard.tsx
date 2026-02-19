@@ -39,11 +39,12 @@ interface UserCardProps {
 }
 
 const ROLE_CONFIG: Record<CompanyRole, { label: string; icon: React.ReactNode; className: string }> = {
-  super_admin: { label: 'Super Admin', icon: <Crown className="h-3 w-3" />, className: 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-600 border-amber-500/30' },
+  owner: { label: 'Owner', icon: <Crown className="h-3 w-3" />, className: 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-600 border-amber-500/30' },
   admin: { label: 'Admin', icon: <Shield className="h-3 w-3" />, className: 'bg-destructive/10 text-destructive border-destructive/20' },
   manager: { label: 'Manager', icon: <Briefcase className="h-3 w-3" />, className: 'bg-primary/10 text-primary border-primary/20' },
-  standard: { label: 'Standard', icon: <Users className="h-3 w-3" />, className: 'bg-secondary text-secondary-foreground border-border' },
-  client: { label: 'Client', icon: <Users className="h-3 w-3" />, className: 'bg-success/10 text-success border-success/20' },
+  member: { label: 'Member', icon: <Users className="h-3 w-3" />, className: 'bg-secondary text-secondary-foreground border-border' },
+  viewer: { label: 'Viewer', icon: <Users className="h-3 w-3" />, className: 'bg-muted text-muted-foreground border-border' },
+  billing: { label: 'Billing', icon: <Users className="h-3 w-3" />, className: 'bg-success/10 text-success border-success/20' },
 };
 
 const STATUS_CONFIG: Record<UserStatus, { label: string; icon: React.ReactNode; className: string }> = {
@@ -57,7 +58,7 @@ const STATUS_CONFIG: Record<UserStatus, { label: string; icon: React.ReactNode; 
 export function UserCard({ user, onEditPermissions, onEditUser, onChangeRole, onChangeStatus }: UserCardProps) {
   const { isSuperAdmin, user: currentUser } = useAuth();
   const isCurrentUser = currentUser?.id === user.user_id;
-  const isSuperAdminUser = user.role === 'super_admin';
+  const isSuperAdminUser = user.role === 'owner';
   const canModify = (isSuperAdmin || !isSuperAdminUser) && !isCurrentUser;
 
   const getInitials = (name: string | null) => {

@@ -77,7 +77,7 @@ export const PERMISSION_CATEGORIES = {
 } as const;
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<CompanyRole, PermissionType[]> = {
-  super_admin: ALL_PERMISSIONS,
+  owner: ALL_PERMISSIONS,
   admin: ALL_PERMISSIONS.filter(p => !p.startsWith('settings.billing') && !p.startsWith('settings.security')),
   manager: [
     'clients.view', 'projects.view', 'projects.edit',
@@ -87,18 +87,19 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<CompanyRole, PermissionType[]> = {
     'comments.view', 'comments.create', 'comments.edit', 'comments.delete',
     'reports.view'
   ],
-  standard: [
+  member: [
     'clients.view', 'projects.view',
     'tasks.view', 'tasks.create', 'tasks.edit',
     'deliverables.view',
     'files.view', 'files.upload',
     'comments.view', 'comments.create', 'comments.edit'
   ],
-  client: [
-    'projects.view',
-    'deliverables.view', 'deliverables.approve',
-    'files.view',
-    'comments.view', 'comments.create'
+  viewer: [
+    'clients.view', 'projects.view', 'tasks.view', 'deliverables.view',
+    'files.view', 'comments.view', 'reports.view'
+  ],
+  billing: [
+    'settings.billing', 'financials.view', 'financials.create', 'financials.edit'
   ]
 };
 

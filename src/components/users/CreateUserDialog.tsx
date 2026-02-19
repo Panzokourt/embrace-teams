@@ -41,8 +41,9 @@ interface CreateUserDialogProps {
 const ROLE_OPTIONS: { value: CompanyRole; label: string }[] = [
   { value: 'admin', label: 'Admin' },
   { value: 'manager', label: 'Manager' },
-  { value: 'standard', label: 'Standard' },
-  { value: 'client', label: 'Client' },
+  { value: 'member', label: 'Member' },
+  { value: 'viewer', label: 'Viewer' },
+  { value: 'billing', label: 'Billing' },
 ];
 
 interface Team {
@@ -63,7 +64,7 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
   const [department, setDepartment] = useState('');
   const [phone, setPhone] = useState('');
   const [reportsTo, setReportsTo] = useState('none');
-  const [role, setRole] = useState<CompanyRole>('standard');
+  const [role, setRole] = useState<CompanyRole>('member');
   const [accessScope, setAccessScope] = useState<AccessScope>('assigned');
   const [selectedPermissions, setSelectedPermissions] = useState<PermissionType[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -74,13 +75,13 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
     if (open) {
       fetchTeamsAndUsers();
       // Set default permissions for standard role
-      setSelectedPermissions(DEFAULT_ROLE_PERMISSIONS.standard);
+      setSelectedPermissions(DEFAULT_ROLE_PERMISSIONS.member);
     }
   }, [open]);
 
   // Update permissions when role changes
   useEffect(() => {
-    if (role !== 'super_admin') {
+    if (role !== 'owner') {
       setSelectedPermissions(DEFAULT_ROLE_PERMISSIONS[role]);
     }
   }, [role]);
@@ -112,9 +113,9 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
     setDepartment('');
     setPhone('');
     setReportsTo('none');
-    setRole('standard');
+    setRole('member');
     setAccessScope('assigned');
-    setSelectedPermissions(DEFAULT_ROLE_PERMISSIONS.standard);
+    setSelectedPermissions(DEFAULT_ROLE_PERMISSIONS.member);
   };
 
   const handleSubmit = async () => {

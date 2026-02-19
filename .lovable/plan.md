@@ -1,72 +1,172 @@
 
+# Enterprise Auth & Multi-tenant System
 
-# Αναβάθμιση My Work - 6 Features
+Πλήρης αναδιάρθρωση του συστήματος authentication, organizations και ρόλων σε enterprise-grade αρχιτεκτονική.
 
-## 1. Εμφάνιση ημερομηνιών (start_date & due_date) στα task rows
+---
 
-Προσθήκη στο `TaskRow` component: εμφάνιση start_date -> due_date σε μορφή `d/MM - d/MM` δίπλα στο project name ή σε ξεχωριστή στήλη.
+## Φάση 1: Database Migration
 
-## 2. Drag & Drop σειρά εργασιών σήμερα
+### 1A. Αλλαγή Role Enum
+Αντικατάσταση του `company_role` enum:
+- `super_admin` -> `owner`
+- `admin` -> παραμένει
+- `manager` -> παραμένει
+- `standard` -> `member`
+- `client` -> αφαιρείται
+- Νέοι: `viewer`, `billing`
 
-Μετατροπή του "Tasks Σήμερα" σε reorderable λίστα:
-- Χρήση `@dnd-kit/sortable` (ήδη εγκατεστημένο) για drag & drop μεταξύ γραμμών
-- Αποθήκευση σειράς τοπικά σε `localStorage` (key: `my-work-task-order-{userId}-{date}`) ώστε να μην χρειάζεται DB migration
-- Drag handle (GripVertical icon) στην αρχή κάθε γραμμής
-- Η σειρά καθορίζει πώς ο χρήστης σκοπεύει να δουλέψει, ανεξάρτητα από ημερομηνίες
+Ενημέρωση υπάρχοντων δεδομένων (`UPDATE user_company_roles SET role = 'owner' WHERE role = 'super_admin'` κτλ).
 
-## 3. Section εγκρίσεων tasks (νέο πεδίο `approver`)
+### 1B. Νέος πίνακας `join_requests`
+Για αιτήματα εισόδου μέσω corporate email domain:
+- `id`, `user_id`, `company_id`, `status` (pending/approved/rejected), `reviewed_by`, `reviewed_at`, `created_at`
+- RLS: χρήστης βλέπει τα δικά του, admin βλέπει τα εταιρικά
 
-### Database Migration
-- Προσθήκη στήλης `approver` (uuid, nullable) στον πίνακα `tasks`
-- RLS: ο approver μπορεί να βλέπει tasks που του έχουν ανατεθεί για έγκριση
+### 1C. Επέκταση πίνακα `companies`
+Προσθήκη στηλών:
+- `domain_verified` (boolean, default false)
+- `sso_enforced` (boolean, default false)
+- `allow_domain_requests` (boolean, default true)
 
-### UI
-- Νέο section "Εκκρεμείς Εγκρίσεις Tasks" στο My Work
-- Fetch tasks όπου `approver = user.id` και `status = 'review'`
-- Κουμπιά Approve (αλλαγή status σε completed) / Reject (αλλαγή status πίσω σε in_progress)
-- Εμφανίζεται μόνο αν υπάρχουν εκκρεμή
+### 1D. Ενημέρωση security functions
+Αντικατάσταση αναφορών σε `super_admin` με `owner` σε όλες τις DB functions (`is_super_admin`, `is_company_admin`, κτλ).
 
-## 4. Task Sidebar (Sheet) αντί navigation
+---
 
-- Κλικ σε task ανοίγει Sheet (δεξιά πλαϊνή μπάρα) με τις βασικές πληροφορίες του task
-- Μέσα στο Sheet: τίτλος, status, priority, dates, project, assignee, description, progress
-- Κουμπί "Άνοιγμα σελίδας" μέσα στο Sheet που κάνει navigate στο `/tasks/:id`
-- Χρήση του υπάρχοντος Sheet component (`@/components/ui/sheet`)
+## Φάση 2: Auth Context & Routing
 
-## 5. Πλήρη Quick Links
+### 2A. Ανανέωση AuthContext
+- Ενημέρωση type `CompanyRole` σε: `'owner' | 'admin' | 'manager' | 'member' | 'viewer' | 'billing'`
+- Νέα post-login λογική:
+  - 0 organizations -> redirect `/onboarding`
+  - 1 organization -> redirect `/` (κατευθείαν)
+  - 2+ organizations -> redirect `/select-workspace`
+- Αποθήκευση `activeCompanyId` στο state
+- `switchCompany(companyId)` function
 
-Προσθήκη στο Quick Links grid (ίδιες επιλογές με το QuickActionButton):
-- Νέο Έργο, Νέο Task (υπάρχουν ήδη)
-- Χρόνος, Άδεια, Ημερολόγιο (υπάρχουν ήδη)
-- Creative Brief, Digital Campaign Brief, Contact Report, Website Brief, Event Brief, Communication Brief
-- Αναφορές, Αρχεία
+### 2B. Νέες σελίδες / Routes
 
-## 6. AI Chat Agent
+| Route | Σελίδα | Περιγραφή |
+|-------|--------|-----------|
+| `/auth` | Auth (ανανεωμένη) | Login/Signup + Google OAuth |
+| `/onboarding` | Onboarding | Create org ή accept invite ή domain join |
+| `/select-workspace` | WorkspaceSelector | Επιλογή organization |
+| `/accept-invite/:token` | AcceptInvite | Αποδοχή πρόσκλησης |
+| `/settings/organization` | OrgSettings | Ρυθμίσεις εταιρείας |
+| `/settings/members` | MembersManagement | Διαχείριση μελών |
+| `/settings/security` | SecuritySettings | Domain, SSO, sessions |
 
-- Νέο collapsible/expandable chat widget στο κάτω μέρος ή ως floating panel
-- Edge function `my-work-ai-chat` που χρησιμοποιεί Lovable AI (google/gemini-3-flash-preview)
-- Streaming responses
-- System prompt: ο agent γνωρίζει τα tasks, projects και δεδομένα του χρήστη
-- Δυνατότητες: αναζήτηση, δημιουργία tasks, σύνοψη εργασιών
-- Floating chat button δίπλα στο FAB
+---
 
-## Τεχνικές λεπτομέρειες
+## Φάση 3: Auth Page (ανανέωση)
 
-### Αρχεία
+- Login form (email + password)
+- Signup form (name + email + password)
+- Google OAuth button (μέσω `lovable.auth.signInWithOAuth("google")`)
+- Microsoft button disabled με "Coming soon" label
+- Branding Olseny (logo, χρώματα)
+- Redirect logic μετά το login βάσει αριθμού organizations
 
-| Αρχείο | Ενέργεια |
-|--------|----------|
-| `src/pages/MyWork.tsx` | Πλήρης αναβάθμιση (drag & drop, sidebar, approvals, dates, quick links) |
-| `supabase/functions/my-work-ai-chat/index.ts` | Νέο edge function για AI chat |
-| DB Migration | Προσθήκη `approver` στον πίνακα `tasks` |
+---
+
+## Φάση 4: Onboarding Flow
+
+Σελίδα με 3 επιλογές:
+
+**A) Δημιουργία Εταιρείας**
+- Φόρμα: Company name, domain
+- Ο χρήστης γίνεται `owner`
+- Auto-set domain από email αν είναι εταιρικό
+
+**B) Αποδοχή Πρόσκλησης**
+- Input token ή αυτόματα αν ήρθε από link
+- Κλήση `accept_invitation(token)` (ήδη υπάρχει)
+
+**C) Αίτημα εισόδου βάσει domain**
+- Αν το email domain ταιριάζει με εταιρεία που έχει `allow_domain_requests = true`
+- Δημιουργείται εγγραφή στο `join_requests` με status `pending`
+- Μήνυμα "Το αίτημά σας στάλθηκε στον admin"
+
+---
+
+## Φάση 5: Workspace Selector
+
+- Λίστα εταιρειών στις οποίες ανήκει ο χρήστης
+- Κάρτες με logo, όνομα, ρόλος
+- Κλικ -> `switchCompany(id)` -> redirect `/`
+- Κουμπί "Δημιουργία νέας εταιρείας"
+
+---
+
+## Φάση 6: Organization Settings
+
+### Members Management
+- Πίνακας μελών με ρόλο, status, last login
+- Αλλαγή ρόλου (Owner, Admin, Manager, Member, Viewer, Billing)
+- Suspend/Deactivate
+- Pending join requests (approve/reject)
+- Invitations list με ανάκληση
+
+### Domain & Security Settings
+- Domain verification (εμφάνιση domain, toggle `allow_domain_requests`)
+- SSO enforcement toggle
+- Active sessions listing (placeholder)
+
+### Organization General
+- Όνομα, logo, domain
+- Ownership transfer (Owner only)
+- Danger zone: delete organization
+
+---
+
+## Φάση 7: Permission Updates
+
+Ενημέρωση `hasPermission` function:
+- `owner`: πλήρης πρόσβαση σε ΟΛΑ
+- `admin`: πρόσβαση σε όλα εκτός billing/SSO
+- `manager`: projects, tasks, deliverables
+- `member`: κανονική χρήση assigned
+- `viewer`: μόνο view permissions
+- `billing`: μόνο `settings.billing`, `financials.view`
+
+Ενημέρωση sidebar visibility βάσει νέων ρόλων.
+
+---
+
+## Τεχνικές Λεπτομέρειες
+
+### Αρχεία που δημιουργούνται
+
+| Αρχείο | Περιγραφή |
+|--------|-----------|
+| `src/pages/Onboarding.tsx` | Onboarding flow (create/join/request) |
+| `src/pages/WorkspaceSelector.tsx` | Επιλογή workspace |
+| `src/pages/AcceptInvite.tsx` | Αποδοχή πρόσκλησης |
+| `src/pages/OrganizationSettings.tsx` | Ρυθμίσεις organization |
+| `src/components/auth/GoogleAuthButton.tsx` | Google OAuth button |
+| DB Migration SQL | Enum changes, new table, company columns |
+
+### Αρχεία που τροποποιούνται
+
+| Αρχείο | Αλλαγές |
+|--------|---------|
+| `src/contexts/AuthContext.tsx` | Νέοι ρόλοι, multi-org logic, switchCompany |
+| `src/pages/Auth.tsx` | Google OAuth, νέο branding, post-login redirect |
+| `src/App.tsx` | Νέα routes |
+| `src/components/layout/AppLayout.tsx` | Active company check |
+| `src/components/layout/AppSidebar.tsx` | Νέοι ρόλοι, org settings link |
+| `src/hooks/useRBAC.ts` | Ενημέρωση ρόλων και permissions |
+| `src/components/users/InviteUserDialog.tsx` | Νέοι ρόλοι |
+| `supabase/functions/create-user/index.ts` | Νέοι ρόλοι |
+| Όλα τα DB security functions | `owner` αντί `super_admin` |
 
 ### Σειρά υλοποίησης
-
-1. DB Migration: προσθήκη `approver` column
-2. Ενημέρωση `TaskRow` με ημερομηνίες + drag handle
-3. Drag & drop στο "Tasks Σήμερα" με localStorage
-4. Task Sheet sidebar
-5. Section εγκρίσεων
-6. Πλήρη Quick Links
-7. AI Chat edge function + widget
-
+1. DB Migration (enum, tables, functions)
+2. AuthContext + routing
+3. Auth page (Google OAuth + redirect logic)
+4. Onboarding + WorkspaceSelector
+5. AcceptInvite page
+6. Organization Settings (members, domain, security)
+7. Sidebar + permission updates
+8. Edge function updates

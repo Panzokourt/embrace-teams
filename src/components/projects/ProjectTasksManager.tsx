@@ -37,7 +37,7 @@ import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
-type TaskStatus = 'todo' | 'in_progress' | 'review' | 'completed';
+type TaskStatus = 'todo' | 'in_progress' | 'review' | 'internal_review' | 'client_review' | 'completed';
 
 interface Task {
   id: string;
@@ -250,6 +250,8 @@ export function ProjectTasksManager({ projectId }: ProjectTasksManagerProps) {
       case 'completed': return <CheckCircle2 className="h-4 w-4 text-success" />;
       case 'in_progress': return <Clock className="h-4 w-4 text-primary" />;
       case 'review': return <AlertCircle className="h-4 w-4 text-warning" />;
+      case 'internal_review': return <AlertCircle className="h-4 w-4 text-violet-600" />;
+      case 'client_review': return <AlertCircle className="h-4 w-4 text-orange-500" />;
       default: return <Circle className="h-4 w-4 text-muted-foreground" />;
     }
   };
@@ -259,6 +261,8 @@ export function ProjectTasksManager({ projectId }: ProjectTasksManagerProps) {
       todo: 'Προς Υλοποίηση',
       in_progress: 'Σε Εξέλιξη',
       review: 'Αναθεώρηση',
+      internal_review: 'Εσωτ. Έγκριση',
+      client_review: 'Έγκριση Πελάτη',
       completed: 'Ολοκληρώθηκε',
     };
     return labels[status];
@@ -323,6 +327,8 @@ export function ProjectTasksManager({ projectId }: ProjectTasksManagerProps) {
                   <SelectItem value="todo">Προς Υλοποίηση</SelectItem>
                   <SelectItem value="in_progress">Σε Εξέλιξη</SelectItem>
                   <SelectItem value="review">Αναθεώρηση</SelectItem>
+                  <SelectItem value="internal_review">Εσωτ. Έγκριση</SelectItem>
+                  <SelectItem value="client_review">Έγκριση Πελάτη</SelectItem>
                   <SelectItem value="completed">Ολοκληρώθηκε</SelectItem>
                 </SelectContent>
               </Select>
@@ -381,12 +387,14 @@ export function ProjectTasksManager({ projectId }: ProjectTasksManagerProps) {
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todo">Προς Υλοποίηση</SelectItem>
-                    <SelectItem value="in_progress">Σε Εξέλιξη</SelectItem>
-                    <SelectItem value="review">Αναθεώρηση</SelectItem>
-                    <SelectItem value="completed">Ολοκληρώθηκε</SelectItem>
-                  </SelectContent>
+                    <SelectContent>
+                      <SelectItem value="todo">Προς Υλοποίηση</SelectItem>
+                      <SelectItem value="in_progress">Σε Εξέλιξη</SelectItem>
+                      <SelectItem value="review">Αναθεώρηση</SelectItem>
+                      <SelectItem value="internal_review">Εσωτ. Έγκριση</SelectItem>
+                      <SelectItem value="client_review">Έγκριση Πελάτη</SelectItem>
+                      <SelectItem value="completed">Ολοκληρώθηκε</SelectItem>
+                    </SelectContent>
                 </Select>
               </div>
 

@@ -21,7 +21,7 @@ import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
-type TaskStatus = 'todo' | 'in_progress' | 'review' | 'completed';
+type TaskStatus = 'todo' | 'in_progress' | 'review' | 'internal_review' | 'client_review' | 'completed';
 
 interface TaskData {
   id: string;
@@ -73,6 +73,8 @@ const STATUS_CONFIG: Record<TaskStatus, { icon: React.ReactNode; label: string; 
   todo: { icon: <Circle className="h-3.5 w-3.5" />, label: 'Προς Υλοποίηση', className: 'bg-muted text-muted-foreground' },
   in_progress: { icon: <Clock className="h-3.5 w-3.5" />, label: 'Σε Εξέλιξη', className: 'bg-primary/10 text-primary border-primary/20' },
   review: { icon: <AlertCircle className="h-3.5 w-3.5" />, label: 'Αναθεώρηση', className: 'bg-warning/10 text-warning border-warning/20' },
+  internal_review: { icon: <AlertCircle className="h-3.5 w-3.5" />, label: 'Εσωτερική Έγκριση', className: 'bg-violet-500/10 text-violet-600 border-violet-500/20' },
+  client_review: { icon: <AlertCircle className="h-3.5 w-3.5" />, label: 'Έγκριση Πελάτη', className: 'bg-orange-500/10 text-orange-600 border-orange-500/20' },
   completed: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: 'Ολοκληρώθηκε', className: 'bg-success/10 text-success border-success/20' },
 };
 
@@ -215,10 +217,31 @@ export default function TaskDetailPage() {
   const handleStatusChange = async (newStatus: TaskStatus) => {
     if (!task) return;
     try {
-      const { error } = await supabase
-        .from('tasks')
-        .update({ status: newStatus })
-        .eq('id', task.id);
+      let updateData: Record<string, string | null> = { status: newStatus };
+
+      // Auto-assign internal_reviewer when moving to internal_review
+      if (newStatus === 'internal_review' && task.assigned_to) {
+        const { data: assigneeProfile } = await supabase
+          .from('profiles')
+          .select('reports_to, department_id')
+          .eq('id', task.assigned_to)
+          .single();
+
+        let reviewerId: string | null = null;
+        if (assigneeProfile?.reports_to) {
+          reviewerId = assigneeProfile.reports_to;
+        } else if (assigneeProfile?.department_id) {
+          const { data: dept } = await supabase
+            .from('departments')
+            .select('head_user_id')
+            .eq('id', assigneeProfile.department_id)
+            .single();
+          reviewerId = dept?.head_user_id || null;
+        }
+        if (reviewerId) updateData.internal_reviewer = reviewerId;
+      }
+
+      const { error } = await supabase.from('tasks').update(updateData).eq('id', task.id);
       if (error) throw error;
       setTask(prev => prev ? { ...prev, status: newStatus } : null);
       toast.success('Η κατάσταση ενημερώθηκε!');

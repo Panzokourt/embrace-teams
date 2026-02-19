@@ -49,7 +49,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 type ProjectStatus = 'lead' | 'proposal' | 'negotiation' | 'won' | 'active' | 'completed' | 'cancelled' | 'lost' | 'tender';
-type TaskStatus = 'todo' | 'in_progress' | 'review' | 'completed';
+type TaskStatus = 'todo' | 'in_progress' | 'review' | 'completed' | 'internal_review' | 'client_review';
 
 interface Project {
   id: string;

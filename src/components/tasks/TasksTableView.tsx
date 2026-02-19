@@ -41,7 +41,7 @@ import { format, isPast, isToday, isTomorrow, parseISO } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { toast } from 'sonner';
 
-type TaskStatus = 'todo' | 'in_progress' | 'review' | 'completed';
+type TaskStatus = 'todo' | 'in_progress' | 'review' | 'internal_review' | 'client_review' | 'completed';
 
 interface Task {
   id: string;
@@ -96,6 +96,8 @@ const STATUS_OPTIONS = [
   { value: 'todo', label: 'Προς Υλοποίηση', color: 'hsl(var(--muted-foreground))' },
   { value: 'in_progress', label: 'Σε Εξέλιξη', color: 'hsl(var(--primary))' },
   { value: 'review', label: 'Αναθεώρηση', color: 'hsl(var(--warning))' },
+  { value: 'internal_review', label: 'Εσωτ. Έγκριση', color: '#7c3aed' },
+  { value: 'client_review', label: 'Έγκριση Πελάτη', color: '#ea580c' },
   { value: 'completed', label: 'Ολοκληρώθηκε', color: 'hsl(var(--success))' },
 ];
 

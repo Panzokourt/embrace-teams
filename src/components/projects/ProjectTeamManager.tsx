@@ -11,7 +11,8 @@ import {
   UserMinus, 
   Users,
   Search,
-  X 
+  X,
+  Settings2
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
@@ -23,6 +24,12 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface TeamMember {
   id: string;
@@ -51,9 +58,13 @@ interface ProjectTeamManagerProps {
   canEdit: boolean;
 }
 
-// Get company ID from the auth context's company object
+interface ProjectTeamManagerProps {
+  projectId: string;
+  canEdit: boolean;
+  compact?: boolean;
+}
 
-export function ProjectTeamManager({ projectId, canEdit }: ProjectTeamManagerProps) {
+export function ProjectTeamManager({ projectId, canEdit, compact = false }: ProjectTeamManagerProps) {
   const { company } = useAuth();
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [availableUsers, setAvailableUsers] = useState<AvailableUser[]>([]);
@@ -237,6 +248,185 @@ export function ProjectTeamManager({ projectId, canEdit }: ProjectTeamManagerPro
     );
   }
 
+  const MAX_VISIBLE = 4;
+
+  // ─── COMPACT MODE (avatar stack) ───────────────────────────────────────────
+  if (compact) {
+    const visibleMembers = teamMembers.slice(0, MAX_VISIBLE);
+    const extraCount = teamMembers.length - MAX_VISIBLE;
+
+    return (
+      <TooltipProvider>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Ομάδα Έργου</span>
+              <Badge variant="secondary" className="text-xs">{teamMembers.length}</Badge>
+            </div>
+            {canEdit && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setAddDialogOpen(true)}
+              >
+                <UserPlus className="h-3.5 w-3.5 mr-1" />
+                Προσθήκη
+              </Button>
+            )}
+          </div>
+
+          {teamMembers.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Δεν έχουν ανατεθεί μέλη</p>
+          ) : (
+            <div className="flex items-center gap-2">
+              {/* Avatar stack */}
+              <div className="flex -space-x-2">
+                {visibleMembers.map(member => (
+                  <Tooltip key={member.id}>
+                    <TooltipTrigger asChild>
+                      <Avatar className="h-8 w-8 border-2 border-background cursor-pointer ring-1 ring-border">
+                        <AvatarImage src={member.profile.avatar_url || ''} />
+                        <AvatarFallback className="text-xs">
+                          {getInitials(member.profile.full_name, member.profile.email)}
+                        </AvatarFallback>
+                      </Avatar>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="font-medium">{member.profile.full_name || member.profile.email}</p>
+                      <p className="text-xs text-muted-foreground">{member.role?.role || 'member'}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
+                {extraCount > 0 && (
+                  <div className="h-8 w-8 rounded-full bg-muted border-2 border-background flex items-center justify-center text-xs font-medium text-muted-foreground ring-1 ring-border">
+                    +{extraCount}
+                  </div>
+                )}
+              </div>
+
+              {/* Manage button */}
+              <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 ml-1">
+                    <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Διαχείριση Ομάδας</DialogTitle>
+                    <DialogDescription>Προσθήκη ή αφαίρεση μελών από την ομάδα του έργου</DialogDescription>
+                  </DialogHeader>
+
+                  {/* Current members */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-muted-foreground">Τρέχοντα μέλη ({teamMembers.length})</p>
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                      {teamMembers.map(member => (
+                        <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg border bg-card">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={member.profile.avatar_url || ''} />
+                            <AvatarFallback className="text-xs">
+                              {getInitials(member.profile.full_name, member.profile.email)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">
+                              {member.profile.full_name || member.profile.email.split('@')[0]}
+                            </p>
+                          </div>
+                          {getRoleBadge(member.role?.role)}
+                          {canEdit && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive"
+                              onClick={() => removeMember(member.id)}
+                              disabled={removing === member.id}
+                            >
+                              {removing === member.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <UserMinus className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Add member search */}
+                  {canEdit && (
+                    <div className="space-y-2 border-t pt-3">
+                      <p className="text-sm font-medium text-muted-foreground">Προσθήκη μέλους</p>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Αναζήτηση χρήστη..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="pl-9"
+                        />
+                        {searchTerm && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                            onClick={() => setSearchTerm('')}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      <ScrollArea className="h-[200px] pr-2">
+                        {filteredUsers.length === 0 ? (
+                          <p className="text-center text-sm text-muted-foreground py-4">
+                            Δεν βρέθηκαν διαθέσιμοι χρήστες
+                          </p>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {filteredUsers.map(user => (
+                              <div key={user.id} className="flex items-center gap-3 p-2 rounded-lg border hover:bg-muted/50">
+                                <Avatar className="h-8 w-8">
+                                  <AvatarImage src={user.avatar_url || ''} />
+                                  <AvatarFallback className="text-xs">{getInitials(user.full_name, user.email)}</AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">
+                                    {user.full_name || user.email.split('@')[0]}
+                                  </p>
+                                </div>
+                                {getRoleBadge(user.role)}
+                                <Button
+                                  size="sm"
+                                  onClick={() => addMember(user.id)}
+                                  disabled={adding === user.id}
+                                >
+                                  {adding === user.id ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <UserPlus className="h-3.5 w-3.5" />
+                                  )}
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </ScrollArea>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
+            </div>
+          )}
+        </div>
+      </TooltipProvider>
+    );
+  }
+
+  // ─── FULL MODE ──────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">

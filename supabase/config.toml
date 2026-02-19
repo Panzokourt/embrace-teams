@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.my-work-ai-chat]
 verify_jwt = false
+
+[functions.seed-dummy-data]
+verify_jwt = false

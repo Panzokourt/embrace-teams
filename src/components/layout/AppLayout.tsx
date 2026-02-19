@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Outlet, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import AppSidebar from './AppSidebar';
 import TopBar from './TopBar';
@@ -8,18 +8,8 @@ import { GlobalActivityFeed } from '@/components/activity/GlobalActivityFeed';
 import { Loader2 } from 'lucide-react';
 
 export default function AppLayout() {
-  const navigate = useNavigate();
   const { user, loading, isApproved, postLoginRoute } = useAuth();
   const [activityOpen, setActivityOpen] = useState(false);
-
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
-    }
-    if (!loading && user && postLoginRoute && postLoginRoute !== '/') {
-      navigate(postLoginRoute, { replace: true });
-    }
-  }, [user, loading, navigate, postLoginRoute]);
 
   if (loading) {
     return (
@@ -30,7 +20,11 @@ export default function AppLayout() {
   }
 
   if (!user) {
-    return null;
+    return <Navigate to="/auth" replace />;
+  }
+
+  if (postLoginRoute && postLoginRoute !== '/') {
+    return <Navigate to={postLoginRoute} replace />;
   }
 
   return (

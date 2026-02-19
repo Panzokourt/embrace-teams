@@ -1,79 +1,49 @@
 
 
-# Reports Section -- Κεντρικό Hub Αναφορών
+# Προσθήκη Tab "Εργασίες" και Φίλτρων Τμήματος/Ατόμου στις Αναφορές
 
-## Επισκόπηση
+## Τι αλλάζει
 
-Νέο ανεξάρτητο section "Αναφορές" (`/reports`) στο sidebar, με πλήρες σύστημα reporting που καλύπτει όλους τους τομείς της εφαρμογής. Ο χρήστης θα μπορεί να βλέπει live dashboards και να εξάγει αναφορές σε PDF, Excel και CSV.
+### 1. Νέο Tab "Εργασίες"
 
-## Δομή Tabs
+Προστίθεται 6ο tab στις Αναφορές με αναλυτική προβολή tasks:
 
-| Tab | Περιεχόμενο |
-|-----|-------------|
-| **Επισκόπηση** | Executive summary με KPIs, γραφήματα τάσεων, top-level μετρικές |
-| **Οικονομικά** | P&L ανά πελάτη/έργο/μήνα, aging analysis, revenue trends, expense breakdown |
-| **Έργα** | Project status breakdown, progress tracking, budget vs actual, timeline adherence |
-| **Πελάτες** | Revenue ανά πελάτη, project count, profitability ranking |
-| **Ομάδα** | Task completion rates, workload distribution, time tracking summaries |
+- **KPI Cards**: Σύνολο tasks, σε εξέλιξη, ολοκληρωμένα, overdue/critical
+- **Critical Deadline Table**: Πίνακας με tasks που πλησιάζουν ή έχουν ξεπεράσει deadline, ταξινομημένα κατά urgency (overdue πρώτα, μετά τα επόμενα 7 ημέρες)
+- **Status Pie Chart**: Κατανομή tasks ανά status (todo, in_progress, done, blocked)
+- **Priority Bar Chart**: Κατανομή ανά priority (critical, high, medium, low)
+- **Αναλυτικός πίνακας**: Όλα τα tasks με στήλες: Τίτλος, Έργο, Ανατεθειμένο σε, Προτεραιότητα, Status, Due Date, Πρόοδος
+- **Export support**: CSV/Excel εξαγωγή του πίνακα tasks
 
-## Features
+### 2. Νέα Φίλτρα: Τμήμα και Άτομο
 
-- **Global Filters**: Περίοδος (3/6/12 μήνες, custom range), Πελάτης, Έργο
-- **Live Dashboards**: Recharts γραφήματα (Area, Bar, Pie, Line) σε κάθε tab
-- **Export σε πολλαπλά formats**:
-  - **Excel** (.xls) -- μέσω του υπάρχοντος `exportToExcel`
-  - **CSV** -- μέσω του υπάρχοντος `exportToCSV`
-  - **PDF** -- μέσω `window.print()` με print-optimized CSS
-- **Saved Reports**: Δυνατότητα αποθήκευσης report configurations στο localStorage
-- **Responsive**: Πλήρης υποστήριξη mobile/tablet
+Προστίθενται 2 νέα global φίλτρα δίπλα στα υπάρχοντα:
+
+- **Τμήμα**: Dropdown με τα departments -- φιλτράρει tasks/profiles βάσει department_id του assigned_to
+- **Άτομο**: Dropdown με τα profiles -- φιλτράρει tasks βάσει assigned_to
+
+Τα φίλτρα εφαρμόζονται σε ΟΛΑ τα tabs (tasks, team, projects κλπ).
 
 ## Τεχνικές Αλλαγές
 
-### Νέα Αρχεία
-
-| Αρχείο | Περιγραφή |
-|--------|-----------|
-| `src/pages/Reports.tsx` | Ανανεωμένη κεντρική σελίδα -- wrapper με tabs, global filters, export menu |
-| `src/components/reports/ReportsOverview.tsx` | Tab: Executive summary KPIs & trends |
-| `src/components/reports/ReportsFinancial.tsx` | Tab: Οικονομικά -- P&L, aging, revenue/expense charts |
-| `src/components/reports/ReportsProjects.tsx` | Tab: Έργα -- status, budget vs actual, timeline |
-| `src/components/reports/ReportsClients.tsx` | Tab: Πελάτες -- revenue ranking, profitability |
-| `src/components/reports/ReportsTeam.tsx` | Tab: Ομάδα -- workload, task completion, time tracking |
-| `src/components/reports/ReportExportMenu.tsx` | Dropdown menu εξαγωγής (PDF/Excel/CSV) |
-| `src/components/reports/ReportFilters.tsx` | Global filters component (period, client, project) |
-| `src/hooks/useReportsData.ts` | Custom hook -- single data fetch για όλα τα report tabs |
-
-### Τροποποιήσεις Υπαρχόντων
-
 | Αρχείο | Αλλαγή |
 |--------|--------|
-| `src/components/layout/AppSidebar.tsx` | Προσθήκη "Αναφορές" link με εικονίδιο `BarChart3` στο sidebar |
-| `src/App.tsx` | Αφαίρεση redirect `/reports` -> `/financials`, νέο route `/reports` -> Reports page |
-| `src/index.css` | Print-specific CSS (`@media print`) για καθαρή εξαγωγή PDF |
+| `src/hooks/useReportsData.ts` | Προσθήκη `departments` στο fetch, νέα πεδία `departmentId` και `userId` στο `ReportsFilters`, φιλτράρισμα tasks/profiles βάσει αυτών |
+| `src/components/reports/ReportFilters.tsx` | Προσθήκη 2 νέων Select dropdowns (Τμήμα, Άτομο), νέα props `departments` και `profiles` |
+| `src/components/reports/ReportsTasks.tsx` | **Νέο αρχείο** -- Πλήρες tab component με KPIs, critical deadline πίνακα, charts, αναλυτικό πίνακα |
+| `src/pages/Reports.tsx` | Προσθήκη tab "Εργασίες", import ReportsTasks, export handlers για tasks, περνάει departments/profiles στο ReportFilters |
 
-### Data Flow
+### Data Flow για φίλτρα
 
-Ο hook `useReportsData` θα κάνει ένα batch fetch από:
-- `projects` (με client join)
-- `invoices` (με client & project joins)
-- `expenses` (με project join)
-- `tasks` (με assignee & project joins)
-- `clients`
-- `time_entries` (για team reporting)
-- `profiles` (για team member names)
+- Το `useReportsData` κάνει fetch departments από Supabase
+- Όταν επιλέγεται Τμήμα, φιλτράρονται tasks που ο assigned_to ανήκει σε αυτό το department (μέσω profiles.department_id)
+- Όταν επιλέγεται Άτομο, φιλτράρονται tasks με assigned_to === userId
+- Τα φίλτρα λειτουργούν σωρευτικά με τα υπάρχοντα (περίοδος, πελάτης, έργο)
 
-Τα δεδομένα φιλτράρονται client-side βάσει των global filters (period, client, project) και περνάνε σε κάθε tab component.
+### Critical Deadline Logic
 
-### Export Functionality
-
-Το `ReportExportMenu` θα προσφέρει 3 επιλογές:
-1. **PDF**: `window.print()` με print-optimized layout (ήδη υποστηρίζεται, θα προστεθεί print CSS)
-2. **Excel**: Χρήση `exportToExcel` από `src/utils/exportUtils.ts` -- δημιουργεί HTML table που ανοίγει στο Excel
-3. **CSV**: Χρήση `exportToCSV` από `src/utils/exportUtils.ts` -- με BOM για ελληνικούς χαρακτήρες
-
-Κάθε tab θα εκθέτει μια `getExportData()` function που επιστρέφει τα relevant δεδομένα σε tabular format για export.
-
-### Sidebar Position
-
-Η "Αναφορές" θα τοποθετηθεί μετά το "Λογιστήριο" στο κύριο navigation, με permission `financials.view` (ίδιο με Λογιστήριο, καθώς τα reports αφορούν κυρίως οικονομικά & project data).
+Ένα task θεωρείται "critical" αν:
+- **Overdue**: `due_date < today` και status !== done/completed
+- **Κρίσιμο**: `due_date` εντός 3 ημερών και status !== done/completed  
+- **Σύντομα**: `due_date` εντός 7 ημερών και status !== done/completed
 

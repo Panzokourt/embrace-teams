@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Users, Building2, Network, Timer, Calendar, UsersRound } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Users, Building2, Network, Timer, Calendar, UsersRound, UserPlus } from 'lucide-react';
 
 // Lazy load existing page content
 import UsersAccessPage from '@/pages/UsersAccess';
@@ -14,6 +15,7 @@ import { LeaveRequestForm } from '@/components/hr/LeaveRequestForm';
 import { LeaveRequestsList } from '@/components/hr/LeaveRequestsList';
 import { LeaveApprovalCard } from '@/components/hr/LeaveApprovalCard';
 import { useLeaveManagement } from '@/hooks/useLeaveManagement';
+import { JoinRequestsManager, useJoinRequestsCount } from '@/components/hr/JoinRequestsManager';
 
 const TAB_MAP: Record<string, string> = {
   'users': 'staff',
@@ -26,7 +28,8 @@ export default function HRPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'staff';
   const [activeTab, setActiveTab] = useState(initialTab);
-  const { isAdmin, isManager } = useAuth();
+  const { isAdmin, isManager, isOwner, isCompanyAdmin } = useAuth();
+  const pendingJoinRequests = useJoinRequestsCount();
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
@@ -70,6 +73,17 @@ export default function HRPage() {
             <Calendar className="h-4 w-4" />
             Άδειες
           </TabsTrigger>
+          {(isOwner || isCompanyAdmin) && (
+            <TabsTrigger value="join-requests" className="gap-2">
+              <UserPlus className="h-4 w-4" />
+              Αιτήματα
+              {pendingJoinRequests > 0 && (
+                <Badge variant="destructive" className="ml-1 h-5 min-w-5 text-xs px-1">
+                  {pendingJoinRequests}
+                </Badge>
+              )}
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="staff">
@@ -91,6 +105,12 @@ export default function HRPage() {
         <TabsContent value="leaves">
           <LeavesContent />
         </TabsContent>
+
+        {(isOwner || isCompanyAdmin) && (
+          <TabsContent value="join-requests">
+            <JoinRequestsManager />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

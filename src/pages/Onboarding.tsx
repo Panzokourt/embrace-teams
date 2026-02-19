@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,16 +7,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Loader2, Building2, Mail, Link2, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Loader2, Building2, Mail, Link2, ArrowLeft, CheckCircle, Clock } from 'lucide-react';
 import olsenyLogo from '@/assets/olseny-logo.png';
 
-type Step = 'choose' | 'create-org' | 'accept-invite' | 'domain-join' | 'pending';
+type Step = 'loading' | 'choose' | 'create-org' | 'accept-invite' | 'domain-join' | 'pending';
 
 export default function Onboarding() {
   const navigate = useNavigate();
   const { user, profile, signOut, refreshUserData } = useAuth();
-  const [step, setStep] = useState<Step>('choose');
+  const [step, setStep] = useState<Step>('loading');
   const [loading, setLoading] = useState(false);
+  const [autoOnboardRan, setAutoOnboardRan] = useState(false);
 
   // Create org state
   const [companyName, setCompanyName] = useState('');
@@ -29,8 +30,54 @@ export default function Onboarding() {
   const [domainCompanies, setDomainCompanies] = useState<any[]>([]);
   const [domainChecked, setDomainChecked] = useState(false);
 
+  // Pending info
+  const [pendingCompanyName, setPendingCompanyName] = useState('');
+
   const emailDomain = user?.email?.split('@')[1] || '';
-  const isPersonalEmail = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'live.com', 'icloud.com'].includes(emailDomain);
+  const isPersonalEmail = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'live.com', 'icloud.com', 'yahoo.gr', 'hotmail.gr', 'googlemail.com', 'protonmail.com', 'aol.com', 'mail.com', 'zoho.com'].includes(emailDomain);
+
+  // Auto-onboard on mount
+  useEffect(() => {
+    if (!user || autoOnboardRan) return;
+    setAutoOnboardRan(true);
+
+    const runAutoOnboard = async () => {
+      try {
+        const { data, error } = await supabase.rpc('auto_onboard_user');
+        if (error) throw error;
+
+        const result = data as any;
+        switch (result.action) {
+          case 'created_company':
+            toast.success(`Η εταιρεία "${result.company_name}" δημιουργήθηκε αυτόματα!`);
+            await refreshUserData();
+            navigate('/', { replace: true });
+            return;
+          case 'join_requested':
+            setPendingCompanyName(result.company_name || '');
+            setStep('pending');
+            return;
+          case 'already_requested':
+            setPendingCompanyName(result.company_name || '');
+            setStep('pending');
+            return;
+          case 'already_member':
+            await refreshUserData();
+            navigate('/', { replace: true });
+            return;
+          case 'personal_email':
+          default:
+            setStep('choose');
+            return;
+        }
+      } catch (error: any) {
+        console.error('Auto-onboard error:', error);
+        setStep('choose');
+      }
+    };
+
+    runAutoOnboard();
+  }, [user]);
 
   const handleCreateOrg = async () => {
     if (!companyName.trim()) return;
@@ -40,7 +87,6 @@ export default function Onboarding() {
         _name: companyName.trim(),
         _domain: companyDomain.trim() || emailDomain
       });
-
       if (error) throw error;
       toast.success('Η εταιρεία δημιουργήθηκε!');
       await refreshUserData();
@@ -59,14 +105,12 @@ export default function Onboarding() {
       const { data, error } = await supabase.rpc('accept_invitation', {
         _token: inviteToken.trim()
       });
-
       if (error) throw error;
       const result = data as any;
       if (!result.success) {
         toast.error(result.error || 'Μη έγκυρη πρόσκληση');
         return;
       }
-
       toast.success('Η πρόσκληση έγινε αποδεκτή!');
       await refreshUserData();
       navigate('/', { replace: true });
@@ -124,6 +168,13 @@ export default function Onboarding() {
           <img src={olsenyLogo} alt="Olseny" className="h-10 w-10 rounded-lg" />
           <span className="text-2xl font-bold text-foreground">OLSENY</span>
         </div>
+
+        {step === 'loading' && (
+          <div className="flex flex-col items-center justify-center py-16">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+            <p className="text-muted-foreground">Ρύθμιση λογαριασμού...</p>
+          </div>
+        )}
 
         {step === 'choose' && (
           <div className="space-y-4">
@@ -252,9 +303,14 @@ export default function Onboarding() {
         {step === 'pending' && (
           <Card className="border-border/40">
             <CardContent className="text-center py-12">
-              <CheckCircle className="h-16 w-16 text-success mx-auto mb-4" />
-              <h2 className="text-xl font-semibold text-foreground mb-2">Αίτημα στάλθηκε</h2>
-              <p className="text-muted-foreground mb-6">Ο admin της εταιρείας θα εγκρίνει το αίτημά σας</p>
+              <Clock className="h-16 w-16 text-amber-500 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold text-foreground mb-2">Σε αναμονή έγκρισης</h2>
+              <p className="text-muted-foreground mb-2">
+                Το αίτημά σας για ένταξη στην εταιρεία {pendingCompanyName && <strong>"{pendingCompanyName}"</strong>} έχει σταλεί.
+              </p>
+              <p className="text-sm text-muted-foreground mb-6">
+                Ο διαχειριστής θα εγκρίνει το αίτημά σας. Θα ενημερωθείτε μόλις γίνει αποδεκτό.
+              </p>
               <Button variant="outline" onClick={signOut}>Αποσύνδεση</Button>
             </CardContent>
           </Card>

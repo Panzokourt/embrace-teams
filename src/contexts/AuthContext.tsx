@@ -206,7 +206,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Determine post-login route
       const activeRoles = roles.filter(r => r.status === 'active');
       if (activeRoles.length === 0) {
-        setPostLoginRoute('/onboarding');
+        // Check if there's a pending join request
+        const { data: pendingRequests } = await supabase
+          .from('join_requests')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('status', 'pending')
+          .limit(1);
+
+        if (pendingRequests && pendingRequests.length > 0) {
+          // User has a pending join request - show pending screen via onboarding
+          setPostLoginRoute('/onboarding');
+        } else {
+          setPostLoginRoute('/onboarding');
+        }
         setCompanyRole(null);
         setCompany(null);
       } else if (activeRoles.length === 1) {

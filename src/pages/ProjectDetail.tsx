@@ -18,6 +18,7 @@ import { ProjectInfoEditor } from '@/components/projects/ProjectInfoEditor';
 import { ProjectTeamManager } from '@/components/projects/ProjectTeamManager';
 import { FileExplorer } from '@/components/files/FileExplorer';
 import { ProjectGanttView } from '@/components/projects/ProjectGanttView';
+import { ProjectCommentsAndHistory } from '@/components/projects/ProjectCommentsAndHistory';
 import { toast } from 'sonner';
 import { 
   ArrowLeft,
@@ -36,6 +37,7 @@ import {
   Megaphone,
   TrendingUp,
   GanttChartSquare,
+  MessageSquare,
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -495,6 +497,10 @@ export default function ProjectDetailPage() {
               Media Plan
             </TabsTrigger>
             <TabsTrigger value="files">Αρχεία</TabsTrigger>
+            <TabsTrigger value="comments">
+              <MessageSquare className="h-4 w-4 mr-1.5" />
+              Σχόλια
+            </TabsTrigger>
             {(canViewFinancials || isClient) && (
               <>
                 <TabsTrigger value="pl-report">
@@ -673,6 +679,11 @@ export default function ProjectDetailPage() {
         {/* Files Tab */}
         <TabsContent value="files">
           <FileExplorer projectId={project.id} />
+        </TabsContent>
+
+        {/* Comments & History Tab */}
+        <TabsContent value="comments" className="mt-4">
+          <ProjectCommentsAndHistory projectId={project.id} />
         </TabsContent>
 
         {/* Media Plan Tab */}

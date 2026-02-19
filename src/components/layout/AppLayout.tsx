@@ -9,14 +9,17 @@ import { Loader2 } from 'lucide-react';
 
 export default function AppLayout() {
   const navigate = useNavigate();
-  const { user, loading, isApproved } = useAuth();
+  const { user, loading, isApproved, postLoginRoute } = useAuth();
   const [activityOpen, setActivityOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
       navigate('/auth');
     }
-  }, [user, loading, navigate]);
+    if (!loading && user && postLoginRoute && postLoginRoute !== '/') {
+      navigate(postLoginRoute, { replace: true });
+    }
+  }, [user, loading, navigate, postLoginRoute]);
 
   if (loading) {
     return (

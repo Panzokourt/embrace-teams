@@ -2598,6 +2598,14 @@ export type Database = {
     }
     Functions: {
       accept_invitation: { Args: { _token: string }; Returns: Json }
+      approve_join_request: {
+        Args: {
+          _request_id: string
+          _role?: Database["public"]["Enums"]["company_role"]
+        }
+        Returns: Json
+      }
+      auto_onboard_user: { Args: never; Returns: Json }
       create_company_with_owner: {
         Args: { _domain: string; _name: string }
         Returns: string
@@ -2657,6 +2665,7 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      reject_join_request: { Args: { _request_id: string }; Returns: Json }
     }
     Enums: {
       access_scope: "company" | "assigned" | "department" | "team"

@@ -30,20 +30,22 @@ interface UserData {
 }
 
 const roleLabels: Record<string, string> = {
-  super_admin: 'Super Admin',
+  owner: 'Owner',
   admin: 'Admin',
   manager: 'Manager',
-  standard: 'Standard',
-  client: 'Client',
+  member: 'Member',
+  viewer: 'Viewer',
+  billing: 'Billing',
 };
 
 export default function EmployeeProfile() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { company } = useAuth();
+  const { company, isCompanyAdmin, isManager } = useAuth();
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<UserData | null>(null);
   const [roleName, setRoleName] = useState<string | null>(null);
+  const [ucrStatus, setUcrStatus] = useState<string>('pending');
   const [departmentName, setDepartmentName] = useState<string | null>(null);
   const [projects, setProjects] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
@@ -64,7 +66,7 @@ export default function EmployeeProfile() {
       // Parallel fetches
       const [profileRes, roleRes, projectAccessRes, teamMembersRes, tasksRes, timeRes, activityRes] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', id).single(),
-        supabase.from('user_company_roles').select('role').eq('user_id', id).single(),
+        supabase.from('user_company_roles').select('role, status').eq('user_id', id).single(),
         supabase.from('project_user_access').select('project_id').eq('user_id', id),
         supabase.from('team_members').select('team_id').eq('user_id', id),
         supabase.from('tasks').select('id, title, status, due_date, project:projects(name)').eq('assigned_to', id).order('due_date').limit(20),
@@ -75,6 +77,7 @@ export default function EmployeeProfile() {
       if (profileRes.error) throw profileRes.error;
       setUser(profileRes.data);
       setRoleName(roleRes.data ? roleLabels[roleRes.data.role] || roleRes.data.role : null);
+      if (roleRes.data?.status) setUcrStatus(roleRes.data.status);
 
       // Fetch department name
       if (profileRes.data?.department_id) {
@@ -120,7 +123,13 @@ export default function EmployeeProfile() {
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
-      <EmployeeHeader user={user} departmentName={departmentName} roleName={roleName} />
+      <EmployeeHeader
+        user={{ ...user, status: ucrStatus }}
+        departmentName={departmentName}
+        roleName={roleName}
+        canEdit={isCompanyAdmin || isManager}
+        onUserUpdate={(updates) => setUser(prev => prev ? { ...prev, ...updates } : prev)}
+      />
 
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList className="flex-wrap">

@@ -255,7 +255,7 @@ export function UsersTableView({
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuLabel className="text-xs text-muted-foreground">Αλλαγή Ρόλου</DropdownMenuLabel>
-                            {(['admin', 'manager', 'standard', 'client'] as CompanyRole[]).map(role => (
+                            {(['admin', 'manager', 'member', 'viewer', 'billing'] as CompanyRole[]).map(role => (
                               <DropdownMenuItem 
                                 key={role} 
                                 onClick={() => onChangeRole(user.user_id, role)} 

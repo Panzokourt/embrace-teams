@@ -96,11 +96,12 @@ const statusColors: Record<string, string> = {
 };
 
 const roleLabels: Record<string, string> = {
-  super_admin: 'Super Admin',
+  owner: 'Owner',
   admin: 'Admin',
   manager: 'Manager',
-  standard: 'Standard',
-  client: 'Client'
+  member: 'Member',
+  viewer: 'Viewer',
+  billing: 'Billing',
 };
 
 export default function UserDetailPage() {

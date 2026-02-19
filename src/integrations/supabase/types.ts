@@ -1914,6 +1914,7 @@ export type Database = {
           due_date: string | null
           estimated_hours: number | null
           id: string
+          internal_reviewer: string | null
           is_ai_generated: boolean | null
           is_recurring: boolean | null
           parent_task_id: string | null
@@ -1941,6 +1942,7 @@ export type Database = {
           due_date?: string | null
           estimated_hours?: number | null
           id?: string
+          internal_reviewer?: string | null
           is_ai_generated?: boolean | null
           is_recurring?: boolean | null
           parent_task_id?: string | null
@@ -1968,6 +1970,7 @@ export type Database = {
           due_date?: string | null
           estimated_hours?: number | null
           id?: string
+          internal_reviewer?: string | null
           is_ai_generated?: boolean | null
           is_recurring?: boolean | null
           parent_task_id?: string | null
@@ -1996,6 +1999,13 @@ export type Database = {
             columns: ["depends_on"]
             isOneToOne: false
             referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_internal_reviewer_fkey"
+            columns: ["internal_reviewer"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -2737,7 +2747,13 @@ export type Database = {
         | "negotiation"
         | "won"
         | "lost"
-      task_status: "todo" | "in_progress" | "review" | "completed"
+      task_status:
+        | "todo"
+        | "in_progress"
+        | "review"
+        | "completed"
+        | "internal_review"
+        | "client_review"
       tender_stage:
         | "identification"
         | "preparation"
@@ -2950,7 +2966,14 @@ export const Constants = {
         "won",
         "lost",
       ],
-      task_status: ["todo", "in_progress", "review", "completed"],
+      task_status: [
+        "todo",
+        "in_progress",
+        "review",
+        "completed",
+        "internal_review",
+        "client_review",
+      ],
       tender_stage: [
         "identification",
         "preparation",

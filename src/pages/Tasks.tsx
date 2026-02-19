@@ -63,7 +63,7 @@ import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { DraggableCard } from '@/components/dnd/DraggableCard';
 import { DroppableColumn } from '@/components/dnd/DroppableColumn';
 
-type TaskStatus = 'todo' | 'in_progress' | 'review' | 'completed';
+type TaskStatus = 'todo' | 'in_progress' | 'review' | 'internal_review' | 'client_review' | 'completed';
 
 interface Profile {
   id: string;
@@ -99,7 +99,9 @@ interface Task {
 const statusConfig: Record<TaskStatus, { icon: React.ReactNode; label: string; className: string }> = {
   todo: { icon: <Circle className="h-4 w-4" />, label: 'Προς Υλοποίηση', className: 'bg-muted text-muted-foreground' },
   in_progress: { icon: <Clock className="h-4 w-4" />, label: 'Σε Εξέλιξη', className: 'bg-primary/10 text-primary border-primary/20' },
-  review: { icon: <AlertCircle className="h-4 w-4" />, label: 'Προς Έλεγχο', className: 'bg-warning/10 text-warning border-warning/20' },
+  review: { icon: <AlertCircle className="h-4 w-4" />, label: 'Αναθεώρηση', className: 'bg-warning/10 text-warning border-warning/20' },
+  internal_review: { icon: <AlertCircle className="h-4 w-4" />, label: 'Εσωτ. Έγκριση', className: 'bg-violet-500/10 text-violet-600 border-violet-500/20' },
+  client_review: { icon: <AlertCircle className="h-4 w-4" />, label: 'Έγκριση Πελάτη', className: 'bg-orange-500/10 text-orange-600 border-orange-500/20' },
   completed: { icon: <CheckCircle2 className="h-4 w-4" />, label: 'Ολοκληρώθηκε', className: 'bg-success/10 text-success border-success/20' },
 };
 
@@ -320,6 +322,8 @@ export default function TasksPage({ embedded = false }: { embedded?: boolean }) 
     todo: filteredTasks.filter(t => t.status === 'todo'),
     in_progress: filteredTasks.filter(t => t.status === 'in_progress'),
     review: filteredTasks.filter(t => t.status === 'review'),
+    internal_review: filteredTasks.filter(t => t.status === 'internal_review'),
+    client_review: filteredTasks.filter(t => t.status === 'client_review'),
     completed: filteredTasks.filter(t => t.status === 'completed'),
   }), [filteredTasks]);
 
@@ -340,7 +344,7 @@ export default function TasksPage({ embedded = false }: { embedded?: boolean }) 
     const activeTask = tasks.find(t => t.id === activeId);
     if (!activeTask) return;
 
-    const statuses: TaskStatus[] = ['todo', 'in_progress', 'review', 'completed'];
+    const statuses: TaskStatus[] = ['todo', 'in_progress', 'review', 'internal_review', 'client_review', 'completed'];
     if (statuses.includes(overId as TaskStatus)) {
       if (activeTask.status !== overId) {
         setTasks(prev => prev.map(t =>
@@ -362,7 +366,7 @@ export default function TasksPage({ embedded = false }: { embedded?: boolean }) 
     const draggedTask = tasks.find(t => t.id === activeId);
     if (!draggedTask) return;
 
-    const statuses: TaskStatus[] = ['todo', 'in_progress', 'review', 'completed'];
+    const statuses: TaskStatus[] = ['todo', 'in_progress', 'review', 'internal_review', 'client_review', 'completed'];
     let targetStatus: TaskStatus | null = null;
 
     if (statuses.includes(overId as TaskStatus)) {
@@ -376,9 +380,39 @@ export default function TasksPage({ embedded = false }: { embedded?: boolean }) 
 
     if (targetStatus && draggedTask.status !== targetStatus) {
       try {
+        // If moving to internal_review, find hierarchical reviewer
+        let updateData: Record<string, string | null> = { status: targetStatus };
+        
+        if (targetStatus === 'internal_review' && draggedTask.assigned_to) {
+          // Look up the assigned user's reports_to and department head
+          const { data: assigneeProfile } = await supabase
+            .from('profiles')
+            .select('reports_to, department_id')
+            .eq('id', draggedTask.assigned_to)
+            .single();
+          
+          let reviewerId: string | null = null;
+          
+          if (assigneeProfile?.reports_to) {
+            reviewerId = assigneeProfile.reports_to;
+          } else if (assigneeProfile?.department_id) {
+            const { data: dept } = await supabase
+              .from('departments')
+              .select('head_user_id')
+              .eq('id', assigneeProfile.department_id)
+              .single();
+            reviewerId = dept?.head_user_id || null;
+          }
+          
+          // Fallback: use approver from the task (not loaded here, skip)
+          if (reviewerId) {
+            updateData.internal_reviewer = reviewerId;
+          }
+        }
+
         const { error } = await supabase
           .from('tasks')
-          .update({ status: targetStatus })
+          .update(updateData)
           .eq('id', activeId);
 
         if (error) throw error;
@@ -584,7 +618,9 @@ export default function TasksPage({ embedded = false }: { embedded?: boolean }) 
   const columns = [
     { id: 'todo' as TaskStatus, label: 'Προς Υλοποίηση', icon: <Circle className="h-5 w-5 text-muted-foreground" /> },
     { id: 'in_progress' as TaskStatus, label: 'Σε Εξέλιξη', icon: <Clock className="h-5 w-5 text-primary" /> },
-    { id: 'review' as TaskStatus, label: 'Προς Έλεγχο', icon: <AlertCircle className="h-5 w-5 text-warning" /> },
+    { id: 'review' as TaskStatus, label: 'Αναθεώρηση', icon: <AlertCircle className="h-5 w-5 text-warning" /> },
+    { id: 'internal_review' as TaskStatus, label: 'Εσωτ. Έγκριση', icon: <AlertCircle className="h-5 w-5 text-violet-600" /> },
+    { id: 'client_review' as TaskStatus, label: 'Έγκριση Πελάτη', icon: <AlertCircle className="h-5 w-5 text-orange-500" /> },
     { id: 'completed' as TaskStatus, label: 'Ολοκληρώθηκε', icon: <CheckCircle2 className="h-5 w-5 text-success" /> },
   ];
 
@@ -671,7 +707,7 @@ export default function TasksPage({ embedded = false }: { embedded?: boolean }) 
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
-      <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {columns.map(column => (
           <div key={column.id} className="space-y-4">
             <div className="flex items-center gap-2">
@@ -822,7 +858,9 @@ export default function TasksPage({ embedded = false }: { embedded?: boolean }) 
                         <SelectContent>
                           <SelectItem value="todo">Προς υλοποίηση</SelectItem>
                           <SelectItem value="in_progress">Σε εξέλιξη</SelectItem>
-                          <SelectItem value="review">Προς έλεγχο</SelectItem>
+                          <SelectItem value="review">Αναθεώρηση</SelectItem>
+                          <SelectItem value="internal_review">Εσωτ. Έγκριση</SelectItem>
+                          <SelectItem value="client_review">Έγκριση Πελάτη</SelectItem>
                           <SelectItem value="completed">Ολοκληρώθηκε</SelectItem>
                         </SelectContent>
                       </Select>

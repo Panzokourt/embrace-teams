@@ -48,7 +48,9 @@ interface TaskWithProject {
   description?: string | null;
   assigned_to?: string | null;
   approver?: string | null;
+  internal_reviewer?: string | null;
   project?: { name: string } | null;
+  assignee?: { full_name: string | null } | null;
 }
 
 interface MyProject {
@@ -61,7 +63,7 @@ interface MyProject {
 
 type ChatMsg = { role: 'user' | 'assistant'; content: string };
 
-const TASK_SELECT = 'id, title, status, priority, due_date, start_date, estimated_hours, actual_hours, progress, task_type, task_category, project_id, description, assigned_to, project:projects(name)';
+const TASK_SELECT = 'id, title, status, priority, due_date, start_date, estimated_hours, actual_hours, progress, task_type, task_category, project_id, description, assigned_to, internal_reviewer, project:projects(name)';
 
 // ── Helpers ────────────────────────────────────────
 function getStatusLabel(s: string) {
@@ -316,7 +318,8 @@ export default function MyWork() {
   const [todayTasks, setTodayTasks] = useState<TaskWithProject[]>([]);
   const [weekTasks, setWeekTasks] = useState<TaskWithProject[]>([]);
   const [upcomingTasks, setUpcomingTasks] = useState<TaskWithProject[]>([]);
-  const [approvalTasks, setApprovalTasks] = useState<TaskWithProject[]>([]);
+  const [approvalTasks, setApprovalTasks] = useState<TaskWithProject[]>([]); // client_review (approver)
+  const [internalReviewTasks, setInternalReviewTasks] = useState<TaskWithProject[]>([]); // internal_review
   const [myProjects, setMyProjects] = useState<MyProject[]>([]);
   const [todayHours, setTodayHours] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -370,15 +373,17 @@ export default function MyWork() {
     const weekEnd = format(endOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd');
     const tomorrowISO = format(startOfTomorrow(), 'yyyy-MM-dd');
 
-    const [allMyTasks, approvalRes, projects, timeEntries] = await Promise.all([
+    const [allMyTasks, approvalRes, internalReviewRes, projects, timeEntries] = await Promise.all([
       supabase.from('tasks').select(TASK_SELECT).eq('assigned_to', user.id).neq('status', 'completed').order('due_date', { ascending: true }),
-      supabase.from('tasks').select(TASK_SELECT).eq('approver', user.id as any).eq('status', 'review' as any) as any,
+      supabase.from('tasks').select(TASK_SELECT + ', assignee:profiles!assigned_to(full_name)').eq('approver', user.id as any).in('status', ['review', 'client_review'] as any) as any,
+      supabase.from('tasks').select(TASK_SELECT + ', assignee:profiles!assigned_to(full_name)').eq('internal_reviewer', user.id as any).eq('status', 'internal_review' as any) as any,
       supabase.from('project_user_access').select('project:projects(id, name, status, progress, client:clients(name))').eq('user_id', user.id),
       supabase.from('time_entries').select('duration_minutes').eq('user_id', user.id).gte('start_time', new Date(today).toISOString()).eq('is_running', false),
     ]);
 
     const allTasks = (allMyTasks.data || []) as TaskWithProject[];
     setApprovalTasks((approvalRes.data || []) as TaskWithProject[]);
+    setInternalReviewTasks((internalReviewRes.data || []) as TaskWithProject[]);
 
     const todayFiltered = allTasks.filter(t => {
       const dd = t.due_date ? startOfDay(new Date(t.due_date)) : null;
@@ -425,13 +430,26 @@ export default function MyWork() {
   }
 
   async function approveTask(task: TaskWithProject) {
+    // Internal review: approve → client_review (if approver) or completed
     const { error } = await supabase.from('tasks').update({ status: 'completed' as any }).eq('id', task.id);
     if (!error) { toast.success('Task εγκρίθηκε!'); fetchAll(); }
   }
 
+  async function approveInternalReview(task: TaskWithProject) {
+    // If task has an approver, go to client_review; otherwise completed
+    const newStatus = task.approver ? 'client_review' : 'completed';
+    const { error } = await supabase.from('tasks').update({ status: newStatus as any }).eq('id', task.id);
+    if (!error) { toast.success(newStatus === 'client_review' ? 'Προχωρά σε Έγκριση Πελάτη!' : 'Task εγκρίθηκε!'); fetchAll(); }
+  }
+
+  async function rejectInternalReview(task: TaskWithProject) {
+    const { error } = await supabase.from('tasks').update({ status: 'in_progress' as any, internal_reviewer: null as any }).eq('id', task.id);
+    if (!error) { toast.success('Task απορρίφθηκε, επιστροφή σε Σε Εξέλιξη'); fetchAll(); }
+  }
+
   async function rejectTask(task: TaskWithProject) {
     const { error } = await supabase.from('tasks').update({ status: 'in_progress' as any }).eq('id', task.id);
-    if (!error) { toast.success('Task απορρίφθηκε, επιστροφή σε In Progress'); fetchAll(); }
+    if (!error) { toast.success('Task απορρίφθηκε, επιστροφή σε Σε Εξέλιξη'); fetchAll(); }
   }
 
   function handleDragEnd(event: any) {
@@ -517,35 +535,76 @@ export default function MyWork() {
         </Card>
       </div>
 
-      {/* Pending Task Approvals */}
-      {approvalTasks.length > 0 && (
+      {/* Προς Έγκριση (Internal + Client Review) */}
+      {(internalReviewTasks.length > 0 || approvalTasks.length > 0) && (
         <Card className="border-border/50 border-warning/30">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-warning" />
-              Εκκρεμείς Εγκρίσεις Tasks ({approvalTasks.length})
+              Προς Έγκριση ({internalReviewTasks.length + approvalTasks.length})
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="divide-y divide-border/50">
-              {approvalTasks.map(task => (
-                <div key={task.id} className="flex items-center gap-3 px-4 md:px-6 py-3">
-                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setSelectedTask(task)}>
-                    <p className="text-sm font-medium text-foreground hover:text-primary">{task.title}</p>
-                    <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
-                  </div>
-                  <Badge variant={getPriorityColor(task.priority)} className="text-[10px]">{task.priority}</Badge>
-                  <div className="flex gap-1.5">
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-success hover:text-success" onClick={() => approveTask(task)}>
-                      <Check className="h-4 w-4" />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => rejectTask(task)}>
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
+            {/* Εσωτερική Έγκριση */}
+            {internalReviewTasks.length > 0 && (
+              <>
+                <div className="px-4 md:px-6 py-2 bg-violet-500/5 border-b border-border/50 flex items-center gap-2">
+                  <span className="text-xs font-semibold text-violet-600">🏢 Εσωτερική Έγκριση ({internalReviewTasks.length})</span>
                 </div>
-              ))}
-            </div>
+                <div className="divide-y divide-border/50">
+                  {internalReviewTasks.map(task => (
+                    <div key={task.id} className="flex items-center gap-3 px-4 md:px-6 py-3">
+                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setSelectedTask(task)}>
+                        <p className="text-sm font-medium text-foreground hover:text-primary">{task.title}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
+                          {(task as any).assignee?.full_name && (
+                            <span className="text-xs text-muted-foreground">· {(task as any).assignee.full_name}</span>
+                          )}
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] border-violet-500/30 text-violet-600">Εσωτ. Έγκριση</Badge>
+                      <div className="flex gap-1.5">
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-success hover:text-success" onClick={() => approveInternalReview(task)}>
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => rejectInternalReview(task)}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Έγκριση Πελάτη */}
+            {approvalTasks.length > 0 && (
+              <>
+                <div className="px-4 md:px-6 py-2 bg-orange-500/5 border-b border-border/50 flex items-center gap-2">
+                  <span className="text-xs font-semibold text-orange-600">🤝 Έγκριση Πελάτη ({approvalTasks.length})</span>
+                </div>
+                <div className="divide-y divide-border/50">
+                  {approvalTasks.map(task => (
+                    <div key={task.id} className="flex items-center gap-3 px-4 md:px-6 py-3">
+                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setSelectedTask(task)}>
+                        <p className="text-sm font-medium text-foreground hover:text-primary">{task.title}</p>
+                        <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
+                      </div>
+                      <Badge variant={getPriorityColor(task.priority)} className="text-[10px]">{task.priority}</Badge>
+                      <div className="flex gap-1.5">
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-success hover:text-success" onClick={() => approveTask(task)}>
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => rejectTask(task)}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       )}

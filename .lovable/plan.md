@@ -1,165 +1,164 @@
 
-# Δύο Νέα Στάδια Task: Εσωτερική Έγκριση & Έγκριση Πελάτη
+# Gantt / Timeline View στην Καρτέλα Έργου
 
-## Τι αλλάζει στη βάση (Migration)
+## Τι θα προσθέσουμε
 
-Το υπάρχον enum `task_status` έχει μόνο 4 τιμές: `todo | in_progress | review | completed`. Χρειάζεται να προσθέσουμε 2 νέες:
+Ένα νέο tab **"Timeline"** στην καρτέλα κάθε έργου που εμφανίζει tasks και deliverables σε Gantt chart — οριζόντιες μπάρες σε χρονολογικό άξονα, χωρισμένες ανά Deliverable (grouping).
 
-- **`internal_review`** — Εσωτερική Έγκριση (ο αμέσως ανώτερος ιεραρχικά)
-- **`client_review`** — Έγκριση Πελάτη (θα ορίζεται χειροκίνητα, π.χ. project manager)
+Δεν χρειάζεται εξωτερική βιβλιοθήκη Gantt — θα υλοποιηθεί **custom με pure CSS/Tailwind + Recharts** (ήδη εγκατεστημένο) χρησιμοποιώντας `recharts` για το χρονολογικό άξονα και SVG bars για τα items.
 
-Επίσης, για να γνωρίζει το σύστημα ποιος είναι ο "εσωτερικός εγκριτής", χρειάζεται ένα νέο πεδίο `internal_reviewer` (UUID, nullable) στον πίνακα `tasks`. Αυτό θα συμπληρώνεται **αυτόματα** όταν ένα task μεταβεί σε `internal_review`, βάσει της ιεραρχίας:
-1. Πρώτα: `profiles.reports_to` (άμεσος manager)
-2. Αν δεν υπάρχει: `departments.head_user_id` (επικεφαλής τμήματος)
-3. Αν δεν υπάρχει: fallback στον υπάρχοντα `approver`
+---
 
-## Αρχιτεκτονική Ιεραρχικής Ανάθεσης
+## Αρχιτεκτονική Gantt (Pure Custom — χωρίς εξωτερική βιβλιοθήκη)
 
-```text
-Χρήστης αλλάζει task σε "Εσωτερική Έγκριση"
-        ↓
-Frontend: κοιτά το profiles.reports_to του assigned_to
-        ↓ (αν null)
-κοιτά το departments.head_user_id του τμήματος του assigned_to
-        ↓ (αν null)
-χρησιμοποιεί τον υπάρχοντα approver
-        ↓
-Αποθηκεύει task με status='internal_review' και internal_reviewer=<id>
-        ↓
-Ο internal_reviewer βλέπει το task στο My Work του στο section "Προς Έγκριση"
-```
+Το Gantt θα είναι ένα **scrollable grid** με:
 
-## Τι αλλάζει σε κάθε αρχείο
-
-### 1. Database Migration (νέα migration)
-
-```sql
--- Προσθήκη νέων τιμών στο enum task_status
-ALTER TYPE task_status ADD VALUE 'internal_review';
-ALTER TYPE task_status ADD VALUE 'client_review';
-
--- Νέο πεδίο για εσωτερικό εγκριτή
-ALTER TABLE tasks ADD COLUMN internal_reviewer uuid REFERENCES profiles(id);
-```
-
-### 2. `src/pages/Tasks.tsx` — Kanban & Status Config
-
-Προσθήκη 2 νέων columns στο Kanban view:
-- `internal_review` → "Εσωτερική Έγκριση" (χρώμα: violet/purple)
-- `client_review` → "Έγκριση Πελάτη" (χρώμα: orange)
-
-Ενημέρωση του `statusConfig` object με icons και labels.
-
-Λογική status transition: όταν ένα task drag-and-drop σε `internal_review`, η `handleStatusChange` θα κάνει query τον `reports_to` / `department.head_user_id` του assigned_to και θα αποθηκεύει αυτόματα τον `internal_reviewer`.
-
-### 3. `src/components/tasks/TasksTableView.tsx` — Table View
-
-Ενημέρωση του `STATUS_OPTIONS` array με τα 2 νέα statuses και τα σωστά labels/colors.
-
-### 4. `src/pages/TaskDetail.tsx` — Task Detail Page
-
-Ενημέρωση του `STATUS_CONFIG` object. Προσθήκη εμφάνισης του `internal_reviewer` στο Properties Grid (μόνο για tasks σε `internal_review`). Λογική αυτόματης ανάθεσης internal_reviewer κατά την αλλαγή status.
-
-### 5. `src/components/projects/ProjectTasksManager.tsx`
-
-Ενημέρωση του τύπου `TaskStatus` και των `getStatusLabel`/`getStatusIcon` functions. Ενημέρωση Select options στο form.
-
-### 6. `src/pages/MyWork.tsx` — Σελίδα "My Work"
-
-Αυτή είναι η **κεντρική αλλαγή** στο UX. Το υπάρχον section "Εκκρεμείς Εγκρίσεις Tasks" δείχνει ήδη tasks όπου `approver = user.id` και `status = 'review'`. Θα επεκταθεί για να δείχνει και tasks όπου:
-
-- `internal_reviewer = user.id` AND `status = 'internal_review'`
-
-Το section θα μετονομαστεί σε **"Προς Έγκριση"** και θα χωρίζεται σε 2 υπο-ομάδες:
+- **Αριστερά (fixed, ~240px)**: Λίστα με όνομα task/deliverable + badge κατάστασης
+- **Δεξιά (scrollable)**: Οριζόντιο grid ημερών/εβδομάδων με μπάρες
 
 ```text
-┌─────────────────────────────────────────────────────────┐
-│  Προς Έγκριση (N)                                        │
-│  ─────────────────────────────────────────────────────  │
-│  🏢 Εσωτερική Έγκριση                                    │
-│  □ [Task Title]  [Έργο]  [Assignee]  [✓ Έγκριση] [✗]  │
-│  □ [Task Title]  [Έργο]  [Assignee]  [✓ Έγκριση] [✗]  │
-│                                                         │
-│  🤝 Έγκριση Πελάτη (υπάρχον review + approver)         │
-│  □ [Task Title]  [Έργο]  [Priority]  [✓] [✗]           │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────┬────────────────────────────────────────────────┐
+│  ΕΡΓΑΣΙΑ / ΠΑΡΑΔΟΤΕΟ     │  Ιαν │ Φεβ │ Μαρ │ Απρ │ Μαι │ Ιουν │ ...  │
+├──────────────────────────┼────────────────────────────────────────────────┤
+│  📦 Deliverable Α        │  ██████████████████████                       │
+│    └ Task 1              │     ████████████                               │
+│    └ Task 2              │              ████████████████                  │
+│  📦 Deliverable Β        │                       ██████████████████       │
+│    └ Task 3              │                       ██████                   │
+│  ⚡ Tasks χωρίς deliverable│                                  ████████   │
+└──────────────────────────┴────────────────────────────────────────────────┘
 ```
 
-**Fetch logic στο My Work:**
+---
+
+## Νέο Component: `ProjectGanttView.tsx`
+
+**Νέο αρχείο**: `src/components/projects/ProjectGanttView.tsx`
+
+### Props
 ```typescript
-// Internal reviews που ο current user είναι internal_reviewer
-supabase.from('tasks')
-  .select(...)
-  .eq('internal_reviewer', user.id)
-  .eq('status', 'internal_review')
-
-// Client reviews που ο current user είναι approver
-supabase.from('tasks')
-  .select(...)
-  .eq('approver', user.id)
-  .eq('status', 'review') // υπάρχον 'review' OR 'client_review'
+interface ProjectGanttViewProps {
+  projectId: string;
+  projectStartDate?: string | null;
+  projectEndDate?: string | null;
+}
 ```
 
-**Approve/Reject actions για internal_review:**
-- **Έγκριση**: status → `client_review` (αν υπάρχει approver) ή `completed`
-- **Απόρριψη**: status → `in_progress`, εμφάνιση toast
+### Data Fetching
+- Tasks: `id, title, status, priority, start_date, due_date, deliverable_id, assigned_to` + assignee profile
+- Deliverables: `id, name, due_date, completed`
+- Grouping: Tasks ομαδοποιούνται κάτω από το deliverable τους, τα unassigned σε ξεχωριστή ομάδα
 
-**Approve/Reject actions για client_review:**
-- **Έγκριση**: status → `completed`
-- **Απόρριψη**: status → `in_progress`
+### Χρονολογικό Εύρος (Timeline Range)
+- **Αρχή**: `min(project.start_date, earliest task.start_date || task.due_date)` 
+- **Τέλος**: `max(project.end_date, latest task.due_date)` + buffer 2 εβδομάδες
+- Αν δεν υπάρχουν ημερομηνίες, default ±3 μήνες από σήμερα
+- **Granularity toggle**: Εβδομάδες (default) ή Μήνες (για μεγάλα έργα)
 
-### 7. RLS Policy για `internal_reviewer`
+### Οπτικά στοιχεία κάθε μπάρας
 
-Χρειάζεται νέα RLS policy ώστε ο `internal_reviewer` να μπορεί να βλέπει και να ενημερώνει τα tasks που του έχουν ανατεθεί για έγκριση:
+| Τύπος | Χρώμα | Ύψος | Εικονίδιο |
+|-------|-------|------|-----------|
+| Deliverable | `bg-primary` | 6px | 📦 |
+| Task `todo` | `bg-muted-foreground/40` | 16px | ○ |
+| Task `in_progress` | `bg-primary` | 16px | ⟳ |
+| Task `review` | `bg-warning` | 16px | ! |
+| Task `internal_review` | `bg-violet-500` | 16px | 🏢 |
+| Task `client_review` | `bg-orange-500` | 16px | 🤝 |
+| Task `completed` | `bg-success` | 16px | ✓ |
+| Task overdue | `bg-destructive` | 16px | ⚠ |
 
-```sql
--- Ο internal_reviewer μπορεί να βλέπει τα tasks
-CREATE POLICY "Users can view tasks for internal review"
-ON tasks FOR SELECT
-USING (auth.uid() = internal_reviewer);
+### Σήμανση "Σήμερα"
+Μια κατακόρυφη κόκκινη γραμμή που δείχνει πού βρισκόμαστε στο timeline.
 
--- Ο internal_reviewer μπορεί να ενημερώνει το status
-CREATE POLICY "Internal reviewers can update task status"
-ON tasks FOR UPDATE
-USING (auth.uid() = internal_reviewer);
-```
+### Tooltip on hover
+Κάθε μπάρα δείχνει tooltip με:
+- Τίτλος
+- Start date → Due date
+- Status badge
+- Assignee (για tasks)
+- Progress %
 
-## Ροή Χρήστη (UX Flow)
+---
+
+## Controls (φίλτρα πάνω από το Gantt)
 
 ```text
-[Assignee] Ολοκληρώνει εργασία
-    ↓
-Αλλάζει status σε "Εσωτερική Έγκριση"
-    ↓
-Σύστημα: βρίσκει αυτόματα τον ανώτερο ιεραρχικά
-  → reports_to ή department head
-    ↓
-[Manager] Βλέπει task στο MY WORK > "Προς Έγκριση"
-    ↓
-  [Εγκρίνει] → status: "Έγκριση Πελάτη" ή "Ολοκληρώθηκε"
-  [Απορρίπτει] → status: "Σε Εξέλιξη" (επιστροφή στον assignee)
-    ↓
-[Approver/PM] Βλέπει task στο MY WORK > "Έγκριση Πελάτη"
-    ↓
-  [Εγκρίνει] → status: "Ολοκληρώθηκε"
-  [Απορρίπτει] → status: "Σε Εξέλιξη"
+┌─────────────────────────────────────────────────────┐
+│ [Εβδομάδες | Μήνες]  [Φίλτρο Status ▼]  [Zoom ←→] │
+└─────────────────────────────────────────────────────┘
 ```
+
+- **Granularity toggle**: Εβδομάδες / Μήνες
+- **Status filter**: Checkbox multi-select για φιλτράρισμα tasks
+- **Scroll navigation**: Κουμπιά "< Πριν" / "Μετά >" ή scroll με mouse
+- **Κουμπί "Σήμερα"**: Κεντράρει το view στη σημερινή ημερομηνία
+
+---
+
+## Τεχνική Υλοποίηση
+
+### Layout με CSS Grid
+```text
+Το Gantt είναι ένα div με overflow-x:scroll
+  Header row: sticky top με τους μήνες/εβδομάδες  
+  Body rows: flex row με fixed αριστερό panel + scrolling bars area
+  Κάθε μπάρα: position:absolute, left% + width% βάσει ημερομηνιών
+```
+
+### Υπολογισμός θέσης μπάρας
+```typescript
+// left% = (startDate - timelineStart) / totalDays * 100
+// width% = (endDate - startDate) / totalDays * 100
+const getBarStyle = (startDate: Date, endDate: Date) => ({
+  left: `${((startDate - timelineStart) / totalMs) * 100}%`,
+  width: `${((endDate - startDate) / totalMs) * 100}%`,
+  minWidth: '4px' // για tasks χωρίς start_date (μόνο due_date = 1 ημέρα)
+});
+```
+
+### Χειρισμός tasks χωρίς start_date
+Αν task έχει μόνο `due_date` (κοινή περίπτωση), εμφανίζεται ως **διαμαντένιο milestone marker** (◆) στο due_date αντί για μπάρα.
+
+---
+
+## Αλλαγές στο `ProjectDetail.tsx`
+
+Προσθήκη νέου tab "Timeline":
+
+```typescript
+// Στο TabsList:
+<TabsTrigger value="timeline">
+  <GanttChartSquare className="h-4 w-4 mr-1.5" />
+  Timeline
+</TabsTrigger>
+
+// Νέο TabsContent:
+<TabsContent value="timeline">
+  <ProjectGanttView
+    projectId={project.id}
+    projectStartDate={project.start_date}
+    projectEndDate={project.end_date}
+  />
+</TabsContent>
+```
+
+---
 
 ## Αρχεία που αλλάζουν
 
-| Αρχείο | Τύπος αλλαγής |
-|--------|---------------|
-| `supabase/migrations/new.sql` | Migration: νέες τιμές enum + πεδίο internal_reviewer + RLS policies |
-| `src/pages/Tasks.tsx` | Νέα status columns στο Kanban, λογική internal_reviewer |
-| `src/components/tasks/TasksTableView.tsx` | STATUS_OPTIONS ενημέρωση |
-| `src/pages/TaskDetail.tsx` | STATUS_CONFIG, Properties Grid, αυτόματη ανάθεση internal_reviewer |
-| `src/components/projects/ProjectTasksManager.tsx` | TaskStatus type, labels, Select options |
-| `src/pages/MyWork.tsx` | Section "Προς Έγκριση" με ιεραρχία, approve/reject logic |
-| `src/hooks/useRealtimeSubscription.ts` | Ενδεχομένως ενημέρωση για νέα statuses |
+| Αρχείο | Αλλαγή |
+|--------|--------|
+| `src/components/projects/ProjectGanttView.tsx` | **Νέο αρχείο** — πλήρες Gantt component |
+| `src/pages/ProjectDetail.tsx` | Προσθήκη tab "Timeline" + import |
 
-## Σημαντικές Τεχνικές Σημειώσεις
+---
 
-- Η αυτόματη ανάθεση `internal_reviewer` γίνεται **client-side** κατά τη στιγμή της αλλαγής status — αποφεύγουμε edge function για λόγους απλότητας
-- Η ιεραρχία ανάγνωσης (reports_to → dept head → approver) εφαρμόζεται παντού όπου αλλάζει status σε `internal_review`
-- Οι existing tasks με `status='review'` συνεχίζουν να λειτουργούν κανονικά — δεν σπάει backward compatibility
-- Το `client_review` θα αντικαταστήσει λειτουργικά το παλιό `review` status ως "Έγκριση από Πελάτη", ενώ το παλιό `review` παραμένει ως "Αναθεώρηση" για backward compat
+## UX Λεπτομέρειες
+
+- **Empty state**: Αν δεν υπάρχουν tasks/deliverables με ημερομηνίες, εμφανίζεται friendly message
+- **Loading skeleton**: Animated rows ενώ φορτώνει
+- **Horizontal scroll**: Smooth, με scrollbar εμφανή
+- **Mobile**: Σε κινητό εμφανίζει μόνο τη λίστα tasks ταξινομημένη κατά due_date (fallback)
+- **Task click**: Ανοίγει το task detail page (navigate `/tasks/:id`)
+

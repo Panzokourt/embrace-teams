@@ -23,13 +23,24 @@ export default function AppLayout() {
     return <Navigate to="/auth" replace />;
   }
 
-  // Redirect to onboarding if user has no company role (new signup via Google OAuth)
+  // Hard redirect to onboarding if user has no company role (new signup via Google OAuth)
+  // Using window.location.replace to prevent React re-renders from interrupting the redirect
   if (!companyRole) {
-    return <Navigate to="/onboarding" replace />;
+    window.location.replace('/onboarding');
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   if (postLoginRoute && postLoginRoute !== '/') {
-    return <Navigate to={postLoginRoute} replace />;
+    window.location.replace(postLoginRoute);
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return (

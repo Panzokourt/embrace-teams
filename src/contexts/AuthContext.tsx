@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -102,6 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [permissions, setPermissions] = useState<PermissionType[]>([]);
   const [legacyRoles, setLegacyRoles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const fetchingRef = useRef(false);
   const [postLoginRoute, setPostLoginRoute] = useState<string | null>(null);
 
   const applySession = (nextSession: Session | null) => {
@@ -146,6 +147,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const fetchUserData = async (userId: string) => {
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
     try {
       // Fetch profile
       const { data: profileData } = await supabase
@@ -262,6 +265,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Error fetching user data:', error);
     } finally {
+      fetchingRef.current = false;
       setLoading(false);
     }
   };

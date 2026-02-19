@@ -1,27 +1,47 @@
 
 
-# Fix: Dialogs με κομμένο περιεχόμενο (non-scrollable)
+# Fix: Status "Αναμονή", Role Change & Inline Editing
 
-## Πρόβλημα
+## Πρόβλημα 1: Status "Αναμονή"
 
-Τα dialogs που χρησιμοποιούν `overflow-hidden flex flex-col` με εσωτερικό `ScrollArea` δεν κάνουν scroll σωστά. Το περιεχόμενο κόβεται γιατί τα flex children στο CSS δεν μικραίνουν κάτω από το content size τους (default `min-height: auto`).
+Το `profiles.status` στη βάση είναι `pending` ενώ το `user_company_roles.status` είναι `active`. Η σελίδα Employee Profile διαβάζει από το λάθος πεδίο. Θα:
+- Ενημερώσουμε το `profiles.status` σε `active` στη βάση
+- Αλλάξουμε την EmployeeProfile να διαβάζει status από `user_company_roles` αντί `profiles`
 
-## Λύση
+## Πρόβλημα 2: Αλλαγή Ρόλου δεν δουλεύει
 
-Δύο αλλαγές:
+Στο dropdown (UsersTableView, γραμμή 258) χρησιμοποιεί τα παλιά ονόματα ρόλων: `standard`, `client`. Θα αντικατασταθούν με τα σωστά: `admin`, `manager`, `member`, `viewer`, `billing`.
 
-### 1. Base DialogContent component (`src/components/ui/dialog.tsx`)
-Προσθήκη `min-h-0` στο flex container wrapper ώστε τα flex children να μπορούν να shrink σωστά σε κάθε dialog.
+## Πρόβλημα 3: Παλιά role labels
 
-### 2. Dialogs με `overflow-hidden flex flex-col`
-Προσθήκη `min-h-0` στα form/div wrappers μέσα στα dialogs που χρησιμοποιούν flex layout, ώστε το ScrollArea να παίρνει σωστό ύψος.
+Στο EmployeeProfile.tsx (γραμμές 32-38) χρησιμοποιεί ακόμα `super_admin`, `standard`, `client`. Θα ενημερωθούν σε `owner`, `member`, `viewer`, `billing`.
 
-Αφορά τα εξής αρχεία:
-- `src/components/users/EditPermissionsDialog.tsx` - form needs `min-h-0`
-- `src/components/users/InviteUserDialog.tsx` - form needs `min-h-0`
-- `src/components/users/CreateUserDialog.tsx` - form needs `min-h-0`
-- `src/components/blueprints/BriefFormDialog.tsx` - content needs `min-h-0`
+## Πρόβλημα 4: Inline Editing στο προφίλ χρήστη
 
-### Τεχνική εξήγηση
-Στο CSS Flexbox, τα children έχουν `min-height: auto` by default. Αυτό σημαίνει ότι δεν μικραίνουν κάτω από το μέγεθος του περιεχομένου τους, ακόμα κι αν ο parent έχει `overflow-hidden`. Προσθέτοντας `min-h-0` (Tailwind class για `min-height: 0`) στα flex children, τους επιτρέπουμε να shrink και το `ScrollArea` / `overflow-y-auto` λειτουργεί κανονικά.
+Θα προστεθεί inline editing στην EmployeeProfile/EmployeeHeader για τα πεδία:
+- **Job Title** (Θέση εργασίας)
+- **Phone** (Τηλέφωνο)
+- **Hire Date** (Ημ. Πρόσληψης)
+- **Full Name** (Ονοματεπώνυμο)
+
+Κάθε πεδίο θα εμφανίζεται κανονικά, και με click θα γίνεται editable (χρησιμοποιώντας το υπάρχον pattern InlineEditCell ή απλό inline editing).
+
+---
+
+## Τεχνικές Αλλαγές
+
+### Αρχεία που τροποποιούνται
+
+| Αρχείο | Αλλαγή |
+|--------|--------|
+| `src/components/users/UsersTableView.tsx` | Fix role list στο dropdown: `['admin', 'manager', 'member', 'viewer', 'billing']` |
+| `src/pages/EmployeeProfile.tsx` | Ενημέρωση roleLabels σε νέους ρόλους, ανάγνωση status από user_company_roles |
+| `src/components/hr/EmployeeHeader.tsx` | Προσθήκη inline editing για name, job_title, phone, hire_date |
+| `src/pages/UserDetail.tsx` | Ενημέρωση roleLabels σε νέους ρόλους |
+
+### Database fix
+- UPDATE profiles SET status = 'active' WHERE id = 'f6fee19b-...' (sync profiles.status με user_company_roles.status)
+
+### Inline editing approach
+Στο EmployeeHeader, κάθε πεδίο πληροφοριών (job_title, phone, hire_date) θα μετατραπεί σε editable span. Με click, εμφανίζεται input, με Enter/blur αποθηκεύεται στη βάση (profiles table). Μόνο users με canEdit δικαίωμα (admin/manager) θα μπορούν να επεξεργαστούν.
 

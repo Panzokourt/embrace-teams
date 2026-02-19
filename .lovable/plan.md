@@ -1,114 +1,72 @@
-# Dummy Data: Γέμισμα εφαρμογής με δοκιμαστικά δεδομένα
 
-## Τι θα δημιουργηθεί
+# Αυτοματοποίηση Εγγραφής & Διαχείριση Join Requests
 
-Ένα backend function που θα εισάγει ολοκληρωμένα dummy data σε όλη την εφαρμογή, χρησιμοποιώντας ελληνικά ονόματα και ρεαλιστικά δεδομένα.
+## Πώς θα λειτουργεί
 
-### Χρήστες (6 νέοι)
+### Ροή εγγραφής (αυτόματη)
 
+```text
+Νέος χρήστης εγγράφεται
+       |
+       v
+  Είναι εταιρικό email; (όχι gmail/yahoo κλπ)
+      / \
+    Ναι  Όχι --> Onboarding (manual: create org ή invite)
+     |
+     v
+  Υπάρχει εταιρεία με αυτό το domain;
+      / \
+    Ναι  Όχι --> Auto-create εταιρεία, χρήστης = Owner
+     |
+     v
+  Auto-create Join Request
+  --> Μήνυμα "Σε αναμονή έγκρισης"
+```
 
-| Όνομα              | Email                                           | Ρόλος   | Τμήμα    |
-| ------------------ | ----------------------------------------------- | ------- | -------- |
-| Μαρία Παπαδοπούλου | [maria@advize.gr](mailto:maria@advize.gr)       | admin   | Digital  |
-| Γιώργος Νικολάου   | [giorgos@advize.gr](mailto:giorgos@advize.gr)   | manager | Creative |
-| Ελένη Κωστοπούλου  | [eleni@advize.gr](mailto:eleni@advize.gr)       | member  | Digital  |
-| Δημήτρης Αθανασίου | [dimitris@advize.gr](mailto:dimitris@advize.gr) | member  | Creative |
-| Σοφία Μαυρίδου     | [sofia@advize.gr](mailto:sofia@advize.gr)       | viewer  | Digital  |
-| Νίκος Παπαγεωργίου | [nikos@advize.gr](mailto:nikos@advize.gr)       | billing | -        |
-
-
-### Τμήματα
-
-- Ενημέρωση υπαρχόντων (Digital, Creative) με heads
-- Διοίκηση (C-level & Heads (Director, Managers)
-- Λογιστήριο
-- Γραμματεία
-- Εκδηλώσεις
-
-### Οργανόγραμμα
-
-- Πλήρης ιεραρχία: CEO -> Heads -> Members
-
-### Πελάτες
-
-- 3 νέοι: Vodafone, Cosmote, Alpha Bank
-
-### Έργα (6 νέα)
-
-- Σε διάφορα stages (active, proposal, completed)
-- Με deliverables, tasks, team assignments
-
-### Tasks (~30 νέα)
-
-- Σε κάθε project, διαφορετικά status, assigned σε χρήστες
-
-### Υπηρεσίες (Services)
-
-- 6 υπηρεσίες: Social Media Management, Web Development, Branding, SEO, Media Buying, Content Creation
-
-### Συμβάσεις (Contracts)
-
-- 4 συμβάσεις σε projects (active, draft, ended)
-
-### Τιμολόγια (Invoices)
-
-- 8 τιμολόγια (paid, unpaid, overdue)
-
-### Έξοδα (Expenses)
-
-- 10 έξοδα (vendor, overhead, media_spend)
-
-### Leave Types & Requests
-
-- 3 τύποι: Κανονική, Ασθένεια, Άδεια άνευ
-- Balances για κάθε χρήστη
-- 5 αιτήματα αδείας (pending, approved, rejected)
-
-### Timesheets
-
-- 30+ time entries για τις τελευταίες 2 εβδομάδες
+### Στο HR: Tab "Αιτήματα Ένταξης"
+- Εμφανίζει join_requests με status = pending
+- Ο Admin/Owner μπορεί να Εγκρίνει (δημιουργεί user_company_roles με member) ή Απορρίψει
+- Ειδοποίηση στο NotificationBell για νέα αιτήματα
 
 ---
 
-## Τεχνική Υλοποίηση
+## Τεχνικές Αλλαγές
 
-### 1. Edge Function: `seed-dummy-data`
+### 1. Database: Νέα function `auto_onboard_user`
+Νέα SQL function (security definer) που καλείται κατά το onboarding:
+- Δέχεται user_id
+- Ελέγχει domain του email
+- Αν δεν υπάρχει εταιρεία: δημιουργεί εταιρεία + owner role
+- Αν υπάρχει: δημιουργεί join_request
+- Επιστρέφει jsonb με `action: 'created_company' | 'join_requested' | 'personal_email'`
 
-Νέο backend function που:
+### 2. Onboarding.tsx: Auto-trigger
+- Κατά το mount, αν ο χρήστης δεν έχει εταιρεία, καλεί `auto_onboard_user`
+- Αν `action = created_company`: redirect στο `/`
+- Αν `action = join_requested`: δείχνει pending screen
+- Αν `action = personal_email`: δείχνει τις manual επιλογές (όπως σήμερα)
 
-- Δημιουργεί χρήστες μέσω Admin API (auth.admin.createUser)
-- Εισάγει δεδομένα σε όλους τους πίνακες με service role key (bypasses RLS)
-- Ελέγχει αν τα δεδομένα υπάρχουν ήδη (idempotent)
-- Επιστρέφει σύνοψη τι δημιουργήθηκε
+### 3. HR Page: Ενότητα Join Requests
+- Νέο component `JoinRequestsManager.tsx`
+- Πίνακας με: Ονοματεπώνυμο, Email, Ημερομηνία αιτήματος, Status
+- Κουμπιά: Έγκριση (insert user_company_roles + update status approved) / Απόρριψη (update status rejected)
+- Εμφάνιση μόνο σε Admin/Owner
+- Badge στο HR tab αν υπάρχουν pending requests
 
-### 2. Σειρά εισαγωγής (λόγω foreign keys)
-
-```text
-1. Users (auth + profiles + roles)
-2. Departments (+ assign heads)
-3. Org Chart Positions
-4. Clients
-5. Projects (+ project_user_access)
-6. Deliverables
-7. Tasks
-8. Services
-9. Contracts
-10. Invoices
-11. Expenses
-12. Leave Types + Balances + Requests
-13. Time Entries
-```
-
-### 3. Κλήση από UI
-
-Προσωρινό κουμπί στο Settings ή απευθείας κλήση μέσω browser console. Εναλλακτικά, θα τρέξει αυτόματα με curl μετά το deploy.
+### 4. AuthContext update
+- Μετά το login, αν δεν υπάρχουν company roles ΑΛΛΑ υπάρχει pending join_request, redirect σε pending screen αντί onboarding
 
 ### Αρχεία
 
+| Αρχείο | Ενέργεια |
+|--------|----------|
+| Migration SQL | Νέα function `auto_onboard_user` |
+| `src/pages/Onboarding.tsx` | Auto-trigger logic κατά mount |
+| `src/contexts/AuthContext.tsx` | Check pending join requests |
+| `src/components/hr/JoinRequestsManager.tsx` | Νέο - πίνακας αιτημάτων |
+| `src/pages/HR.tsx` | Προσθήκη tab/section join requests |
 
-| Αρχείο                                        | Ενέργεια                   |
-| --------------------------------------------- | -------------------------- |
-| `supabase/functions/seed-dummy-data/index.ts` | Νέο - edge function seeder |
-
-
-Κωδικός πρόσβασης για όλους τους dummy χρήστες: `Test123!`
+### Ασφάλεια
+- Η `auto_onboard_user` είναι security definer -- δεν χρειάζεται service role
+- Τα join_requests έχουν ήδη RLS policies (users create own, admins view/manage)
+- Η έγκριση γίνεται μόνο μέσω admin check στο component + RLS στη βάση

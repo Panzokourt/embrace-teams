@@ -8,7 +8,7 @@ import { GlobalActivityFeed } from '@/components/activity/GlobalActivityFeed';
 import { Loader2 } from 'lucide-react';
 
 export default function AppLayout() {
-  const { user, loading, isApproved, postLoginRoute } = useAuth();
+  const { user, loading, companyRole, postLoginRoute } = useAuth();
   const [activityOpen, setActivityOpen] = useState(false);
 
   if (loading) {
@@ -21,6 +21,11 @@ export default function AppLayout() {
 
   if (!user) {
     return <Navigate to="/auth" replace />;
+  }
+
+  // Redirect to onboarding if user has no company role (new signup via Google OAuth)
+  if (!companyRole) {
+    return <Navigate to="/onboarding" replace />;
   }
 
   if (postLoginRoute && postLoginRoute !== '/') {

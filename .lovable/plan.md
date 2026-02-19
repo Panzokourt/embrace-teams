@@ -1,47 +1,114 @@
+# Dummy Data: Γέμισμα εφαρμογής με δοκιμαστικά δεδομένα
+
+## Τι θα δημιουργηθεί
+
+Ένα backend function που θα εισάγει ολοκληρωμένα dummy data σε όλη την εφαρμογή, χρησιμοποιώντας ελληνικά ονόματα και ρεαλιστικά δεδομένα.
+
+### Χρήστες (6 νέοι)
 
 
-# Fix: Status "Αναμονή", Role Change & Inline Editing
+| Όνομα              | Email                                           | Ρόλος   | Τμήμα    |
+| ------------------ | ----------------------------------------------- | ------- | -------- |
+| Μαρία Παπαδοπούλου | [maria@advize.gr](mailto:maria@advize.gr)       | admin   | Digital  |
+| Γιώργος Νικολάου   | [giorgos@advize.gr](mailto:giorgos@advize.gr)   | manager | Creative |
+| Ελένη Κωστοπούλου  | [eleni@advize.gr](mailto:eleni@advize.gr)       | member  | Digital  |
+| Δημήτρης Αθανασίου | [dimitris@advize.gr](mailto:dimitris@advize.gr) | member  | Creative |
+| Σοφία Μαυρίδου     | [sofia@advize.gr](mailto:sofia@advize.gr)       | viewer  | Digital  |
+| Νίκος Παπαγεωργίου | [nikos@advize.gr](mailto:nikos@advize.gr)       | billing | -        |
 
-## Πρόβλημα 1: Status "Αναμονή"
 
-Το `profiles.status` στη βάση είναι `pending` ενώ το `user_company_roles.status` είναι `active`. Η σελίδα Employee Profile διαβάζει από το λάθος πεδίο. Θα:
-- Ενημερώσουμε το `profiles.status` σε `active` στη βάση
-- Αλλάξουμε την EmployeeProfile να διαβάζει status από `user_company_roles` αντί `profiles`
+### Τμήματα
 
-## Πρόβλημα 2: Αλλαγή Ρόλου δεν δουλεύει
+- Ενημέρωση υπαρχόντων (Digital, Creative) με heads
+- Διοίκηση (C-level & Heads (Director, Managers)
+- Λογιστήριο
+- Γραμματεία
+- Εκδηλώσεις
 
-Στο dropdown (UsersTableView, γραμμή 258) χρησιμοποιεί τα παλιά ονόματα ρόλων: `standard`, `client`. Θα αντικατασταθούν με τα σωστά: `admin`, `manager`, `member`, `viewer`, `billing`.
+### Οργανόγραμμα
 
-## Πρόβλημα 3: Παλιά role labels
+- Πλήρης ιεραρχία: CEO -> Heads -> Members
 
-Στο EmployeeProfile.tsx (γραμμές 32-38) χρησιμοποιεί ακόμα `super_admin`, `standard`, `client`. Θα ενημερωθούν σε `owner`, `member`, `viewer`, `billing`.
+### Πελάτες
 
-## Πρόβλημα 4: Inline Editing στο προφίλ χρήστη
+- 3 νέοι: Vodafone, Cosmote, Alpha Bank
 
-Θα προστεθεί inline editing στην EmployeeProfile/EmployeeHeader για τα πεδία:
-- **Job Title** (Θέση εργασίας)
-- **Phone** (Τηλέφωνο)
-- **Hire Date** (Ημ. Πρόσληψης)
-- **Full Name** (Ονοματεπώνυμο)
+### Έργα (6 νέα)
 
-Κάθε πεδίο θα εμφανίζεται κανονικά, και με click θα γίνεται editable (χρησιμοποιώντας το υπάρχον pattern InlineEditCell ή απλό inline editing).
+- Σε διάφορα stages (active, proposal, completed)
+- Με deliverables, tasks, team assignments
+
+### Tasks (~30 νέα)
+
+- Σε κάθε project, διαφορετικά status, assigned σε χρήστες
+
+### Υπηρεσίες (Services)
+
+- 6 υπηρεσίες: Social Media Management, Web Development, Branding, SEO, Media Buying, Content Creation
+
+### Συμβάσεις (Contracts)
+
+- 4 συμβάσεις σε projects (active, draft, ended)
+
+### Τιμολόγια (Invoices)
+
+- 8 τιμολόγια (paid, unpaid, overdue)
+
+### Έξοδα (Expenses)
+
+- 10 έξοδα (vendor, overhead, media_spend)
+
+### Leave Types & Requests
+
+- 3 τύποι: Κανονική, Ασθένεια, Άδεια άνευ
+- Balances για κάθε χρήστη
+- 5 αιτήματα αδείας (pending, approved, rejected)
+
+### Timesheets
+
+- 30+ time entries για τις τελευταίες 2 εβδομάδες
 
 ---
 
-## Τεχνικές Αλλαγές
+## Τεχνική Υλοποίηση
 
-### Αρχεία που τροποποιούνται
+### 1. Edge Function: `seed-dummy-data`
 
-| Αρχείο | Αλλαγή |
-|--------|--------|
-| `src/components/users/UsersTableView.tsx` | Fix role list στο dropdown: `['admin', 'manager', 'member', 'viewer', 'billing']` |
-| `src/pages/EmployeeProfile.tsx` | Ενημέρωση roleLabels σε νέους ρόλους, ανάγνωση status από user_company_roles |
-| `src/components/hr/EmployeeHeader.tsx` | Προσθήκη inline editing για name, job_title, phone, hire_date |
-| `src/pages/UserDetail.tsx` | Ενημέρωση roleLabels σε νέους ρόλους |
+Νέο backend function που:
 
-### Database fix
-- UPDATE profiles SET status = 'active' WHERE id = 'f6fee19b-...' (sync profiles.status με user_company_roles.status)
+- Δημιουργεί χρήστες μέσω Admin API (auth.admin.createUser)
+- Εισάγει δεδομένα σε όλους τους πίνακες με service role key (bypasses RLS)
+- Ελέγχει αν τα δεδομένα υπάρχουν ήδη (idempotent)
+- Επιστρέφει σύνοψη τι δημιουργήθηκε
 
-### Inline editing approach
-Στο EmployeeHeader, κάθε πεδίο πληροφοριών (job_title, phone, hire_date) θα μετατραπεί σε editable span. Με click, εμφανίζεται input, με Enter/blur αποθηκεύεται στη βάση (profiles table). Μόνο users με canEdit δικαίωμα (admin/manager) θα μπορούν να επεξεργαστούν.
+### 2. Σειρά εισαγωγής (λόγω foreign keys)
 
+```text
+1. Users (auth + profiles + roles)
+2. Departments (+ assign heads)
+3. Org Chart Positions
+4. Clients
+5. Projects (+ project_user_access)
+6. Deliverables
+7. Tasks
+8. Services
+9. Contracts
+10. Invoices
+11. Expenses
+12. Leave Types + Balances + Requests
+13. Time Entries
+```
+
+### 3. Κλήση από UI
+
+Προσωρινό κουμπί στο Settings ή απευθείας κλήση μέσω browser console. Εναλλακτικά, θα τρέξει αυτόματα με curl μετά το deploy.
+
+### Αρχεία
+
+
+| Αρχείο                                        | Ενέργεια                   |
+| --------------------------------------------- | -------------------------- |
+| `supabase/functions/seed-dummy-data/index.ts` | Νέο - edge function seeder |
+
+
+Κωδικός πρόσβασης για όλους τους dummy χρήστες: `Test123!`

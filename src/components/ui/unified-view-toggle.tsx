@@ -15,9 +15,9 @@ interface UnifiedViewToggleProps {
 }
 
 export function usePersistedViewMode(
-  storageKey: string,
-  defaultMode: UnifiedViewMode = 'card'
-): [UnifiedViewMode, (mode: UnifiedViewMode) => void] {
+storageKey: string,
+defaultMode: UnifiedViewMode = 'card')
+: [UnifiedViewMode, (mode: UnifiedViewMode) => void] {
   const [viewMode, setViewMode] = useState<UnifiedViewMode>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(`viewMode_${storageKey}`);
@@ -36,9 +36,9 @@ export function usePersistedViewMode(
   return [viewMode, handleViewModeChange];
 }
 
-export function UnifiedViewToggle({ 
-  viewMode: controlledViewMode, 
-  onViewModeChange, 
+export function UnifiedViewToggle({
+  viewMode: controlledViewMode,
+  onViewModeChange,
   showKanban = true,
   className,
   storageKey,
@@ -62,14 +62,14 @@ export function UnifiedViewToggle({
   };
 
   return (
-    <div className={cn("flex items-center gap-1 p-1 bg-muted rounded-lg", className)}>
+    <div className={cn("flex items-center gap-1 p-1 rounded-lg bg-secondary-foreground", className)}>
       <Button
         variant={viewMode === 'card' ? 'default' : 'ghost'}
         size="sm"
         className="h-8 px-3"
         onClick={() => handleChange('card')}
-        title="Προβολή καρτών"
-      >
+        title="Προβολή καρτών">
+
         <LayoutGrid className="h-4 w-4 mr-1.5" />
         Cards
       </Button>
@@ -78,23 +78,23 @@ export function UnifiedViewToggle({
         size="sm"
         className="h-8 px-3"
         onClick={() => handleChange('table')}
-        title="Προβολή πίνακα"
-      >
+        title="Προβολή πίνακα">
+
         <List className="h-4 w-4 mr-1.5" />
         Πίνακας
       </Button>
-      {showKanban && (
-        <Button
-          variant={viewMode === 'kanban' ? 'default' : 'ghost'}
-          size="sm"
-          className="h-8 px-3"
-          onClick={() => handleChange('kanban')}
-          title="Προβολή Kanban"
-        >
+      {showKanban &&
+      <Button
+        variant={viewMode === 'kanban' ? 'default' : 'ghost'}
+        size="sm"
+        className="h-8 px-3"
+        onClick={() => handleChange('kanban')}
+        title="Προβολή Kanban">
+
           <Columns className="h-4 w-4 mr-1.5" />
           Kanban
         </Button>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 }

@@ -39,7 +39,7 @@ import {
 'lucide-react';
 
 import { PermissionType } from '@/contexts/AuthContext';
-import mscommLogo from '@/assets/mscomm-logo.png';
+import olsenyLogo from '@/assets/olseny-logo.png';
 import { ActiveTimerIndicator } from '@/components/time-tracking/ActiveTimerIndicator';
 
 interface NavItem {
@@ -100,14 +100,13 @@ export default function AppSidebar() {
       {/* Logo */}
       <div className="p-4 flex items-center justify-between">
         {(!collapsed || isMobile) &&
-      <span className="font-bold text-lg text-foreground tracking-tight">OLSENY
-
-      </span>
+      <div className="flex items-center gap-2">
+        <img src={olsenyLogo} alt="Olseny" className="h-8 w-8 rounded-lg" />
+        <span className="font-bold text-lg text-foreground tracking-tight">OLSENY</span>
+      </div>
       }
         {collapsed && !isMobile &&
-      <span className="font-bold text-sm text-foreground mx-auto">
-            MS
-          </span>
+      <img src={olsenyLogo} alt="Olseny" className="h-8 w-8 rounded-lg mx-auto" />
       }
         {!isMobile &&
       <Button

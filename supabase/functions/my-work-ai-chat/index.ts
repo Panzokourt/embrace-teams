@@ -10,39 +10,56 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
-
-    // Get user context from auth
+    // Validate authentication first
     const authHeader = req.headers.get("Authorization") || "";
+    if (!authHeader.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey, {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: "Invalid authentication token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const userId = claimsData.claims.sub as string;
+
+    const { messages } = await req.json();
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
     let contextInfo = "";
 
-    if (user) {
+    if (userId) {
       // Fetch user's tasks and projects for context
       const [tasksRes, projectsRes, profileRes] = await Promise.all([
         supabase
           .from("tasks")
           .select("id, title, status, priority, due_date, start_date, project_id, project:projects(name)")
-          .eq("assigned_to", user.id)
+          .eq("assigned_to", userId)
           .neq("status", "completed")
           .order("due_date", { ascending: true })
           .limit(30),
         supabase
           .from("project_user_access")
           .select("project:projects(id, name, status, progress)")
-          .eq("user_id", user.id),
+          .eq("user_id", userId),
         supabase
           .from("profiles")
           .select("full_name, email, job_title, department")
-          .eq("id", user.id)
+          .eq("id", userId)
           .single(),
       ]);
 
@@ -53,7 +70,7 @@ serve(async (req) => {
       contextInfo = `
 ## Πληροφορίες χρήστη
 - Όνομα: ${profile?.full_name || "Άγνωστο"}
-- Email: ${profile?.email || user.email}
+- Email: ${profile?.email || "N/A"}
 - Θέση: ${profile?.job_title || "N/A"}
 - Τμήμα: ${profile?.department || "N/A"}
 

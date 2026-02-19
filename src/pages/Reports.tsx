@@ -6,6 +6,7 @@ import { ReportExportMenu } from '@/components/reports/ReportExportMenu';
 import { ReportsOverview } from '@/components/reports/ReportsOverview';
 import { ReportsFinancial } from '@/components/reports/ReportsFinancial';
 import { ReportsProjects } from '@/components/reports/ReportsProjects';
+import { ReportsTasks } from '@/components/reports/ReportsTasks';
 import { ReportsClients } from '@/components/reports/ReportsClients';
 import { ReportsTeam } from '@/components/reports/ReportsTeam';
 import { exportToCSV, exportToExcel, formatters } from '@/utils/exportUtils';
@@ -15,6 +16,7 @@ const TABS = [
   { value: 'overview', label: 'Επισκόπηση' },
   { value: 'financial', label: 'Οικονομικά' },
   { value: 'projects', label: 'Έργα' },
+  { value: 'tasks', label: 'Εργασίες' },
   { value: 'clients', label: 'Πελάτες' },
   { value: 'team', label: 'Ομάδα' },
 ];
@@ -25,6 +27,8 @@ export default function Reports() {
     period: '12m',
     clientId: null,
     projectId: null,
+    departmentId: null,
+    userId: null,
   });
 
   const data = useReportsData(filters);
@@ -59,6 +63,20 @@ export default function Reports() {
         { key: 'job_title', label: 'Ρόλος' },
         { key: 'email', label: 'Email' },
       ], 'report-team');
+    } else if (activeTab === 'tasks') {
+      exportToCSV(data.tasks.map(t => {
+        const proj = data.projects.find(p => p.id === t.project_id);
+        const assignee = data.profiles.find(p => p.id === t.assigned_to);
+        return { ...t, project_name: proj?.name || '-', assignee_name: assignee?.full_name || '-' };
+      }), [
+        { key: 'title', label: 'Εργασία' },
+        { key: 'project_name', label: 'Έργο' },
+        { key: 'assignee_name', label: 'Ανατεθειμένο σε' },
+        { key: 'priority', label: 'Προτεραιότητα' },
+        { key: 'status', label: 'Κατάσταση' },
+        { key: 'due_date', label: 'Προθεσμία', format: (v) => formatters.date(v) },
+        { key: 'progress', label: 'Πρόοδος', format: (v) => formatters.percentage(v) },
+      ], 'report-tasks');
     }
   }, [activeTab, data]);
 
@@ -114,6 +132,8 @@ export default function Reports() {
             onChange={setFilters}
             clients={data.clients}
             projects={data.projects}
+            departments={data.departments}
+            profiles={data.profiles}
           />
           <ReportExportMenu
             onExportCSV={handleExportCSV}
@@ -133,6 +153,7 @@ export default function Reports() {
         <TabsContent value="overview"><ReportsOverview data={data} /></TabsContent>
         <TabsContent value="financial"><ReportsFinancial data={data} /></TabsContent>
         <TabsContent value="projects"><ReportsProjects data={data} /></TabsContent>
+        <TabsContent value="tasks"><ReportsTasks data={data} /></TabsContent>
         <TabsContent value="clients"><ReportsClients data={data} /></TabsContent>
         <TabsContent value="team"><ReportsTeam data={data} /></TabsContent>
       </Tabs>

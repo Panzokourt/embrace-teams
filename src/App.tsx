@@ -14,6 +14,7 @@ import Projects from "@/pages/Projects";
 import ProjectDetail from "@/pages/ProjectDetail";
 import Tasks from "@/pages/Tasks";
 import Financials from "@/pages/Financials";
+import Reports from "@/pages/Reports";
 import Clients from "@/pages/Clients";
 import ClientDetail from "@/pages/ClientDetail";
 import Settings from "@/pages/Settings";
@@ -61,6 +62,7 @@ const App = () => (
                 <Route path="/tenders" element={<Navigate to="/work?tab=projects" replace />} />
                 <Route path="/tenders/:id" element={<Navigate to="/work?tab=projects" replace />} />
                 <Route path="/financials" element={<Financials />} />
+                <Route path="/reports" element={<Reports />} />
                 <Route path="/clients" element={<Clients />} />
                 <Route path="/clients/:id" element={<ClientDetail />} />
                 <Route path="/hr" element={<HR />} />

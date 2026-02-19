@@ -35,7 +35,8 @@ import {
   Network,
   FileArchive,
   Timer,
-  FileStack } from
+  FileStack,
+  BarChart3 } from
 'lucide-react';
 
 import { PermissionType } from '@/contexts/AuthContext';
@@ -56,7 +57,8 @@ const navItems: NavItem[] = [
 { title: 'Εργασίες', href: '/work', icon: FolderKanban, permission: 'projects.view' },
 { title: 'Αρχείο', href: '/files', icon: FileArchive, permission: 'files.view' },
 { title: 'HR', href: '/hr', icon: UserCog },
-{ title: 'Λογιστήριο', href: '/financials', icon: DollarSign, permission: 'financials.view' }];
+{ title: 'Λογιστήριο', href: '/financials', icon: DollarSign, permission: 'financials.view' },
+{ title: 'Αναφορές', href: '/reports', icon: BarChart3, permission: 'financials.view' }];
 
 
 const adminNavItems: NavItem[] = [

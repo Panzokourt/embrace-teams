@@ -247,7 +247,7 @@ export function EditUserDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {ROLE_OPTIONS.filter(r => isSuperAdmin || r.value !== 'super_admin').map(option => (
+                  {ROLE_OPTIONS.filter(r => isSuperAdmin || r.value !== 'owner').map(option => (
                     <SelectItem key={option.value} value={option.value}>
                       <div className="flex items-center gap-2">
                         {option.icon}

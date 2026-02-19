@@ -40,26 +40,28 @@ interface InviteUserDialogProps {
 }
 
 const ROLE_LABELS: Record<CompanyRole, string> = {
-  super_admin: 'Super Admin',
+  owner: 'Owner',
   admin: 'Admin',
   manager: 'Manager',
-  standard: 'Standard',
-  client: 'Client'
+  member: 'Member',
+  viewer: 'Viewer',
+  billing: 'Billing'
 };
 
 const ROLE_DESCRIPTIONS: Record<CompanyRole, string> = {
-  super_admin: 'Πλήρης πρόσβαση σε όλα + settings + audit',
+  owner: 'Πλήρης πρόσβαση σε όλα + settings + audit',
   admin: 'Διαχείριση χρηστών, clients, projects',
   manager: 'Διαχείριση assigned clients/projects',
-  standard: 'Πρόσβαση σε assigned projects/tasks',
-  client: 'Προβολή deliverables & status'
+  member: 'Πρόσβαση σε assigned projects/tasks',
+  viewer: 'Μόνο ανάγνωση',
+  billing: 'Πρόσβαση μόνο στο billing section'
 };
 
 export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDialogProps) {
   const { createInvitation } = useRBAC();
   const [saving, setSaving] = useState(false);
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<CompanyRole>('standard');
+  const [role, setRole] = useState<CompanyRole>('member');
   const [accessScope, setAccessScope] = useState<AccessScope>('assigned');
   const [selectedPermissions, setSelectedPermissions] = useState<PermissionType[]>([]);
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
@@ -120,9 +122,9 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
 
   const resetForm = () => {
     setEmail('');
-    setRole('standard');
+    setRole('member');
     setAccessScope('assigned');
-    setSelectedPermissions(DEFAULT_ROLE_PERMISSIONS['standard']);
+    setSelectedPermissions(DEFAULT_ROLE_PERMISSIONS['member']);
     setSelectedClients([]);
     setSelectedProjects([]);
   };
@@ -177,7 +179,7 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
               <div className="space-y-2">
                 <Label>Ρόλος</Label>
                 <div className="grid grid-cols-2 gap-2">
-                  {(['admin', 'manager', 'standard', 'client'] as CompanyRole[]).map((r) => (
+                  {(['admin', 'manager', 'member', 'viewer', 'billing'] as CompanyRole[]).map((r) => (
                     <button
                       key={r}
                       type="button"
@@ -200,7 +202,7 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
               </div>
 
               {/* Access Scope */}
-              {role !== 'client' && (
+              {role !== 'billing' && (
                 <div className="space-y-2">
                   <Label>Εύρος Πρόσβασης</Label>
                   <Select value={accessScope} onValueChange={(v) => setAccessScope(v as AccessScope)}>
@@ -226,7 +228,7 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
               )}
 
               {/* Client/Project Selection for assigned scope */}
-              {accessScope === 'assigned' && role !== 'client' && (
+              {accessScope === 'assigned' && role !== 'billing' && (
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">

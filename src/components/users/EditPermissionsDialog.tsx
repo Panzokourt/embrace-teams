@@ -206,7 +206,7 @@ export function EditPermissionsDialog({ user, open, onOpenChange, onSuccess }: E
           <ScrollArea className="flex-1 pr-4">
             <div className="space-y-6 pb-4">
               {/* Access Scope */}
-              {user.role !== 'client' && (
+              {user.role !== 'billing' && (
                 <div className="space-y-2">
                   <Label>Εύρος Πρόσβασης</Label>
                   <Select value={accessScope} onValueChange={(v) => setAccessScope(v as AccessScope)}>
@@ -244,7 +244,7 @@ export function EditPermissionsDialog({ user, open, onOpenChange, onSuccess }: E
               )}
 
               {/* Department Selection for department scope */}
-              {accessScope === 'department' && user.role !== 'client' && (
+              {accessScope === 'department' && user.role !== 'billing' && (
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
                     <Building2 className="h-4 w-4" />
@@ -276,7 +276,7 @@ export function EditPermissionsDialog({ user, open, onOpenChange, onSuccess }: E
               )}
 
               {/* Team Selection for team scope */}
-              {accessScope === 'team' && user.role !== 'client' && (
+              {accessScope === 'team' && user.role !== 'billing' && (
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
                     <UsersRound className="h-4 w-4" />
@@ -308,7 +308,7 @@ export function EditPermissionsDialog({ user, open, onOpenChange, onSuccess }: E
               )}
 
               {/* Client/Project Selection */}
-              {accessScope === 'assigned' && user.role !== 'client' && (
+              {accessScope === 'assigned' && user.role !== 'billing' && (
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">

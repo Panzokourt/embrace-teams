@@ -190,7 +190,7 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 pr-4 min-h-0">
+        <div className="flex-1 min-h-0 overflow-y-auto pr-4">
           <div className="space-y-6 pb-4">
             {/* Basic Info */}
             <div className="grid grid-cols-2 gap-4">
@@ -379,7 +379,7 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
               </AccordionItem>
             </Accordion>
           </div>
-        </ScrollArea>
+        </div>
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

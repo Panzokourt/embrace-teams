@@ -288,8 +288,8 @@ function SidebarLink({
       className={cn(
         "group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 ease-apple",
         active ?
-        "bg-primary/10 text-primary" :
-        "text-muted-foreground hover:text-foreground hover:bg-secondary/60",
+        "bg-primary text-primary-foreground" :
+        "text-muted-foreground hover:text-primary-foreground hover:bg-primary",
         collapsed && "justify-center px-2"
       )}
       style={{ animationDelay: `${delay}ms` }}>

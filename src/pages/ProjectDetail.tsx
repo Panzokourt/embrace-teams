@@ -17,6 +17,7 @@ import { ProjectAISuggestions } from '@/components/projects/ProjectAISuggestions
 import { ProjectInfoEditor } from '@/components/projects/ProjectInfoEditor';
 import { ProjectTeamManager } from '@/components/projects/ProjectTeamManager';
 import { FileExplorer } from '@/components/files/FileExplorer';
+import { ProjectGanttView } from '@/components/projects/ProjectGanttView';
 import { toast } from 'sonner';
 import { 
   ArrowLeft,
@@ -33,7 +34,8 @@ import {
   Upload,
   BarChart3,
   Megaphone,
-  TrendingUp
+  TrendingUp,
+  GanttChartSquare,
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -484,6 +486,10 @@ export default function ProjectDetailPage() {
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="deliverables">Παραδοτέα</TabsTrigger>
             <TabsTrigger value="tasks">Tasks</TabsTrigger>
+            <TabsTrigger value="timeline">
+              <GanttChartSquare className="h-4 w-4 mr-1.5" />
+              Timeline
+            </TabsTrigger>
             <TabsTrigger value="media-plan">
               <Megaphone className="h-4 w-4 mr-1.5" />
               Media Plan
@@ -653,6 +659,15 @@ export default function ProjectDetailPage() {
         {/* Tasks Tab */}
         <TabsContent value="tasks">
           <ProjectTasksTable projectId={project.id} />
+        </TabsContent>
+
+        {/* Timeline Tab */}
+        <TabsContent value="timeline" className="mt-4">
+          <ProjectGanttView
+            projectId={project.id}
+            projectStartDate={project.start_date}
+            projectEndDate={project.end_date}
+          />
         </TabsContent>
 
         {/* Files Tab */}

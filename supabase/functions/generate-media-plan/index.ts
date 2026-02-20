@@ -149,8 +149,9 @@ Return ONLY valid JSON in this exact format:
   ]
 }
 
-IMPORTANT RULES:
-- The budget amounts must be NET (after agency fee deduction). Total of all items must NOT exceed the net budget provided.
+CRITICAL RULES — VIOLATION IS NOT ACCEPTABLE:
+- CRITICAL: The SUM of ALL budget values MUST equal EXACTLY €${Math.round(netBudget)}. Do NOT exceed this amount.
+- If you create 10 items and net budget is €85,000, the total must be exactly €85,000 — not €86,000 or €90,000.
 - Create 6-14 diverse media items across the selected channels
 - Each item MUST align its "phase" with one of the campaign phases provided
 - Each item's "objective" must match one of the campaign's objectives
@@ -222,6 +223,19 @@ Instructions:
       else throw new Error("No JSON found in response");
     } catch {
       throw new Error("Failed to parse AI response as JSON");
+    }
+
+    // ── Budget normalization: enforce netBudget strictly ──────────────────────
+    if (result.mediaPlanItems && Array.isArray(result.mediaPlanItems)) {
+      const totalAI = result.mediaPlanItems.reduce((s: number, i: { budget?: number }) => s + (i.budget || 0), 0);
+      if (totalAI > netBudget * 1.01) {
+        const scale = netBudget / totalAI;
+        result.mediaPlanItems = result.mediaPlanItems.map((i: { budget?: number; [key: string]: unknown }) => ({
+          ...i,
+          budget: Math.round((i.budget || 0) * scale),
+        }));
+        console.log(`Budget scaled from €${Math.round(totalAI)} → €${Math.round(netBudget)} (scale: ${scale.toFixed(3)})`);
+      }
     }
 
     console.log("Successfully generated media plan with", result.mediaPlanItems?.length || 0, "items");

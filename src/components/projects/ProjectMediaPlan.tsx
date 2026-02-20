@@ -23,10 +23,11 @@ import {
 import {
   Plus, Sparkles, Download, ChevronDown, ChevronRight, Loader2, ArrowLeft,
   DollarSign, Target, Trash2, Pencil, CheckCircle2, X, BarChart2,
-  Calendar, Layout, AlertTriangle, FileText, MoreHorizontal, Megaphone,
-  TrendingUp, Info, ChevronUp, CheckSquare, Square,
+  Calendar, Layout, AlertTriangle, FileText, Megaphone,
+  TrendingUp, Info, ChevronUp, Search, SlidersHorizontal,
+  RefreshCw, ClipboardList,
 } from 'lucide-react';
-import { format, parseISO, differenceInDays, addDays, min as dateMin, max as dateMax, eachDayOfInterval, startOfMonth, endOfMonth, eachMonthOfInterval } from 'date-fns';
+import { format, parseISO, differenceInDays, addDays, eachDayOfInterval, startOfMonth, endOfMonth, eachMonthOfInterval } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import {
@@ -594,7 +595,7 @@ function GanttView({ items }: { items: MediaPlanItem[] }) {
           <div key={medium}>
             <div className="flex items-center bg-muted/30 border-y py-1.5">
               <div className="w-48 shrink-0 px-3 text-xs font-semibold">
-                {MEDIA_EMOJI[medium] || '📌'} {medium}
+                {medium}
               </div>
               <div className="flex-1" />
             </div>
@@ -711,52 +712,52 @@ function SpreadsheetRow({ item, deliverables, onUpdate, onDelete }: {
 
   return (
     <tr className="group hover:bg-muted/30 transition-colors border-b border-border/50">
-      <td className="px-2 py-1 text-sm font-medium min-w-[140px]">
+      <td className="px-2 py-1 text-sm font-medium" style={{width:'180px', whiteSpace:'normal', wordBreak:'break-word'}}>
         <EditableCell value={item.campaign_name || ''} onSave={v => onUpdate(item.id, 'campaign_name', v)} placeholder="Όνομα καμπάνιας" />
       </td>
-      <td className="px-2 py-1 text-sm min-w-[120px]">
+      <td className="px-2 py-1 text-sm" style={{width:'130px'}}>
         <SelectCell
           value={item.medium}
-          options={ALL_MEDIA.map(m => ({ value: m, label: `${MEDIA_EMOJI[m] || ''} ${m}` }))}
+          options={ALL_MEDIA.map(m => ({ value: m, label: m }))}
           onSave={v => onUpdate(item.id, 'medium', v)}
         />
       </td>
-      <td className="px-2 py-1 text-sm min-w-[100px]">
+      <td className="px-2 py-1 text-sm" style={{width:'90px', whiteSpace:'normal', wordBreak:'break-word'}}>
         <EditableCell value={item.format || ''} onSave={v => onUpdate(item.id, 'format', v)} placeholder="Format" />
       </td>
-      <td className="px-2 py-1 text-sm min-w-[120px]">
+      <td className="px-2 py-1 text-sm" style={{width:'110px', whiteSpace:'normal', wordBreak:'break-word'}}>
         <EditableCell value={item.phase || ''} onSave={v => onUpdate(item.id, 'phase', v)} placeholder="Φάση" />
       </td>
-      <td className="px-2 py-1 min-w-[110px]">
+      <td className="px-2 py-1" style={{width:'110px'}}>
         <SelectCell
           value={item.objective}
           options={OBJECTIVES.map(o => ({ value: o.value, label: o.label }))}
           onSave={v => onUpdate(item.id, 'objective', v)}
         />
       </td>
-      <td className="px-2 py-1 text-sm min-w-[105px]">
+      <td className="px-2 py-1 text-sm" style={{width:'88px'}}>
         <EditableCell value={item.start_date || ''} type="date" onSave={v => onUpdate(item.id, 'start_date', v)} />
       </td>
-      <td className="px-2 py-1 text-sm min-w-[105px]">
+      <td className="px-2 py-1 text-sm" style={{width:'88px'}}>
         <EditableCell value={item.end_date || ''} type="date" onSave={v => onUpdate(item.id, 'end_date', v)} />
       </td>
-      <td className="px-2 py-1 text-sm text-right min-w-[90px] font-medium">
+      <td className="px-2 py-1 text-sm text-right font-medium" style={{width:'80px', whiteSpace:'nowrap'}}>
         <EditableCell value={item.budget} type="number" onSave={v => onUpdate(item.id, 'budget', parseFloat(v) || 0)} className="text-right" />
       </td>
-      <td className="px-2 py-1 text-sm text-right min-w-[80px] text-muted-foreground">
+      <td className="px-2 py-1 text-sm text-right text-muted-foreground" style={{width:'80px', whiteSpace:'nowrap'}}>
         {fmt(item.net_budget || item.budget)}
       </td>
-      <td className="px-2 py-1 text-sm text-right min-w-[80px]">
+      <td className="px-2 py-1 text-sm text-right" style={{width:'80px', whiteSpace:'nowrap'}}>
         <EditableCell value={item.actual_cost} type="number" onSave={v => onUpdate(item.id, 'actual_cost', parseFloat(v) || 0)} className="text-right" />
       </td>
-      <td className="px-2 py-1 min-w-[120px]">
+      <td className="px-2 py-1" style={{width:'110px'}}>
         <SelectCell
           value={item.status}
           options={ITEM_STATUS_OPTIONS}
           onSave={v => onUpdate(item.id, 'status', v)}
         />
       </td>
-      <td className="px-2 py-1">
+      <td className="px-2 py-1" style={{width:'32px'}}>
         <button onClick={() => onDelete(item.id)}
           className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-destructive/10 hover:text-destructive text-muted-foreground">
           <Trash2 className="h-3.5 w-3.5" />
@@ -824,7 +825,7 @@ function ProjectionsSection({ items }: { items: MediaPlanItem[] }) {
             <tbody>
               {Object.entries(byMedium).map(([medium, stats]) => (
                 <tr key={medium} className="border-b hover:bg-muted/10">
-                  <td className="px-3 py-2">{MEDIA_EMOJI[medium] || '📌'} {medium}</td>
+                  <td className="px-3 py-2">{medium}</td>
                   <td className="px-3 py-2 text-right">{stats.impressions > 0 ? fmtK(stats.impressions) : <span className="text-muted-foreground/50">—</span>}</td>
                   <td className="px-3 py-2 text-right">{stats.reach > 0 ? fmtK(stats.reach) : <span className="text-muted-foreground/50">—</span>}</td>
                   <td className="px-3 py-2 text-right">{stats.clicks > 0 ? fmtK(stats.clicks) : <span className="text-muted-foreground/50">—</span>}</td>
@@ -841,6 +842,317 @@ function ProjectionsSection({ items }: { items: MediaPlanItem[] }) {
         </div>
       </CollapsibleContent>
     </Collapsible>
+  );
+}
+
+// ─── ReAllocate Modal ─────────────────────────────────────────────────────────
+function ReAllocateModal({ open, onClose, items, newBudget, onApply }: {
+  open: boolean; onClose: () => void;
+  items: MediaPlanItem[]; newBudget: number;
+  onApply: (allocations: Record<string, number>) => void;
+}) {
+  const currentTotal = items.reduce((s, i) => s + (i.budget || 0), 0);
+  const [mode, setMode] = useState<'proportional' | 'custom'>('proportional');
+  const [customAlloc, setCustomAlloc] = useState<Record<string, number>>(() => {
+    const init: Record<string, number> = {};
+    items.forEach(i => { init[i.id] = i.budget || 0; });
+    return init;
+  });
+
+  const proportionalAlloc = useMemo(() => {
+    const alloc: Record<string, number> = {};
+    if (currentTotal === 0) {
+      const even = Math.round(newBudget / items.length);
+      items.forEach(i => { alloc[i.id] = even; });
+    } else {
+      items.forEach(i => { alloc[i.id] = Math.round((i.budget / currentTotal) * newBudget); });
+    }
+    return alloc;
+  }, [items, currentTotal, newBudget]);
+
+  const customTotal = Object.values(customAlloc).reduce((s, v) => s + v, 0);
+
+  return (
+    <Dialog open={open} onOpenChange={v => !v && onClose()}>
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <RefreshCw className="h-5 w-5 text-primary" /> Re-Allocate Budget
+          </DialogTitle>
+          <DialogDescription>
+            Νέο budget: <span className="font-semibold text-foreground">{fmt(newBudget)}</span>
+            {currentTotal > 0 && <> · Τρέχον: {fmt(currentTotal)}</>}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Mode toggle */}
+          <div className="flex gap-1 p-1 bg-muted rounded-lg">
+            {(['proportional', 'custom'] as const).map(m => (
+              <button key={m} onClick={() => setMode(m)}
+                className={cn('flex-1 py-1.5 rounded text-xs font-medium transition-colors',
+                  mode === m ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground')}>
+                {m === 'proportional' ? '⚖️ Αναλογική Κατανομή' : '✏️ Χειροκίνητη'}
+              </button>
+            ))}
+          </div>
+
+          {mode === 'proportional' ? (
+            <div className="space-y-2 text-sm">
+              <p className="text-muted-foreground text-xs">Τα items θα κλιμακωθούν αναλογικά βάσει τρέχουσας κατανομής:</p>
+              {items.map(i => (
+                <div key={i.id} className="flex items-center justify-between py-1.5 border-b border-border/40 last:border-0">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium truncate">{i.campaign_name || i.medium}</p>
+                    <p className="text-xs text-muted-foreground">{i.medium}</p>
+                  </div>
+                  <div className="text-right shrink-0 ml-3">
+                    <span className="text-muted-foreground line-through text-xs">{fmt(i.budget)}</span>
+                    <span className="ml-2 font-semibold text-primary">{fmt(proportionalAlloc[i.id])}</span>
+                  </div>
+                </div>
+              ))}
+              <div className="pt-2 flex justify-between font-semibold border-t">
+                <span>Σύνολο</span>
+                <span className="text-primary">{fmt(Object.values(proportionalAlloc).reduce((s, v) => s + v, 0))}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2 text-sm">
+              <p className="text-muted-foreground text-xs">Ορίστε χειροκίνητα το budget κάθε item:</p>
+              {items.map(i => (
+                <div key={i.id} className="flex items-center gap-3 py-1">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium truncate text-xs">{i.campaign_name || i.medium}</p>
+                    <p className="text-xs text-muted-foreground">{i.medium}</p>
+                  </div>
+                  <Input
+                    type="number"
+                    value={customAlloc[i.id] ?? 0}
+                    onChange={e => setCustomAlloc(prev => ({ ...prev, [i.id]: parseFloat(e.target.value) || 0 }))}
+                    className="h-8 w-28 text-right text-sm"
+                  />
+                </div>
+              ))}
+              <div className={cn('pt-2 flex justify-between font-semibold border-t text-sm', customTotal > newBudget ? 'text-destructive' : '')}>
+                <span>Σύνολο{customTotal > newBudget ? ' ⚠️ Υπέρβαση!' : ''}</span>
+                <span>{fmt(customTotal)} / {fmt(newBudget)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Ακύρωση</Button>
+          <Button onClick={() => { onApply(mode === 'proportional' ? proportionalAlloc : customAlloc); onClose(); }}
+            disabled={mode === 'custom' && customTotal > newBudget}>
+            <RefreshCw className="h-4 w-4 mr-2" /> Εφαρμογή
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Actual Spent Wizard ──────────────────────────────────────────────────────
+function ActualSpentWizard({ open, onClose, items, onSave }: {
+  open: boolean; onClose: () => void;
+  items: MediaPlanItem[];
+  onSave: (entries: Record<string, number>) => void;
+}) {
+  const [entries, setEntries] = useState<Record<string, number>>(() => {
+    const init: Record<string, number> = {};
+    items.forEach(i => { init[i.id] = i.actual_cost || 0; });
+    return init;
+  });
+  const [saving, setSaving] = useState(false);
+
+  const totalActual = Object.values(entries).reduce((s, v) => s + v, 0);
+  const totalBudget = items.reduce((s, i) => s + (i.budget || 0), 0);
+
+  const handleSave = async () => {
+    setSaving(true);
+    await onSave(entries);
+    setSaving(false);
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={v => !v && onClose()}>
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ClipboardList className="h-5 w-5 text-primary" /> Καταχώρηση Actual Costs
+          </DialogTitle>
+          <DialogDescription>Εισάγετε το πραγματικό κόστος για κάθε media item</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-1.5">
+          <div className="grid grid-cols-[1fr_120px_100px] gap-2 px-2 py-1 text-xs font-medium text-muted-foreground border-b">
+            <span>Item</span>
+            <span className="text-right">Budget</span>
+            <span className="text-right">Actual</span>
+          </div>
+          {items.map(i => (
+            <div key={i.id} className="grid grid-cols-[1fr_120px_100px] gap-2 items-center px-2 py-1.5 rounded hover:bg-muted/30">
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">{i.campaign_name || i.medium}</p>
+                <p className="text-xs text-muted-foreground">{i.medium}{i.phase ? ` · ${i.phase}` : ''}</p>
+              </div>
+              <div className="text-right text-sm text-muted-foreground">{fmt(i.budget)}</div>
+              <Input
+                type="number"
+                value={entries[i.id] ?? 0}
+                onChange={e => setEntries(prev => ({ ...prev, [i.id]: parseFloat(e.target.value) || 0 }))}
+                className="h-8 text-right text-sm"
+                min={0}
+              />
+            </div>
+          ))}
+        </div>
+
+        <div className={cn('rounded-lg p-3 text-sm flex justify-between font-semibold border', totalActual > totalBudget ? 'border-destructive/30 bg-destructive/5 text-destructive' : 'border-border bg-muted/30')}>
+          <span>Σύνολο Actual {totalActual > totalBudget ? '⚠️ Υπέρβαση Budget!' : ''}</span>
+          <span>{fmt(totalActual)} / {fmt(totalBudget)}</span>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Ακύρωση</Button>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ClipboardList className="h-4 w-4 mr-2" />}
+            Αποθήκευση Όλων
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Filter / Group Toolbar ───────────────────────────────────────────────────
+type GroupByType = 'medium' | 'phase' | 'objective' | 'category';
+
+function FilterGroupToolbar({ items, groupBy, setGroupBy, filterPhase, setFilterPhase, filterObjective, setFilterObjective, filterCategory, setFilterCategory, searchQuery, setSearchQuery }: {
+  items: MediaPlanItem[];
+  groupBy: GroupByType; setGroupBy: (v: GroupByType) => void;
+  filterPhase: string[]; setFilterPhase: (v: string[]) => void;
+  filterObjective: string[]; setFilterObjective: (v: string[]) => void;
+  filterCategory: string; setFilterCategory: (v: string) => void;
+  searchQuery: string; setSearchQuery: (v: string) => void;
+}) {
+  const allPhases = useMemo(() => [...new Set(items.map(i => i.phase).filter(Boolean) as string[])], [items]);
+  const allObjectives = useMemo(() => [...new Set(items.map(i => i.objective).filter(Boolean) as string[])], [items]);
+  const hasFilters = filterPhase.length > 0 || filterObjective.length > 0 || filterCategory !== 'all' || searchQuery;
+
+  const toggleMulti = (arr: string[], val: string, set: (v: string[]) => void) => {
+    set(arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val]);
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        <Input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+          placeholder="Αναζήτηση..." className="h-8 pl-8 pr-3 text-xs w-44" />
+        {searchQuery && (
+          <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+            <X className="h-3 w-3" />
+          </button>
+        )}
+      </div>
+
+      {/* Group by */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            Ομαδ/ση: {groupBy === 'medium' ? 'Κανάλι' : groupBy === 'phase' ? 'Φάση' : groupBy === 'objective' ? 'Objective' : 'Κατηγορία'}
+            <ChevronDown className="h-3 w-3 opacity-60" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          {([['medium','Κανάλι'],['phase','Φάση'],['objective','Objective'],['category','Κατηγορία']] as [GroupByType,string][]).map(([val, label]) => (
+            <DropdownMenuItem key={val} onClick={() => setGroupBy(val)} className={groupBy === val ? 'font-semibold' : ''}>
+              {groupBy === val ? '✓ ' : ''}{label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Filter Phase */}
+      {allPhases.length > 0 && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className={cn('h-8 text-xs gap-1.5', filterPhase.length > 0 && 'border-primary text-primary')}>
+              Φάση {filterPhase.length > 0 ? `(${filterPhase.length})` : ''}
+              <ChevronDown className="h-3 w-3 opacity-60" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {allPhases.map(ph => (
+              <DropdownMenuItem key={ph} onClick={() => toggleMulti(filterPhase, ph, setFilterPhase)}
+                className="flex items-center gap-2">
+                <div className={cn('w-3.5 h-3.5 rounded-sm border-2 flex items-center justify-center', filterPhase.includes(ph) ? 'border-primary bg-primary' : 'border-muted-foreground/40')}>
+                  {filterPhase.includes(ph) && <span className="text-primary-foreground text-[8px] font-bold">✓</span>}
+                </div>
+                {ph}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+
+      {/* Filter Objective */}
+      {allObjectives.length > 0 && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className={cn('h-8 text-xs gap-1.5', filterObjective.length > 0 && 'border-primary text-primary')}>
+              Objective {filterObjective.length > 0 ? `(${filterObjective.length})` : ''}
+              <ChevronDown className="h-3 w-3 opacity-60" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {allObjectives.map(obj => {
+              const label = OBJECTIVES.find(o => o.value === obj)?.label || obj;
+              return (
+                <DropdownMenuItem key={obj} onClick={() => toggleMulti(filterObjective, obj, setFilterObjective)}
+                  className="flex items-center gap-2">
+                  <div className={cn('w-3.5 h-3.5 rounded-sm border-2 flex items-center justify-center', filterObjective.includes(obj) ? 'border-primary bg-primary' : 'border-muted-foreground/40')}>
+                    {filterObjective.includes(obj) && <span className="text-primary-foreground text-[8px] font-bold">✓</span>}
+                  </div>
+                  {label}
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+
+      {/* Filter Category */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" className={cn('h-8 text-xs gap-1.5', filterCategory !== 'all' && 'border-primary text-primary')}>
+            {filterCategory !== 'all' ? filterCategory : 'Κατηγορία'}
+            <ChevronDown className="h-3 w-3 opacity-60" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          <DropdownMenuItem onClick={() => setFilterCategory('all')} className={filterCategory === 'all' ? 'font-semibold' : ''}>Όλες οι κατηγορίες</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {Object.keys(MEDIA_CATEGORIES).map(cat => (
+            <DropdownMenuItem key={cat} onClick={() => setFilterCategory(cat)} className={filterCategory === cat ? 'font-semibold' : ''}>{cat}</DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Clear filters */}
+      {hasFilters && (
+        <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground gap-1"
+          onClick={() => { setFilterPhase([]); setFilterObjective([]); setFilterCategory('all'); setSearchQuery(''); }}>
+          <X className="h-3 w-3" /> Καθαρισμός
+        </Button>
+      )}
+    </div>
   );
 }
 
@@ -863,11 +1175,49 @@ function PlanDetailView({ plan, projectId, projectName, projectBudget, agencyFee
   const [editingName, setEditingName] = useState(false);
   const [planName, setPlanName] = useState(plan.name);
   const [planBudget, setPlanBudget] = useState(plan.total_budget);
+  const [showReAllocate, setShowReAllocate] = useState(false);
+  const [showActualWizard, setShowActualWizard] = useState(false);
+  const [pendingBudget, setPendingBudget] = useState<number | null>(null);
+  // Filter/group state
+  const [groupBy, setGroupBy] = useState<GroupByType>('medium');
+  const [filterPhase, setFilterPhase] = useState<string[]>([]);
+  const [filterObjective, setFilterObjective] = useState<string[]>([]);
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const netBudget = projectBudget * (1 - agencyFeePercentage / 100);
   const allocatedBudget = items.reduce((sum, i) => sum + (i.budget || 0), 0);
   const actualSpent = items.reduce((sum, i) => sum + (i.actual_cost || 0), 0);
   const overBudget = allocatedBudget > (planBudget || netBudget);
+
+  const getCategory = (medium: string) =>
+    Object.entries(MEDIA_CATEGORIES).find(([, mediums]) => mediums.includes(medium))?.[0] || 'Άλλο';
+
+  // Filtered + grouped items
+  const displayedItems = useMemo(() => {
+    let result = items;
+    if (searchQuery) result = result.filter(i =>
+      i.campaign_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      i.medium.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    if (filterPhase.length > 0) result = result.filter(i => filterPhase.includes(i.phase || ''));
+    if (filterObjective.length > 0) result = result.filter(i => filterObjective.includes(i.objective));
+    if (filterCategory !== 'all') result = result.filter(i => getCategory(i.medium) === filterCategory);
+    return result;
+  }, [items, searchQuery, filterPhase, filterObjective, filterCategory]);
+
+  const groupedItems = useMemo(() => {
+    const groups: Record<string, MediaPlanItem[]> = {};
+    displayedItems.forEach(item => {
+      const key = groupBy === 'medium' ? item.medium
+        : groupBy === 'phase' ? (item.phase || 'Χωρίς Φάση')
+        : groupBy === 'objective' ? (OBJECTIVES.find(o => o.value === item.objective)?.label || item.objective)
+        : getCategory(item.medium);
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(item);
+    });
+    return groups;
+  }, [displayedItems, groupBy]);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -1014,22 +1364,12 @@ function PlanDetailView({ plan, projectId, projectName, projectBudget, agencyFee
     }
   };
 
-  // Group by medium for spreadsheet
-  const groupedItems = useMemo(() => {
-    const groups: Record<string, MediaPlanItem[]> = {};
-    items.forEach(item => {
-      if (!groups[item.medium]) groups[item.medium] = [];
-      groups[item.medium].push(item);
-    });
-    return groups;
+  // Chart data (uses all items, not filtered)
+  const channelData = useMemo(() => {
+    const byMedium: Record<string, number> = {};
+    items.forEach(i => { byMedium[i.medium] = (byMedium[i.medium] || 0) + i.budget; });
+    return Object.entries(byMedium).map(([name, budget]) => ({ name, budget })).sort((a, b) => b.budget - a.budget);
   }, [items]);
-
-  // Chart data
-  const channelData = useMemo(() =>
-    Object.entries(groupedItems).map(([medium, its]) => ({
-      name: medium, budget: its.reduce((s, i) => s + i.budget, 0),
-    })).sort((a, b) => b.budget - a.budget),
-    [groupedItems]);
 
   const objectiveData = useMemo(() => {
     const obj: Record<string, number> = {};
@@ -1080,9 +1420,24 @@ function PlanDetailView({ plan, projectId, projectName, projectBudget, agencyFee
               <EditableCell
                 value={planBudget}
                 type="number"
-                onSave={v => { const n = parseFloat(v) || 0; setPlanBudget(n); updatePlan('total_budget', n); }}
+                onSave={v => {
+                  const n = parseFloat(v) || 0;
+                  const old = planBudget;
+                  setPlanBudget(n);
+                  updatePlan('total_budget', n);
+                  if (items.length > 0 && n !== old) {
+                    setPendingBudget(n);
+                    setShowReAllocate(true);
+                  }
+                }}
                 className="font-semibold text-foreground"
               />
+              {items.length > 0 && canEdit && (
+                <button onClick={() => { setPendingBudget(planBudget); setShowReAllocate(true); }}
+                  className="text-xs text-primary hover:underline flex items-center gap-0.5">
+                  <RefreshCw className="h-3 w-3" /> Re-allocate
+                </button>
+              )}
             </div>
             <div className="flex items-center gap-1 text-muted-foreground">
               <span>Fee: {agencyFeePercentage}%</span>
@@ -1104,7 +1459,7 @@ function PlanDetailView({ plan, projectId, projectName, projectBudget, agencyFee
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {canEdit && (
             <>
               <Button variant="outline" size="sm" onClick={addItem} className="gap-1">
@@ -1113,6 +1468,11 @@ function PlanDetailView({ plan, projectId, projectName, projectBudget, agencyFee
               <Button variant="outline" size="sm" onClick={() => setShowWizard(true)} className="gap-1">
                 <Sparkles className="h-4 w-4" /> AI Wizard
               </Button>
+              {items.length > 0 && (
+                <Button variant="outline" size="sm" onClick={() => setShowActualWizard(true)} className="gap-1">
+                  <ClipboardList className="h-4 w-4" /> Actual Costs
+                </Button>
+              )}
             </>
           )}
           <Button variant="outline" size="sm" onClick={exportCSV} className="gap-1">
@@ -1175,20 +1535,35 @@ function PlanDetailView({ plan, projectId, projectName, projectBudget, agencyFee
         </div>
       )}
 
-      {/* View Toggle */}
-      <div className="flex items-center justify-between">
-        <div className="flex gap-1 p-1 bg-muted rounded-lg">
-          {([
-            { key: 'spreadsheet', label: '📋 Πίνακας' },
-            { key: 'gantt', label: '📊 Gantt' },
-            { key: 'calendar', label: '📅 Ημερολόγιο' },
-          ] as { key: ViewMode; label: string }[]).map(v => (
-            <button key={v.key} onClick={() => setViewMode(v.key)}
-              className={cn('px-3 py-1.5 rounded text-xs font-medium transition-colors', viewMode === v.key ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground')}>
-              {v.label}
-            </button>
-          ))}
+      {/* View Toggle + Filter Toolbar */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex gap-1 p-1 bg-muted rounded-lg">
+            {([
+              { key: 'spreadsheet', label: '📋 Πίνακας' },
+              { key: 'gantt', label: '📊 Gantt' },
+              { key: 'calendar', label: '📅 Ημερολόγιο' },
+            ] as { key: ViewMode; label: string }[]).map(v => (
+              <button key={v.key} onClick={() => setViewMode(v.key)}
+                className={cn('px-3 py-1.5 rounded text-xs font-medium transition-colors', viewMode === v.key ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground')}>
+                {v.label}
+              </button>
+            ))}
+          </div>
         </div>
+        {items.length > 0 && (viewMode === 'spreadsheet' || viewMode === 'gantt') && (
+          <FilterGroupToolbar
+            items={items}
+            groupBy={groupBy} setGroupBy={setGroupBy}
+            filterPhase={filterPhase} setFilterPhase={setFilterPhase}
+            filterObjective={filterObjective} setFilterObjective={setFilterObjective}
+            filterCategory={filterCategory} setFilterCategory={setFilterCategory}
+            searchQuery={searchQuery} setSearchQuery={setSearchQuery}
+          />
+        )}
+        {displayedItems.length < items.length && (
+          <p className="text-xs text-muted-foreground">Εμφάνιση {displayedItems.length} από {items.length} items</p>
+        )}
       </div>
 
       {/* Main content area */}
@@ -1217,7 +1592,13 @@ function PlanDetailView({ plan, projectId, projectName, projectBudget, agencyFee
           {viewMode === 'spreadsheet' && (
             <div className="rounded-xl border overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm" style={{ minWidth: '1100px' }}>
+                <table className="w-full text-sm" style={{ minWidth: '1069px', tableLayout: 'fixed' }}>
+                  <colgroup>
+                    <col style={{width:'180px'}} /><col style={{width:'130px'}} /><col style={{width:'90px'}} />
+                    <col style={{width:'110px'}} /><col style={{width:'110px'}} /><col style={{width:'88px'}} />
+                    <col style={{width:'88px'}} /><col style={{width:'80px'}} /><col style={{width:'80px'}} />
+                    <col style={{width:'80px'}} /><col style={{width:'110px'}} /><col style={{width:'32px'}} />
+                  </colgroup>
                   <thead>
                     <tr className="bg-muted/50 border-b text-xs font-medium text-muted-foreground">
                       <th className="px-2 py-2 text-left">Καμπάνια</th>
@@ -1235,19 +1616,19 @@ function PlanDetailView({ plan, projectId, projectName, projectBudget, agencyFee
                     </tr>
                   </thead>
                   <tbody>
-                    {Object.entries(groupedItems).map(([medium, groupItems]) => {
-                      const isCollapsed = collapsedGroups.has(medium);
+                    {Object.entries(groupedItems).map(([groupKey, groupItems]) => {
+                      const isCollapsed = collapsedGroups.has(groupKey);
                       const groupBudget = groupItems.reduce((s, i) => s + i.budget, 0);
                       const groupActual = groupItems.reduce((s, i) => s + i.actual_cost, 0);
                       return (
                         <>
-                          <tr key={`group-${medium}`}
+                          <tr key={`group-${groupKey}`}
                             className="bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors border-b"
-                            onClick={() => toggleGroup(medium)}>
+                            onClick={() => toggleGroup(groupKey)}>
                             <td colSpan={7} className="px-2 py-1.5">
                               <div className="flex items-center gap-2">
                                 {isCollapsed ? <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
-                                <span className="font-semibold text-sm">{MEDIA_EMOJI[medium] || '📌'} {medium}</span>
+                                <span className="font-semibold text-sm">{groupKey}</span>
                                 <Badge variant="outline" className="text-xs">{groupItems.length}</Badge>
                               </div>
                             </td>
@@ -1262,12 +1643,15 @@ function PlanDetailView({ plan, projectId, projectName, projectBudget, agencyFee
                         </>
                       );
                     })}
+                    {displayedItems.length === 0 && (
+                      <tr><td colSpan={12} className="px-4 py-8 text-center text-sm text-muted-foreground">Δεν βρέθηκαν αποτελέσματα με τα τρέχοντα φίλτρα.</td></tr>
+                    )}
                     {/* Totals */}
                     <tr className="bg-muted/20 border-t-2 font-semibold text-sm">
                       <td colSpan={7} className="px-2 py-2 text-right text-muted-foreground">ΣΥΝΟΛΟ</td>
-                      <td className="px-2 py-2 text-right">{fmt(allocatedBudget)}</td>
-                      <td className="px-2 py-2 text-right text-muted-foreground">{fmt(items.reduce((s, i) => s + (i.net_budget || i.budget), 0))}</td>
-                      <td className="px-2 py-2 text-right">{fmt(actualSpent)}</td>
+                      <td className="px-2 py-2 text-right">{fmt(displayedItems.reduce((s,i)=>s+i.budget,0))}</td>
+                      <td className="px-2 py-2 text-right text-muted-foreground">{fmt(displayedItems.reduce((s,i)=>s+(i.net_budget||i.budget),0))}</td>
+                      <td className="px-2 py-2 text-right">{fmt(displayedItems.reduce((s,i)=>s+i.actual_cost,0))}</td>
                       <td colSpan={2} />
                     </tr>
                   </tbody>
@@ -1275,8 +1659,8 @@ function PlanDetailView({ plan, projectId, projectName, projectBudget, agencyFee
               </div>
             </div>
           )}
-          {viewMode === 'gantt' && <div className="rounded-xl border p-4"><GanttView items={items} /></div>}
-          {viewMode === 'calendar' && <div className="rounded-xl border p-4"><CalendarView items={items} /></div>}
+          {viewMode === 'gantt' && <div className="rounded-xl border p-4"><GanttView items={displayedItems} /></div>}
+          {viewMode === 'calendar' && <div className="rounded-xl border p-4"><CalendarView items={displayedItems} /></div>}
         </>
       )}
 

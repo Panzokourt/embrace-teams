@@ -223,12 +223,18 @@ function UploadCreativesModal({
 
   const handleUploadAll = async () => {
     if (!user) return;
+    if (files.length === 0) return;
     setUploading(true);
 
-    for (let i = 0; i < files.length; i++) {
-      if (files[i].done) continue;
+    // Snapshot the files array to avoid stale closure issues
+    const snapshot = [...files];
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (let i = 0; i < snapshot.length; i++) {
+      if (snapshot[i].done) { successCount++; continue; }
       update(i, { uploading: true, error: null });
-      const f = files[i];
+      const f = snapshot[i];
       try {
         const objectKey = createProjectFilesObjectKey({
           userId: user.id,
@@ -261,18 +267,26 @@ function UploadCreativesModal({
         if (dbErr) throw dbErr;
 
         update(i, { uploading: false, done: true });
-      } catch (err) {
-        update(i, { uploading: false, error: (err as Error).message });
+        successCount++;
+      } catch (err: any) {
+        console.error('Upload error:', err);
+        update(i, { uploading: false, error: err?.message || 'Σφάλμα ανεβάσματος' });
+        errorCount++;
       }
     }
 
     setUploading(false);
-    const allDone = files.every(f => f.done);
-    if (allDone) {
-      toast.success('Τα εικαστικά ανέβηκαν!');
+
+    if (successCount > 0 && errorCount === 0) {
+      toast.success(`${successCount} εικαστικά ανέβηκαν!`);
       setFiles([]);
       onUploaded();
       onClose();
+    } else if (successCount > 0 && errorCount > 0) {
+      toast.warning(`${successCount} ανέβηκαν, ${errorCount} απέτυχαν`);
+      onUploaded();
+    } else {
+      toast.error('Το ανέβασμα απέτυχε. Δείτε τα σφάλματα παρακάτω.');
     }
   };
 

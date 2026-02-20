@@ -1,227 +1,183 @@
 
-# Media Plan — Ενισχυμένο Σύστημα (6 Βελτιώσεις)
+# Media Plan — 6 Βελτιώσεις
 
-## Ανάλυση Απαιτήσεων
+## Ανάλυση τρέχουσας κατάστασης
 
-Βάσει της ανάλυσης του κώδικα και των 6 σχολίων του χρήστη:
-
-1. **Multi-select objectives + φάσεις με ημερομηνίες** — Ο wizard επιτρέπει μόνο 1 objective (radio button) και οι φάσεις είναι απλό text field
-2. **Budget βάσει project budget - agency fee** — Πρέπει η ολική αξία να λαμβάνει υπόψη ότι το NET budget (project budget × (1 - fee%)) είναι το πραγματικό διαθέσιμο ποσό, και το total budget του media plan δεν πρέπει να ξεπερνά αυτό
-3. **Πολλαπλά media plans ανά έργο + status** — Δεν υπάρχει καθόλου αυτή η δομή. Χρειάζεται νέος πίνακας `media_plans` (header) με FK προς `projects`, και τα `media_plan_items` να έχουν FK προς `media_plans` (όχι άμεσα στο project)
-4. **Excel-like view + Gantt + Calendar + Combined view** — Υπάρχει μόνο spreadsheet view. Χρειάζεται Gantt timeline και εναλλακτικά views
-5. **Projections/Estimations ξεχωριστά** — Τα impressions/reach/CTR/CPM να βγουν από τον κύριο πίνακα και να μπουν σε ξεχωριστό "Performance Projections" tab/section
-6. **Επεξεργασία total budget + inline σε όλα** — Το total budget να είναι editable inline στο header του media plan
+Έχω διαβάσει ολόκληρο το `ProjectMediaPlan.tsx` (1530 γραμμές) και το `generate-media-plan` edge function. Εντόπισα ακριβώς τι πρέπει να αλλάξει:
 
 ---
 
-## Database Migration (Απαιτείται)
+## Πρόβλημα 1: AI κατανέμει περισσότερο από το net budget
 
-### Νέος πίνακας `media_plans` (header/container)
+**Αιτία**: Στο edge function, το prompt λέει να χρησιμοποιεί το net budget (`€${Math.round(netBudget)}`) αλλά το AI το παραβλέπει. Επίσης, δεν γίνεται καμία server-side επικύρωση/normalization μετά τη γέννηση.
 
-```sql
-CREATE TABLE public.media_plans (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
-  name TEXT NOT NULL DEFAULT 'Media Plan',
-  status TEXT NOT NULL DEFAULT 'draft', -- draft | active | approved | cancelled | archived
-  total_budget NUMERIC DEFAULT 0,       -- overridable budget (defaults to project budget)
-  agency_fee_percentage NUMERIC DEFAULT 0,
-  description TEXT,
-  notes TEXT,
-  created_by UUID REFERENCES public.profiles(id),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
-);
-```
+**Λύση (2 επίπεδα)**:
+1. **Edge function**: Μετά το parsing του AI response, normalize το budget: αν `Σ(items.budget) > netBudget`, scale down αναλογικά όλα τα items. Αυτό διασφαλίζει 100% ότι δεν θα ξεπεραστεί ποτέ το όριο, ανεξαρτήτως τι βγάλει το AI.
+2. **Prompt**: Προσθήκη ακόμα πιο αυστηρής οδηγίας (`CRITICAL: Sum of all budget values MUST be EXACTLY €X`) και παράδειγμα budget allocation.
 
-### Αλλαγή στα `media_plan_items`
-
-- Προσθήκη `media_plan_id UUID REFERENCES public.media_plans(id) ON DELETE CASCADE`
-- Το `project_id` παραμένει (για backward compatibility, αλλά αρχίζει να γίνεται derived)
-- Τα existing items: migration με default media_plan creation
-
-### RLS για `media_plans`
-
-Ίδια λογική με `media_plan_items`:
-- Admins/Managers: full access
-- Users: read access για projects όπου έχουν access
-
----
-
-## Τι Αλλάζει Ανά Απαίτηση
-
-### 1. Multi-Select Objectives + Φάσεις με ημερομηνίες στον Wizard
-
-**Wizard State αλλαγές:**
 ```typescript
-interface WizardState {
-  step: 1 | 2 | 3;
-  campaignObjectives: string[];           // ← ΑΛΛΑΓΗ: array (multi-select)
-  targetAudience: string;
-  phases: Array<{                         // ← ΑΛΛΑΓΗ: δομημένες φάσεις
-    name: string;
-    start: string;
-    end: string;
-  }>;
-  selectedChannels: string[];
-  budgetAllocation: Record<string, number>;
+// Μετά το parse, στο edge function:
+const totalAI = result.mediaPlanItems.reduce((s, i) => s + (i.budget || 0), 0);
+if (totalAI > netBudget * 1.01) { // 1% tolerance
+  const scale = netBudget / totalAI;
+  result.mediaPlanItems = result.mediaPlanItems.map(i => ({
+    ...i,
+    budget: Math.round(i.budget * scale),
+  }));
 }
 ```
 
-**Step 1 UI αλλαγές:**
-- Radio buttons → checkboxes (multi-select για objectives)
-- Αντί για 2 date pickers (start/end campaign), νέο **"Φάσεις Καμπάνιας"** section:
-  ```
-  + Προσθήκη Φάσης
-  [Όνομα] [Έναρξη] [Λήξη] [×]
-  Φάση 1 - Launching  23/02  15/03  ×
-  Φάση 2 - Sustaining 16/03  30/04  ×
-  ```
+---
 
-### 2. Budget = Αυστηρά Project Budget - Agency Fee
+## Πρόβλημα 2: Editable total budget + re-allocation
 
-**Header KPI αλλαγές:**
-- Το **Net Budget** (project_budget × (1 - fee%)) γίνεται το **κύριο, κεντρικό μέγεθος**
-- Όταν το total allocated budget των items ξεπερνά το Net Budget → εμφάνιση warning badge
-- Ο Wizard στο Step 3 να δείχνει ξεκάθαρα:
-  ```
-  Project Budget:   €100,000
-  Agency Fee (15%): -€15,000
-  ─────────────────────────
-  Διαθέσιμο Net:    €85,000  ← αυτό μοιράζεται στα media
-  ```
-- Το AI generation να περνά `net_budget = projectBudget * (1 - fee/100)` ώστε το AI να κατανέμει μόνο αυτό
+**Τρέχουσα κατάσταση**: Το budget είναι ήδη editable inline (`EditableCell` στη γραμμή ~1080). Αυτό που λείπει είναι ένα **"Re-allocate" κουμπί** δίπλα στο budget που να ανοίγει ένα dialog με sliders για να ανακατανείμει αναλογικά τα υπάρχοντα items.
 
-### 3. Πολλαπλά Media Plans + Status
-
-**Νέα UX ροή:**
-- Στο tab "Media Plan" εμφανίζεται **λίστα media plans** του project:
-  ```
-  ┌──────────────────────────────────────────────────────┐
-  │ Media Plans (2)                    [+ Νέο Πλάνο]    │
-  ├──────────────────────────────────────────────────────┤
-  │ 📋 Media Plan Q1 2026    [ΕΝΕΡΓΟ]  €85,000  [Open]  │
-  │ 📋 Media Plan Draft v2   [DRAFT]   €72,000  [Open]  │
-  └──────────────────────────────────────────────────────┘
-  ```
-- Κλικ σε ένα plan → ανοίγει το detail view (εντός ίδιας σελίδας, με back button)
-- **Status options** για media plan: `draft | active | approved | cancelled | archived`
-- Inline editable **name** και **status** στο header κάθε plan
-- **Delete plan** → διαγράφει και όλα τα items του
-
-**Plan Header (editable):**
-```
-[← Πίσω]  [Media Plan Q1 2026 (editable)]  [ΕΝΕΡΓΟ ▼]
-Budget: €85,000 (editable)  Fee: 15%  Net: €72,250
-                                        [Export] [AI Wizard] [+]
-```
-
-### 4. Excel View + Gantt Timeline + Calendar View
-
-**View Toggle (3 επιλογές):**
-```
-[📋 Spreadsheet]  [📊 Gantt]  [📅 Calendar]
-```
-
-**Spreadsheet** (υπάρχει, βελτιώνεται): Ήδη υπάρχει, βελτιώνεται με:
-- Sticky headers
-- Φάσεις ως colored row separators (όχι μόνο text)
-- Inline edit σε dates (date picker)
-
-**Gantt Timeline (νέο):**
-- Οριζόντια ράβδοι ανά media item, ομαδοποιημένα ανά medium
-- X-axis: ημερομηνίες (ανά εβδομάδα ή μήνα)
-- Χρωματισμός ανά objective ή status
-- Tooltip με budget/details
-- Υλοποίηση: Pure CSS/div-based gantt (χωρίς νέα library), χρησιμοποιώντας `position: relative` + percentage widths
-
-**Calendar View:**
-- Monthly calendar grid
-- Items εμφανίζονται ως colored chips στις ημερομηνίες έναρξης/λήξης
-
-### 5. Projections/Estimations Ξεχωριστά
-
-**Κύριος πίνακας (columns):**
-```
-Καμπάνια | Format/Φάση | Objective | Περίοδος | BUDGET | NET | ACTUAL | STATUS | Actions
-```
-→ Τα impressions/reach/clicks/CTR/CPM **φεύγουν** από τον κύριο πίνακα
-
-**Νέο "Performance Projections" collapsible section** (κάτω από τον πίνακα ή σε ξεχωριστό tab):
-```
-┌──────────────────────────────────────────────────────────────────┐
-│ 📈 Performance Projections  [Επεξεργασία Benchmarks]  [Αυτόματος Υπολογισμός AI] │
-├──────────────────────────────────────────────────────────────────┤
-│ Μέσο        │ Impr.  │ Reach  │ Clicks │ CTR   │ CPM   │ CPC   │
-│ TV           │ 4.5M   │ 2.1M   │  —     │  —    │ €8.20 │  —   │
-│ Facebook     │ 1.2M   │ 450K   │ 18K    │ 1.5%  │ €4.10 │ €0.75│
-└──────────────────────────────────────────────────────────────────┘
-```
-- Αυτό το section είναι collapsible, αρχικά collapsed
-- Μπορεί να συμπληρωθεί manual ή με AI (future)
-
-### 6. Editable Total Budget στο Header
-
-- Το budget στο header του media plan είναι `EditableCell` (click to edit)
-- Default value: `project.budget * (1 - agency_fee/100)` = net budget
-- Μπορεί να αλλαχτεί ανεξάρτητα (αποθηκεύεται στο `media_plans.total_budget`)
-- Warning indicator αν allocated > total_budget
+**Λύση**: Νέο `ReAllocateModal` component:
+- Δείχνει το νέο total budget
+- Προτείνει αναλογική ανακατανομή (scale existing budgets)
+- Ή επιτρέπει custom allocation ανά κανάλι/medium
+- "Εφαρμογή" → update όλα τα items με batch update
 
 ---
 
-## Αρχεία που Αλλάζουν
+## Πρόβλημα 3: "Actual Spent" Wizard
 
-| Αρχείο | Τύπος αλλαγής |
-|--------|---------------|
-| **Migration SQL** | Νέος πίνακας `media_plans` + `media_plan_id` column στα `media_plan_items` + migration existing data + RLS |
-| `src/components/projects/ProjectMediaPlan.tsx` | Πλήρης επαναγραφή με: multi-plan list view, plan detail view, Gantt, Calendar, βελτιωμένος Wizard, Projections section |
-| `supabase/functions/generate-media-plan/index.ts` | Multi-objectives, phases array στο prompt |
-| `src/pages/ProjectDetail.tsx` | Μικρές αλλαγές αν χρειαστεί (η δομή παραμένει) |
+**Τι ζητείται**: Κουμπί "Καταχώρηση Actual" που ανοίγει wizard για bulk καταχώρηση πραγματικών εξόδων ανά medium item.
 
----
-
-## Λεπτομέρειες Migration (Backward Compatibility)
-
-Τα υπάρχοντα `media_plan_items` που έχουν `project_id` αλλά όχι `media_plan_id`:
-```sql
--- Για κάθε project που έχει media_plan_items χωρίς media_plan_id:
--- 1. Δημιουργούμε ένα default media_plan
--- 2. Κάνουμε UPDATE τα items για να δείχνουν σε αυτό το plan
-INSERT INTO public.media_plans (project_id, name, status, total_budget, agency_fee_percentage)
-SELECT DISTINCT 
-  mpi.project_id,
-  'Media Plan',
-  'active',
-  COALESCE(p.budget * (1 - p.agency_fee_percentage/100), 0),
-  COALESCE(p.agency_fee_percentage, 0)
-FROM public.media_plan_items mpi
-JOIN public.projects p ON p.id = mpi.project_id
-WHERE mpi.media_plan_id IS NULL;
-```
+**Λύση**: Νέο `ActualSpentWizard` modal:
+- Λίστα όλων των items (medium + campaign name + budget)
+- Input για actual cost δίπλα σε κάθε item
+- "Αποθήκευση Όλων" → batch update `actual_cost` σε όλα τα items
+- Τοποθέτηση: νέο κουμπί "Actual Costs" στο header δίπλα στο "AI Wizard"
 
 ---
 
-## UX Flow Σύνοψη
+## Πρόβλημα 4: Φίλτρα + Grouping στον Πίνακα και Gantt
 
+**Τρέχουσα κατάσταση**: Ο πίνακας κάνει groupBy medium πάντα. Το Gantt επίσης. Δεν υπάρχει καμία δυνατότητα φιλτραρίσματος.
+
+**Λύση**: Προσθήκη toolbar πάνω από τον πίνακα/gantt:
+
+```text
+[Group by: Κανάλι ▼]  [Φάση: Όλες ▼]  [Objective: Όλα ▼]  [Κατηγορία ▼]  [🔍 Search]
 ```
-Tab "Media Plan" click
-→ Εμφανίζεται λίστα plans (ή empty state)
-  → [Νέο Πλάνο] → δημιουργία με όνομα + status  
-  → [Open plan] → ανοίγει detail view
-    → Header: Όνομα | Status | Budget (editable)
-    → [Spreadsheet | Gantt | Calendar] toggle
-    → Filters: Objective (multi) | Status | Φάση
-    → Κύριος πίνακας (χωρίς projections columns)
-    → Collapsible "Performance Projections" section
-    → [AI Wizard] → 3 steps με multi-objective + phases
-```
+
+- **Group by**: Κανάλι (medium) | Φάση (phase) | Objective | Κατηγορία (TV & Radio, Social, etc.)
+- **Φίλτρο Φάση**: Multi-select από τις φάσεις που υπάρχουν στα items
+- **Φίλτρο Objective**: Multi-select
+- **Φίλτρο Κατηγορία**: TV & Radio / Digital Paid / Social / Outdoor / Print / Influencers/PR / Events
+- **Search**: Free text search σε campaign_name και medium
+
+State: `groupBy: 'medium' | 'phase' | 'objective' | 'category'`, `filterPhase: string[]`, `filterObjective: string[]`, `filterCategory: string`, `searchQuery: string`
+
+Εφαρμογή και στο GanttView (pass filtered/grouped items).
 
 ---
 
-## Τεχνικές Σημειώσεις
+## Πρόβλημα 5: Αφαίρεση εικονιδίων από κανάλια
 
-- **Gantt**: Υλοποιείται με `div` elements και CSS calc() για widths, χωρίς νέα library. Timeline εύρος: min(start_date) → max(end_date) όλων των items
-- **Media Plan Status Badge**: Inline `<SelectCell>` στο plan header
-- **Wizard phases**: Dynamic array με + button, κάθε phase έχει name/start/end inputs
-- **Budget warning**: Κόκκινη γραμμή/indicator αν `Σ(budget items) > media_plan.total_budget`
-- **Backward compat**: Τα items χωρίς `media_plan_id` γίνονται migrate αυτόματα με trigger
+**Τρέχουσα κατάσταση**: Τα εικονίδια (emoji) εμφανίζονται σε:
+- `MEDIA_EMOJI` map (~γραμμές 106-115)
+- `SpreadsheetRow` → `SelectCell` για medium (γραμμή 720: `${MEDIA_EMOJI[m] || ''} ${m}`)
+- Group headers στον πίνακα (γραμμή 1250: `{MEDIA_EMOJI[medium] || '📌'} {medium}`)
+- `GanttView` group headers (γραμμή 597: `{MEDIA_EMOJI[medium] || '📌'} {medium}`)
+- `ProjectionsSection` (γραμμή 827)
+
+**Λύση**: Αφαίρεση emoji από όλα τα παραπάνω. Ο `MEDIA_EMOJI` map παραμένει (χρησιμοποιείται αλλού για fallback) αλλά δεν γίνεται render πλέον. Αντικατάσταση με colored dot indicators ή απλά το text.
+
+---
+
+## Πρόβλημα 6: Responsive πίνακας + text wrapping
+
+**Τρέχουσα κατάσταση**: 
+- `min-w-[140px]`, `min-w-[120px]`, κλπ. στα `td` + `minWidth: '1100px'` στο table
+- `truncate` class σε αρκετά cells που κόβει το text
+- Το table overflow-x-auto δουλεύει αλλά δεν είναι ευχάριστο
+
+**Λύση**:
+1. Αφαίρεση `truncate` από "Καμπάνια" και "Placement" columns — επιτρέπεται wrapping
+2. Μείωση `min-width` όπου δεν χρειάζεται (dates: 90px αντί 105px, status: 100px)
+3. Στο table style: `table-layout: fixed` με συγκεκριμένα widths ανά column
+4. `whitespace-normal` και `break-words` στα text cells
+5. Column widths (approximate):
+   - Καμπάνια: 180px (wrap)
+   - Μέσο: 130px
+   - Format: 90px (wrap)  
+   - Φάση: 110px (wrap)
+   - Objective: 100px
+   - Έναρξη/Λήξη: 88px each
+   - Budget/Net/Actual: 80px each (right-aligned, no-wrap)
+   - Status: 110px
+   - Actions: 32px
+
+---
+
+## Τεχνικές Λεπτομέρειες
+
+### Αρχεία που αλλάζουν:
+
+| Αρχείο | Αλλαγές |
+|--------|---------|
+| `supabase/functions/generate-media-plan/index.ts` | Budget normalization post-generation + αυστηρότερο prompt |
+| `src/components/projects/ProjectMediaPlan.tsx` | Φίλτρα/grouping toolbar, ActualSpentWizard, ReAllocateModal, αφαίρεση emoji, responsive table |
+
+### ReAllocate Modal λογική:
+```typescript
+// Scale all items proportionally to new budget
+const scale = newBudget / currentAllocated;
+items.forEach(item => {
+  updateItem(item.id, 'budget', Math.round(item.budget * scale));
+});
+```
+
+### Actual Spent Wizard state:
+```typescript
+interface ActualEntry { itemId: string; value: number; }
+const [entries, setEntries] = useState<ActualEntry[]>(
+  items.map(i => ({ itemId: i.id, value: i.actual_cost }))
+);
+```
+
+### Filter/Group toolbar state (added to PlanDetailView):
+```typescript
+const [groupBy, setGroupBy] = useState<'medium' | 'phase' | 'objective' | 'category'>('medium');
+const [filterPhase, setFilterPhase] = useState<string[]>([]);
+const [filterObjective, setFilterObjective] = useState<string[]>([]);
+const [filterCategory, setFilterCategory] = useState<string>('all');
+const [searchQuery, setSearchQuery] = useState('');
+```
+
+### Grouping logic:
+```typescript
+const getCategory = (medium: string) => {
+  return Object.entries(MEDIA_CATEGORIES).find(([, mediums]) => mediums.includes(medium))?.[0] || 'Άλλο';
+};
+
+const displayedItems = useMemo(() => {
+  let result = items;
+  if (searchQuery) result = result.filter(i => 
+    i.campaign_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    i.medium.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  if (filterPhase.length > 0) result = result.filter(i => filterPhase.includes(i.phase || ''));
+  if (filterObjective.length > 0) result = result.filter(i => filterObjective.includes(i.objective));
+  if (filterCategory !== 'all') result = result.filter(i => getCategory(i.medium) === filterCategory);
+  return result;
+}, [items, searchQuery, filterPhase, filterObjective, filterCategory]);
+
+const groupedItems = useMemo(() => {
+  const groups: Record<string, MediaPlanItem[]> = {};
+  displayedItems.forEach(item => {
+    const key = groupBy === 'medium' ? item.medium
+      : groupBy === 'phase' ? (item.phase || 'Χωρίς Φάση')
+      : groupBy === 'objective' ? item.objective
+      : getCategory(item.medium);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(item);
+  });
+  return groups;
+}, [displayedItems, groupBy]);
+```
+
+Δεν χρειάζεται migration — όλες οι αλλαγές είναι frontend + edge function μόνο.

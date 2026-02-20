@@ -1,132 +1,106 @@
 
-# Comments Section με @Mentions & Activity History στην Καρτέλα Έργου
+# Urgent Dashboard: Flag Tasks + "Επείγοντα" Κεντρικό Panel
 
 ## Τι υπάρχει ήδη
 
-Υπάρχει ένα `CommentsSection` component (`src/components/comments/CommentsSection.tsx`) που:
-- Φέρνει σχόλια από τον πίνακα `comments` (project_id / task_id / deliverable_id)
-- Εμφανίζει avatar, όνομα, χρόνο, edit/delete για τον συγγραφέα
-- **Δεν υποστηρίζει**: @mentions, rendering highlights, history/activity log, full-page tab
+Το priority system (`low | medium | high | urgent`) υπάρχει ήδη στη βάση και στα components. Δεν χρειάζεται migration. Τα tasks εμφανίζουν ήδη priority badges στον πίνακα και στο TaskDetail. Αυτό που λείπει είναι:
 
-Το `ProjectDetail.tsx` **δεν έχει** ακόμα tab "Comments" — αυτό θα προσθέσουμε.
+1. **Γρήγορος τρόπος να σημαίνεις ένα task "urgent"** με ένα κλικ (flag button) — χωρίς να ανοίξεις dialog
+2. **Κεντρικό Urgent Dashboard** στο My Work που συγκεντρώνει σε ένα panel ΟΛΕΣ τις κρίσιμες καταστάσεις: overdue + high/urgent priority + pending approvals
 
----
+## Δεν χρειάζεται Migration
 
-## Τι θα φτιάξουμε
-
-### 1. Αναβαθμισμένο `CommentsSection` με @Mentions
-
-**Textarea με mention detection**: Όταν ο χρήστης γράψει `@`, εμφανίζεται floating dropdown με λίστα χρηστών που έχουν πρόσβαση στο έργο. Επιλογή χρήστη → εισάγεται `@full_name` στο κείμενο.
-
-**Rendering των mentions**: Το κείμενο του σχολίου αναλύεται για patterns `@Όνομα Χρήστη` και τα mentions εμφανίζονται ως χρωματιστά badges/chips (π.χ. `@Γιώργος Παπαδόπουλος` → μπλε badge).
-
-**Αποθήκευση**: Το `content` αποθηκεύεται ως plain text με `@full_name` — δεν χρειάζεται αλλαγή στη βάση.
-
-```text
-┌─────────────────────────────────────────────────────┐
-│  Γράψτε ένα σχόλιο...                               │
-│                                                     │
-│  @Γιώ...                                            │
-│  ┌────────────────────────────┐                     │
-│  │ 👤 Γιώργος Παπαδόπουλος  │  ← floating popup   │
-│  │ 👤 Γιώτα Νικολάου         │                     │
-│  └────────────────────────────┘                     │
-└─────────────────────────────────────────────────────┘
-```
-
-### 2. History/Activity Tab στο panel
-
-Το νέο tab "Comments & Activity" θα έχει 2 sub-views:
-- **Σχόλια** (CommentsSection αναβαθμισμένο)
-- **Ιστορικό** (Activity Log — υπάρχουσες εγγραφές από `activity_log` για το project)
-
-```text
-┌─────────────────────────────────────────────────────┐
-│  [💬 Σχόλια (3)]  [📋 Ιστορικό]                     │
-│  ─────────────────────────────────────────────────  │
-│  Σχόλια view:                                        │
-│  👤 Γιώργης • 14 Φεβ, 14:32                         │
-│  Ελέγξτε @Μαρία Παπαδοπούλου το deliverable Α       │
-│  → @Μαρία γίνεται μπλε badge                        │
-│  [✎] [🗑]                                            │
-│  ─────────────────────────────────────────────────  │
-│  Ιστορικό view:                                      │
-│  ⚡ Task "Σχεδιασμός" → "Ολοκληρώθηκε" • Γ.Π.       │
-│  ⚡ Deliverable "Καμπάνια" δημιουργήθηκε • Μ.Ν.      │
-│  ⚡ Προϋπολογισμός άλλαξε σε €15,000 • Γ.Π.          │
-└─────────────────────────────────────────────────────┘
-```
+Το πεδίο `priority` στον πίνακα `tasks` ήδη υποστηρίζει `'urgent'` και `'high'`. Μόνο frontend αλλαγές.
 
 ---
 
-## Τεχνικές Αλλαγές
+## Αλλαγή 1: Flag Button σε κάθε Task Row (My Work + Tasks Table)
 
-### Αρχείο 1: `src/components/comments/CommentsSection.tsx` — Πλήρης αναβάθμιση
+### `SortableTaskRow` στο `MyWork.tsx`
 
-**Νέο state & logic**:
-```typescript
-const [mentionQuery, setMentionQuery] = useState('');        // το string μετά το @
-const [mentionAnchor, setMentionAnchor] = useState<number>(-1); // cursor position
-const [showMentionDropdown, setShowMentionDropdown] = useState(false);
-const [projectUsers, setProjectUsers] = useState<Profile[]>([]); // για το dropdown
+Προσθήκη ενός **Flag icon button** δίπλα στο timer button:
+
+```text
+[☰] [✓] [Task Title]  [Έργο]  [Έναρξη]  [Λήξη]  [Status]  [Priority]  [▶] [🚩]
+                                                                               ↑ Νέο
 ```
 
-**`handleTextChange`**: Ανιχνεύει αν ο cursor βρίσκεται μετά από `@` (χωρίς space) και ενεργοποιεί το dropdown.
+- Αν `priority === 'urgent'` → κόκκινο γεμιστό flag 🚩 (`text-destructive`)
+- Αν `priority === 'high'` → πορτοκαλί flag 🏴 (`text-orange-500`)
+- Αν άλλο → γκρι outline flag (`text-muted-foreground`)
+- **Κλικ**: Toggles μεταξύ `priority = 'urgent'` (αν δεν ήταν urgent) ή `priority = 'medium'` (αν ήταν urgent) — αμέσως, χωρίς confirm
 
-**`insertMention(user)`**: Αντικαθιστά το `@query` με `@full_name ` στο textarea.
+### `TasksTableView.tsx`
 
-**`renderCommentContent(content)`**: 
+Ίδιο Flag button στο τέλος κάθε row, διαθέσιμο σε όλους (όχι μόνο admin).
+
+---
+
+## Αλλαγή 2: "Επείγοντα" Panel στο My Work
+
+Νέο **"Επείγοντα" Card** που εμφανίζεται **πάνω από το "Προς Έγκριση"** section (ή ενσωματωμένο με αυτό), συγκεντρώνοντας:
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│  🚨 Επείγοντα (N)                                                │
+│  ─────────────────────────────────────────────────────────────  │
+│  🔴 Εκπρόθεσμα (N)                                              │
+│  □ [Task]  [Έργο]  [Due 14/02 !!!]  [Status]  [▶] [🚩]         │
+│                                                                 │
+│  🟠 Υψηλή Προτεραιότητα (N)                                     │
+│  □ [Task]  [Έργο]  [Due 28/02]  [Status]  [▶] [🚩]             │
+│                                                                 │
+│  🟡 Προς Έγκριση (N)                                            │
+│  [Εσωτερική / Πελάτη tasks ...]                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Λογική συλλογής δεδομένων
+
+Τα data ήδη φορτώνονται στο `fetchAll()`. Χρειάζεται μόνο να προστεθεί μια νέα υπολογιστή κατηγορία:
+
 ```typescript
-// Splits text on @mentions, wraps them in styled spans
-const parts = content.split(/(@[\w\sΆ-ώά-ω]+)/g);
-return parts.map(part => 
-  part.startsWith('@') 
-    ? <span className="text-primary font-medium bg-primary/10 px-1 rounded">{part}</span>
-    : part
+// Overdue: ήδη υπάρχει ως todayTasks.filter(t => isBefore(due, today))
+// High priority non-completed: ήδη στο allTasks
+const urgentTasks = allTasks.filter(t => 
+  (t.priority === 'urgent' || t.priority === 'high') && 
+  !isBefore(startOfDay(new Date(t.due_date || '9999')), today) // αποκλείει τα overdue (ήδη στη πρώτη κατηγορία)
 );
 ```
 
-**Mention Dropdown**: Absolute-positioned div κάτω από το textarea, φιλτράρει `projectUsers` βάσει `mentionQuery`.
+**Αποφυγή duplicates**: Ένα task overdue+high_priority εμφανίζεται μόνο στο "Εκπρόθεσμα".
 
-**Fetch project users**: Νέο prop `projectId` (ήδη υπάρχει) → query `project_user_access + profiles` για να φέρει τους χρήστες με πρόσβαση στο project.
+---
 
-### Αρχείο 2: `src/pages/ProjectDetail.tsx` — Νέο Tab
+## Αλλαγή 3: KPI Strip αναβάθμιση στο My Work
 
-Προσθήκη tab "Σχόλια & Ιστορικό" με δύο sub-tabs (Radix Tabs εσωτερικά):
+Τo υπάρχον strip έχει: Tasks Σήμερα | Ώρες Σήμερα | Overdue
 
-```typescript
-// Στο TabsList:
-<TabsTrigger value="comments">
-  <MessageSquare className="h-4 w-4 mr-1.5" />
-  Σχόλια
-</TabsTrigger>
+Αναβάθμιση με **4th card "Urgent"** ή αλλαγή της Overdue card σε "Κρίσιμα" που μετράει `overdue + urgent/high`:
 
-// Νέο TabsContent:
-<TabsContent value="comments">
-  <ProjectCommentsAndHistory projectId={project.id} />
-</TabsContent>
+```text
+[Tasks Σήμερα]  [Ώρες Σήμερα]  [Εκπρόθεσμα]  [Προς Έγκριση]
 ```
 
-### Αρχείο 3: Νέο `src/components/projects/ProjectCommentsAndHistory.tsx`
+Το KPI "Προς Έγκριση" θα δείχνει `internalReviewTasks.length + approvalTasks.length` με badge κίτρινο/πορτοκαλί.
 
-Wrapper component με εσωτερικά tabs:
-- **Tab "Σχόλια"**: `<CommentsSection projectId={projectId} />` (αναβαθμισμένο)
-- **Tab "Ιστορικό"**: Query `activity_log` φιλτραρισμένο με `entity_id = projectId` + activity logs για tasks/deliverables του project
+---
+
+## Αλλαγή 4: Quick Flag στο TaskDetail
+
+Στη σελίδα Task Detail, πάνω δεξιά κοντά στα status buttons, προσθήκη ενός **"Σήμανση ως Επείγον"** toggle button με Flag icon:
 
 ```typescript
-// Activity log query:
-const { data } = await supabase
-  .from('activity_log')
-  .select('*, profiles:user_id(full_name, email)')
-  .or(`entity_id.eq.${projectId},and(entity_type.eq.task,...)`)
-  .order('created_at', { ascending: false })
-  .limit(50);
+<Button
+  variant={task.priority === 'urgent' ? 'destructive' : 'outline'}
+  size="sm"
+  onClick={() => updateField('priority', task.priority === 'urgent' ? 'medium' : 'urgent')}
+  className="gap-2"
+>
+  <Flag className="h-4 w-4" />
+  {task.priority === 'urgent' ? 'Επείγον ✓' : 'Σήμανση ως Επείγον'}
+</Button>
 ```
-
-**Εμφάνιση activity**:
-- Εικονίδιο ανά `entity_type` (task → CheckSquare, deliverable → Package, project → FolderOpen)
-- Verb ανά `action` (created → "δημιουργήθηκε", updated → "ενημερώθηκε", deleted → "διαγράφηκε")
-- Timestamp σχετικός (π.χ. "πριν 2 ώρες")
 
 ---
 
@@ -134,19 +108,40 @@ const { data } = await supabase
 
 | Αρχείο | Τύπος αλλαγής |
 |--------|---------------|
-| `src/components/comments/CommentsSection.tsx` | Αναβάθμιση: @mentions detection, dropdown, render highlights, fetch project users |
-| `src/components/projects/ProjectCommentsAndHistory.tsx` | **Νέο αρχείο** — wrapper με tabs: Comments + Activity History |
-| `src/pages/ProjectDetail.tsx` | Προσθήκη tab "Σχόλια" + import |
+| `src/pages/MyWork.tsx` | Νέο "Επείγοντα" panel, 4th KPI card, flag toggle στο SortableTaskRow, νέα `urgentTasks` state |
+| `src/pages/TaskDetail.tsx` | Quick Flag button στο header |
+| `src/components/tasks/TasksTableView.tsx` | Flag button στο table row για inline priority toggle |
 
-**Δεν χρειάζεται migration** — το `content` text field στα `comments` χωράει ήδη @mentions ως plain text.
+**Δεν χρειάζεται migration** — το priority field υποστηρίζει ήδη `'urgent'`.
 
 ---
 
 ## UX Λεπτομέρειες
 
-- **Mentions**: Πατώντας `Escape` ή `space` κλείνει το dropdown χωρίς εισαγωγή
-- **Keyboard navigation**: ↑↓ για navigation στο dropdown, `Enter` για επιλογή
-- **Edit mode**: Το edit textarea υποστηρίζει κι αυτό @mentions
-- **History**: Εμφανίζεται ιστορικό μόνο για αλλαγές που σχετίζονται με το έργο (project + tasks + deliverables)
-- **Relative time**: "πριν 2 ώρες", "χθες", "14 Φεβ" (χρησιμοποιώντας `formatDistanceToNow` από date-fns)
-- **Realtime**: Το history ενημερώνεται και αυτό σε realtime (υπάρχει ήδη το `activity_log` realtime subscription)
+- **Flag toggle**: Άμεσο feedback με toast "Σημάνθηκε ως Επείγον!" / "Αφαιρέθηκε η σήμανση"
+- **Urgent Panel**: Εμφανίζεται μόνο αν υπάρχουν items (όπως το "Προς Έγκριση")
+- **Unified Panel**: Το "Επείγοντα" και "Προς Έγκριση" **συγχωνεύονται** σε ένα "Απαιτούν Προσοχή" card με 3 sub-sections (Εκπρόθεσμα / Υψηλή Προτεραιότητα / Προς Έγκριση), για πιο compact UI
+- **Task row click**: Ανοίγει το task sheet (existing behavior)
+- **Sorting**: Εντός κάθε sub-section, τα tasks ταξινομούνται κατά `due_date` ascending (overdue πρώτα)
+
+## Αρχιτεκτονική "Απαιτούν Προσοχή" Panel
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│  ⚠️  Απαιτούν Προσοχή (N συνολικά)                              │
+├─────────────────────────────────────────────────────────────────┤
+│  🔴 Εκπρόθεσμα (N)                               [collapse ▲]  │
+│  [task rows με κόκκινη ημερομηνία + flag button]                │
+├─────────────────────────────────────────────────────────────────┤
+│  🟠 Υψηλή Προτεραιότητα (N)                      [collapse ▲]  │
+│  [task rows με πορτοκαλί priority badge + flag button]          │
+├─────────────────────────────────────────────────────────────────┤
+│  🟡 Εσωτερική Έγκριση (N)                                       │
+│  [υπάρχοντα rows with ✓/✗]                                      │
+├─────────────────────────────────────────────────────────────────┤
+│  🤝 Έγκριση Πελάτη (N)                                          │
+│  [υπάρχοντα rows with ✓/✗]                                      │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+Αυτό αντικαθιστά το παλιό "Προς Έγκριση" Card και συγκεντρώνει **όλα τα urgent items** σε ένα σημείο.

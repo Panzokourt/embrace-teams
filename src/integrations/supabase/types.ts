@@ -1202,19 +1202,27 @@ export type Database = {
           budget: number | null
           campaign_name: string | null
           clicks: number | null
+          commission_rate: number | null
           cpc: number | null
           cpm: number | null
           created_at: string
           ctr: number | null
           deliverable_id: string | null
           end_date: string | null
+          format: string | null
+          frequency: number | null
           id: string
           impressions: number | null
           invoice_id: string | null
           medium: string
+          net_budget: number | null
           notes: string | null
+          objective: string | null
+          phase: string | null
           placement: string | null
           project_id: string
+          reach: number | null
+          sort_order: number | null
           start_date: string | null
           status: string | null
           target_audience: string | null
@@ -1226,19 +1234,27 @@ export type Database = {
           budget?: number | null
           campaign_name?: string | null
           clicks?: number | null
+          commission_rate?: number | null
           cpc?: number | null
           cpm?: number | null
           created_at?: string
           ctr?: number | null
           deliverable_id?: string | null
           end_date?: string | null
+          format?: string | null
+          frequency?: number | null
           id?: string
           impressions?: number | null
           invoice_id?: string | null
           medium: string
+          net_budget?: number | null
           notes?: string | null
+          objective?: string | null
+          phase?: string | null
           placement?: string | null
           project_id: string
+          reach?: number | null
+          sort_order?: number | null
           start_date?: string | null
           status?: string | null
           target_audience?: string | null
@@ -1250,19 +1266,27 @@ export type Database = {
           budget?: number | null
           campaign_name?: string | null
           clicks?: number | null
+          commission_rate?: number | null
           cpc?: number | null
           cpm?: number | null
           created_at?: string
           ctr?: number | null
           deliverable_id?: string | null
           end_date?: string | null
+          format?: string | null
+          frequency?: number | null
           id?: string
           impressions?: number | null
           invoice_id?: string | null
           medium?: string
+          net_budget?: number | null
           notes?: string | null
+          objective?: string | null
+          phase?: string | null
           placement?: string | null
           project_id?: string
+          reach?: number | null
+          sort_order?: number | null
           start_date?: string | null
           status?: string | null
           target_audience?: string | null

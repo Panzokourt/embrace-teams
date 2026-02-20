@@ -22,7 +22,13 @@ interface GenerateRequest {
   projectId: string;
   projectName: string;
   projectBudget: number;
+  agencyFeePercentage?: number;
   deliverables: Array<{ id: string; name: string }>;
+  campaignObjective?: string;
+  targetAudience?: string;
+  campaignDuration?: { start: string; end: string };
+  selectedChannels?: string[];
+  budgetAllocation?: Record<string, number>;
 }
 
 serve(async (req) => {
@@ -74,7 +80,11 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY not configured");
     }
 
-    const { projectId, projectName, projectBudget, deliverables } = await req.json() as GenerateRequest;
+    const { 
+      projectId, projectName, projectBudget, agencyFeePercentage = 0,
+      deliverables, campaignObjective, targetAudience, campaignDuration, 
+      selectedChannels, budgetAllocation 
+    } = await req.json() as GenerateRequest;
 
     // ============================================
     // SECURITY: Authorization Check
@@ -92,16 +102,12 @@ serve(async (req) => {
     );
 
     if (accessError || !hasAccess) {
-      console.error("User does not have access to project:", projectId);
       return new Response(
         JSON.stringify({ error: 'Unauthorized access to project' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }}
       );
     }
 
-    // ============================================
-    // Input Validation
-    // ============================================
     if (!deliverables || deliverables.length === 0) {
       return new Response(
         JSON.stringify({ error: "No deliverables provided" }),
@@ -109,53 +115,65 @@ serve(async (req) => {
       );
     }
 
-    if (!projectBudget || projectBudget <= 0) {
-      return new Response(
-        JSON.stringify({ error: "Valid project budget is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    const netBudget = projectBudget * (1 - agencyFeePercentage / 100);
+    const channelList = selectedChannels?.length ? selectedChannels.join(', ') : 'TV, Radio, Digital (Social & Search), OOH, Print, Influencers';
+    const allocationText = budgetAllocation && Object.keys(budgetAllocation).length > 0
+      ? Object.entries(budgetAllocation).filter(([, v]) => v > 0).map(([k, v]) => `${k}: ${v}%`).join(', ')
+      : 'Distribute intelligently based on campaign objective';
 
-    console.log("Generating media plan for project:", projectName, "Budget:", projectBudget);
-
-    // ============================================
-    // AI Processing
-    // ============================================
-    const systemPrompt = `You are a media planning expert. Based on the project details and deliverables provided, generate a comprehensive media plan with specific placements, budgets, and timelines.
+    const systemPrompt = `You are a senior media planning expert at an advertising agency. Generate comprehensive, realistic media plans with detailed channel strategy.
 
 Return ONLY valid JSON in this exact format:
 {
   "mediaPlanItems": [
     {
-      "medium": "Facebook|Instagram|Google Ads|LinkedIn|Twitter/X|TikTok|YouTube|TV|Radio|Print|OOH (Out of Home)|Programmatic|Email Marketing|Influencer|Άλλο",
-      "placement": "specific placement like Feed, Stories, Banner 300x250, etc",
+      "medium": "TV|Radio|Facebook|Instagram|TikTok|Google Ads (Search)|Google Ads (Display)|YouTube|OOH (Billboards)|DOOH (Digital OOH)|Programmatic|Influencer|Ambassador|PR|Εφημερίδες|Περιοδικά|Advertorial|Native Content|Email Marketing|SMS Marketing|Sponsorship|Events|Άλλο",
+      "placement": "specific placement e.g. Feed, Stories, Banner 300x250, Spot 30sec",
       "campaign_name": "descriptive campaign name",
+      "format": "creative format e.g. Video 15sec, Carousel, Static 300x250, Spot 30sec",
+      "phase": "campaign phase e.g. Φάση 1 - Launching, Φάση 2 - Sustaining",
+      "objective": "awareness|consideration|conversion|retention|launch|engagement",
       "start_date": "YYYY-MM-DD",
-      "end_date": "YYYY-MM-DD", 
+      "end_date": "YYYY-MM-DD",
       "budget": number,
-      "target_audience": "demographic and interest targeting description",
-      "notes": "additional notes or recommendations",
-      "deliverable_id": "UUID of the associated deliverable if applicable"
+      "reach": number (estimated unique reach),
+      "impressions": number (estimated impressions),
+      "target_audience": "demographic description",
+      "notes": "strategic rationale and recommendations",
+      "deliverable_id": "UUID of associated deliverable if applicable or null"
     }
   ]
 }
 
 Guidelines:
-- Distribute the budget intelligently across different media channels
-- Consider the project goals when selecting media types
-- Include a mix of awareness and conversion-focused placements
-- Be realistic with budget allocations
-- Use Greek for campaign names and notes when the project name is in Greek`;
+- Create 6-12 diverse media items across the selected channels
+- Distribute budget intelligently with realistic allocations
+- Use campaign phases (Φάση 1, Φάση 2 etc.) to show campaign timeline
+- Match each item's objective to the campaign goal
+- Provide realistic reach/impressions estimates for Greek market
+- Include strategic rationale in notes
+- Use Greek for campaign names and notes when project name is in Greek`;
 
-    const userPrompt = `Create a media plan for:
+    const userPrompt = `Create a detailed media plan for:
 
 Project: ${projectName}
 Total Budget: €${projectBudget}
+Net Budget (after ${agencyFeePercentage}% agency fee): €${Math.round(netBudget)}
+Campaign Objective: ${campaignObjective || 'Brand Awareness'}
+Target Audience: ${targetAudience || 'General audience'}
+Campaign Duration: ${campaignDuration?.start || 'TBD'} to ${campaignDuration?.end || 'TBD'}
+Selected Channels: ${channelList}
+Budget Allocation preferences: ${allocationText}
 
-Deliverables:
+Project Deliverables:
 ${deliverables.map(d => `- ${d.name} (ID: ${d.id})`).join('\n')}
 
-Generate appropriate media placements that would help achieve these deliverables. Distribute the budget wisely across channels. Link each media item to relevant deliverables where applicable.`;
+Create a comprehensive media plan that:
+1. Distributes the NET budget (€${Math.round(netBudget)}) across the selected channels
+2. Respects the budget allocation preferences
+3. Organizes placements in logical campaign phases
+4. Links media items to relevant deliverables where applicable
+5. Provides realistic Greek market estimates for reach and impressions`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

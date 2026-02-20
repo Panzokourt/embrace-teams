@@ -1214,6 +1214,7 @@ export type Database = {
           id: string
           impressions: number | null
           invoice_id: string | null
+          media_plan_id: string | null
           medium: string
           net_budget: number | null
           notes: string | null
@@ -1246,6 +1247,7 @@ export type Database = {
           id?: string
           impressions?: number | null
           invoice_id?: string | null
+          media_plan_id?: string | null
           medium: string
           net_budget?: number | null
           notes?: string | null
@@ -1278,6 +1280,7 @@ export type Database = {
           id?: string
           impressions?: number | null
           invoice_id?: string | null
+          media_plan_id?: string | null
           medium?: string
           net_budget?: number | null
           notes?: string | null
@@ -1309,6 +1312,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "media_plan_items_media_plan_id_fkey"
+            columns: ["media_plan_id"]
+            isOneToOne: false
+            referencedRelation: "media_plans"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "media_plan_items_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
@@ -1320,6 +1330,63 @@ export type Database = {
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      media_plans: {
+        Row: {
+          agency_fee_percentage: number | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          notes: string | null
+          project_id: string
+          status: string
+          total_budget: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          agency_fee_percentage?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          project_id: string
+          status?: string
+          total_budget?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          agency_fee_percentage?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          project_id?: string
+          status?: string
+          total_budget?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_plans_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_plans_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]

@@ -338,6 +338,7 @@ export function ProjectMediaPlan({ projectId, projectName, projectBudget, delive
     try {
       const { data, error } = await supabase.functions.invoke('generate-media-plan', {
         body: {
+          projectId,
           projectName,
           projectBudget,
           deliverables: deliverables.map(d => ({ id: d.id, name: d.name })),

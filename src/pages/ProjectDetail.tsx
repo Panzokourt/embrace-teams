@@ -687,24 +687,14 @@ export default function ProjectDetailPage() {
         </TabsContent>
 
         {/* Media Plan Tab */}
-        <TabsContent value="media-plan">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Megaphone className="h-5 w-5" />
-                Media Plan
-              </CardTitle>
-              <CardDescription>Σχεδιασμός και παρακολούθηση media placements</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ProjectMediaPlan 
-                projectId={project.id} 
-                projectName={project.name}
-                projectBudget={project.budget}
-                deliverables={deliverables.map(d => ({ id: d.id, name: d.name }))}
-              />
-            </CardContent>
-          </Card>
+        <TabsContent value="media-plan" className="mt-0">
+          <ProjectMediaPlan 
+            projectId={project.id} 
+            projectName={project.name}
+            projectBudget={project.budget}
+            agencyFeePercentage={project.agency_fee_percentage || 0}
+            deliverables={deliverables.map(d => ({ id: d.id, name: d.name }))}
+          />
         </TabsContent>
 
         {/* P&L Report Tab */}

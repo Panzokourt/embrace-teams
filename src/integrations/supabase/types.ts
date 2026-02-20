@@ -1518,6 +1518,125 @@ export type Database = {
           },
         ]
       }
+      project_creatives: {
+        Row: {
+          company_id: string | null
+          content_type: string | null
+          created_at: string | null
+          deliverable_id: string | null
+          description: string | null
+          file_name: string
+          file_path: string
+          file_size: number | null
+          id: string
+          media_plan_item_id: string | null
+          project_id: string
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          task_id: string | null
+          title: string | null
+          updated_at: string | null
+          uploaded_by: string
+          version: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          content_type?: string | null
+          created_at?: string | null
+          deliverable_id?: string | null
+          description?: string | null
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          id?: string
+          media_plan_item_id?: string | null
+          project_id: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          task_id?: string | null
+          title?: string | null
+          updated_at?: string | null
+          uploaded_by: string
+          version?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          content_type?: string | null
+          created_at?: string | null
+          deliverable_id?: string | null
+          description?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          media_plan_item_id?: string | null
+          project_id?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          task_id?: string | null
+          title?: string | null
+          updated_at?: string | null
+          uploaded_by?: string
+          version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_creatives_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_creatives_deliverable_id_fkey"
+            columns: ["deliverable_id"]
+            isOneToOne: false
+            referencedRelation: "deliverables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_creatives_media_plan_item_id_fkey"
+            columns: ["media_plan_item_id"]
+            isOneToOne: false
+            referencedRelation: "media_plan_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_creatives_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_creatives_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_creatives_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_creatives_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_team_access: {
         Row: {
           created_at: string

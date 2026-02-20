@@ -10,8 +10,8 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ProjectDeliverablesTable } from '@/components/projects/ProjectDeliverablesTable';
 import { ProjectTasksTable } from '@/components/projects/ProjectTasksTable';
-import { ProjectFinancialsManager } from '@/components/projects/ProjectFinancialsManager';
-import { ProjectPLReport } from '@/components/projects/ProjectPLReport';
+import { ProjectFinancialsHub } from '@/components/projects/ProjectFinancialsHub';
+import { ProjectCreatives } from '@/components/projects/ProjectCreatives';
 import { ProjectMediaPlan } from '@/components/projects/ProjectMediaPlan';
 import { ProjectAISuggestions } from '@/components/projects/ProjectAISuggestions';
 import { ProjectInfoEditor } from '@/components/projects/ProjectInfoEditor';
@@ -29,8 +29,6 @@ import {
   Circle,
   AlertCircle,
   Loader2,
-  Package,
-  CheckSquare,
   Sparkles,
   Upload,
   BarChart3,
@@ -38,6 +36,7 @@ import {
   TrendingUp,
   GanttChartSquare,
   MessageSquare,
+  Palette,
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -501,14 +500,15 @@ export default function ProjectDetailPage() {
               <MessageSquare className="h-4 w-4 mr-1.5" />
               Σχόλια
             </TabsTrigger>
+            <TabsTrigger value="creatives">
+              <Palette className="h-4 w-4 mr-1.5" />
+              Δημιουργικά
+            </TabsTrigger>
             {(canViewFinancials || isClient) && (
-              <>
-                <TabsTrigger value="pl-report">
-                  <BarChart3 className="h-4 w-4 mr-1.5" />
-                  P&L
-                </TabsTrigger>
-                <TabsTrigger value="financials">Οικονομικά</TabsTrigger>
-              </>
+              <TabsTrigger value="financials">
+                <DollarSign className="h-4 w-4 mr-1.5" />
+                Οικονομικά
+              </TabsTrigger>
             )}
           </TabsList>
         </div>
@@ -697,29 +697,26 @@ export default function ProjectDetailPage() {
           />
         </TabsContent>
 
-        {/* P&L Report Tab */}
-        {(canViewFinancials || isClient) && (
-          <TabsContent value="pl-report">
-            <ProjectPLReport 
-              projectId={project.id} 
-              projectBudget={project.budget}
-              agencyFeePercentage={project.agency_fee_percentage}
-            />
-          </TabsContent>
-        )}
+        {/* Creatives Tab */}
+        <TabsContent value="creatives" className="mt-4">
+          <ProjectCreatives
+            projectId={project.id}
+            projectName={project.name}
+            deliverables={deliverables.map(d => ({ id: d.id, name: d.name }))}
+            tasks={tasks.map(t => ({ id: t.id, title: t.title }))}
+            mediaPlanItems={[]}
+          />
+        </TabsContent>
 
-        {/* Financials Tab */}
+        {/* Unified Financials Tab */}
         {(canViewFinancials || isClient) && (
-          <TabsContent value="financials">
-            <Card>
-              <CardHeader>
-                <CardTitle>Οικονομικά</CardTitle>
-                <CardDescription>Διαχείριση τιμολογίων και εξόδων</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ProjectFinancialsManager projectId={project.id} clientId={project.client_id} />
-              </CardContent>
-            </Card>
+          <TabsContent value="financials" className="mt-4">
+            <ProjectFinancialsHub
+              projectId={project.id}
+              clientId={project.client_id}
+              projectBudget={project.budget}
+              agencyFeePercentage={project.agency_fee_percentage || 0}
+            />
           </TabsContent>
         )}
       </Tabs>

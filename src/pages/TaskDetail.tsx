@@ -15,7 +15,7 @@ import { TaskTimer } from '@/components/time-tracking/TaskTimer';
 import { toast } from 'sonner';
 import {
   ArrowLeft, Loader2, CheckCircle2, Clock, Circle, AlertCircle,
-  FolderOpen, MessageSquare, Timer, ChevronRight
+  FolderOpen, MessageSquare, Timer, ChevronRight, Flag
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -342,7 +342,7 @@ export default function TaskDetailPage() {
         {/* Left column - Main content */}
         <div className="flex-1 min-w-0 space-y-5">
 
-          {/* Status quick-change */}
+      {/* Status quick-change */}
           <div className="flex items-center gap-1.5 flex-wrap">
             {(Object.entries(STATUS_CONFIG) as [TaskStatus, typeof STATUS_CONFIG['todo']][]).map(([status, config]) => (
               <Button
@@ -355,6 +355,15 @@ export default function TaskDetailPage() {
                 {config.icon} {config.label}
               </Button>
             ))}
+            <Button
+              variant={task.priority === 'urgent' ? 'destructive' : 'outline'}
+              size="sm"
+              onClick={() => updateField('priority', task.priority === 'urgent' ? 'medium' : 'urgent')}
+              className="gap-1.5 h-8 text-xs ml-auto"
+            >
+              <Flag className="h-3.5 w-3.5" />
+              {task.priority === 'urgent' ? 'Επείγον ✓' : 'Σήμανση ως Επείγον'}
+            </Button>
           </div>
 
           {/* Properties Grid */}

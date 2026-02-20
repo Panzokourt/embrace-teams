@@ -26,7 +26,8 @@ import {
   Plus, CalendarDays, Timer, FileText, FolderKanban,
   ChevronRight, Palmtree, Check, X, GripVertical, ExternalLink,
   Palette, Monitor, Globe, Calendar, MessageSquare, BarChart3,
-  FileArchive, Bot, Send, Loader2, Minimize2, Maximize2,
+  FileArchive, Bot, Send, Loader2, Minimize2, Maximize2, Flag,
+  ChevronDown,
 } from 'lucide-react';
 import { format, isBefore, startOfDay, endOfWeek, startOfTomorrow, isAfter } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -109,17 +110,36 @@ function TaskTableHeader({ draggable = false }: { draggable?: boolean }) {
         <th className="py-2 px-2 text-left font-medium">Status</th>
         <th className="py-2 px-2 text-left font-medium hidden sm:table-cell">Priority</th>
         <th className="w-10 py-2 px-2" />
+        <th className="w-8 py-2 px-2" />
       </tr>
     </thead>
   );
 }
 
+// ── Flag Button ────────────────────────────────────
+function FlagButton({ task, onToggle }: { task: TaskWithProject; onToggle: (task: TaskWithProject) => void }) {
+  const isUrgent = task.priority === 'urgent';
+  const isHigh = task.priority === 'high';
+  return (
+    <Button
+      size="icon"
+      variant="ghost"
+      className={`h-7 w-7 ${isUrgent ? 'text-destructive hover:text-destructive' : isHigh ? 'text-orange-500 hover:text-orange-500' : 'text-muted-foreground hover:text-muted-foreground'}`}
+      onClick={(e) => { e.stopPropagation(); onToggle(task); }}
+      title={isUrgent ? 'Αφαίρεση σήμανσης Επείγον' : 'Σήμανση ως Επείγον'}
+    >
+      <Flag className={`h-3.5 w-3.5 ${isUrgent ? 'fill-destructive' : ''}`} />
+    </Button>
+  );
+}
+
 // ── Sortable Task Row ──────────────────────────────
 function SortableTaskRow({
-  task, today, onComplete, onOpenSheet, activeTimer, startTimer, stopTimer, showDate = false, draggable = false,
+  task, today, onComplete, onOpenSheet, activeTimer, startTimer, stopTimer, onFlagToggle, showDate = false, draggable = false,
 }: {
   task: TaskWithProject; today: Date; onComplete: (t: TaskWithProject) => void;
   onOpenSheet: (t: TaskWithProject) => void; activeTimer: any; startTimer: any; stopTimer: any;
+  onFlagToggle: (task: TaskWithProject) => void;
   showDate?: boolean; draggable?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
@@ -173,7 +193,159 @@ function SortableTaskRow({
           </Button>
         )}
       </td>
+      <td className="py-2.5 px-2 w-8">
+        <FlagButton task={task} onToggle={onFlagToggle} />
+      </td>
     </tr>
+  );
+}
+
+// ── Attention Panel ────────────────────────────────
+function AttentionPanel({
+  overdueTasks, highPriorityTasks, internalReviewTasks, approvalTasks, attentionCount,
+  onOpenTask, onFlagToggle, onApproveInternal, onRejectInternal, onApproveClient, onRejectClient,
+  activeTimer, startTimer, stopTimer,
+}: {
+  overdueTasks: TaskWithProject[];
+  highPriorityTasks: TaskWithProject[];
+  internalReviewTasks: TaskWithProject[];
+  approvalTasks: TaskWithProject[];
+  attentionCount: number;
+  onOpenTask: (t: TaskWithProject) => void;
+  onFlagToggle: (t: TaskWithProject) => void;
+  onApproveInternal: (t: TaskWithProject) => void;
+  onRejectInternal: (t: TaskWithProject) => void;
+  onApproveClient: (t: TaskWithProject) => void;
+  onRejectClient: (t: TaskWithProject) => void;
+  activeTimer: any;
+  startTimer: any;
+  stopTimer: any;
+}) {
+  const [overdueOpen, setOverdueOpen] = useState(true);
+  const [highOpen, setHighOpen] = useState(true);
+
+  const SectionHeader = ({ emoji, label, count, open, onToggle }: { emoji: string; label: string; count: number; open: boolean; onToggle: () => void }) => (
+    <button
+      onClick={onToggle}
+      className="w-full flex items-center gap-2 px-4 md:px-6 py-2 border-b border-border/50 hover:bg-muted/30 transition-colors text-left"
+    >
+      <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${open ? '' : '-rotate-90'}`} />
+      <span className="text-xs font-semibold">{emoji} {label} ({count})</span>
+    </button>
+  );
+
+  const TaskMiniRow = ({ task, isOverdue }: { task: TaskWithProject; isOverdue?: boolean }) => (
+    <div className="flex items-center gap-2 px-4 md:px-6 py-2.5 hover:bg-muted/30 transition-colors">
+      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onOpenTask(task)}>
+        <p className="text-sm font-medium text-foreground hover:text-primary truncate">{task.title}</p>
+        <div className="flex items-center gap-2 mt-0.5">
+          <span className="text-xs text-muted-foreground">{(task.project as any)?.name || '-'}</span>
+          {task.due_date && (
+            <span className={`text-xs font-medium ${isOverdue ? 'text-destructive' : 'text-muted-foreground'}`}>
+              · {format(new Date(task.due_date), 'd/MM', { locale: el })}{isOverdue ? ' !!!' : ''}
+            </span>
+          )}
+        </div>
+      </div>
+      <Badge variant={getStatusVariant(task.status)} className="text-[10px] hidden sm:flex">{getStatusLabel(task.status)}</Badge>
+      {!activeTimer?.is_running || activeTimer.task_id !== task.id ? (
+        <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-primary shrink-0" onClick={() => startTimer(task.id, task.project_id)}>
+          <Play className="h-3.5 w-3.5" />
+        </Button>
+      ) : (
+        <Button size="icon" variant="ghost" className="h-7 w-7 text-primary shrink-0" onClick={() => stopTimer()}>
+          <Square className="h-3.5 w-3.5" />
+        </Button>
+      )}
+      <FlagButton task={task} onToggle={onFlagToggle} />
+    </div>
+  );
+
+  return (
+    <Card className="border-destructive/20 border">
+      <CardHeader className="pb-3 border-b border-border/50">
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-destructive" />
+          Απαιτούν Προσοχή
+          <Badge variant="destructive" className="text-xs ml-1">{attentionCount}</Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        {/* Εκπρόθεσμα */}
+        {overdueTasks.length > 0 && (
+          <>
+            <SectionHeader emoji="🔴" label="Εκπρόθεσμα" count={overdueTasks.length} open={overdueOpen} onToggle={() => setOverdueOpen(v => !v)} />
+            {overdueOpen && (
+              <div className="divide-y divide-border/50">
+                {overdueTasks.map(task => <TaskMiniRow key={task.id} task={task} isOverdue />)}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Υψηλή Προτεραιότητα */}
+        {highPriorityTasks.length > 0 && (
+          <>
+            <SectionHeader emoji="🟠" label="Υψηλή Προτεραιότητα" count={highPriorityTasks.length} open={highOpen} onToggle={() => setHighOpen(v => !v)} />
+            {highOpen && (
+              <div className="divide-y divide-border/50">
+                {highPriorityTasks.map(task => <TaskMiniRow key={task.id} task={task} />)}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Εσωτερική Έγκριση */}
+        {internalReviewTasks.length > 0 && (
+          <>
+            <div className="px-4 md:px-6 py-2 bg-muted/20 border-b border-border/50">
+              <span className="text-xs font-semibold">🏢 Εσωτερική Έγκριση ({internalReviewTasks.length})</span>
+            </div>
+            <div className="divide-y divide-border/50">
+              {internalReviewTasks.map(task => (
+                <div key={task.id} className="flex items-center gap-3 px-4 md:px-6 py-3">
+                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onOpenTask(task)}>
+                    <p className="text-sm font-medium text-foreground hover:text-primary">{task.title}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
+                      {(task as any).assignee?.full_name && <span className="text-xs text-muted-foreground">· {(task as any).assignee.full_name}</span>}
+                    </div>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-success hover:text-success" onClick={() => onApproveInternal(task)}><Check className="h-4 w-4" /></Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onRejectInternal(task)}><X className="h-4 w-4" /></Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Έγκριση Πελάτη */}
+        {approvalTasks.length > 0 && (
+          <>
+            <div className="px-4 md:px-6 py-2 bg-muted/20 border-b border-border/50">
+              <span className="text-xs font-semibold">🤝 Έγκριση Πελάτη ({approvalTasks.length})</span>
+            </div>
+            <div className="divide-y divide-border/50">
+              {approvalTasks.map(task => (
+                <div key={task.id} className="flex items-center gap-3 px-4 md:px-6 py-3">
+                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onOpenTask(task)}>
+                    <p className="text-sm font-medium text-foreground hover:text-primary">{task.title}</p>
+                    <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
+                  </div>
+                  <Badge variant={getPriorityColor(task.priority)} className="text-[10px]">{task.priority}</Badge>
+                  <div className="flex gap-1.5">
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-success hover:text-success" onClick={() => onApproveClient(task)}><Check className="h-4 w-4" /></Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onRejectClient(task)}><X className="h-4 w-4" /></Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -423,6 +595,26 @@ export default function MyWork() {
   }
 
   const overdueCount = todayTasks.filter(t => t.due_date && isBefore(new Date(t.due_date), today)).length;
+  const overdueTasks = useMemo(() =>
+    [...todayTasks, ...weekTasks, ...upcomingTasks]
+      .filter(t => t.due_date && isBefore(startOfDay(new Date(t.due_date)), today))
+      .sort((a, b) => (a.due_date || '').localeCompare(b.due_date || '')),
+    [todayTasks, weekTasks, upcomingTasks, today]
+  );
+
+  const overdueIds = useMemo(() => new Set(overdueTasks.map(t => t.id)), [overdueTasks]);
+
+  const highPriorityTasks = useMemo(() => {
+    const allTasks = [...todayTasks, ...weekTasks, ...upcomingTasks];
+    return allTasks
+      .filter(t => (t.priority === 'urgent' || t.priority === 'high') && !overdueIds.has(t.id))
+      .sort((a, b) => {
+        const order: Record<string, number> = { urgent: 0, high: 1 };
+        return (order[a.priority] ?? 2) - (order[b.priority] ?? 2);
+      });
+  }, [todayTasks, weekTasks, upcomingTasks, overdueIds]);
+
+  const attentionCount = overdueTasks.length + highPriorityTasks.length + internalReviewTasks.length + approvalTasks.length;
 
   async function toggleTaskComplete(task: TaskWithProject) {
     const { error } = await supabase.from('tasks').update({ status: 'completed' }).eq('id', task.id);
@@ -450,6 +642,15 @@ export default function MyWork() {
   async function rejectTask(task: TaskWithProject) {
     const { error } = await supabase.from('tasks').update({ status: 'in_progress' as any }).eq('id', task.id);
     if (!error) { toast.success('Task απορρίφθηκε, επιστροφή σε Σε Εξέλιξη'); fetchAll(); }
+  }
+
+  async function toggleFlagPriority(task: TaskWithProject) {
+    const newPriority = task.priority === 'urgent' ? 'medium' : 'urgent';
+    const { error } = await supabase.from('tasks').update({ priority: newPriority } as any).eq('id', task.id);
+    if (!error) {
+      toast.success(newPriority === 'urgent' ? '🚩 Σημάνθηκε ως Επείγον!' : 'Αφαιρέθηκε η σήμανση Επείγον');
+      fetchAll();
+    }
   }
 
   function handleDragEnd(event: any) {
@@ -512,7 +713,7 @@ export default function MyWork() {
       </div>
 
       {/* KPI Strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Card className="border-border/50">
           <CardContent className="p-4 flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center"><CheckSquare className="h-5 w-5 text-primary" /></div>
@@ -530,83 +731,37 @@ export default function MyWork() {
             <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${overdueCount > 0 ? 'bg-destructive/10' : 'bg-muted/50'}`}>
               <AlertTriangle className={`h-5 w-5 ${overdueCount > 0 ? 'text-destructive' : 'text-muted-foreground'}`} />
             </div>
-            <div><p className="text-2xl font-bold text-foreground">{overdueCount}</p><p className="text-xs text-muted-foreground">Overdue</p></div>
+            <div><p className="text-2xl font-bold text-foreground">{overdueCount}</p><p className="text-xs text-muted-foreground">Εκπρόθεσμα</p></div>
+          </CardContent>
+        </Card>
+        <Card className="border-border/50">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${(internalReviewTasks.length + approvalTasks.length) > 0 ? 'bg-warning/10' : 'bg-muted/50'}`}>
+              <Flag className={`h-5 w-5 ${(internalReviewTasks.length + approvalTasks.length) > 0 ? 'text-warning' : 'text-muted-foreground'}`} />
+            </div>
+            <div><p className="text-2xl font-bold text-foreground">{internalReviewTasks.length + approvalTasks.length}</p><p className="text-xs text-muted-foreground">Προς Έγκριση</p></div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Προς Έγκριση (Internal + Client Review) */}
-      {(internalReviewTasks.length > 0 || approvalTasks.length > 0) && (
-        <Card className="border-border/50 border-warning/30">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-warning" />
-              Προς Έγκριση ({internalReviewTasks.length + approvalTasks.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {/* Εσωτερική Έγκριση */}
-            {internalReviewTasks.length > 0 && (
-              <>
-                <div className="px-4 md:px-6 py-2 bg-violet-500/5 border-b border-border/50 flex items-center gap-2">
-                  <span className="text-xs font-semibold text-violet-600">🏢 Εσωτερική Έγκριση ({internalReviewTasks.length})</span>
-                </div>
-                <div className="divide-y divide-border/50">
-                  {internalReviewTasks.map(task => (
-                    <div key={task.id} className="flex items-center gap-3 px-4 md:px-6 py-3">
-                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setSelectedTask(task)}>
-                        <p className="text-sm font-medium text-foreground hover:text-primary">{task.title}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
-                          {(task as any).assignee?.full_name && (
-                            <span className="text-xs text-muted-foreground">· {(task as any).assignee.full_name}</span>
-                          )}
-                        </div>
-                      </div>
-                      <Badge variant="outline" className="text-[10px] border-violet-500/30 text-violet-600">Εσωτ. Έγκριση</Badge>
-                      <div className="flex gap-1.5">
-                        <Button size="icon" variant="ghost" className="h-7 w-7 text-success hover:text-success" onClick={() => approveInternalReview(task)}>
-                          <Check className="h-4 w-4" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => rejectInternalReview(task)}>
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-
-            {/* Έγκριση Πελάτη */}
-            {approvalTasks.length > 0 && (
-              <>
-                <div className="px-4 md:px-6 py-2 bg-orange-500/5 border-b border-border/50 flex items-center gap-2">
-                  <span className="text-xs font-semibold text-orange-600">🤝 Έγκριση Πελάτη ({approvalTasks.length})</span>
-                </div>
-                <div className="divide-y divide-border/50">
-                  {approvalTasks.map(task => (
-                    <div key={task.id} className="flex items-center gap-3 px-4 md:px-6 py-3">
-                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setSelectedTask(task)}>
-                        <p className="text-sm font-medium text-foreground hover:text-primary">{task.title}</p>
-                        <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
-                      </div>
-                      <Badge variant={getPriorityColor(task.priority)} className="text-[10px]">{task.priority}</Badge>
-                      <div className="flex gap-1.5">
-                        <Button size="icon" variant="ghost" className="h-7 w-7 text-success hover:text-success" onClick={() => approveTask(task)}>
-                          <Check className="h-4 w-4" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => rejectTask(task)}>
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
+      {/* Απαιτούν Προσοχή — Unified Panel */}
+      {attentionCount > 0 && (
+        <AttentionPanel
+          overdueTasks={overdueTasks}
+          highPriorityTasks={highPriorityTasks}
+          internalReviewTasks={internalReviewTasks}
+          approvalTasks={approvalTasks}
+          attentionCount={attentionCount}
+          onOpenTask={setSelectedTask}
+          onFlagToggle={toggleFlagPriority}
+          onApproveInternal={approveInternalReview}
+          onRejectInternal={rejectInternalReview}
+          onApproveClient={approveTask}
+          onRejectClient={rejectTask}
+          activeTimer={activeTimer}
+          startTimer={startTimer}
+          stopTimer={stopTimer}
+        />
       )}
 
       {/* Today Tasks - Drag & Drop */}
@@ -629,6 +784,7 @@ export default function MyWork() {
                         key={task.id} task={task} today={today} draggable
                         onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
                         activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
+                        onFlagToggle={toggleFlagPriority}
                       />
                     ))}
                   </tbody>
@@ -655,6 +811,7 @@ export default function MyWork() {
                         key={task.id} task={task} today={today} showDate
                         onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
                         activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
+                        onFlagToggle={toggleFlagPriority}
                       />
                     ))}
                   </tbody>
@@ -678,6 +835,7 @@ export default function MyWork() {
                     key={task.id} task={task} today={today} showDate
                     onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
                     activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
+                    onFlagToggle={toggleFlagPriority}
                   />
                 ))}
               </tbody>

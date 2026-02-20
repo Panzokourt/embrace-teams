@@ -693,6 +693,24 @@ export function TasksTableView({
             </TableCell>
           )}
 
+          {/* Flag toggle */}
+          <TableCell className="w-[40px]">
+            <Button
+              size="icon"
+              variant="ghost"
+              className={`h-7 w-7 ${task.priority === 'urgent' ? 'text-destructive hover:text-destructive' : task.priority === 'high' ? 'text-orange-500 hover:text-orange-500' : 'text-muted-foreground opacity-0 group-hover:opacity-100'}`}
+              title={task.priority === 'urgent' ? 'Αφαίρεση σήμανσης Επείγον' : 'Σήμανση ως Επείγον'}
+              onClick={async (e) => {
+                e.stopPropagation();
+                const newPriority = task.priority === 'urgent' ? 'medium' : 'urgent';
+                await onInlineUpdate(task.id, 'priority', newPriority);
+                toast.success(newPriority === 'urgent' ? '🚩 Σημάνθηκε ως Επείγον!' : 'Αφαιρέθηκε η σήμανση Επείγον');
+              }}
+            >
+              <Flag className={`h-3.5 w-3.5 ${task.priority === 'urgent' ? 'fill-destructive' : ''}`} />
+            </Button>
+          </TableCell>
+
           {/* Actions */}
           <TableCell style={{ width: getColumnWidth('actions') }}>
             {canManage && (
@@ -934,6 +952,7 @@ export function TasksTableView({
                 </ResizableTableHeader>
               )}
               
+              <TableHead className="w-[40px]"><Flag className="h-3.5 w-3.5 text-muted-foreground" /></TableHead>
               <TableHead className="w-[80px]">Ενέργειες</TableHead>
             </TableRow>
           </TableHeader>

@@ -1680,6 +1680,41 @@ function PlanDetailView({ plan, projectId, projectName, projectBudget, agencyFee
           generating={generating}
         />
       )}
+
+      {/* Re-Allocate Modal */}
+      {showReAllocate && pendingBudget !== null && (
+        <ReAllocateModal
+          open={showReAllocate}
+          onClose={() => { setShowReAllocate(false); setPendingBudget(null); }}
+          items={items}
+          newBudget={pendingBudget}
+          onApply={async (allocations) => {
+            const updates = Object.entries(allocations).map(([id, budget]) =>
+              supabase.from('media_plan_items').update({ budget }).eq('id', id)
+            );
+            await Promise.all(updates);
+            await fetchItems();
+            toast.success('Budget ανακατανεμήθηκε!');
+          }}
+        />
+      )}
+
+      {/* Actual Spent Wizard */}
+      {showActualWizard && (
+        <ActualSpentWizard
+          open={showActualWizard}
+          onClose={() => setShowActualWizard(false)}
+          items={items}
+          onSave={async (entries) => {
+            const updates = Object.entries(entries).map(([id, actual_cost]) =>
+              supabase.from('media_plan_items').update({ actual_cost }).eq('id', id)
+            );
+            await Promise.all(updates);
+            await fetchItems();
+            toast.success('Actual costs αποθηκεύτηκαν!');
+          }}
+        />
+      )}
     </div>
   );
 }

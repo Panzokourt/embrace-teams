@@ -1,222 +1,227 @@
 
-# Ολοκληρωμένο Media Plan System — Πλήρης Ανασχεδιασμός
+# Media Plan — Ενισχυμένο Σύστημα (6 Βελτιώσεις)
 
-## Τι υπάρχει ήδη & Τι Λείπει
+## Ανάλυση Απαιτήσεων
 
-**Υπάρχει**: Ένα βασικό component (`ProjectMediaPlan.tsx`) με table/grid view, AI generation, και CSV export. Η βάση (`media_plan_items`) έχει: `medium`, `placement`, `campaign_name`, `budget`, `actual_cost`, `impressions`, `clicks`, `CTR/CPM/CPC` (computed), `status`.
+Βάσει της ανάλυσης του κώδικα και των 6 σχολίων του χρήστη:
 
-**Λείπουν κρίσιμα πεδία στη βάση**:
-- `objective` — το marketing objective (Awareness, Consideration, Conversion, Retention)
-- `phase` — χρονική φάση καμπάνιας (π.χ. "Φάση 1 - Launching")
-- `format` — format/size (π.χ. "Video 15sec", "Banner 300x250")
-- `frequency` — αριθμός εμφανίσεων ανά χρήστη
-- `reach` — εκτιμώμενη reach
-- `commission_rate` — ποσοστό προμήθειας agency
-
-**Λείπει η λογική**: Budget allocation per deliverable/objective/channel, AI wizard με ερωτήσεις, σωστή breakdown view, inline editing.
+1. **Multi-select objectives + φάσεις με ημερομηνίες** — Ο wizard επιτρέπει μόνο 1 objective (radio button) και οι φάσεις είναι απλό text field
+2. **Budget βάσει project budget - agency fee** — Πρέπει η ολική αξία να λαμβάνει υπόψη ότι το NET budget (project budget × (1 - fee%)) είναι το πραγματικό διαθέσιμο ποσό, και το total budget του media plan δεν πρέπει να ξεπερνά αυτό
+3. **Πολλαπλά media plans ανά έργο + status** — Δεν υπάρχει καθόλου αυτή η δομή. Χρειάζεται νέος πίνακας `media_plans` (header) με FK προς `projects`, και τα `media_plan_items` να έχουν FK προς `media_plans` (όχι άμεσα στο project)
+4. **Excel-like view + Gantt + Calendar + Combined view** — Υπάρχει μόνο spreadsheet view. Χρειάζεται Gantt timeline και εναλλακτικά views
+5. **Projections/Estimations ξεχωριστά** — Τα impressions/reach/CTR/CPM να βγουν από τον κύριο πίνακα και να μπουν σε ξεχωριστό "Performance Projections" tab/section
+6. **Επεξεργασία total budget + inline σε όλα** — Το total budget να είναι editable inline στο header του media plan
 
 ---
 
-## Database Migration
+## Database Migration (Απαιτείται)
 
-Νέα πεδία στον `media_plan_items`:
+### Νέος πίνακας `media_plans` (header/container)
 
 ```sql
-ALTER TABLE public.media_plan_items 
-  ADD COLUMN IF NOT EXISTS objective TEXT DEFAULT 'awareness',
-  ADD COLUMN IF NOT EXISTS phase TEXT,
-  ADD COLUMN IF NOT EXISTS format TEXT,
-  ADD COLUMN IF NOT EXISTS frequency NUMERIC DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS reach INTEGER DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS commission_rate NUMERIC DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS net_budget NUMERIC GENERATED ALWAYS AS 
-    (budget * (1 - commission_rate / 100)) STORED,
-  ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+CREATE TABLE public.media_plans (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+  name TEXT NOT NULL DEFAULT 'Media Plan',
+  status TEXT NOT NULL DEFAULT 'draft', -- draft | active | approved | cancelled | archived
+  total_budget NUMERIC DEFAULT 0,       -- overridable budget (defaults to project budget)
+  agency_fee_percentage NUMERIC DEFAULT 0,
+  description TEXT,
+  notes TEXT,
+  created_by UUID REFERENCES public.profiles(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
 ```
 
-**Δεν αλλάζει** το `medium`, `budget`, `actual_cost`, `impressions`, `clicks`, `ctr`, `cpm`, `cpc` — είναι ήδη σωστά.
+### Αλλαγή στα `media_plan_items`
+
+- Προσθήκη `media_plan_id UUID REFERENCES public.media_plans(id) ON DELETE CASCADE`
+- Το `project_id` παραμένει (για backward compatibility, αλλά αρχίζει να γίνεται derived)
+- Τα existing items: migration με default media_plan creation
+
+### RLS για `media_plans`
+
+Ίδια λογική με `media_plan_items`:
+- Admins/Managers: full access
+- Users: read access για projects όπου έχουν access
 
 ---
 
-## Αρχιτεκτονική Νέου Media Plan
+## Τι Αλλάζει Ανά Απαίτηση
 
-### Δομή Κεντρικής Σελίδας
+### 1. Multi-Select Objectives + Φάσεις με ημερομηνίες στον Wizard
 
-```text
-┌──────────────────────────────────────────────────────────────────────────┐
-│  📢 Media Plan                                   [Export] [AI Wizard] [+] │
-├──────────────────────────────────────────────────────────────────────────┤
-│  KPI Strip:                                                              │
-│  [Total Budget: €X] [Net (μετά προμ.): €X] [Planned: €X] [Spent: €X]   │
-│  [Impressions: X]   [Reach: X]              [CTR avg: X%] [CPM avg: €X] │
-├──────────────────────────────────────────────────────────────────────────┤
-│  Budget Breakdown Tabs:                                                  │
-│  [Ανά Κανάλι] [Ανά Objective] [Ανά Παραδοτέο] [Ανά Φάση]              │
-│  ── mini donut chart + bar chart ─────────────────────────────────────  │
-├──────────────────────────────────────────────────────────────────────────┤
-│  View Toggle: [📋 Spreadsheet] [📊 Pivot] [📅 Timeline]                 │
-│  Filters: [Κανάλι ▼] [Objective ▼] [Status ▼] [Φάση ▼] [🔍 Search]    │
-├──────────────────────────────────────────────────────────────────────────┤
-│  Spreadsheet View (inline editable):                                     │
-│  ΚΑΝΆΛΙ | FORMAT | ΦΆΣΗ | OBJECTIVE | ΠΕΡΊΟΔΟΣ | BUDGET | NET | STATUS  │
-│  ──────────────────────────────────────────────────────────────────────  │
-│  📺 TV   │ Spot 30"│ Φ.1 │ Awareness │ Ιαν-Μαρ │ €50K  │ €42K│ Active │
-│  📱 Meta │ Feed    │ Φ.1 │ Conversion│ Ιαν     │ €15K  │ €13K│ Planned│
-│  ── ΣΥΝΟΛΟ ─────────────────────────────────────────────── €65K│ €55K  │
-└──────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Component: Νέος `ProjectMediaPlan.tsx` (πλήρης επαναγραφή)
-
-### Τμήμα 1: KPI Dashboard Strip
-
-8 KPIs σε grid:
-- **Total Budget** (αθροισμα `budget`)
-- **Net Budget** (αθροισμα `net_budget` — μετά αφαίρεση commission)
-- **Planned** (budget items με status=planned)
-- **Πραγματικό Κόστος** (αθροισμα `actual_cost`)
-- **Υπόλοιπο** (Total Budget - actual_cost)
-- **Impressions** / **Reach** / **Avg CTR**
-
-### Τμήμα 2: Budget Breakdown Visualizations
-
-4 mini views (switchable tabs):
-- **Ανά Κανάλι**: Bar chart (Recharts) — ποιο medium πόσο budget
-- **Ανά Objective**: Donut chart — Awareness / Consideration / Conversion / Retention
-- **Ανά Παραδοτέο**: Horizontal bar — ποιο deliverable πόσο media budget
-- **Ανά Φάση**: Stacked bar timeline ανά phase
-
-### Τμήμα 3: Spreadsheet View (κύριος πίνακας)
-
-**Grouping ανά κανάλι** (collapsible sections):
-```text
-▼ 📺 TV (2 placements) ────────────── Budget: €80K  Actual: €72K
-   | Campaign | Format | Φάση | Obj. | Έναρξη | Λήξη | Budget | Net | Actual | Impr. | Clicks | CTR | Status |
-   | Summer TV| Spot30"| Φ.1  | Awr. | 1/3    | 31/3 | €50K   | €42K| €48K  | 2.5M  | -      | -   | Active |
-
-▼ 📱 Social Media (3 placements) ──── Budget: €45K  Actual: €30K
-   [rows...]
-
-▶ 📻 Radio (0 placements) ────── [Collapsed]
-```
-
-**Inline editing**: Κλικ σε cell → edit in-place (Input/Select) → blur/Enter = save
-- Budget, actual_cost, impressions, clicks → numeric inputs
-- status, objective, phase → select dropdowns
-- dates → date pickers
-
-### Τμήμα 4: AI Wizard (Modal)
-
-Αντί για απευθείας generation, **ανοίγει wizard dialog** με 3 βήματα:
-
-**Βήμα 1 — Briefing**:
-```
-Ποιος είναι ο κύριος στόχος της καμπάνιας;
-○ Brand Awareness    ○ Lead Generation
-○ Product Launch     ○ Sales / Conversion
-○ Retention/Loyalty  ○ Event Promotion
-
-Σε ποιο κοινό στοχεύετε;
-[text input]
-
-Ποια είναι η χρονική διάρκεια; [start] → [end]
-```
-
-**Βήμα 2 — Media Mix Preferences**:
-```
-Ποια κανάλια να συμπεριληφθούν; (multi-select)
-☑ TV  ☑ Radio  ☑ Digital (Social)  ☑ Digital (Search)
-☑ OOH  ☐ Print  ☑ Influencers  ☐ PR
-
-Υπάρχει επιθυμητή κατανομή budget; (optional sliders)
-TV ────────────────── 40%
-Digital ───────────── 35%
-OOH ──────────────── 15%
-Other ─────────────── 10%
-```
-
-**Βήμα 3 — Review & Generate**:
-```
-Project: Alpha Bank App Launch
-Budget: €95,000 | Net (μετά 15% fee): €80,750
-Κανάλια: TV, Digital, OOH
-Στόχος: Brand Awareness + App Downloads
-Κοινό: 25-44, urban, mobile-first
-[Δημιουργία με AI →]
-```
-
-### Τμήμα 5: Export
-
-- **Export CSV**: Υπάρχει ήδη (ενισχύεται με τα νέα πεδία)
-- **Export Excel-like**: Grouped per channel με subtotals
-- **Print View**: Cleaned print stylesheet
-
----
-
-## Edge Function: `generate-media-plan` (ενισχύεται)
-
-Δέχεται επιπλέον parameters από τον wizard:
+**Wizard State αλλαγές:**
 ```typescript
-interface GenerateRequest {
-  projectId: string;
-  projectName: string;
-  projectBudget: number;
-  agencyFeePercentage: number;     // NEW
-  deliverables: Array<{ id: string; name: string }>;
-  campaignObjective: string;       // NEW: "awareness" | "launch" | "conversion" etc.
-  targetAudience: string;          // NEW
-  campaignDuration: { start: string; end: string }; // NEW
-  selectedChannels: string[];      // NEW
-  budgetAllocation?: Record<string, number>; // NEW: optional % per channel
+interface WizardState {
+  step: 1 | 2 | 3;
+  campaignObjectives: string[];           // ← ΑΛΛΑΓΗ: array (multi-select)
+  targetAudience: string;
+  phases: Array<{                         // ← ΑΛΛΑΓΗ: δομημένες φάσεις
+    name: string;
+    start: string;
+    end: string;
+  }>;
+  selectedChannels: string[];
+  budgetAllocation: Record<string, number>;
 }
 ```
 
-**Βελτιωμένο prompt** (Gemini 2.5 Flash):
-- Παράγει `phase` (φάσεις καμπάνιας)
-- Παράγει `objective` ανά item
-- Παράγει `format` ανά placement
-- Παράγει `reach` εκτιμήσεις
-- Υπολογίζει `commission_rate` βάσει `agency_fee_percentage` του project
-- Κατανέμει budget με βάση τα user preferences (sliders)
+**Step 1 UI αλλαγές:**
+- Radio buttons → checkboxes (multi-select για objectives)
+- Αντί για 2 date pickers (start/end campaign), νέο **"Φάσεις Καμπάνιας"** section:
+  ```
+  + Προσθήκη Φάσης
+  [Όνομα] [Έναρξη] [Λήξη] [×]
+  Φάση 1 - Launching  23/02  15/03  ×
+  Φάση 2 - Sustaining 16/03  30/04  ×
+  ```
+
+### 2. Budget = Αυστηρά Project Budget - Agency Fee
+
+**Header KPI αλλαγές:**
+- Το **Net Budget** (project_budget × (1 - fee%)) γίνεται το **κύριο, κεντρικό μέγεθος**
+- Όταν το total allocated budget των items ξεπερνά το Net Budget → εμφάνιση warning badge
+- Ο Wizard στο Step 3 να δείχνει ξεκάθαρα:
+  ```
+  Project Budget:   €100,000
+  Agency Fee (15%): -€15,000
+  ─────────────────────────
+  Διαθέσιμο Net:    €85,000  ← αυτό μοιράζεται στα media
+  ```
+- Το AI generation να περνά `net_budget = projectBudget * (1 - fee/100)` ώστε το AI να κατανέμει μόνο αυτό
+
+### 3. Πολλαπλά Media Plans + Status
+
+**Νέα UX ροή:**
+- Στο tab "Media Plan" εμφανίζεται **λίστα media plans** του project:
+  ```
+  ┌──────────────────────────────────────────────────────┐
+  │ Media Plans (2)                    [+ Νέο Πλάνο]    │
+  ├──────────────────────────────────────────────────────┤
+  │ 📋 Media Plan Q1 2026    [ΕΝΕΡΓΟ]  €85,000  [Open]  │
+  │ 📋 Media Plan Draft v2   [DRAFT]   €72,000  [Open]  │
+  └──────────────────────────────────────────────────────┘
+  ```
+- Κλικ σε ένα plan → ανοίγει το detail view (εντός ίδιας σελίδας, με back button)
+- **Status options** για media plan: `draft | active | approved | cancelled | archived`
+- Inline editable **name** και **status** στο header κάθε plan
+- **Delete plan** → διαγράφει και όλα τα items του
+
+**Plan Header (editable):**
+```
+[← Πίσω]  [Media Plan Q1 2026 (editable)]  [ΕΝΕΡΓΟ ▼]
+Budget: €85,000 (editable)  Fee: 15%  Net: €72,250
+                                        [Export] [AI Wizard] [+]
+```
+
+### 4. Excel View + Gantt Timeline + Calendar View
+
+**View Toggle (3 επιλογές):**
+```
+[📋 Spreadsheet]  [📊 Gantt]  [📅 Calendar]
+```
+
+**Spreadsheet** (υπάρχει, βελτιώνεται): Ήδη υπάρχει, βελτιώνεται με:
+- Sticky headers
+- Φάσεις ως colored row separators (όχι μόνο text)
+- Inline edit σε dates (date picker)
+
+**Gantt Timeline (νέο):**
+- Οριζόντια ράβδοι ανά media item, ομαδοποιημένα ανά medium
+- X-axis: ημερομηνίες (ανά εβδομάδα ή μήνα)
+- Χρωματισμός ανά objective ή status
+- Tooltip με budget/details
+- Υλοποίηση: Pure CSS/div-based gantt (χωρίς νέα library), χρησιμοποιώντας `position: relative` + percentage widths
+
+**Calendar View:**
+- Monthly calendar grid
+- Items εμφανίζονται ως colored chips στις ημερομηνίες έναρξης/λήξης
+
+### 5. Projections/Estimations Ξεχωριστά
+
+**Κύριος πίνακας (columns):**
+```
+Καμπάνια | Format/Φάση | Objective | Περίοδος | BUDGET | NET | ACTUAL | STATUS | Actions
+```
+→ Τα impressions/reach/clicks/CTR/CPM **φεύγουν** από τον κύριο πίνακα
+
+**Νέο "Performance Projections" collapsible section** (κάτω από τον πίνακα ή σε ξεχωριστό tab):
+```
+┌──────────────────────────────────────────────────────────────────┐
+│ 📈 Performance Projections  [Επεξεργασία Benchmarks]  [Αυτόματος Υπολογισμός AI] │
+├──────────────────────────────────────────────────────────────────┤
+│ Μέσο        │ Impr.  │ Reach  │ Clicks │ CTR   │ CPM   │ CPC   │
+│ TV           │ 4.5M   │ 2.1M   │  —     │  —    │ €8.20 │  —   │
+│ Facebook     │ 1.2M   │ 450K   │ 18K    │ 1.5%  │ €4.10 │ €0.75│
+└──────────────────────────────────────────────────────────────────┘
+```
+- Αυτό το section είναι collapsible, αρχικά collapsed
+- Μπορεί να συμπληρωθεί manual ή με AI (future)
+
+### 6. Editable Total Budget στο Header
+
+- Το budget στο header του media plan είναι `EditableCell` (click to edit)
+- Default value: `project.budget * (1 - agency_fee/100)` = net budget
+- Μπορεί να αλλαχτεί ανεξάρτητα (αποθηκεύεται στο `media_plans.total_budget`)
+- Warning indicator αν allocated > total_budget
 
 ---
 
-## Αρχεία που αλλάζουν
+## Αρχεία που Αλλάζουν
 
-| Αρχείο | Τύπος |
-|--------|-------|
-| **Migration SQL** | Νέα πεδία `objective`, `phase`, `format`, `frequency`, `reach`, `commission_rate`, `sort_order`, `net_budget` |
-| `src/components/projects/ProjectMediaPlan.tsx` | **Πλήρης επαναγραφή** |
-| `supabase/functions/generate-media-plan/index.ts` | Ενισχυμένος wizard prompt + νέα inputs |
-| `src/pages/ProjectDetail.tsx` | Μικρή αλλαγή: αφαίρεση του Card wrapper γύρω από το Media Plan tab (το νέο component έχει δικό του header) + pass `agencyFeePercentage` |
+| Αρχείο | Τύπος αλλαγής |
+|--------|---------------|
+| **Migration SQL** | Νέος πίνακας `media_plans` + `media_plan_id` column στα `media_plan_items` + migration existing data + RLS |
+| `src/components/projects/ProjectMediaPlan.tsx` | Πλήρης επαναγραφή με: multi-plan list view, plan detail view, Gantt, Calendar, βελτιωμένος Wizard, Projections section |
+| `supabase/functions/generate-media-plan/index.ts` | Multi-objectives, phases array στο prompt |
+| `src/pages/ProjectDetail.tsx` | Μικρές αλλαγές αν χρειαστεί (η δομή παραμένει) |
 
 ---
 
-## Νέα Media Categories (επεκτεμένες)
+## Λεπτομέρειες Migration (Backward Compatibility)
 
-```typescript
-const MEDIA_CATEGORIES = {
-  'TV & Radio': ['TV', 'Radio', 'Streaming Audio', 'Podcast'],
-  'Digital Paid': ['Google Ads (Search)', 'Google Ads (Display)', 'YouTube', 'Programmatic'],
-  'Social Media': ['Facebook', 'Instagram', 'TikTok', 'LinkedIn', 'Twitter/X', 'Pinterest'],
-  'Outdoor': ['OOH (Billboards)', 'DOOH (Digital OOH)', 'Transit Ads'],
-  'Print': ['Εφημερίδες', 'Περιοδικά', 'Advertorial', 'Native Content'],
-  'Influencers/PR': ['Influencer', 'Ambassador', 'PR', 'Sponsored Content'],
-  'Email/CRM': ['Email Marketing', 'SMS Marketing', 'Push Notifications'],
-  'Events': ['Sponsorship', 'Events', 'Άλλο'],
-};
+Τα υπάρχοντα `media_plan_items` που έχουν `project_id` αλλά όχι `media_plan_id`:
+```sql
+-- Για κάθε project που έχει media_plan_items χωρίς media_plan_id:
+-- 1. Δημιουργούμε ένα default media_plan
+-- 2. Κάνουμε UPDATE τα items για να δείχνουν σε αυτό το plan
+INSERT INTO public.media_plans (project_id, name, status, total_budget, agency_fee_percentage)
+SELECT DISTINCT 
+  mpi.project_id,
+  'Media Plan',
+  'active',
+  COALESCE(p.budget * (1 - p.agency_fee_percentage/100), 0),
+  COALESCE(p.agency_fee_percentage, 0)
+FROM public.media_plan_items mpi
+JOIN public.projects p ON p.id = mpi.project_id
+WHERE mpi.media_plan_id IS NULL;
 ```
 
 ---
 
-## UX Λεπτομέρειες
+## UX Flow Σύνοψη
 
-- **Inline editing**: Click to edit any cell directly in the spreadsheet (no dialog required for quick edits)
-- **Row drag-and-drop**: Αλλαγή sort_order μέσω drag (@dnd-kit υπάρχει ήδη)
-- **Commission indicator**: Κόκκινο/πράσινο chip δείχνει net budget μετά agency fee
-- **Budget bar**: Progress bar budget used vs allocated σε κάθε group
-- **AI Wizard**: Αντικαθιστά το απευθείας "AI Generate" κουμπί — ανοίγει modal
-- **Empty state**: Επιλογή μεταξύ AI Wizard ή manual entry
-- **Mobile**: Horizontal scroll για τον πίνακα, collapsible KPI strip
+```
+Tab "Media Plan" click
+→ Εμφανίζεται λίστα plans (ή empty state)
+  → [Νέο Πλάνο] → δημιουργία με όνομα + status  
+  → [Open plan] → ανοίγει detail view
+    → Header: Όνομα | Status | Budget (editable)
+    → [Spreadsheet | Gantt | Calendar] toggle
+    → Filters: Objective (multi) | Status | Φάση
+    → Κύριος πίνακας (χωρίς projections columns)
+    → Collapsible "Performance Projections" section
+    → [AI Wizard] → 3 steps με multi-objective + phases
+```
+
+---
+
+## Τεχνικές Σημειώσεις
+
+- **Gantt**: Υλοποιείται με `div` elements και CSS calc() για widths, χωρίς νέα library. Timeline εύρος: min(start_date) → max(end_date) όλων των items
+- **Media Plan Status Badge**: Inline `<SelectCell>` στο plan header
+- **Wizard phases**: Dynamic array με + button, κάθε phase έχει name/start/end inputs
+- **Budget warning**: Κόκκινη γραμμή/indicator αν `Σ(budget items) > media_plan.total_budget`
+- **Backward compat**: Τα items χωρίς `media_plan_id` γίνονται migrate αυτόματα με trigger

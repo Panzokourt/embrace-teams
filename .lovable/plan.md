@@ -1,183 +1,290 @@
 
-# Media Plan — 6 Βελτιώσεις
+# Creatives Section + Ενοποιημένο Financials Tab
 
-## Ανάλυση τρέχουσας κατάστασης
+## Ανάλυση Τρέχουσας Κατάστασης
 
-Έχω διαβάσει ολόκληρο το `ProjectMediaPlan.tsx` (1530 γραμμές) και το `generate-media-plan` edge function. Εντόπισα ακριβώς τι πρέπει να αλλάξει:
+**Τρέχοντα tabs στο ProjectDetail**: Overview | Παραδοτέα | Tasks | Timeline | Media Plan | Αρχεία | Σχόλια | P&L | Οικονομικά
 
----
+**Τι λείπει εντελώς**: Κανένα σύστημα για "δημιουργικά/εικαστικά" — ούτε DB table, ούτε storage bucket, ούτε UI component.
 
-## Πρόβλημα 1: AI κατανέμει περισσότερο από το net budget
-
-**Αιτία**: Στο edge function, το prompt λέει να χρησιμοποιεί το net budget (`€${Math.round(netBudget)}`) αλλά το AI το παραβλέπει. Επίσης, δεν γίνεται καμία server-side επικύρωση/normalization μετά τη γέννηση.
-
-**Λύση (2 επίπεδα)**:
-1. **Edge function**: Μετά το parsing του AI response, normalize το budget: αν `Σ(items.budget) > netBudget`, scale down αναλογικά όλα τα items. Αυτό διασφαλίζει 100% ότι δεν θα ξεπεραστεί ποτέ το όριο, ανεξαρτήτως τι βγάλει το AI.
-2. **Prompt**: Προσθήκη ακόμα πιο αυστηρής οδηγίας (`CRITICAL: Sum of all budget values MUST be EXACTLY €X`) και παράδειγμα budget allocation.
-
-```typescript
-// Μετά το parse, στο edge function:
-const totalAI = result.mediaPlanItems.reduce((s, i) => s + (i.budget || 0), 0);
-if (totalAI > netBudget * 1.01) { // 1% tolerance
-  const scale = netBudget / totalAI;
-  result.mediaPlanItems = result.mediaPlanItems.map(i => ({
-    ...i,
-    budget: Math.round(i.budget * scale),
-  }));
-}
-```
+**Τι πρέπει να ενοποιηθεί**: Τα tabs "P&L" και "Οικονομικά" σε ένα ενιαίο "Οικονομικά" tab με sub-tabs.
 
 ---
 
-## Πρόβλημα 2: Editable total budget + re-allocation
+## Μέρος 1: Creative Assets — Νέο Tab "Δημιουργικά"
 
-**Τρέχουσα κατάσταση**: Το budget είναι ήδη editable inline (`EditableCell` στη γραμμή ~1080). Αυτό που λείπει είναι ένα **"Re-allocate" κουμπί** δίπλα στο budget που να ανοίγει ένα dialog με sliders για να ανακατανείμει αναλογικά τα υπάρχοντα items.
+### Σχεδιαστική Φιλοσοφία
 
-**Λύση**: Νέο `ReAllocateModal` component:
-- Δείχνει το νέο total budget
-- Προτείνει αναλογική ανακατανομή (scale existing budgets)
-- Ή επιτρέπει custom allocation ανά κανάλι/medium
-- "Εφαρμογή" → update όλα τα items με batch update
-
----
-
-## Πρόβλημα 3: "Actual Spent" Wizard
-
-**Τι ζητείται**: Κουμπί "Καταχώρηση Actual" που ανοίγει wizard για bulk καταχώρηση πραγματικών εξόδων ανά medium item.
-
-**Λύση**: Νέο `ActualSpentWizard` modal:
-- Λίστα όλων των items (medium + campaign name + budget)
-- Input για actual cost δίπλα σε κάθε item
-- "Αποθήκευση Όλων" → batch update `actual_cost` σε όλα τα items
-- Τοποθέτηση: νέο κουμπί "Actual Costs" στο header δίπλα στο "AI Wizard"
-
----
-
-## Πρόβλημα 4: Φίλτρα + Grouping στον Πίνακα και Gantt
-
-**Τρέχουσα κατάσταση**: Ο πίνακας κάνει groupBy medium πάντα. Το Gantt επίσης. Δεν υπάρχει καμία δυνατότητα φιλτραρίσματος.
-
-**Λύση**: Προσθήκη toolbar πάνω από τον πίνακα/gantt:
+Αντί για απλό file manager, δημιουργούμε ένα **visual asset board** εμπνευσμένο από το Figma/Notion asset gallery — καθαρό, gallery-first, με πλήρη context linking (deliverable / task / media plan action).
 
 ```text
-[Group by: Κανάλι ▼]  [Φάση: Όλες ▼]  [Objective: Όλα ▼]  [Κατηγορία ▼]  [🔍 Search]
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Δημιουργικά                                  [Upload] [Bulk Actions ▼]  │
+├─────────────────────────────────────────────────────────────────────────┤
+│ [🖼 Gallery] [☰ Λίστα]   Group by: [Παραδοτέο ▼]  Status: [Όλα ▼]      │
+│ Search: [___________]                                                   │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│ ▼ Παραδοτέο: Social Media Pack                          3 εικαστικά     │
+│   ┌──────────┐  ┌──────────┐  ┌──────────┐                             │
+│   │ [preview]│  │ [preview]│  │ [preview]│                             │
+│   │ Story v1 │  │ Story v2 │  │ Feed Post│                             │
+│   │ [APPROVED│  │ [REVIEW] │  │ [DRAFT]  │                             │
+│   └──────────┘  └──────────┘  └──────────┘                             │
+│                                                                         │
+│ ▼ Media Plan: Google Display                           2 εικαστικά     │
+│   ┌──────────┐  ┌──────────┐                                           │
+│   │ [preview]│  │ [preview]│                                           │
+│   │ Banner   │  │ Rectangle│                                           │
+│   │ [ACTIVE] │  │ [DRAFT]  │                                           │
+│   └──────────┘  └──────────┘                                           │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Group by**: Κανάλι (medium) | Φάση (phase) | Objective | Κατηγορία (TV & Radio, Social, etc.)
-- **Φίλτρο Φάση**: Multi-select από τις φάσεις που υπάρχουν στα items
-- **Φίλτρο Objective**: Multi-select
-- **Φίλτρο Κατηγορία**: TV & Radio / Digital Paid / Social / Outdoor / Print / Influencers/PR / Events
-- **Search**: Free text search σε campaign_name και medium
+### Database Migration: Νέος πίνακας `project_creatives`
 
-State: `groupBy: 'medium' | 'phase' | 'objective' | 'category'`, `filterPhase: string[]`, `filterObjective: string[]`, `filterCategory: string`, `searchQuery: string`
-
-Εφαρμογή και στο GanttView (pass filtered/grouped items).
-
----
-
-## Πρόβλημα 5: Αφαίρεση εικονιδίων από κανάλια
-
-**Τρέχουσα κατάσταση**: Τα εικονίδια (emoji) εμφανίζονται σε:
-- `MEDIA_EMOJI` map (~γραμμές 106-115)
-- `SpreadsheetRow` → `SelectCell` για medium (γραμμή 720: `${MEDIA_EMOJI[m] || ''} ${m}`)
-- Group headers στον πίνακα (γραμμή 1250: `{MEDIA_EMOJI[medium] || '📌'} {medium}`)
-- `GanttView` group headers (γραμμή 597: `{MEDIA_EMOJI[medium] || '📌'} {medium}`)
-- `ProjectionsSection` (γραμμή 827)
-
-**Λύση**: Αφαίρεση emoji από όλα τα παραπάνω. Ο `MEDIA_EMOJI` map παραμένει (χρησιμοποιείται αλλού για fallback) αλλά δεν γίνεται render πλέον. Αντικατάσταση με colored dot indicators ή απλά το text.
-
----
-
-## Πρόβλημα 6: Responsive πίνακας + text wrapping
-
-**Τρέχουσα κατάσταση**: 
-- `min-w-[140px]`, `min-w-[120px]`, κλπ. στα `td` + `minWidth: '1100px'` στο table
-- `truncate` class σε αρκετά cells που κόβει το text
-- Το table overflow-x-auto δουλεύει αλλά δεν είναι ευχάριστο
-
-**Λύση**:
-1. Αφαίρεση `truncate` από "Καμπάνια" και "Placement" columns — επιτρέπεται wrapping
-2. Μείωση `min-width` όπου δεν χρειάζεται (dates: 90px αντί 105px, status: 100px)
-3. Στο table style: `table-layout: fixed` με συγκεκριμένα widths ανά column
-4. `whitespace-normal` και `break-words` στα text cells
-5. Column widths (approximate):
-   - Καμπάνια: 180px (wrap)
-   - Μέσο: 130px
-   - Format: 90px (wrap)  
-   - Φάση: 110px (wrap)
-   - Objective: 100px
-   - Έναρξη/Λήξη: 88px each
-   - Budget/Net/Actual: 80px each (right-aligned, no-wrap)
-   - Status: 110px
-   - Actions: 32px
-
----
-
-## Τεχνικές Λεπτομέρειες
-
-### Αρχεία που αλλάζουν:
-
-| Αρχείο | Αλλαγές |
-|--------|---------|
-| `supabase/functions/generate-media-plan/index.ts` | Budget normalization post-generation + αυστηρότερο prompt |
-| `src/components/projects/ProjectMediaPlan.tsx` | Φίλτρα/grouping toolbar, ActualSpentWizard, ReAllocateModal, αφαίρεση emoji, responsive table |
-
-### ReAllocate Modal λογική:
-```typescript
-// Scale all items proportionally to new budget
-const scale = newBudget / currentAllocated;
-items.forEach(item => {
-  updateItem(item.id, 'budget', Math.round(item.budget * scale));
-});
-```
-
-### Actual Spent Wizard state:
-```typescript
-interface ActualEntry { itemId: string; value: number; }
-const [entries, setEntries] = useState<ActualEntry[]>(
-  items.map(i => ({ itemId: i.id, value: i.actual_cost }))
+```sql
+CREATE TABLE public.project_creatives (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+  company_id UUID REFERENCES public.companies(id),
+  
+  -- File info (stored in project-files bucket)
+  file_name TEXT NOT NULL,
+  file_path TEXT NOT NULL,
+  file_size INTEGER,
+  content_type TEXT,
+  
+  -- Metadata
+  title TEXT,           -- display name (can differ from file_name)
+  description TEXT,
+  version TEXT DEFAULT '1.0',
+  
+  -- Linking (context — optional, can link to one of these)
+  deliverable_id UUID REFERENCES public.deliverables(id) ON DELETE SET NULL,
+  task_id UUID REFERENCES public.tasks(id) ON DELETE SET NULL,
+  media_plan_item_id UUID REFERENCES public.media_plan_items(id) ON DELETE SET NULL,
+  
+  -- Status & Review
+  status TEXT NOT NULL DEFAULT 'draft',
+  -- draft | review | client_review | approved | rejected | active | archived
+  
+  review_notes TEXT,
+  reviewed_by UUID REFERENCES public.profiles(id),
+  reviewed_at TIMESTAMP WITH TIME ZONE,
+  
+  -- Upload info
+  uploaded_by UUID NOT NULL REFERENCES public.profiles(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-```
 
-### Filter/Group toolbar state (added to PlanDetailView):
-```typescript
-const [groupBy, setGroupBy] = useState<'medium' | 'phase' | 'objective' | 'category'>('medium');
-const [filterPhase, setFilterPhase] = useState<string[]>([]);
-const [filterObjective, setFilterObjective] = useState<string[]>([]);
-const [filterCategory, setFilterCategory] = useState<string>('all');
-const [searchQuery, setSearchQuery] = useState('');
-```
+-- RLS
+ALTER TABLE public.project_creatives ENABLE ROW LEVEL SECURITY;
 
-### Grouping logic:
-```typescript
-const getCategory = (medium: string) => {
-  return Object.entries(MEDIA_CATEGORIES).find(([, mediums]) => mediums.includes(medium))?.[0] || 'Άλλο';
-};
+CREATE POLICY "Admin/Manager can manage creatives" ON public.project_creatives
+  FOR ALL USING (is_admin_or_manager(auth.uid()));
 
-const displayedItems = useMemo(() => {
-  let result = items;
-  if (searchQuery) result = result.filter(i => 
-    i.campaign_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    i.medium.toLowerCase().includes(searchQuery.toLowerCase())
+CREATE POLICY "Users can view creatives for their projects" ON public.project_creatives
+  FOR SELECT USING (
+    auth.uid() IS NOT NULL AND has_project_access(auth.uid(), project_id)
   );
-  if (filterPhase.length > 0) result = result.filter(i => filterPhase.includes(i.phase || ''));
-  if (filterObjective.length > 0) result = result.filter(i => filterObjective.includes(i.objective));
-  if (filterCategory !== 'all') result = result.filter(i => getCategory(i.medium) === filterCategory);
-  return result;
-}, [items, searchQuery, filterPhase, filterObjective, filterCategory]);
 
-const groupedItems = useMemo(() => {
-  const groups: Record<string, MediaPlanItem[]> = {};
-  displayedItems.forEach(item => {
-    const key = groupBy === 'medium' ? item.medium
-      : groupBy === 'phase' ? (item.phase || 'Χωρίς Φάση')
-      : groupBy === 'objective' ? item.objective
-      : getCategory(item.medium);
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(item);
-  });
-  return groups;
-}, [displayedItems, groupBy]);
+CREATE POLICY "Active users can upload creatives" ON public.project_creatives
+  FOR INSERT WITH CHECK (
+    is_active_user(auth.uid()) AND auth.uid() = uploaded_by
+  );
+
+-- Trigger for updated_at
+CREATE TRIGGER update_project_creatives_updated_at
+  BEFORE UPDATE ON public.project_creatives
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 ```
 
-Δεν χρειάζεται migration — όλες οι αλλαγές είναι frontend + edge function μόνο.
+Αποθήκευση στο **υπάρχον bucket** `project-files` (path: `{userId}/creatives/{timestamp}_{filename}`).
+
+### Νέο Component: `src/components/projects/ProjectCreatives.tsx`
+
+**Props**: `projectId`, `projectName`, `deliverables`, `tasks`, `mediaPlanItems`
+
+**State**:
+- `creatives: Creative[]` — από DB
+- `view: 'gallery' | 'list'`
+- `groupBy: 'deliverable' | 'task' | 'media_plan' | 'status' | 'none'`
+- `filterStatus: string`
+- `searchQuery: string`
+- `selectedIds: string[]` — για bulk actions
+- `selectedCreative: Creative | null` — για detail/review panel
+- `uploading: boolean`
+
+**Υποcomponents (εντός του ίδιου αρχείου)**:
+
+**`CreativeCard`** (Gallery view):
+```text
+┌────────────────────┐
+│                    │
+│   [Image Preview]  │
+│   ή [File Icon]    │
+│                    │
+├────────────────────┤
+│ ☐  Story v1.png    │
+│ [APPROVED] v1.0    │
+│ 📎 Social Pack     │
+│ [↓] [👁] [···]     │
+└────────────────────┘
+```
+- Thumbnail για images (PNG/JPG/GIF/WEBP/SVG)
+- File type icon για άλλους τύπους (PDF, AI, PSD, ZIP)
+- Status badge με χρωματική κωδικοποίηση
+- Hover: quick actions overlay (Download, View, Edit Status, Delete)
+- Checkbox για bulk select
+
+**`CreativeListRow`** (List view):
+- Table row με columns: Checkbox | Preview (small) | Τίτλος | Τύπος | Συνδέεται με | Status | Version | Ημ/νία | Actions
+
+**`CreativeDetailPanel`** (Slide-over / Sheet από δεξιά):
+Ανοίγει on click οποιουδήποτε creative.
+```text
+┌──────────────────────────────────────┐
+│ Story_v1.png                    [×]  │
+│ Status: [APPROVED ▼]                 │
+├──────────────────────────────────────┤
+│ [Full Preview / Lightbox]            │
+│                                      │
+├──────────────────────────────────────┤
+│ Συνδέεται με:                        │
+│ [Παραδοτέο ▼] [Social Media Pack]   │
+│                                      │
+│ Version: [1.0]                       │
+│ Περιγραφή: [editable textarea]       │
+├──────────────────────────────────────┤
+│ Review Notes:                        │
+│ [textarea για feedback]              │
+│ Reviewed by: Γιάννης Π. · 20/2/26   │
+├──────────────────────────────────────┤
+│ [Download] [Delete]                  │
+└──────────────────────────────────────┘
+```
+
+**`UploadCreativesModal`**:
+- Drag & drop zone
+- Multi-file support
+- Per-file: Title (auto από filename), Status (default: draft), Link to (Deliverable / Task / Media Plan action)
+- Preview thumbnails
+- [Upload All]
+
+**`BulkActionsBar`** (εμφανίζεται όταν selectedIds.length > 0):
+```text
+3 επιλεγμένα  [Αλλαγή Status ▼] [Download All] [Διαγραφή]
+```
+
+**Grouping logic**:
+- **Ανά Παραδοτέο**: Groups by `deliverable_id` → deliverable name (+ "Χωρίς σύνδεση")
+- **Ανά Task**: Groups by `task_id` → task title
+- **Ανά Media Plan Action**: Groups by `media_plan_item_id` → medium/campaign_name
+- **Ανά Status**: Groups by `status`
+- **Χωρίς ομαδοποίηση**: Flat list/gallery
+
+**Statuses με χρώματα**:
+| Status | Label | Χρώμα |
+|--------|-------|-------|
+| `draft` | Draft | gray |
+| `review` | Εσωτερικό Review | yellow |
+| `client_review` | Πελάτης Review | orange |
+| `approved` | Εγκρίθηκε | green |
+| `rejected` | Απορρίφθηκε | red |
+| `active` | Ενεργό | blue |
+| `archived` | Αρχείο | gray/muted |
+
+---
+
+## Μέρος 2: Ενοποιημένο "Οικονομικά" Tab
+
+### Τρέχουσα κατάσταση
+- Tab "P&L" → `ProjectPLReport` (analytics only, read-only)
+- Tab "Οικονομικά" → `ProjectFinancialsManager` (CRUD για invoices/expenses)
+
+### Νέα δομή: 1 tab "Οικονομικά" με 3 sub-tabs
+
+```text
+Οικονομικά
+├── Τιμολόγια & Έξοδα  ← ήταν "Οικονομικά" (ProjectFinancialsManager)
+├── P&L Report         ← ήταν "P&L" (ProjectPLReport)  
+└── Budget Overview    ← νέο: σύνοψη budget, net budget, committed vs actual
+```
+
+**Αλλαγές στο `ProjectDetail.tsx`**:
+1. Αφαίρεση του `<TabsTrigger value="pl-report">` και `<TabsTrigger value="financials">`
+2. Προσθήκη ενός `<TabsTrigger value="financials">` με εικονίδιο DollarSign
+3. Το `<TabsContent value="financials">` εμφανίζει ένα νέο component `ProjectFinancialsHub`
+
+**Νέο Component: `src/components/projects/ProjectFinancialsHub.tsx`**
+
+```text
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Οικονομικά                                                              │
+├─────────────────────────────────────────────────────────────────────────┤
+│ [📊 Budget Overview] [📄 Τιμολόγια & Έξοδα] [📈 P&L Report]           │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│ Budget Overview:                                                        │
+│ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐                   │
+│ │ Συνολικό │ │  Agency  │ │   Net    │ │ Τιμολ.   │                   │
+│ │ Budget   │ │  Fee     │ │  Budget  │ │ Εκκρεμή  │                   │
+│ │ €100,000 │ │ €15,000  │ │ €85,000  │ │ €30,000  │                   │
+│ └──────────┘ └──────────┘ └──────────┘ └──────────┘                   │
+│                                                                         │
+│ [Progress bar: Budget Used]                                             │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+Αυτό το component:
+- Ορίζει 3 sub-tabs (χρησιμοποιεί τα υπάρχοντα `Tabs` / `TabsList` / `TabsTrigger`)
+- **Tab "Budget Overview"**: Summary KPIs (Total Budget, Agency Fee, Net Budget, Invoiced, Paid, Expenses, Profit margin) + progress bars. Read-only analytics quick view.
+- **Tab "Τιμολόγια & Έξοδα"**: Renders `<ProjectFinancialsManager>` (χωρίς αλλαγές στο existing component)
+- **Tab "P&L Report"**: Renders `<ProjectPLReport>` (χωρίς αλλαγές στο existing component)
+
+---
+
+## Αρχεία που Αλλάζουν
+
+| Αρχείο | Τύπος αλλαγής |
+|--------|---------------|
+| **Migration SQL** | Νέος πίνακας `project_creatives` + RLS policies |
+| `src/components/projects/ProjectCreatives.tsx` | **Νέο αρχείο** — Gallery + List view, Upload modal, Review panel, Bulk actions |
+| `src/components/projects/ProjectFinancialsHub.tsx` | **Νέο αρχείο** — Wrapper με 3 sub-tabs που ενσωματώνει τα 2 υπάρχοντα components + Budget Overview |
+| `src/pages/ProjectDetail.tsx` | Αλλαγές tabs: Προσθήκη "Δημιουργικά", αντικατάσταση P&L+Οικονομικά με ένα "Οικονομικά" tab |
+| `src/integrations/supabase/types.ts` | Αυτόματη ενημέρωση από migration |
+
+---
+
+## UX Flow
+
+```text
+Tab "Δημιουργικά" click
+→ Gallery view, Group by Παραδοτέο (default)
+  → [Upload] → drag & drop modal με per-file settings
+  → Click on card → slide-over detail panel
+    → Αλλαγή status inline
+    → Προσθήκη review notes
+    → Change linking (Παραδοτέο / Task / Media Plan)
+  → Checkbox → bulk bar εμφανίζεται
+    → Bulk Status change | Download All | Delete
+
+Tab "Οικονομικά" click
+→ Budget Overview sub-tab (default)
+  → [Τιμολόγια & Έξοδα] sub-tab → CRUD (existing)
+  → [P&L Report] sub-tab → analytics (existing)
+```
+
+---
+
+## Τεχνικές Σημειώσεις
+
+- **Image previews**: `supabase.storage.from('project-files').createSignedUrl(path, 3600)` για thumbnails. Για non-images → colored icon based on content_type.
+- **Bulk download**: `Promise.all` signed URLs → individual `<a download>` triggers (browser-native).
+- **Review workflow**: Αλλαγή status γίνεται με inline select (no dialog needed). Review notes προστίθενται στο detail panel.
+- **Storage path**: `{userId}/creatives/{projectId}/{timestamp}_{safeName}` εντός του `project-files` bucket.
+- **Δεν χρειάζεται νέο storage bucket** — χρησιμοποιεί το υπάρχον `project-files`.
+- **`ProjectFinancialsHub`**: Είναι wrapper-only, κάνει import τα 2 υπάρχοντα components χωρίς καμία αλλαγή τους. Μόνο το `ProjectDetail.tsx` αλλάζει για τα tabs.

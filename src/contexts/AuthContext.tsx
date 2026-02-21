@@ -108,6 +108,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const applySession = (nextSession: Session | null) => {
     setSession(nextSession);
     setUser(nextSession?.user ?? null);
+    // If a new user session arrives, keep loading=true until fetchUserData completes
+    // This prevents AppLayout from seeing user!=null + companyRole==null and redirecting to onboarding
+    if (nextSession?.user) {
+      setLoading(true);
+    }
   };
 
   useEffect(() => {

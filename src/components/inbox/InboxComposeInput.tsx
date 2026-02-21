@@ -1,22 +1,42 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Send, Loader2, Plus, X } from 'lucide-react';
+import { Send, Loader2, Paperclip, X } from 'lucide-react';
 
 interface InboxComposeInputProps {
-  onSend: (params: { to: string[]; cc?: string[]; subject: string; body: string; reply_to_message_id?: string }) => Promise<any>;
-  replyTo?: { message_id: string; subject: string; to: string };
+  onSend: (params: { to: string[]; cc?: string[]; subject: string; body: string; reply_to_message_id?: string; attachments?: File[] }) => Promise<any>;
+  replyTo?: { message_id: string; subject: string; to: string; cc?: string };
   isNewCompose?: boolean;
+  prefillBody?: string;
+  showRecipients?: boolean;
 }
 
-export function InboxComposeInput({ onSend, replyTo, isNewCompose }: InboxComposeInputProps) {
-  const [body, setBody] = useState('');
+export function InboxComposeInput({ onSend, replyTo, isNewCompose, prefillBody, showRecipients }: InboxComposeInputProps) {
+  const [body, setBody] = useState(prefillBody || '');
   const [to, setTo] = useState(replyTo?.to || '');
-  const [subject, setSubject] = useState(replyTo ? `Re: ${replyTo.subject?.replace(/^Re:\s*/i, '')}` : '');
+  const [subject, setSubject] = useState(replyTo ? replyTo.subject : '');
   const [sending, setSending] = useState(false);
-  const [showCc, setShowCc] = useState(false);
-  const [cc, setCc] = useState('');
+  const [showCc, setShowCc] = useState(!!(replyTo?.cc));
+  const [cc, setCc] = useState(replyTo?.cc || '');
+  const [files, setFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Update fields when replyTo/prefillBody changes
+  useEffect(() => {
+    if (replyTo) {
+      setTo(replyTo.to);
+      setSubject(replyTo.subject);
+      if (replyTo.cc) {
+        setCc(replyTo.cc);
+        setShowCc(true);
+      }
+    }
+  }, [replyTo?.to, replyTo?.subject, replyTo?.cc]);
+
+  useEffect(() => {
+    if (prefillBody) setBody(prefillBody);
+  }, [prefillBody]);
 
   const handleSend = async () => {
     if (!body.trim() || !to.trim()) return;
@@ -27,9 +47,11 @@ export function InboxComposeInput({ onSend, replyTo, isNewCompose }: InboxCompos
       subject: subject || '(χωρίς θέμα)',
       body: body.trim(),
       reply_to_message_id: replyTo?.message_id,
+      attachments: files.length > 0 ? files : undefined,
     });
     if (result) {
       setBody('');
+      setFiles([]);
       if (isNewCompose) {
         setTo('');
         setSubject('');
@@ -46,9 +68,22 @@ export function InboxComposeInput({ onSend, replyTo, isNewCompose }: InboxCompos
     }
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeFile = (index: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const showFields = isNewCompose || showRecipients;
+
   return (
-    <div className="border-t border-border bg-card p-4 space-y-3">
-      {(isNewCompose || !replyTo) && (
+    <div className="bg-card p-4 space-y-3">
+      {showFields && (
         <>
           <div className="flex gap-2 items-center">
             <Input
@@ -74,15 +109,49 @@ export function InboxComposeInput({ onSend, replyTo, isNewCompose }: InboxCompos
               className="h-9 text-sm"
             />
           )}
-          <Input
-            value={subject}
-            onChange={e => setSubject(e.target.value)}
-            placeholder="Θέμα"
-            className="h-9 text-sm"
-          />
+          {isNewCompose && (
+            <Input
+              value={subject}
+              onChange={e => setSubject(e.target.value)}
+              placeholder="Θέμα"
+              className="h-9 text-sm"
+            />
+          )}
         </>
       )}
+
+      {/* Attached files */}
+      {files.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {files.map((file, i) => (
+            <div key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-muted text-xs border border-border/40">
+              <Paperclip className="h-3 w-3 text-muted-foreground" />
+              <span className="truncate max-w-[120px]">{file.name}</span>
+              <button onClick={() => removeFile(i)} className="hover:text-destructive">
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="flex items-end gap-2">
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={handleFileSelect}
+        />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-10 w-10 shrink-0"
+          onClick={() => fileInputRef.current?.click()}
+          title="Επισύναψη αρχείου"
+        >
+          <Paperclip className="h-4 w-4" />
+        </Button>
         <Textarea
           value={body}
           onChange={e => setBody(e.target.value)}

@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTimeTracking, TimeEntry } from '@/hooks/useTimeTracking';
 import { TimeEntryForm } from '@/components/time-tracking/TimeEntryForm';
-import { TimesheetFilters, DatePreset, GroupBy } from '@/components/time-tracking/TimesheetFilters';
+import { TimesheetFilters, DatePreset, GroupBy, AggregationLevel } from '@/components/time-tracking/TimesheetFilters';
 import { TimesheetGridView } from '@/components/time-tracking/TimesheetGridView';
 import { TimeEntriesListView } from '@/components/time-tracking/TimeEntriesListView';
 import { exportToCSV, exportToExcel } from '@/utils/exportUtils';
@@ -34,6 +34,7 @@ export default function Timesheets() {
     return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) };
   });
   const [groupBy, setGroupBy] = useState<GroupBy>('project');
+  const [aggregation, setAggregation] = useState<AggregationLevel>('day');
   const [filterProject, setFilterProject] = useState('all');
   const [filterUser, setFilterUser] = useState('all');
 
@@ -72,7 +73,7 @@ export default function Timesheets() {
       const [entriesRes, projectsRes, tasksRes, usersRes] = await Promise.all([
         supabase
           .from('time_entries')
-          .select('*, task:tasks(title), project:projects(name), profile:profiles(full_name)')
+          .select('*, task:tasks(title), project:projects(name)')
           .order('start_time', { ascending: false }),
         supabase.from('projects').select('id, name'),
         supabase.from('tasks').select('id, title, project_id'),
@@ -80,7 +81,17 @@ export default function Timesheets() {
           ? supabase.from('profiles').select('id, full_name')
           : Promise.resolve({ data: [] }),
       ]);
-      setEntries((entriesRes.data || []) as unknown as TimeEntry[]);
+      
+      const rawEntries = (entriesRes.data || []) as unknown as TimeEntry[];
+      
+      // If we have users, enrich entries with profile data
+      const usersMap = new Map((usersRes.data || []).map((u: any) => [u.id, u]));
+      const enrichedEntries = rawEntries.map(e => ({
+        ...e,
+        profile: usersMap.get(e.user_id) || { full_name: null },
+      }));
+      
+      setEntries(enrichedEntries as TimeEntry[]);
       setProjects(projectsRes.data || []);
       setTasks(tasksRes.data || []);
       setUsers(usersRes.data || []);
@@ -104,8 +115,12 @@ export default function Timesheets() {
 
   const filteredEntries = useMemo(() => {
     return entries.filter(e => {
-      const entryDate = parseISO(e.start_time);
-      const inRange = isWithinInterval(entryDate, { start: dateRange.start, end: dateRange.end });
+      const entryDate = new Date(e.start_time);
+      // Compare using local date strings to avoid UTC issues
+      const entryDateStr = `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, '0')}-${String(entryDate.getDate()).padStart(2, '0')}`;
+      const startStr = `${dateRange.start.getFullYear()}-${String(dateRange.start.getMonth() + 1).padStart(2, '0')}-${String(dateRange.start.getDate()).padStart(2, '0')}`;
+      const endStr = `${dateRange.end.getFullYear()}-${String(dateRange.end.getMonth() + 1).padStart(2, '0')}-${String(dateRange.end.getDate()).padStart(2, '0')}`;
+      const inRange = entryDateStr >= startStr && entryDateStr <= endStr;
       const matchesProject = filterProject === 'all' || e.project_id === filterProject;
       const matchesUser = filterUser === 'all' || e.user_id === filterUser;
       return inRange && matchesProject && matchesUser;
@@ -201,6 +216,8 @@ export default function Timesheets() {
         onDateRangeChange={setDateRange}
         groupBy={groupBy}
         onGroupByChange={setGroupBy}
+        aggregation={aggregation}
+        onAggregationChange={setAggregation}
         filterProject={filterProject}
         onFilterProjectChange={setFilterProject}
         filterUser={filterUser}
@@ -217,6 +234,7 @@ export default function Timesheets() {
           entries={filteredEntries}
           dateRange={dateRange}
           groupBy={groupBy}
+          aggregation={aggregation}
           onStartTimer={startTimer}
           onRefresh={fetchData}
         />

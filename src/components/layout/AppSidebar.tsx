@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { cn } from '@/lib/utils';
@@ -14,6 +14,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger } from
 '@/components/ui/dropdown-menu';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import {
   LayoutDashboard,
   LayoutList,
@@ -37,8 +42,15 @@ import {
   Timer,
   FileStack,
   BarChart3,
-  Bot } from
-'lucide-react';
+  Plus,
+  Palette,
+  Monitor,
+  Globe,
+  Calendar,
+  MessageSquare,
+} from 'lucide-react';
+import { briefDefinitions, getBriefDefinition } from '@/components/blueprints/briefDefinitions';
+import { BriefFormDialog } from '@/components/blueprints/BriefFormDialog';
 
 import { PermissionType } from '@/contexts/AuthContext';
 import olsenyLogo from '@/assets/olseny-logo.png';
@@ -52,8 +64,11 @@ interface NavItem {
   adminOnly?: boolean;
 }
 
+const briefIcons: Record<string, React.ComponentType<{ className?: string }>> = {
+  Palette, Monitor, FileText, Globe, Calendar, MessageSquare,
+};
+
 const navItems: NavItem[] = [
-{ title: 'Secretary', href: '/secretary', icon: Bot },
 { title: 'My Work', href: '/my-work', icon: LayoutList },
 { title: 'Dashboard', href: '/', icon: LayoutDashboard },
 { title: 'Εργασίες', href: '/work', icon: FolderKanban, permission: 'projects.view' },
@@ -71,10 +86,15 @@ const adminNavItems: NavItem[] = [
 
 export default function AppSidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { profile, roles, signOut, isAdmin, isManager, isClient, hasPermission, isSuperAdmin, isCompanyAdmin } = useAuth();
   const { resolvedTheme, setTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [selectedBriefType, setSelectedBriefType] = useState<string | null>(null);
+
+  const selectedDef = selectedBriefType ? getBriefDefinition(selectedBriefType) : null;
 
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
@@ -200,6 +220,58 @@ export default function AppSidebar() {
       }
       </nav>
 
+      {/* Quick Actions */}
+      <div className={cn("px-3 py-1", collapsed && !isMobile && "flex justify-center")}>
+        <Popover open={quickOpen} onOpenChange={setQuickOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="default"
+              size={collapsed && !isMobile ? "icon" : "default"}
+              className={cn(
+                "h-10 transition-all duration-200 bg-primary text-primary-foreground hover:bg-primary/90",
+                (!collapsed || isMobile) && "w-full justify-start gap-3 px-3",
+                quickOpen && "[&>svg:first-child]:rotate-45"
+              )}
+            >
+              <Plus className="h-[18px] w-[18px] transition-transform duration-200" />
+              {(!collapsed || isMobile) && <span className="text-sm font-medium">Νέο...</span>}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent side="right" align="end" className="w-56 p-2" sideOffset={8}>
+            <div className="space-y-1">
+              <button
+                onClick={() => { navigate('/projects?new=true'); setQuickOpen(false); }}
+                className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted transition-colors text-left"
+              >
+                <FolderKanban className="h-4 w-4 text-muted-foreground" />
+                Νέο Έργο
+              </button>
+              <button
+                onClick={() => { navigate('/tasks?new=true'); setQuickOpen(false); }}
+                className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted transition-colors text-left"
+              >
+                <CheckSquare className="h-4 w-4 text-muted-foreground" />
+                Νέο Task
+              </button>
+              <div className="h-px bg-border my-1" />
+              {briefDefinitions.map(def => {
+                const Icon = briefIcons[def.icon] || FileText;
+                return (
+                  <button
+                    key={def.type}
+                    onClick={() => { setSelectedBriefType(def.type); setQuickOpen(false); }}
+                    className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted transition-colors text-left"
+                  >
+                    <Icon className="h-4 w-4 text-muted-foreground" />
+                    {def.label}
+                  </button>
+                );
+              })}
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+
       {/* Theme Toggle */}
       <div className={cn(
       "px-3 py-2",
@@ -263,6 +335,14 @@ export default function AppSidebar() {
       )}>
         <SidebarContent />
       </aside>
+
+      {selectedDef && (
+        <BriefFormDialog
+          open={true}
+          onOpenChange={() => setSelectedBriefType(null)}
+          definition={selectedDef}
+        />
+      )}
     </>);
 
 }

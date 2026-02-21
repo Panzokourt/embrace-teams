@@ -3,7 +3,6 @@ import { Outlet, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import AppSidebar from './AppSidebar';
 import TopBar from './TopBar';
-import { QuickActionButton } from '@/components/layout/QuickActionButton';
 import SecretaryPanel, { type RightPanelTab } from '@/components/secretary/SecretaryPanel';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { Loader2 } from 'lucide-react';
@@ -118,7 +117,6 @@ export default function AppLayout() {
           </>
         )}
       </ResizablePanelGroup>
-      <QuickActionButton rightPanelOpen={rightPanelOpen} />
     </div>
   );
 }

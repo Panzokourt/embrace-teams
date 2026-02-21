@@ -1,143 +1,113 @@
 
-# Εργασιακή Ημέρα (Work Day Clock) & Status Χρήστη
+
+# Αναδιάρθρωση Sidebar Navigation & Project Folders
 
 ## Επισκόπηση
 
-Προσθήκη λειτουργίας **Εργασιακής Ημέρας** στο TopBar: live ρολόι, αυτόματη/χειροκίνητη έναρξη και λήξη ημέρας, παρακολούθηση ωρών εργασίας σε πραγματικό χρόνο, status χρήστη, και καταγραφή όλων στη βάση. Η λειτουργία αυτή είναι **ξεχωριστή** από το task time tracking αλλά θα συνυπάρχει αρμονικά μαζί του.
+Μετατροπή του sidebar σε **ιεραρχικό navigation** με expandable sections, αφαίρεση της Επισκόπησης, και δυνατότητα δημιουργίας φακέλων μέσα στα Έργα -- ένα σύστημα που θυμίζει file explorer.
 
 ---
 
-## 1. Database — Νέοι Πίνακες & Στήλες
+## 1. Ιεραρχικό Sidebar Navigation
 
-### Πίνακας `work_schedules` (Ωράριο χρήστη)
-Ο χρήστης δηλώνει τις ημέρες και ώρες που εργάζεται.
+### "Εργασίες" με υποσελίδες
+Το "Εργασίες" γίνεται expandable section στο sidebar:
+
+```text
+v Εργασίες
+    Έργα
+    Tasks
+    Ημερολόγιο
+```
+
+- Κλικ στο "Εργασίες" expand/collapse τα children
+- Κλικ στο "Έργα" πηγαίνει στο `/work?tab=projects`
+- Κλικ στο "Tasks" πηγαίνει στο `/work?tab=tasks`
+- Κλικ στο "Ημερολόγιο" πηγαίνει στο `/work?tab=calendar`
+- Αφαίρεση του tab "Επισκόπηση" από τη σελίδα Work
+
+### "Έργα" με live project tree
+Μέσα στο sub-item "Έργα", τα ενεργά projects εμφανίζονται σαν tree nodes:
+
+```text
+v Εργασίες
+    v Έργα
+        [+] Νέος Φάκελος
+        v Cosmote
+            Cosmote Rebranding
+            Cosmote SEO
+        Alpha Bank App Launch
+        EDYTE
+    Tasks
+    Ημερολόγιο
+```
+
+- Κλικ σε project navigates στο `/projects/:id`
+- Φάκελοι ομαδοποιούν projects (π.χ. ανά πελάτη ή θεματικά)
+- Drag & drop projects μέσα σε φακέλους
+- Context menu (δεξί κλικ / "...") για μετονομασία/διαγραφή φακέλου
+
+---
+
+## 2. Database -- Project Folders
+
+### Νέος πίνακας `project_folders`
 
 | Στήλη | Τύπος | Περιγραφή |
 |-------|-------|-----------|
 | id | uuid PK | |
-| user_id | uuid FK -> profiles | |
-| company_id | uuid FK -> companies | |
-| day_of_week | integer (0-6) | 0=Δευτέρα...6=Κυριακή |
-| start_time | time | Ώρα έναρξης (π.χ. 09:00) |
-| end_time | time | Ώρα λήξης (π.χ. 17:00) |
-| is_working_day | boolean default true | Αν εργάζεται εκείνη τη μέρα |
-| created_at, updated_at | timestamptz | |
-
-UNIQUE constraint στο (user_id, day_of_week).
-
-### Πίνακας `work_day_logs` (Καταγραφή ημερών)
-Κάθε φορά που ο χρήστης ξεκινά/τελειώνει τη μέρα του.
-
-| Στήλη | Τύπος | Περιγραφή |
-|-------|-------|-----------|
-| id | uuid PK | |
-| user_id | uuid FK -> profiles | |
-| company_id | uuid FK -> companies | |
-| date | date | Ημερομηνία |
-| clock_in | timestamptz | Ώρα έναρξης |
-| clock_out | timestamptz, nullable | Ώρα λήξης |
-| scheduled_minutes | integer | Προγραμματισμένα λεπτά βάσει ωραρίου |
-| actual_minutes | integer default 0 | Πραγματικά λεπτά εργασίας |
-| status | text | `active`, `completed`, `overtime`, `absent` |
-| auto_started | boolean default false | Αν ξεκίνησε αυτόματα από login |
-| notes | text | |
+| company_id | uuid | |
+| parent_folder_id | uuid, nullable | Για nested folders |
+| name | text | Όνομα φακέλου |
+| color | text, nullable | Χρώμα εικονιδίου |
+| sort_order | integer, default 0 | Σειρά εμφάνισης |
 | created_at | timestamptz | |
 
-UNIQUE constraint στο (user_id, date).
+### Νέα στήλη στο `projects`
 
-### Στήλη `work_status` στο `profiles`
-Νέα στήλη στον πίνακα profiles:
+| Στήλη | Τύπος | Περιγραφή |
+|-------|-------|-----------|
+| folder_id | uuid, nullable FK -> project_folders | Σε ποιον φάκελο ανήκει |
 
-| Στήλη | Τύπος | Τιμές |
-|-------|-------|-------|
-| work_status | text, default 'offline' | `online`, `busy`, `away`, `on_leave`, `offline` |
-
-### RLS Policies
-- `work_schedules`: SELECT/INSERT/UPDATE για τον ίδιο χρήστη. Admin/Manager βλέπουν/διαχειρίζονται όλα.
-- `work_day_logs`: SELECT/INSERT/UPDATE για τον ίδιο χρήστη. Admin/Manager βλέπουν όλα.
-- Realtime: `ALTER PUBLICATION supabase_realtime ADD TABLE work_day_logs;`
+### RLS
+- SELECT: active users στο ίδιο company
+- INSERT/UPDATE/DELETE: admin/manager
 
 ---
 
-## 2. TopBar — Work Day Clock Widget
+## 3. Sidebar Component -- Collapsible Nav
 
-Στο αριστερό μέρος του TopBar (πριν το search) θα εμφανίζεται:
+### Νέο component: `SidebarNavGroup`
+Αντικαθιστά το flat `SidebarLink` για items με children:
 
-```
-[Ημερομηνία] | [Live Ρολόι] | [Εργάσιμος Χρόνος: 05:23:41] | [Start Day / End Day] | [Status ●]
-```
+- Chevron icon (expand/collapse)
+- Expanded state αποθηκεύεται στο localStorage
+- Indentation ανά επίπεδο (padding-left)
+- Active state: highlight αν κάποιο child route είναι active
 
-### Στοιχεία:
-- **Live ημερομηνία και ώρα**: Ενημερώνεται κάθε δευτερόλεπτο
-- **Εργάσιμος χρόνος**: Μετρητής από την ώρα clock_in, σε μορφή HH:MM:SS
-  - Πράσινο χρώμα: κανονικές ώρες
-  - Κόκκινο χρώμα + pulse: όταν ξεπεράσει τις δηλωμένες ώρες εργασίας (π.χ. 8ω)
-  - Πορτοκαλί: όταν πλησιάζει (τελευταία 30 λεπτά)
-- **Start Day**: Κουμπί που ξεκινά την εργασιακή ημέρα (δημιουργεί work_day_log)
-- **End Day**: Κουμπί που κλείνει τη μέρα (ενημερώνει clock_out, υπολογίζει actual_minutes)
-- **Status indicator**: Dropdown με τα status (Ενεργός, Απασχολημένος, Εκτός, Σε Άδεια)
-
-### Αυτόματη έναρξη στο Login
-- Κατά το login, αν είναι εργάσιμη ημέρα βάσει του `work_schedules` και δεν υπάρχει ήδη log για σήμερα, εμφανίζεται toast: "Καλημέρα! Ξεκίνησε η εργασιακή σου ημέρα" και δημιουργείται αυτόματα work_day_log.
-- Αν δεν είναι εργάσιμη ημέρα: toast "Σήμερα δεν είναι εργάσιμη ημέρα. Θέλεις να ξεκινήσεις;"
-
-### Μηνύματα/Alerts
-- Στο clock_in: "Καλημέρα [Όνομα]! Ώρα έναρξης: HH:MM"
-- Πριν λήξει το ωράριο (30 λεπτά πριν): notification "Το ωράριό σου λήγει σε 30 λεπτά"
-- Μετά τη λήξη: "Υπερωρία! Έχεις ξεπεράσει τις κανονικές ώρες κατά X λεπτά"
-- Στο End Day: "Καλό απόγευμα! Συνολικές ώρες σήμερα: X"
+### Νέο component: `SidebarProjectTree`
+Μικρό tree μέσα στο sidebar που φορτώνει:
+- `project_folders` (ιεραρχικά)
+- `projects` (ενεργά, grouped by folder)
+- Inline "+" για νέο φάκελο
+- Context menu για rename/delete/move
 
 ---
 
-## 3. Work Schedule Settings
+## 4. Work Page -- Αφαίρεση Επισκόπησης
 
-Στη σελίδα **Settings** (`/settings`) θα προστεθεί νέο Card "Ωράριο Εργασίας":
-
-- Πίνακας 7 ημερών (Δευτέρα - Κυριακή)
-- Για κάθε ημέρα: checkbox "Εργάσιμη", ώρα έναρξης, ώρα λήξης
-- Default: Δευ-Παρ 09:00-17:00, Σαβ-Κυρ off
-- Υπολογισμός εβδομαδιαίων ωρών
+- Αφαίρεση του tab "Επισκόπηση" και του `WorkOverview` component
+- Τα tabs γίνονται 3: Έργα, Tasks, Ημερολόγιο
+- Αφαίρεση header/subtitle (αφού πλέον η πλοήγηση γίνεται από sidebar)
 
 ---
 
-## 4. Hook: `useWorkDay`
+## 5. Προτεινόμενες Επιπλέον Λειτουργίες
 
-Νέο custom hook που θα διαχειρίζεται τη λογική:
-
-```
-useWorkDay() -> {
-  todayLog, schedule, isWorkingDay,
-  clockIn, clockOut,
-  elapsedMinutes, scheduledMinutes,
-  isOvertime, isNearEnd,
-  workStatus, setWorkStatus
-}
-```
-
----
-
-## 5. Ενοποίηση με Timesheets
-
-- Στη σελίδα Timesheets θα εμφανίζεται νέα ενότητα "Παρουσίες" (attendance) με τα work_day_logs
-- Οι Admins/Managers θα μπορούν να δουν τις παρουσίες όλων
-- Στο Employee Profile θα εμφανίζεται το ωράριο και το ιστορικό παρουσιών
-
----
-
-## 6. User Status
-
-### Τιμές:
-| Τιμή | Ετικέτα | Χρώμα |
-|------|---------|-------|
-| online | Ενεργός | Πράσινο |
-| busy | Απασχολημένος | Κόκκινο |
-| away | Εκτός | Κίτρινο |
-| on_leave | Σε Άδεια | Μπλε |
-| offline | Εκτός Σύνδεσης | Γκρι |
-
-- Αυτόματη αλλαγή σε `online` κατά το clock_in
-- Αυτόματη αλλαγή σε `offline` κατά το clock_out / signOut
-- Χειροκίνητη αλλαγή μέσω dropdown στο TopBar
+1. **Pinned Projects**: Δυνατότητα "pin" αγαπημένων projects που εμφανίζονται πάντα στην κορυφή του tree
+2. **Αυτόματη ομαδοποίηση**: Επιλογή "Group by Client" που δημιουργεί αυτόματα φακέλους ανά πελάτη
+3. **Badge counts**: Μικρά badges δίπλα σε κάθε sub-item (π.χ. "Tasks (5)" για εκκρεμή tasks)
+4. **Drag & drop reorder**: Αναδιάταξη projects και folders με drag
 
 ---
 
@@ -145,18 +115,19 @@ useWorkDay() -> {
 
 | Αρχείο | Αλλαγή |
 |--------|--------|
-| **Migration SQL** | Πίνακες work_schedules, work_day_logs + profiles.work_status + RLS + realtime |
-| `src/hooks/useWorkDay.ts` | **Νέο** — Hook διαχείρισης εργασιακής ημέρας |
-| `src/components/topbar/WorkDayClock.tsx` | **Νέο** — Widget live ρολοιού, timer, start/end day, status |
-| `src/components/layout/TopBar.tsx` | Ενσωμάτωση WorkDayClock |
-| `src/pages/Settings.tsx` | Νέο Card "Ωράριο Εργασίας" |
-| `src/contexts/AuthContext.tsx` | Αυτόματη αλλαγή status σε offline κατά το signOut |
+| **Migration SQL** | Πίνακας `project_folders` + στήλη `projects.folder_id` + RLS |
+| `src/components/layout/AppSidebar.tsx` | Ιεραρχικό nav με collapsible groups |
+| `src/components/layout/SidebarNavGroup.tsx` | **Νέο** -- Expandable nav group component |
+| `src/components/layout/SidebarProjectTree.tsx` | **Νέο** -- Project tree με folders |
+| `src/pages/Work.tsx` | Αφαίρεση Επισκόπησης tab |
+| `src/App.tsx` | Cleanup routes αν χρειαστεί |
 
 ---
 
 ## Τεχνικές Σημειώσεις
 
-- Ο μετρητής εργάσιμου χρόνου τρέχει client-side (setInterval κάθε 1s) αλλά η πηγή αλήθειας είναι το `clock_in` στη βάση
-- Η σχέση Εργασιακή Ημέρα vs Task Timers: είναι ανεξάρτητες. Ένας χρήστης μπορεί να έχει ενεργή εργασιακή ημέρα χωρίς task timer και αντίστροφα
-- Τα work_day_logs χρησιμοποιούν UNIQUE(user_id, date) για αποφυγή διπλών εγγραφών
-- Η αυτόματη έναρξη γίνεται μέσω του hook, όχι μέσω trigger στη βάση
+- Τα expanded states του sidebar αποθηκεύονται σε localStorage (`sidebar-expanded-groups`)
+- Το project tree φορτώνει μόνο active/lead/proposal projects (όχι completed/lost) για να μην είναι υπερβολικά μεγάλο
+- Σε collapsed sidebar, τα sub-items εμφανίζονται ως popover/tooltip
+- Η αναζήτηση projects στο sidebar γίνεται client-side (filter στα ήδη φορτωμένα)
+

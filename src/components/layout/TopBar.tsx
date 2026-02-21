@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, FolderKanban, CheckSquare, FileText, Users, PanelRightOpen, PanelRightClose } from 'lucide-react';
+import { Search, FolderKanban, CheckSquare, FileText, Users, PanelRightOpen, PanelRightClose, BookUser } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
@@ -10,14 +10,15 @@ import { cn } from '@/lib/utils';
 interface SearchResult {
   id: string;
   name: string;
-  type: 'project' | 'task' | 'tender' | 'client';
+  type: 'project' | 'task' | 'tender' | 'client' | 'contact';
 }
 
 const entityConfig = {
   project: { icon: FolderKanban, path: '/projects/', label: 'Projects', color: 'text-blue-500' },
   task: { icon: CheckSquare, path: '/tasks', label: 'Tasks', color: 'text-green-500' },
   tender: { icon: FileText, path: '/tenders/', label: 'Tenders', color: 'text-orange-500' },
-  client: { icon: Users, path: '/clients/', label: 'Clients', color: 'text-purple-500' }
+  client: { icon: Users, path: '/clients/', label: 'Clients', color: 'text-purple-500' },
+  contact: { icon: BookUser, path: '/contacts/', label: 'Contacts', color: 'text-teal-500' },
 };
 
 interface TopBarProps {
@@ -50,17 +51,19 @@ export default function TopBar({ onPanelToggle, rightPanelOpen }: TopBarProps) {
     setLoading(true);
     try {
       const searchTerm = `%${q}%`;
-      const [projects, tasks, tenders, clients] = await Promise.all([
+      const [projects, tasks, tenders, clients, contactsRes] = await Promise.all([
         supabase.from('projects').select('id, name').ilike('name', searchTerm).limit(5),
         supabase.from('tasks').select('id, title').ilike('title', searchTerm).limit(5),
         supabase.from('tenders').select('id, name').ilike('name', searchTerm).limit(5),
-        supabase.from('clients').select('id, name').ilike('name', searchTerm).limit(5)
+        supabase.from('clients').select('id, name').ilike('name', searchTerm).limit(5),
+        supabase.from('contacts').select('id, name').ilike('name', searchTerm).limit(5)
       ]);
       const mapped: SearchResult[] = [
         ...(projects.data || []).map((p) => ({ id: p.id, name: p.name, type: 'project' as const })),
         ...(tasks.data || []).map((t) => ({ id: t.id, name: t.title, type: 'task' as const })),
         ...(tenders.data || []).map((t) => ({ id: t.id, name: t.name, type: 'tender' as const })),
-        ...(clients.data || []).map((c) => ({ id: c.id, name: c.name, type: 'client' as const }))
+        ...(clients.data || []).map((c) => ({ id: c.id, name: c.name, type: 'client' as const })),
+        ...(contactsRes.data || []).map((c) => ({ id: c.id, name: c.name, type: 'contact' as const }))
       ];
       setResults(mapped);
     } catch (err) {

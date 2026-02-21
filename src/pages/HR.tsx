@@ -3,13 +3,12 @@ import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Users, Building2, Network, Timer, Calendar, UsersRound, UserPlus } from 'lucide-react';
+import { Users, Building2, Network, Calendar, UsersRound, UserPlus } from 'lucide-react';
 
 // Lazy load existing page content
 import UsersAccessPage from '@/pages/UsersAccess';
 import DepartmentsPage from '@/pages/Departments';
 import OrgChartPage from '@/pages/OrgChart';
-import TimesheetsPage from '@/pages/Timesheets';
 import { LeaveBalanceCard } from '@/components/hr/LeaveBalanceCard';
 import { LeaveRequestForm } from '@/components/hr/LeaveRequestForm';
 import { LeaveRequestsList } from '@/components/hr/LeaveRequestsList';
@@ -65,10 +64,6 @@ export default function HRPage() {
             <Network className="h-4 w-4" />
             Οργανόγραμμα
           </TabsTrigger>
-          <TabsTrigger value="timesheets" className="gap-2">
-            <Timer className="h-4 w-4" />
-            Timesheets
-          </TabsTrigger>
           <TabsTrigger value="leaves" className="gap-2">
             <Calendar className="h-4 w-4" />
             Άδειες
@@ -98,10 +93,6 @@ export default function HRPage() {
           <OrgChartContent />
         </TabsContent>
 
-        <TabsContent value="timesheets">
-          <TimesheetsContent />
-        </TabsContent>
-
         <TabsContent value="leaves">
           <LeavesContent />
         </TabsContent>
@@ -128,10 +119,6 @@ function DepartmentsContent() {
 
 function OrgChartContent() {
   return <div className="-m-6 lg:-m-8"><OrgChartPage /></div>;
-}
-
-function TimesheetsContent() {
-  return <div className="-m-6 lg:-m-8"><TimesheetsPage /></div>;
 }
 
 function LeavesContent() {

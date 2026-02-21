@@ -22,6 +22,7 @@ import Calendar from "@/pages/Calendar";
 import Files from "@/pages/Files";
 import Blueprints from "@/pages/Blueprints";
 import HR from "@/pages/HR";
+import Timesheets from "@/pages/Timesheets";
 import EmployeeProfile from "@/pages/EmployeeProfile";
 import TaskDetail from "@/pages/TaskDetail";
 import NotFound from "./pages/NotFound";
@@ -80,7 +81,7 @@ const App = () => (
                 <Route path="/teams" element={<Navigate to="/hr?tab=staff" replace />} />
                 <Route path="/departments" element={<Navigate to="/hr?tab=departments" replace />} />
                 <Route path="/org-chart" element={<Navigate to="/hr?tab=orgchart" replace />} />
-                <Route path="/timesheets" element={<Navigate to="/hr?tab=timesheets" replace />} />
+                <Route path="/timesheets" element={<Timesheets />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

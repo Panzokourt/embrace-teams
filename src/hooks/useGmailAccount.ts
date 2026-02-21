@@ -23,10 +23,9 @@ export function useGmailAccount() {
   const fetchAccount = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from('gmail_oauth_tokens')
+    const { data, error } = await (supabase as any)
+      .from('gmail_accounts_safe')
       .select('id, user_id, company_id, email_address, display_name, is_active, last_sync_at, created_at, updated_at')
-      .eq('user_id', user.id)
       .maybeSingle();
 
     if (!error && data) {

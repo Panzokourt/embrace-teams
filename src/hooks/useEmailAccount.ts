@@ -14,7 +14,6 @@ export interface EmailAccount {
   smtp_host: string;
   smtp_port: number;
   username: string;
-  encrypted_password: string;
   use_tls: boolean;
   is_active: boolean;
   last_sync_at: string | null;
@@ -38,10 +37,9 @@ export function useEmailAccount() {
   const fetchAccount = async () => {
     if (!user) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from('email_accounts')
+    const { data, error } = await (supabase as any)
+      .from('email_accounts_safe')
       .select('*')
-      .eq('user_id', user.id)
       .maybeSingle();
 
     if (!error && data) {

@@ -160,7 +160,7 @@ function DroppableFolder({
 }
 
 // Collapsible virtual folder for auto mode
-function VirtualFolder({ name, color, children, defaultOpen = false }: {
+function VirtualFolder({ name, color, children, defaultOpen = true }: {
   name: string; color?: string | null; children: React.ReactNode; defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -396,7 +396,7 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
           </Tooltip>
         </div>
 
-        <div className="max-h-[300px] overflow-y-auto space-y-0.5 scrollbar-thin">
+        <div className="max-h-[50vh] overflow-y-auto space-y-0.5 scrollbar-thin">
           {categories.map(cat => {
             const bucket = categoryMap.get(cat.name);
             if (!bucket || bucket.clients.size === 0) return null;

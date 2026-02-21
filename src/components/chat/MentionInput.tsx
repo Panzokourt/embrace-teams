@@ -2,11 +2,11 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import { User, FolderKanban, CheckSquare } from 'lucide-react';
+import { User, FolderKanban, CheckSquare, Mail } from 'lucide-react';
 
 interface MentionSuggestion {
   id: string;
-  type: 'user' | 'project' | 'task';
+  type: 'user' | 'project' | 'task' | 'email';
   label: string;
   sub?: string;
 }
@@ -66,6 +66,22 @@ export default function MentionInput({ query, position, onSelect, onClose }: Men
         results.push({ id: t.id, type: 'task', label: t.title });
       });
 
+      // Fetch email threads
+      const { data: emails } = await supabase
+        .from('email_messages')
+        .select('id, thread_id, subject, from_name, from_address')
+        .ilike('subject', `%${q}%`)
+        .order('sent_at', { ascending: false })
+        .limit(5);
+
+      const seenThreads = new Set<string>();
+      (emails || []).forEach((e: any) => {
+        const tid = e.thread_id || e.id;
+        if (seenThreads.has(tid)) return;
+        seenThreads.add(tid);
+        results.push({ id: tid, type: 'email', label: e.subject || '(χωρίς θέμα)', sub: e.from_name || e.from_address || undefined });
+      });
+
       setSuggestions(results);
       setSelectedIndex(0);
     };
@@ -101,6 +117,7 @@ export default function MentionInput({ query, position, onSelect, onClose }: Men
       case 'user': return <User className="h-3.5 w-3.5 text-muted-foreground" />;
       case 'project': return <FolderKanban className="h-3.5 w-3.5 text-muted-foreground" />;
       case 'task': return <CheckSquare className="h-3.5 w-3.5 text-muted-foreground" />;
+      case 'email': return <Mail className="h-3.5 w-3.5 text-muted-foreground" />;
       default: return null;
     }
   };

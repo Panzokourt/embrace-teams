@@ -8,6 +8,7 @@ import { InboxEmptyState } from '@/components/inbox/InboxEmptyState';
 import { InboxComposeInput } from '@/components/inbox/InboxComposeInput';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { Loader2, Mail } from 'lucide-react';
 
 export default function Inbox() {
@@ -33,43 +34,65 @@ export default function Inbox() {
   const userEmail = account.email_address;
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex">
-      {/* Thread List */}
-      <div className={cn(
-        'w-full md:w-96 md:shrink-0 h-full',
-        selectedThread && 'hidden md:flex md:flex-col'
-      )}>
-        <InboxThreadList
-          threads={threads}
-          selectedThreadId={selectedThreadId}
-          onSelectThread={setSelectedThreadId}
-          onSync={syncEmails}
-          syncing={syncing}
-          onCompose={() => setComposeOpen(true)}
-        />
-      </div>
-
-      {/* Conversation */}
-      <div className={cn(
-        'flex-1 h-full',
-        !selectedThread && 'hidden md:flex'
-      )}>
-        {selectedThread ? (
-          <InboxConversation
-            thread={selectedThread}
-            userEmail={userEmail}
-            onSend={sendEmail}
-            onToggleStar={toggleStar}
-            onBack={() => setSelectedThreadId(null)}
-          />
+    <div className="h-[calc(100vh-4rem)]">
+      {/* Mobile view */}
+      <div className="md:hidden flex h-full">
+        {!selectedThread ? (
+          <div className="w-full h-full">
+            <InboxThreadList
+              threads={threads}
+              selectedThreadId={selectedThreadId}
+              onSelectThread={setSelectedThreadId}
+              onSync={syncEmails}
+              syncing={syncing}
+              onCompose={() => setComposeOpen(true)}
+            />
+          </div>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-muted-foreground">
-            <div className="text-center space-y-2">
-              <Mail className="h-12 w-12 mx-auto opacity-30" />
-              <p>Επιλέξτε ένα thread για να δείτε τη συνομιλία</p>
-            </div>
+          <div className="w-full h-full">
+            <InboxConversation
+              thread={selectedThread}
+              userEmail={userEmail}
+              onSend={sendEmail}
+              onToggleStar={toggleStar}
+              onBack={() => setSelectedThreadId(null)}
+            />
           </div>
         )}
+      </div>
+
+      {/* Desktop view with resizable panels */}
+      <div className="hidden md:flex h-full">
+        <ResizablePanelGroup direction="horizontal">
+          <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
+            <InboxThreadList
+              threads={threads}
+              selectedThreadId={selectedThreadId}
+              onSelectThread={setSelectedThreadId}
+              onSync={syncEmails}
+              syncing={syncing}
+              onCompose={() => setComposeOpen(true)}
+            />
+          </ResizablePanel>
+          <ResizableHandle withHandle />
+          <ResizablePanel defaultSize={70}>
+            {selectedThread ? (
+              <InboxConversation
+                thread={selectedThread}
+                userEmail={userEmail}
+                onSend={sendEmail}
+                onToggleStar={toggleStar}
+              />
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-muted-foreground h-full">
+                <div className="text-center space-y-2">
+                  <Mail className="h-12 w-12 mx-auto opacity-30" />
+                  <p>Επιλέξτε ένα thread για να δείτε τη συνομιλία</p>
+                </div>
+              </div>
+            )}
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </div>
 
       {/* Compose Dialog */}

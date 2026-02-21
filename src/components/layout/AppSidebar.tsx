@@ -223,6 +223,23 @@ export default function AppSidebar() {
       }
       </nav>
 
+      {/* Secretary AI */}
+      <div className={cn("px-3 py-1", collapsed && !isMobile && "flex justify-center")}>
+        <NavLink
+          to="/secretary"
+          onClick={() => isMobile && setMobileOpen(false)}
+          className={cn(
+            "flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 ease-apple",
+            "bg-gradient-to-r from-violet-500 to-indigo-500 text-white hover:from-violet-600 hover:to-indigo-600 shadow-md",
+            collapsed && !isMobile && "justify-center px-2",
+            (!collapsed || isMobile) && "w-full"
+          )}
+        >
+          <Zap className="h-[18px] w-[18px]" />
+          {(!collapsed || isMobile) && <span className="text-sm font-semibold">AI Secretary</span>}
+        </NavLink>
+      </div>
+
       {/* Quick Actions */}
       <div className={cn("px-3 py-1", collapsed && !isMobile && "flex justify-center")}>
         <Popover open={quickOpen} onOpenChange={setQuickOpen}>

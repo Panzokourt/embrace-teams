@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useEmailAccount } from '@/hooks/useEmailAccount';
+import { useGmailAccount } from '@/hooks/useGmailAccount';
 import { useEmailMessages } from '@/hooks/useEmailMessages';
 import { useAuth } from '@/contexts/AuthContext';
 import { InboxThreadList } from '@/components/inbox/InboxThreadList';
@@ -12,7 +12,7 @@ import { Loader2, Mail } from 'lucide-react';
 
 export default function Inbox() {
   const { profile } = useAuth();
-  const { account, loading: accountLoading } = useEmailAccount();
+  const { account, loading: accountLoading } = useGmailAccount();
   const { threads, loading, syncing, syncEmails, sendEmail, toggleStar } = useEmailMessages(account?.id || null);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);

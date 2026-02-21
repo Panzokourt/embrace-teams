@@ -106,7 +106,7 @@ export function useEmailMessages(accountId: string | null) {
     setSyncing(true);
     try {
       const res = await supabase.functions.invoke('email-fetch', {
-        body: { account_id: accountId },
+        body: { action: 'sync' },
       });
       if (res.error) {
         toast.error('Σφάλμα συγχρονισμού: ' + (res.error as any)?.message);
@@ -132,10 +132,14 @@ export function useEmailMessages(accountId: string | null) {
     if (!accountId) return null;
     try {
       const res = await supabase.functions.invoke('email-send', {
-        body: { account_id: accountId, ...params },
+        body: params,
       });
       if (res.error) {
         toast.error('Σφάλμα αποστολής');
+        return null;
+      }
+      if (res.data?.error) {
+        toast.error(res.data.error);
         return null;
       }
       toast.success('Το email στάλθηκε!');

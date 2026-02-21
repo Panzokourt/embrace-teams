@@ -29,3 +29,9 @@ verify_jwt = false
 
 [functions.email-send]
 verify_jwt = false
+
+[functions.gmail-auth-start]
+verify_jwt = false
+
+[functions.gmail-auth-callback]
+verify_jwt = false

@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Activity, FolderKanban, CheckSquare, FileText, Users, Bot, Bell } from 'lucide-react';
+import { Search, FolderKanban, CheckSquare, FileText, Users, PanelRightOpen, PanelRightClose } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import type { RightPanelTab } from '@/components/secretary/SecretaryPanel';
 
 interface SearchResult {
   id: string;
@@ -22,14 +21,11 @@ const entityConfig = {
 };
 
 interface TopBarProps {
-  onActivityToggle: () => void;
-  onSecretaryToggle: () => void;
-  onNotificationsToggle: () => void;
+  onPanelToggle: () => void;
   rightPanelOpen?: boolean;
-  activeTab?: RightPanelTab;
 }
 
-export default function TopBar({ onActivityToggle, onSecretaryToggle, onNotificationsToggle, rightPanelOpen, activeTab }: TopBarProps) {
+export default function TopBar({ onPanelToggle, rightPanelOpen }: TopBarProps) {
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -95,8 +91,6 @@ export default function TopBar({ onActivityToggle, onSecretaryToggle, onNotifica
     return acc;
   }, {});
 
-  const isActive = (tab: RightPanelTab) => rightPanelOpen && activeTab === tab;
-
   return (
     <div className="sticky top-0 z-20 h-14 gap-2 border-b bg-background/80 backdrop-blur-lg md:px-6 mx-0 flex items-center justify-center my-0 px-0 py-[10px]">
       {/* Search */}
@@ -141,32 +135,16 @@ export default function TopBar({ onActivityToggle, onSecretaryToggle, onNotifica
         </Popover>
       </div>
 
-      {/* Action icons */}
-      <div className="gap-1 px-0 flex items-center justify-end">
+      {/* Panel toggle */}
+      <div className="px-1 flex items-center">
         <Button
           variant="ghost"
           size="icon"
-          onClick={onSecretaryToggle}
-          title="Secretary (⌘J)"
-          className={cn(isActive('secretary') && "bg-secondary")}
+          onClick={onPanelToggle}
+          title="Panel (⌘J)"
+          className={cn(rightPanelOpen && "bg-secondary")}
         >
-          <Bot className="h-5 w-5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onActivityToggle}
-          className={cn(isActive('activity') && "bg-secondary")}
-        >
-          <Activity className="h-5 w-5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onNotificationsToggle}
-          className={cn(isActive('notifications') && "bg-secondary")}
-        >
-          <Bell className="h-5 w-5" />
+          {rightPanelOpen ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
         </Button>
       </div>
     </div>

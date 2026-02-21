@@ -328,13 +328,10 @@ export default function AppSidebar() {
         </Sheet>
       </div>
 
-      {/* Desktop Sidebar */}
-      <aside className={cn(
-        "h-screen bg-card/50 backdrop-blur-sm border-r border-border/40 flex-col transition-all duration-300 ease-apple hidden md:flex",
-        collapsed ? "w-[72px]" : "w-64"
-      )}>
+      {/* Desktop Sidebar - rendered inside ResizablePanel in AppLayout */}
+      <div className="h-screen bg-card/50 backdrop-blur-sm flex-col hidden md:flex overflow-hidden">
         <SidebarContent />
-      </aside>
+      </div>
 
       {selectedDef && (
         <BriefFormDialog

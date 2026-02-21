@@ -54,6 +54,7 @@ export default function AppLayout() {
   }, [rightPanelOpen, activeTab]);
 
   const closePanel = useCallback(() => setRightPanelOpen(false), []);
+  const togglePanelSimple = useCallback(() => setRightPanelOpen(prev => !prev), []);
 
   if (loading) {
     return (
@@ -87,16 +88,19 @@ export default function AppLayout() {
 
   return (
     <div className="flex h-screen bg-background">
-      <AppSidebar />
       <ResizablePanelGroup direction="horizontal" className="flex-1">
-        <ResizablePanel defaultSize={rightPanelOpen ? 70 : 100} minSize={40}>
+        {/* Sidebar panel */}
+        <ResizablePanel defaultSize={15} minSize={5} maxSize={25} className="hidden md:block">
+          <AppSidebar />
+        </ResizablePanel>
+        <ResizableHandle className="hidden md:flex" />
+
+        {/* Main content */}
+        <ResizablePanel defaultSize={rightPanelOpen ? 55 : 85} minSize={30}>
           <main className="h-full overflow-auto flex flex-col">
             <TopBar
-              onSecretaryToggle={() => togglePanel('secretary')}
-              onActivityToggle={() => togglePanel('activity')}
-              onNotificationsToggle={() => togglePanel('notifications')}
+              onPanelToggle={togglePanelSimple}
               rightPanelOpen={rightPanelOpen}
-              activeTab={activeTab}
             />
             <div className="flex-1">
               <Outlet />

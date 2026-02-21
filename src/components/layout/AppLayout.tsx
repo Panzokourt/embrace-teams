@@ -1,17 +1,60 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import AppSidebar from './AppSidebar';
 import TopBar from './TopBar';
 import { QuickActionButton } from '@/components/layout/QuickActionButton';
-import { GlobalActivityFeed } from '@/components/activity/GlobalActivityFeed';
-import SecretaryPanel from '@/components/secretary/SecretaryPanel';
+import SecretaryPanel, { type RightPanelTab } from '@/components/secretary/SecretaryPanel';
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { Loader2 } from 'lucide-react';
+
+const PANEL_OPEN_KEY = 'secretary-panel-open';
+const PANEL_TAB_KEY = 'secretary-panel-tab';
 
 export default function AppLayout() {
   const { user, loading, companyRole, postLoginRoute } = useAuth();
-  const [activityOpen, setActivityOpen] = useState(false);
-  const [secretaryOpen, setSecretaryOpen] = useState(false);
+  const [rightPanelOpen, setRightPanelOpen] = useState(() => {
+    try { return localStorage.getItem(PANEL_OPEN_KEY) === 'true'; } catch { return false; }
+  });
+  const [activeTab, setActiveTab] = useState<RightPanelTab>(() => {
+    try { return (localStorage.getItem(PANEL_TAB_KEY) as RightPanelTab) || 'secretary'; } catch { return 'secretary'; }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(PANEL_OPEN_KEY, String(rightPanelOpen));
+    } catch {}
+  }, [rightPanelOpen]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(PANEL_TAB_KEY, activeTab);
+    } catch {}
+  }, [activeTab]);
+
+  // Cmd+J shortcut
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'j') {
+        e.preventDefault();
+        setRightPanelOpen(prev => !prev);
+        setActiveTab('secretary');
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  const togglePanel = useCallback((tab: RightPanelTab) => {
+    if (rightPanelOpen && activeTab === tab) {
+      setRightPanelOpen(false);
+    } else {
+      setActiveTab(tab);
+      setRightPanelOpen(true);
+    }
+  }, [rightPanelOpen, activeTab]);
+
+  const closePanel = useCallback(() => setRightPanelOpen(false), []);
 
   if (loading) {
     return (
@@ -25,8 +68,6 @@ export default function AppLayout() {
     return <Navigate to="/auth" replace />;
   }
 
-  // Hard redirect to onboarding if user has no company role (new signup via Google OAuth)
-  // Using window.location.replace to prevent React re-renders from interrupting the redirect
   if (!companyRole) {
     window.location.replace('/onboarding');
     return (
@@ -48,15 +89,36 @@ export default function AppLayout() {
   return (
     <div className="flex h-screen bg-background">
       <AppSidebar />
-      <main className="flex-1 overflow-auto flex flex-col">
-        <TopBar onActivityToggle={() => setActivityOpen(true)} onSecretaryToggle={() => setSecretaryOpen(true)} />
-        <div className="flex-1">
-          <Outlet />
-        </div>
-      </main>
-      <QuickActionButton />
-      <GlobalActivityFeed open={activityOpen} onOpenChange={setActivityOpen} />
-      <SecretaryPanel open={secretaryOpen} onOpenChange={setSecretaryOpen} />
+      <ResizablePanelGroup direction="horizontal" className="flex-1">
+        <ResizablePanel defaultSize={rightPanelOpen ? 70 : 100} minSize={40}>
+          <main className="h-full overflow-auto flex flex-col">
+            <TopBar
+              onSecretaryToggle={() => togglePanel('secretary')}
+              onActivityToggle={() => togglePanel('activity')}
+              onNotificationsToggle={() => togglePanel('notifications')}
+              rightPanelOpen={rightPanelOpen}
+              activeTab={activeTab}
+            />
+            <div className="flex-1">
+              <Outlet />
+            </div>
+          </main>
+        </ResizablePanel>
+
+        {rightPanelOpen && (
+          <>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={30} minSize={20} maxSize={45}>
+              <SecretaryPanel
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                onClose={closePanel}
+              />
+            </ResizablePanel>
+          </>
+        )}
+      </ResizablePanelGroup>
+      <QuickActionButton rightPanelOpen={rightPanelOpen} />
     </div>
   );
 }

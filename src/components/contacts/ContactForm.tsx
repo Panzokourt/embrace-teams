@@ -24,13 +24,22 @@ interface Contact {
   notes: string;
   tags: string[];
   category: string;
+  sector: string;
   avatar_url: string;
 }
 
 const defaultContact: Contact = {
   name: '', entity_type: 'person', email: '', phone: '', secondary_phone: '',
-  address: '', website: '', tax_id: '', notes: '', tags: [], category: 'other', avatar_url: '',
+  address: '', website: '', tax_id: '', notes: '', tags: [], category: 'other', sector: '', avatar_url: '',
 };
+
+const sectorOptions = [
+  { value: 'public', label: 'Δημόσιος Τομέας' },
+  { value: 'private', label: 'Ιδιωτικός Τομέας' },
+  { value: 'non_profit', label: 'Μη Κερδοσκοπικός' },
+  { value: 'government', label: 'Κυβερνητικός' },
+  { value: 'mixed', label: 'Μικτός' },
+];
 
 const categories = [
   { value: 'client', label: 'Πελάτης' },
@@ -95,6 +104,7 @@ export function ContactForm({ open, onOpenChange, contact, onSaved }: ContactFor
         notes: form.notes || null,
         tags: form.tags,
         category: form.category,
+        sector: form.sector || null,
         avatar_url: form.avatar_url || null,
         company_id: companyId,
       };
@@ -143,6 +153,15 @@ export function ContactForm({ open, onOpenChange, contact, onSaved }: ContactFor
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {categories.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="col-span-2">
+            <Label>Τομέας</Label>
+            <Select value={form.sector} onValueChange={v => set('sector', v)}>
+              <SelectTrigger><SelectValue placeholder="Επιλέξτε τομέα" /></SelectTrigger>
+              <SelectContent>
+                {sectorOptions.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

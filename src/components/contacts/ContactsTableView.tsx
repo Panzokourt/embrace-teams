@@ -116,7 +116,12 @@ export function ContactsTableView({ contacts, loading, onEdit, onRefresh }: Cont
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{categoryLabels[contact.category] || contact.category}</Badge>
+                    <div className="flex flex-wrap gap-1">
+                      <Badge variant="secondary">{categoryLabels[contact.category] || contact.category}</Badge>
+                      {contact.sector && <Badge variant="outline" className="text-[10px]">{
+                        { public: 'Δημόσιος', private: 'Ιδιωτικός', non_profit: 'Μη Κερδ.', government: 'Κυβερν.', mixed: 'Μικτός' }[contact.sector as string] || contact.sector
+                      }</Badge>}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">

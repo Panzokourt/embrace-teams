@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -21,8 +23,17 @@ import {
   Building2, 
   Plus, 
   Search,
-  Loader2
+  Loader2,
+  X
 } from 'lucide-react';
+
+const sectorOptions = [
+  { value: 'public', label: 'Δημόσιος Τομέας' },
+  { value: 'private', label: 'Ιδιωτικός Τομέας' },
+  { value: 'non_profit', label: 'Μη Κερδοσκοπικός' },
+  { value: 'government', label: 'Κυβερνητικός' },
+  { value: 'mixed', label: 'Μικτός' },
+];
 
 interface Client {
   id: string;
@@ -32,6 +43,12 @@ interface Client {
   address: string | null;
   notes: string | null;
   created_at: string;
+  sector: string | null;
+  website: string | null;
+  tax_id: string | null;
+  secondary_phone: string | null;
+  tags: string[] | null;
+  logo_url: string | null;
   projectCount?: number;
 }
 
@@ -44,6 +61,7 @@ export default function ClientsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [tagInput, setTagInput] = useState('');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -51,6 +69,11 @@ export default function ClientsPage() {
     contact_phone: '',
     address: '',
     notes: '',
+    sector: '',
+    website: '',
+    tax_id: '',
+    secondary_phone: '',
+    tags: [] as string[],
   });
 
   useEffect(() => {
@@ -59,7 +82,6 @@ export default function ClientsPage() {
 
   const fetchClients = async () => {
     try {
-      // Fetch clients with project count
       const { data: clientsData, error } = await supabase
         .from('clients')
         .select('*')
@@ -67,7 +89,6 @@ export default function ClientsPage() {
 
       if (error) throw error;
 
-      // Get project counts
       const { data: projectCounts } = await supabase
         .from('projects')
         .select('client_id');
@@ -93,6 +114,18 @@ export default function ClientsPage() {
     }
   };
 
+  const addTag = () => {
+    const t = tagInput.trim();
+    if (t && !formData.tags.includes(t)) {
+      setFormData(prev => ({ ...prev, tags: [...prev.tags, t] }));
+    }
+    setTagInput('');
+  };
+
+  const removeTag = (tag: string) => {
+    setFormData(prev => ({ ...prev, tags: prev.tags.filter(t => t !== tag) }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -104,6 +137,11 @@ export default function ClientsPage() {
         contact_phone: formData.contact_phone || null,
         address: formData.address || null,
         notes: formData.notes || null,
+        sector: formData.sector || null,
+        website: formData.website || null,
+        tax_id: formData.tax_id || null,
+        secondary_phone: formData.secondary_phone || null,
+        tags: formData.tags,
       };
 
       if (editingClient) {
@@ -151,6 +189,11 @@ export default function ClientsPage() {
       contact_phone: client.contact_phone || '',
       address: client.address || '',
       notes: client.notes || '',
+      sector: client.sector || '',
+      website: client.website || '',
+      tax_id: client.tax_id || '',
+      secondary_phone: client.secondary_phone || '',
+      tags: client.tags || [],
     });
     setDialogOpen(true);
   };
@@ -178,18 +221,25 @@ export default function ClientsPage() {
 
   const resetForm = () => {
     setEditingClient(null);
+    setTagInput('');
     setFormData({
       name: '',
       contact_email: '',
       contact_phone: '',
       address: '',
       notes: '',
+      sector: '',
+      website: '',
+      tax_id: '',
+      secondary_phone: '',
+      tags: [],
     });
   };
 
   const filteredClients = clients.filter(client =>
     client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    client.contact_email?.toLowerCase().includes(searchQuery.toLowerCase())
+    client.contact_email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    client.tax_id?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const canManage = isAdmin || isManager;
@@ -229,7 +279,7 @@ export default function ClientsPage() {
                   Νέος Πελάτης
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-lg">
+              <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle className="text-lg">{editingClient ? 'Επεξεργασία Πελάτη' : 'Νέος Πελάτης'}</DialogTitle>
                   <DialogDescription className="text-sm">
@@ -237,18 +287,38 @@ export default function ClientsPage() {
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name" className="text-sm font-medium">Επωνυμία *</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                      placeholder="π.χ. ABC Company"
-                      required
-                    />
-                  </div>
-
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label htmlFor="name" className="text-sm font-medium">Επωνυμία *</Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder="π.χ. ABC Company"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Τομέας</Label>
+                      <Select value={formData.sector} onValueChange={v => setFormData(prev => ({ ...prev, sector: v }))}>
+                        <SelectTrigger><SelectValue placeholder="Επιλέξτε τομέα" /></SelectTrigger>
+                        <SelectContent>
+                          {sectorOptions.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="tax_id" className="text-sm font-medium">ΑΦΜ</Label>
+                      <Input
+                        id="tax_id"
+                        value={formData.tax_id}
+                        onChange={(e) => setFormData(prev => ({ ...prev, tax_id: e.target.value }))}
+                        placeholder="123456789"
+                      />
+                    </div>
+
                     <div className="space-y-2">
                       <Label htmlFor="email" className="text-sm font-medium">Email</Label>
                       <Input
@@ -269,27 +339,68 @@ export default function ClientsPage() {
                         placeholder="+30 210 1234567"
                       />
                     </div>
-                  </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="address" className="text-sm font-medium">Διεύθυνση</Label>
-                    <Input
-                      id="address"
-                      value={formData.address}
-                      onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                      placeholder="Οδός, Αριθμός, Πόλη"
-                    />
-                  </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="secondary_phone" className="text-sm font-medium">Δεύτερο Τηλέφωνο</Label>
+                      <Input
+                        id="secondary_phone"
+                        value={formData.secondary_phone}
+                        onChange={(e) => setFormData(prev => ({ ...prev, secondary_phone: e.target.value }))}
+                        placeholder="+30 210 7654321"
+                      />
+                    </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="notes" className="text-sm font-medium">Σημειώσεις</Label>
-                    <Textarea
-                      id="notes"
-                      value={formData.notes}
-                      onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                      rows={3}
-                      className="resize-none"
-                    />
+                    <div className="space-y-2">
+                      <Label htmlFor="website" className="text-sm font-medium">Ιστοσελίδα</Label>
+                      <Input
+                        id="website"
+                        value={formData.website}
+                        onChange={(e) => setFormData(prev => ({ ...prev, website: e.target.value }))}
+                        placeholder="https://example.com"
+                      />
+                    </div>
+
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label htmlFor="address" className="text-sm font-medium">Διεύθυνση</Label>
+                      <Input
+                        id="address"
+                        value={formData.address}
+                        onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+                        placeholder="Οδός, Αριθμός, Πόλη"
+                      />
+                    </div>
+
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label className="text-sm font-medium">Tags</Label>
+                      <div className="flex gap-2 mb-2 flex-wrap">
+                        {formData.tags.map(tag => (
+                          <Badge key={tag} variant="secondary" className="gap-1">
+                            {tag}
+                            <X className="h-3 w-3 cursor-pointer" onClick={() => removeTag(tag)} />
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          value={tagInput}
+                          onChange={e => setTagInput(e.target.value)}
+                          placeholder="Προσθήκη tag..."
+                          onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                        />
+                        <Button type="button" variant="outline" size="sm" onClick={addTag}>+</Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label htmlFor="notes" className="text-sm font-medium">Σημειώσεις</Label>
+                      <Textarea
+                        id="notes"
+                        value={formData.notes}
+                        onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                        rows={3}
+                        className="resize-none"
+                      />
+                    </div>
                   </div>
 
                   <DialogFooter className="gap-2">

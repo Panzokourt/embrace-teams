@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
@@ -13,8 +13,16 @@ import { el } from 'date-fns/locale';
 import { 
   ArrowLeft, Building2, Mail, Phone, MapPin, Calendar, 
   FolderKanban, Wallet, FileText, Loader2, TrendingUp, 
-  CheckCircle2, Clock, StickyNote
+  CheckCircle2, Clock, StickyNote, Globe, Hash, BookUser
 } from 'lucide-react';
+
+const sectorLabels: Record<string, string> = {
+  public: 'Δημόσιος Τομέας',
+  private: 'Ιδιωτικός Τομέας',
+  non_profit: 'Μη Κερδοσκοπικός',
+  government: 'Κυβερνητικός',
+  mixed: 'Μικτός',
+};
 
 interface ClientData {
   id: string;
@@ -24,6 +32,12 @@ interface ClientData {
   address: string | null;
   notes: string | null;
   created_at: string;
+  sector: string | null;
+  website: string | null;
+  tax_id: string | null;
+  secondary_phone: string | null;
+  tags: string[] | null;
+  logo_url: string | null;
 }
 
 interface Project {
@@ -64,6 +78,7 @@ export default function ClientDetailPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
+  const [contactId, setContactId] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) fetchClientData();
@@ -74,7 +89,6 @@ export default function ClientDetailPage() {
     setLoading(true);
     
     try {
-      // Fetch client
       const { data: clientData, error: clientError } = await supabase
         .from('clients')
         .select('*')
@@ -84,7 +98,14 @@ export default function ClientDetailPage() {
       if (clientError) throw clientError;
       setClient(clientData);
 
-      // Fetch projects
+      // Fetch linked contact
+      const { data: contactData } = await supabase
+        .from('contacts')
+        .select('id')
+        .eq('client_id', id)
+        .maybeSingle();
+      setContactId(contactData?.id || null);
+
       const { data: projectsData } = await supabase
         .from('projects')
         .select('id, name, status, progress, budget, start_date, end_date')
@@ -93,7 +114,6 @@ export default function ClientDetailPage() {
       
       setProjects(projectsData || []);
 
-      // Fetch invoices
       const { data: invoicesData } = await supabase
         .from('invoices')
         .select('id, invoice_number, amount, issued_date, due_date, paid, paid_date')
@@ -102,7 +122,6 @@ export default function ClientDetailPage() {
       
       setInvoices(invoicesData || []);
 
-      // Fetch contracts through projects
       if (projectsData && projectsData.length > 0) {
         const { data: contractsData } = await supabase
           .from('contracts')
@@ -158,14 +177,25 @@ export default function ClientDetailPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold">{client.name}</h1>
-            <div className="flex items-center gap-3 mt-1">
+            <div className="flex items-center gap-3 mt-1 flex-wrap">
+              {client.sector && <Badge variant="secondary">{sectorLabels[client.sector] || client.sector}</Badge>}
               {client.contact_email && (
-                <span className="text-muted-foreground">{client.contact_email}</span>
+                <span className="text-muted-foreground text-sm">{client.contact_email}</span>
               )}
               <Badge variant="outline">{projects.length} έργα</Badge>
             </div>
+            {(client.tags || []).length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {client.tags!.map(t => <Badge key={t} variant="outline" className="text-xs">{t}</Badge>)}
+              </div>
+            )}
           </div>
         </div>
+        {contactId && (
+          <Button variant="outline" size="sm" asChild>
+            <Link to={`/contacts/${contactId}`}><BookUser className="h-4 w-4 mr-1" />Ευρετήριο</Link>
+          </Button>
+        )}
       </div>
 
       <Separator />
@@ -238,6 +268,18 @@ export default function ClientDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {client.sector && (
+                <div className="flex items-center gap-3">
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  <span>{sectorLabels[client.sector] || client.sector}</span>
+                </div>
+              )}
+              {client.tax_id && (
+                <div className="flex items-center gap-3">
+                  <Hash className="h-4 w-4 text-muted-foreground" />
+                  <div><p className="text-xs text-muted-foreground">ΑΦΜ</p><p className="text-sm">{client.tax_id}</p></div>
+                </div>
+              )}
               {client.contact_email && (
                 <div className="flex items-center gap-3">
                   <Mail className="h-4 w-4 text-muted-foreground" />
@@ -248,6 +290,18 @@ export default function ClientDetailPage() {
                 <div className="flex items-center gap-3">
                   <Phone className="h-4 w-4 text-muted-foreground" />
                   <span>{client.contact_phone}</span>
+                </div>
+              )}
+              {client.secondary_phone && (
+                <div className="flex items-center gap-3">
+                  <Phone className="h-4 w-4 text-muted-foreground" />
+                  <div><p className="text-xs text-muted-foreground">Δεύτερο Τηλ.</p><p className="text-sm">{client.secondary_phone}</p></div>
+                </div>
+              )}
+              {client.website && (
+                <div className="flex items-center gap-3">
+                  <Globe className="h-4 w-4 text-muted-foreground" />
+                  <a href={client.website} target="_blank" rel="noreferrer" className="text-primary hover:underline text-sm">{client.website}</a>
                 </div>
               )}
               {client.address && (

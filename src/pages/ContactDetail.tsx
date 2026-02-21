@@ -17,6 +17,11 @@ const categoryLabels: Record<string, string> = {
   media: 'Μέσα', government: 'Φορέας', freelancer: 'Freelancer', other: 'Άλλο',
 };
 
+const sectorLabels: Record<string, string> = {
+  public: 'Δημόσιος Τομέας', private: 'Ιδιωτικός Τομέας', non_profit: 'Μη Κερδοσκοπικός',
+  government: 'Κυβερνητικός', mixed: 'Μικτός',
+};
+
 const entityIcons: Record<string, any> = { person: User, company: Building2, organization: Landmark };
 
 export default function ContactDetail() {
@@ -88,6 +93,7 @@ export default function ContactDetail() {
             <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
               <span className="flex items-center gap-1"><EntityIcon className="h-4 w-4" />{contact.entity_type === 'person' ? 'Φυσικό Πρόσωπο' : contact.entity_type === 'company' ? 'Εταιρεία' : 'Οργανισμός'}</span>
               <Badge variant="secondary">{categoryLabels[contact.category] || contact.category}</Badge>
+              {contact.sector && <Badge variant="outline">{sectorLabels[contact.sector] || contact.sector}</Badge>}
             </div>
             <div className="flex flex-wrap gap-1 mt-2">
               {(contact.tags || []).map((t: string) => <Badge key={t} variant="outline" className="text-xs">{t}</Badge>)}

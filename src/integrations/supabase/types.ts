@@ -3602,6 +3602,18 @@ export type Database = {
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       reject_join_request: { Args: { _request_id: string }; Returns: Json }
+      search_chat_messages: {
+        Args: { _company_id: string; _limit?: number; _query: string }
+        Returns: {
+          channel_id: string
+          channel_name: string
+          content: string
+          created_at: string
+          id: string
+          sender_name: string
+          user_id: string
+        }[]
+      }
     }
     Enums: {
       access_scope: "company" | "assigned" | "department" | "team"

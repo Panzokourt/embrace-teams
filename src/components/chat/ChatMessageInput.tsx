@@ -2,9 +2,10 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, Paperclip, Smile, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import MentionInput, { type MentionSuggestion } from './MentionInput';
 
 interface ChatMessageInputProps {
-  onSend: (content: string) => void;
+  onSend: (content: string, metadata?: Record<string, any>) => void;
   onFileUpload?: (files: FileList) => void;
   placeholder?: string;
   disabled?: boolean;
@@ -18,7 +19,7 @@ const EMOJI_QUICK = ['👍', '❤️', '😂', '🎉', '🔥', '👀', '✅', '�
 export default function ChatMessageInput({
   onSend,
   onFileUpload,
-  placeholder = 'Γράψε μήνυμα...',
+  placeholder = 'Γράψε μήνυμα... (@ για αναφορά)',
   disabled,
   compact,
   replyingTo,
@@ -26,6 +27,9 @@ export default function ChatMessageInput({
 }: ChatMessageInputProps) {
   const [content, setContent] = useState('');
   const [showEmoji, setShowEmoji] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [showMention, setShowMention] = useState(false);
+  const [mentions, setMentions] = useState<{ type: string; id: string; name: string }[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -38,18 +42,48 @@ export default function ChatMessageInput({
 
   const handleSend = () => {
     if (!content.trim() || disabled) return;
-    onSend(content);
+    const metadata: Record<string, any> = {};
+    if (mentions.length > 0) metadata.mentions = mentions;
+    onSend(content, Object.keys(metadata).length > 0 ? metadata : undefined);
     setContent('');
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-    }
+    setMentions([]);
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (showMention) return; // let mention handler take over
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setContent(val);
+
+    // Detect @ mention
+    const cursorPos = e.target.selectionStart || 0;
+    const textBefore = val.slice(0, cursorPos);
+    const atMatch = textBefore.match(/@(\w*)$/);
+    if (atMatch) {
+      setMentionQuery(atMatch[1]);
+      setShowMention(true);
+    } else {
+      setShowMention(false);
+    }
+  };
+
+  const handleMentionSelect = (suggestion: MentionSuggestion) => {
+    const cursorPos = textareaRef.current?.selectionStart || 0;
+    const textBefore = content.slice(0, cursorPos);
+    const textAfter = content.slice(cursorPos);
+    const atIndex = textBefore.lastIndexOf('@');
+    const newText = textBefore.slice(0, atIndex) + `@${suggestion.label} ` + textAfter;
+    setContent(newText);
+    setMentions(prev => [...prev, { type: suggestion.type, id: suggestion.id, name: suggestion.label }]);
+    setShowMention(false);
+    textareaRef.current?.focus();
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -102,7 +136,7 @@ export default function ChatMessageInput({
           <textarea
             ref={textareaRef}
             value={content}
-            onChange={e => setContent(e.target.value)}
+            onChange={handleChange}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             disabled={disabled}
@@ -112,6 +146,15 @@ export default function ChatMessageInput({
               compact && "text-xs py-1.5 px-2"
             )}
           />
+
+          {showMention && (
+            <MentionInput
+              query={mentionQuery}
+              position={{ top: 8, left: 0 }}
+              onSelect={handleMentionSelect}
+              onClose={() => setShowMention(false)}
+            />
+          )}
 
           {showEmoji && (
             <div className="absolute bottom-full mb-1 left-0 bg-popover border border-border/60 rounded-lg shadow-lg p-2 flex gap-1 z-50">

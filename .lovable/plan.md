@@ -1,84 +1,121 @@
 
-# Right Panel Redesign - Secretary, Activity, Notifications
+# Timesheets — Ξεχωριστή Σελίδα με Προηγμένες Προβολές
 
-## Problems to Fix
+## Επισκόπηση
 
-1. **Dark overlay**: The Secretary panel uses a Sheet (modal) that darkens the background and blocks interaction with the rest of the app
-2. **QuickAction button overlap**: The floating "+" button at bottom-right overlaps with the Secretary chat input
-3. **No unified panel**: Secretary, Activity, and Notifications are separate components - need to be tabs in one panel
+Αφαίρεση του Timesheets tab από το HR και δημιουργία αυτόνομης σελίδας `/timesheets` με:
+- Weekly grid view (σαν την εικόνα αναφοράς) — tasks σε γραμμές, ημέρες σε στήλες
+- List view (βελτιωμένη τρέχουσα)
+- Φίλτρα ανά χρονικό διάστημα (προεπιλογές + custom range)
+- Ομαδοποίηση ανά έργο, άτομο, task, status
+- Inline editing καταχωρήσεων
+- Navbar link για Timesheets
 
-## Solution
+---
 
-### 1. Replace Sheet with Inline Resizable Panel
+## 1. Routing & Navigation
 
-Instead of a modal Sheet, the right panel will be part of the main layout flex container. When open, it pushes the main content area narrower (responsive).
+### App.tsx
+- Αλλαγή: `/timesheets` δείχνει σε `<Timesheets />` αντί για redirect στο HR
+- Αφαίρεση του redirect `/timesheets -> /hr?tab=timesheets`
+
+### HR.tsx
+- Αφαίρεση του Timesheets tab και του `TimesheetsContent` wrapper
+- Αφαίρεση του import `TimesheetsPage`
+
+### AppSidebar.tsx
+- Προσθήκη νέου nav item: `{ title: 'Timesheets', href: '/timesheets', icon: Timer }`
+
+---
+
+## 2. Weekly Grid View (Timesheet View)
+
+Νέο section στη σελίδα Timesheets, όπως η εικόνα αναφοράς:
 
 ```text
-┌─────────┬──────────────────────┬──────────────────┐
-│ Sidebar │   Main Content       │  Right Panel     │
-│         │   (shrinks when      │  (Secretary /    │
-│         │    panel opens)      │   Activity /     │
-│         │                      │   Notifications) │
-└─────────┴──────────────────────┴──────────────────┘
+< >  Φεβ 16 – Φεβ 22  v
+
+Task / Location          | Δευ 16 | Τρι 17 | Τετ 18 | Πεμ 19 | Παρ 20 | Σαβ 21 | Κυρ 22 | Total
+─────────────────────────┼────────┼────────┼────────┼────────┼────────┼────────┼────────┼──────
+Digitalisation           |   —    | 2h 44m | 1h 21m | 8h 55m | 4h 9m  |   —    |   —    | 17h 11m
+  On Going / Project X   |        |        |        |        |        |        |        |
+Audit Accounts           |   —    | 3h 17m | 6h 18m |   —    |   —    |   —    |   —    | 9h 35m
+  Open / Project Y       |        |        |        |        |        |        |        |
 ```
 
-- Uses `react-resizable-panels` (already installed)
-- Panel width: min 320px, max 600px, default ~400px
-- Resizable drag handle on left edge
-- Panel state (open/closed, width) saved to localStorage
-- Smooth transition when opening/closing
-- No overlay, no backdrop - everything stays interactive
+- Γραμμές = tasks (ομαδοποιημένα ανά project)
+- Στήλες = ημέρες της εβδομάδας
+- Κάθε κελί = σύνολο χρόνου για task+ημέρα
+- Click σε κελί = inline edit ή popover για προσθήκη/επεξεργασία χρόνου
+- Header στηλών: ημέρα + σύνολο ωρών ημέρας
+- Τελευταία στήλη: Total ανά task
+- Color bar στο header ανά ημέρα (progress indicator)
+- Play button ανά task row για εκκίνηση timer
+- Πλοήγηση εβδομάδας με < > βελάκια
 
-### 2. Unified Right Panel with Tabs
+---
 
-The panel header will have 3 tab options:
-- **Secretary** (Bot icon) - AI chat
-- **Activity** (Activity icon) - Global activity feed
-- **Notifications** (Bell icon) - Notification list
+## 3. Φίλτρα & Χρονικό Διάστημα
 
-Each tab shows its respective content. The panel remembers which tab was last active.
+### Προεπιλογές
+- Σήμερα, Αυτή την εβδομάδα, Αυτόν τον μήνα, Προηγούμενη εβδομάδα, Προηγούμενος μήνας
 
-### 3. Fix QuickAction Button
+### Custom Range
+- Date range picker (από - έως) για ελεύθερη επιλογή
 
-Move the FAB button so it doesn't overlap with the panel. When the panel is open, the FAB shifts left to stay within the main content area (using CSS transition or conditional positioning).
+### Ομαδοποίηση (Group By)
+- Ανά Έργο (default)
+- Ανά Άτομο
+- Ανά Task
+- Ανά Status
 
-## Files to Change
+### Φίλτρα
+- Έργο (dropdown)
+- Άτομο (dropdown, μόνο admin/manager)
+- Status (todo, in_progress, done, κλπ)
 
-| File | Change |
-|------|--------|
-| `src/components/layout/AppLayout.tsx` | Replace Sheet-based panel with inline ResizablePanel layout; manage panel state (open/tab) |
-| `src/components/secretary/SecretaryPanel.tsx` | Rewrite as a tabbed panel (Secretary + Activity + Notifications) without Sheet |
-| `src/components/layout/TopBar.tsx` | Update toggle buttons to open panel with specific tab |
-| `src/components/activity/GlobalActivityFeed.tsx` | Extract the content into a standalone component (remove Sheet wrapper) so it can be embedded in the panel |
-| `src/components/notifications/NotificationBell.tsx` | Keep the bell icon in TopBar but also create an inline notification list for the panel |
-| `src/components/layout/QuickActionButton.tsx` | Adjust positioning to avoid overlap with panel |
+---
 
-## Technical Details
+## 4. View Toggle
 
-### AppLayout Changes
-- Wrap main content + panel in `ResizablePanelGroup` (horizontal)
-- Main content is a `ResizablePanel` with `defaultSize={100}` (shrinks when panel opens)
-- Right panel is conditionally rendered `ResizablePanel` with `ResizableHandle`
-- State: `rightPanelOpen: boolean`, `activeTab: 'secretary' | 'activity' | 'notifications'`
+Δύο προβολές με toggle:
+- **Timesheet** (weekly grid) — η κύρια, σαν την εικόνα
+- **Time Entries** (list) — η βελτιωμένη τρέχουσα λίστα
 
-### Panel Header
-```text
-┌──────────────────────────────────────────┐
-│  [Secretary] [Activity] [Notifications] X│
-├──────────────────────────────────────────┤
-│  (content based on active tab)           │
-└──────────────────────────────────────────┘
-```
+---
 
-### TopBar Integration
-- Secretary button opens panel with "secretary" tab
-- Activity button opens panel with "activity" tab  
-- Notification bell opens panel with "notifications" tab
-- If panel is already open on that tab, clicking closes it (toggle)
+## 5. Inline Editing
 
-### Keyboard Shortcut
-- Cmd+J toggles Secretary panel (existing behavior preserved)
+Στη list view, κάθε καταχώρηση θα υποστηρίζει inline edit:
+- Ώρα έναρξης / λήξης
+- Σημειώσεις (description)
+- Task assignment
+- Project
 
-### localStorage Persistence
-- Key: `secretary-panel-open` (boolean)
-- Key: `secretary-panel-tab` (active tab)
+Στη timesheet (grid) view:
+- Click σε κελί ανοίγει popover για edit/add χρόνο
+
+---
+
+## Αρχεία που Αλλάζουν
+
+| Αρχείο | Αλλαγή |
+|--------|--------|
+| `src/pages/Timesheets.tsx` | **Rewrite** — Νέα σελίδα με view toggle, grid view, filters |
+| `src/pages/HR.tsx` | Αφαίρεση timesheets tab |
+| `src/App.tsx` | Route `/timesheets` -> `<Timesheets />` αντί redirect |
+| `src/components/layout/AppSidebar.tsx` | Νέο nav item Timesheets |
+| `src/components/time-tracking/TimesheetGridView.tsx` | **Νέο** — Weekly grid component |
+| `src/components/time-tracking/TimesheetFilters.tsx` | **Νέο** — Filters & date range |
+| `src/components/time-tracking/TimeEntriesListView.tsx` | **Νέο** — Βελτιωμένη list view με inline edit |
+
+---
+
+## Τεχνικές Σημειώσεις
+
+- Τα δεδομένα φορτώνονται από τον πίνακα `time_entries` με joins σε `tasks`, `projects`, `profiles`
+- Η grid view υπολογίζει aggregates client-side (group by task+day)
+- Inline edit χρησιμοποιεί το υπάρχον `EnhancedInlineEditCell` component
+- Realtime subscription για live updates παραμένει
+- Export CSV/Excel παραμένει
+- Η σελίδα δεν απαιτεί database migration — χρησιμοποιεί τους υπάρχοντες πίνακες

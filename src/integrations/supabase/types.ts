@@ -1807,6 +1807,51 @@ export type Database = {
           },
         ]
       }
+      project_folders: {
+        Row: {
+          color: string | null
+          company_id: string
+          created_at: string
+          id: string
+          name: string
+          parent_folder_id: string | null
+          sort_order: number
+        }
+        Insert: {
+          color?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          name: string
+          parent_folder_id?: string | null
+          sort_order?: number
+        }
+        Update: {
+          color?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          parent_folder_id?: string | null
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_folders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_folders_parent_folder_id_fkey"
+            columns: ["parent_folder_id"]
+            isOneToOne: false
+            referencedRelation: "project_folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_team_access: {
         Row: {
           created_at: string
@@ -2025,6 +2070,7 @@ export type Database = {
           created_at: string
           description: string | null
           end_date: string | null
+          folder_id: string | null
           id: string
           lost_reason: string | null
           metadata: Json | null
@@ -2047,6 +2093,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           end_date?: string | null
+          folder_id?: string | null
           id?: string
           lost_reason?: string | null
           metadata?: Json | null
@@ -2069,6 +2116,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           end_date?: string | null
+          folder_id?: string | null
           id?: string
           lost_reason?: string | null
           metadata?: Json | null
@@ -2096,6 +2144,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "project_folders"
             referencedColumns: ["id"]
           },
         ]

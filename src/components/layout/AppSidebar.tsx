@@ -49,6 +49,7 @@ import {
   Calendar,
   MessageSquare,
   BookUser,
+  Briefcase,
 } from 'lucide-react';
 import { briefDefinitions, getBriefDefinition } from '@/components/blueprints/briefDefinitions';
 import { BriefFormDialog } from '@/components/blueprints/BriefFormDialog';
@@ -56,6 +57,8 @@ import { BriefFormDialog } from '@/components/blueprints/BriefFormDialog';
 import { PermissionType } from '@/contexts/AuthContext';
 import olsenyLogo from '@/assets/olseny-logo.png';
 import { ActiveTimerIndicator } from '@/components/time-tracking/ActiveTimerIndicator';
+import { SidebarNavGroup, SidebarSubLink } from '@/components/layout/SidebarNavGroup';
+import { SidebarProjectTree } from '@/components/layout/SidebarProjectTree';
 
 interface NavItem {
   title: string;
@@ -69,22 +72,28 @@ const briefIcons: Record<string, React.ComponentType<{ className?: string }>> = 
   Palette, Monitor, FileText, Globe, Calendar, MessageSquare,
 };
 
-const navItems: NavItem[] = [
-{ title: 'My Work', href: '/my-work', icon: LayoutList },
-{ title: 'Dashboard', href: '/', icon: LayoutDashboard },
-{ title: 'Εργασίες', href: '/work', icon: FolderKanban, permission: 'projects.view' },
-{ title: 'Αρχείο', href: '/files', icon: FileArchive, permission: 'files.view' },
-{ title: 'Timesheets', href: '/timesheets', icon: Timer },
-{ title: 'Ευρετήριο', href: '/contacts', icon: BookUser },
-{ title: 'HR', href: '/hr', icon: UserCog },
-{ title: 'Λογιστήριο', href: '/financials', icon: DollarSign, permission: 'financials.view' },
-{ title: 'Αναφορές', href: '/reports', icon: BarChart3, permission: 'financials.view' }];
+// Items that go BEFORE the expandable Εργασίες group
+const topNavItems: NavItem[] = [
+  { title: 'My Work', href: '/my-work', icon: LayoutList },
+  { title: 'Dashboard', href: '/', icon: LayoutDashboard },
+];
+
+// Items that go AFTER the expandable Εργασίες group
+const bottomNavItems: NavItem[] = [
+  { title: 'Αρχείο', href: '/files', icon: FileArchive, permission: 'files.view' },
+  { title: 'Timesheets', href: '/timesheets', icon: Timer },
+  { title: 'Ευρετήριο', href: '/contacts', icon: BookUser },
+  { title: 'HR', href: '/hr', icon: UserCog },
+  { title: 'Λογιστήριο', href: '/financials', icon: DollarSign, permission: 'financials.view' },
+  { title: 'Αναφορές', href: '/reports', icon: BarChart3, permission: 'financials.view' },
+];
 
 
 const adminNavItems: NavItem[] = [
-{ title: 'Πελάτες', href: '/clients', icon: Building2, permission: 'clients.view' },
-{ title: 'Προσχέδια', href: '/blueprints', icon: FileStack, permission: 'settings.company' },
-{ title: 'Ρυθμίσεις', href: '/settings', icon: Settings, permission: 'settings.company' }];
+  { title: 'Πελάτες', href: '/clients', icon: Building2, permission: 'clients.view' },
+  { title: 'Προσχέδια', href: '/blueprints', icon: FileStack, permission: 'settings.company' },
+  { title: 'Ρυθμίσεις', href: '/settings', icon: Settings, permission: 'settings.company' },
+];
 
 
 export default function AppSidebar() {
@@ -178,7 +187,8 @@ export default function AppSidebar() {
 
       // Admin/Manager/Employee navigation
       <>
-            {navItems.filter(canAccess).map((item, index) =>
+            {/* Top nav items (My Work, Dashboard) */}
+            {topNavItems.filter(canAccess).map((item, index) =>
         <SidebarLink
           key={item.href}
           to={item.href}
@@ -188,10 +198,56 @@ export default function AppSidebar() {
           collapsed={collapsed && !isMobile}
           onClick={() => isMobile && setMobileOpen(false)}
           delay={index * 20} />
-
         )}
 
-            {/* Admin Section - Show if any admin nav item is accessible */}
+            {/* Εργασίες - Expandable group */}
+            <SidebarNavGroup
+              id="work"
+              icon={<Briefcase className="h-[18px] w-[18px]" />}
+              label="Εργασίες"
+              collapsed={collapsed && !isMobile}
+              isActive={location.pathname === '/work' || location.pathname.startsWith('/projects/') || location.pathname.startsWith('/tasks/')}
+            >
+              <SidebarSubLink
+                to="/work?tab=projects"
+                icon={<FolderKanban className="h-4 w-4" />}
+                label="Έργα"
+                active={location.pathname === '/work' && (!location.search || location.search.includes('tab=projects'))}
+                onClick={() => { navigate('/work?tab=projects'); isMobile && setMobileOpen(false); }}
+              />
+              {/* Project tree under Έργα */}
+              <SidebarProjectTree collapsed={collapsed && !isMobile} />
+
+              <SidebarSubLink
+                to="/work?tab=tasks"
+                icon={<CheckSquare className="h-4 w-4" />}
+                label="Tasks"
+                active={location.pathname === '/work' && location.search.includes('tab=tasks')}
+                onClick={() => { navigate('/work?tab=tasks'); isMobile && setMobileOpen(false); }}
+              />
+              <SidebarSubLink
+                to="/work?tab=calendar"
+                icon={<CalendarDays className="h-4 w-4" />}
+                label="Ημερολόγιο"
+                active={location.pathname === '/work' && location.search.includes('tab=calendar')}
+                onClick={() => { navigate('/work?tab=calendar'); isMobile && setMobileOpen(false); }}
+              />
+            </SidebarNavGroup>
+
+            {/* Bottom nav items */}
+            {bottomNavItems.filter(canAccess).map((item, index) =>
+        <SidebarLink
+          key={item.href}
+          to={item.href}
+          icon={<item.icon className="h-[18px] w-[18px]" />}
+          label={item.title}
+          active={location.pathname === item.href}
+          collapsed={collapsed && !isMobile}
+          onClick={() => isMobile && setMobileOpen(false)}
+          delay={(topNavItems.length + 4 + index) * 20} />
+        )}
+
+            {/* Admin Section */}
             {adminNavItems.some(canAccess) &&
         <>
                 <div className={cn(
@@ -214,8 +270,7 @@ export default function AppSidebar() {
             active={location.pathname === item.href}
             collapsed={collapsed && !isMobile}
             onClick={() => isMobile && setMobileOpen(false)}
-            delay={(navItems.length + index) * 20} />
-
+            delay={(topNavItems.length + bottomNavItems.length + 4 + index) * 20} />
           )}
               </>
         }

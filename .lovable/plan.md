@@ -1,133 +1,112 @@
 
-
-# Αναδιάρθρωση Sidebar Navigation & Project Folders
+# Drag & Drop Έργων, Bulk Actions & Sidebar Scroll
 
 ## Επισκόπηση
 
-Μετατροπή του sidebar σε **ιεραρχικό navigation** με expandable sections, αφαίρεση της Επισκόπησης, και δυνατότητα δημιουργίας φακέλων μέσα στα Έργα -- ένα σύστημα που θυμίζει file explorer.
+Τρεις βασικές βελτιώσεις: (1) drag & drop projects σε folders στο sidebar + "Move to folder" μέσα στο project detail, (2) bulk actions στη σελίδα Projects με multi-select (Ctrl/Cmd + Shift), (3) collapsible + scrollable project tree στο sidebar.
 
 ---
 
-## 1. Ιεραρχικό Sidebar Navigation
+## 1. Sidebar Project Tree -- Drag & Drop + Collapsible + Scroll
 
-### "Εργασίες" με υποσελίδες
-Το "Εργασίες" γίνεται expandable section στο sidebar:
+### Αλλαγές στο `SidebarProjectTree.tsx`:
 
-```text
-v Εργασίες
-    Έργα
-    Tasks
-    Ημερολόγιο
+**Drag & Drop:**
+- Wrap ολόκληρο το tree σε `DndContext` (from `@dnd-kit/core`)
+- Κάθε project item γίνεται draggable (`useSortable`)
+- Κάθε folder γίνεται droppable (`useDroppable`)
+- Η root περιοχή (χωρίς folder) είναι επίσης droppable target ("unfolder")
+- On drop: update `projects.folder_id` στη βάση και invalidate queries
+
+**Collapsible "Έργα" section:**
+- Το project tree (folders + projects) τυλίγεται σε collapsible container
+- Κλικ στο "Έργα" στο sidebar expand/collapse
+- Αποθήκευση state σε localStorage
+
+**Scroll με max height:**
+- `max-h-[300px] overflow-y-auto` στο container
+- Custom scrollbar styling (thin, subtle)
+- Δείχνει μέχρι ~10-12 projects, τα υπόλοιπα με scroll
+
+**Mutation:**
+```typescript
+const moveProject = useMutation({
+  mutationFn: async ({ projectId, folderId }: { projectId: string; folderId: string | null }) => {
+    await supabase.from('projects').update({ folder_id: folderId }).eq('id', projectId);
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['sidebar-projects'] });
+    toast.success('Το έργο μετακινήθηκε');
+  }
+});
 ```
 
-- Κλικ στο "Εργασίες" expand/collapse τα children
-- Κλικ στο "Έργα" πηγαίνει στο `/work?tab=projects`
-- Κλικ στο "Tasks" πηγαίνει στο `/work?tab=tasks`
-- Κλικ στο "Ημερολόγιο" πηγαίνει στο `/work?tab=calendar`
-- Αφαίρεση του tab "Επισκόπηση" από τη σελίδα Work
+---
 
-### "Έργα" με live project tree
-Μέσα στο sub-item "Έργα", τα ενεργά projects εμφανίζονται σαν tree nodes:
+## 2. "Move to Folder" μέσα στο Project Detail
 
-```text
-v Εργασίες
-    v Έργα
-        [+] Νέος Φάκελος
-        v Cosmote
-            Cosmote Rebranding
-            Cosmote SEO
-        Alpha Bank App Launch
-        EDYTE
-    Tasks
-    Ημερολόγιο
-```
+### Αλλαγές στο `ProjectDetail.tsx`:
 
-- Κλικ σε project navigates στο `/projects/:id`
-- Φάκελοι ομαδοποιούν projects (π.χ. ανά πελάτη ή θεματικά)
-- Drag & drop projects μέσα σε φακέλους
-- Context menu (δεξί κλικ / "...") για μετονομασία/διαγραφή φακέλου
+- Προσθήκη dropdown "Μετακίνηση σε φάκελο" στο header (δίπλα στο status)
+- Fetch τους project_folders
+- Select φάκελο ή "Χωρίς φάκελο"
+- Update `folder_id` στη βάση
+- Ίδιο dropdown και στο `ProjectInfoEditor.tsx`
 
 ---
 
-## 2. Database -- Project Folders
+## 3. Bulk Actions στη σελίδα Projects
 
-### Νέος πίνακας `project_folders`
+### Αλλαγές στο `ProjectsTableView.tsx`:
 
-| Στήλη | Τύπος | Περιγραφή |
-|-------|-------|-----------|
-| id | uuid PK | |
-| company_id | uuid | |
-| parent_folder_id | uuid, nullable | Για nested folders |
-| name | text | Όνομα φακέλου |
-| color | text, nullable | Χρώμα εικονιδίου |
-| sort_order | integer, default 0 | Σειρά εμφάνισης |
-| created_at | timestamptz | |
+**Multi-select:**
+- Checkbox στήλη στην αρχή κάθε row
+- "Select All" checkbox στο header
+- Ctrl/Cmd + Click: toggle individual selection
+- Shift + Click: range selection (απο τελευταίο selected ως current)
+- State: `selectedIds: Set<string>`
 
-### Νέα στήλη στο `projects`
+**Bulk Actions Toolbar:**
+- Εμφανίζεται πάνω από τον πίνακα όταν `selectedIds.size > 0`
+- Ενέργειες:
+  - **Μετακίνηση σε Φάκελο**: Dialog με select folder
+  - **Αλλαγή Status**: Dialog (χρήση `BulkActionsDialog` pattern)
+  - **Διαγραφή**: Confirmation dialog
+- Design: Floating bar "X επιλεγμένα | [Move] [Status] [Delete]"
 
-| Στήλη | Τύπος | Περιγραφή |
-|-------|-------|-----------|
-| folder_id | uuid, nullable FK -> project_folders | Σε ποιον φάκελο ανήκει |
+**Keyboard shortcuts:**
+- `Ctrl/Cmd + A`: select all visible
+- `Escape`: clear selection
 
-### RLS
-- SELECT: active users στο ίδιο company
-- INSERT/UPDATE/DELETE: admin/manager
-
----
-
-## 3. Sidebar Component -- Collapsible Nav
-
-### Νέο component: `SidebarNavGroup`
-Αντικαθιστά το flat `SidebarLink` για items με children:
-
-- Chevron icon (expand/collapse)
-- Expanded state αποθηκεύεται στο localStorage
-- Indentation ανά επίπεδο (padding-left)
-- Active state: highlight αν κάποιο child route είναι active
-
-### Νέο component: `SidebarProjectTree`
-Μικρό tree μέσα στο sidebar που φορτώνει:
-- `project_folders` (ιεραρχικά)
-- `projects` (ενεργά, grouped by folder)
-- Inline "+" για νέο φάκελο
-- Context menu για rename/delete/move
+### Νέο component: `ProjectBulkActions.tsx`
+Toolbar component με τα bulk action buttons.
 
 ---
 
-## 4. Work Page -- Αφαίρεση Επισκόπησης
+## 4. Αλλαγές στο `SidebarNavGroup` / `AppSidebar`
 
-- Αφαίρεση του tab "Επισκόπηση" και του `WorkOverview` component
-- Τα tabs γίνονται 3: Έργα, Tasks, Ημερολόγιο
-- Αφαίρεση header/subtitle (αφού πλέον η πλοήγηση γίνεται από sidebar)
-
----
-
-## 5. Προτεινόμενες Επιπλέον Λειτουργίες
-
-1. **Pinned Projects**: Δυνατότητα "pin" αγαπημένων projects που εμφανίζονται πάντα στην κορυφή του tree
-2. **Αυτόματη ομαδοποίηση**: Επιλογή "Group by Client" που δημιουργεί αυτόματα φακέλους ανά πελάτη
-3. **Badge counts**: Μικρά badges δίπλα σε κάθε sub-item (π.χ. "Tasks (5)" για εκκρεμή tasks)
-4. **Drag & drop reorder**: Αναδιάταξη projects και folders με drag
+### "Έργα" sub-link γίνεται collapsible:
+- Κλικ στο "Έργα" εναλλάσσει expand/collapse του project tree κάτω από αυτό
+- Ξεχωριστό expand state για τα "Έργα" (ανεξάρτητο από το "Εργασίες" group)
 
 ---
 
-## Αρχεία που Δημιουργούνται / Αλλάζουν
+## Αρχεία που αλλάζουν
 
 | Αρχείο | Αλλαγή |
 |--------|--------|
-| **Migration SQL** | Πίνακας `project_folders` + στήλη `projects.folder_id` + RLS |
-| `src/components/layout/AppSidebar.tsx` | Ιεραρχικό nav με collapsible groups |
-| `src/components/layout/SidebarNavGroup.tsx` | **Νέο** -- Expandable nav group component |
-| `src/components/layout/SidebarProjectTree.tsx` | **Νέο** -- Project tree με folders |
-| `src/pages/Work.tsx` | Αφαίρεση Επισκόπησης tab |
-| `src/App.tsx` | Cleanup routes αν χρειαστεί |
+| `src/components/layout/SidebarProjectTree.tsx` | DnD context, droppable folders, draggable projects, max-height scroll, collapsible |
+| `src/components/projects/ProjectsTableView.tsx` | Checkbox column, multi-select logic (Ctrl/Shift), bulk actions toolbar |
+| `src/components/projects/ProjectBulkActions.tsx` | **Νεο** -- Bulk actions bar (Move, Status, Delete) |
+| `src/pages/ProjectDetail.tsx` | "Move to Folder" dropdown στο header |
+| `src/components/layout/AppSidebar.tsx` | Minor: Κάνει το "Έργα" link collapsible toggle για το tree |
 
 ---
 
-## Τεχνικές Σημειώσεις
+## Τεχνικες σημειώσεις
 
-- Τα expanded states του sidebar αποθηκεύονται σε localStorage (`sidebar-expanded-groups`)
-- Το project tree φορτώνει μόνο active/lead/proposal projects (όχι completed/lost) για να μην είναι υπερβολικά μεγάλο
-- Σε collapsed sidebar, τα sub-items εμφανίζονται ως popover/tooltip
-- Η αναζήτηση projects στο sidebar γίνεται client-side (filter στα ήδη φορτωμένα)
-
+- Χρήση ήδη εγκατεστημένου `@dnd-kit/core` και `@dnd-kit/sortable` για drag & drop
+- Η multi-select λογική (Shift range) κρατά `lastSelectedIndex` ref
+- Τα bulk updates γίνονται σε batch: ένα query per action (π.χ. `.in('id', [...selectedIds])`)
+- Η "Move to Folder" dialog χρησιμοποιεί τα ίδια `project_folders` data (ήδη cached)
+- Scroll area: native CSS `overflow-y: auto` με thin scrollbar styling

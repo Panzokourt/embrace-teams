@@ -349,16 +349,17 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
   // --- AUTO MODE ---
   if (mode === 'auto') {
     // Build hierarchy: category > client > projects
-    const categoryMap = new Map<string, { color: string | null; clients: Map<string, ProjectItem[]> }>();
+    // Use ALL sectors found in data, not just project_categories
+    const categoryLookup = new Map<string, { color: string | null; sortOrder: number }>();
+    categories.forEach(cat => {
+      categoryLookup.set(cat.name, { color: cat.color, sortOrder: cat.sort_order });
+    });
+
+    const dynamicCategories = new Map<string, { color: string | null; sortOrder: number; clients: Map<string, ProjectItem[]> }>();
     const uncategorized: { clients: Map<string, ProjectItem[]>; orphans: ProjectItem[] } = {
       clients: new Map(),
       orphans: [],
     };
-
-    // Init category buckets
-    categories.forEach(cat => {
-      categoryMap.set(cat.name, { color: cat.color, clients: new Map() });
-    });
 
     projects.forEach(project => {
       if (!project.client) {
@@ -367,15 +368,31 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
       }
       const clientName = project.client.name;
       const categoryName = sectorToCategory(project.client.sector);
-      if (categoryName && categoryMap.has(categoryName)) {
-        const cat = categoryMap.get(categoryName)!;
-        if (!cat.clients.has(clientName)) cat.clients.set(clientName, []);
-        cat.clients.get(clientName)!.push(project);
-      } else {
+
+      if (!categoryName) {
+        // Client has no sector
         if (!uncategorized.clients.has(clientName)) uncategorized.clients.set(clientName, []);
         uncategorized.clients.get(clientName)!.push(project);
+        return;
       }
+
+      // Get or create dynamic category bucket
+      if (!dynamicCategories.has(categoryName)) {
+        const defined = categoryLookup.get(categoryName);
+        dynamicCategories.set(categoryName, {
+          color: defined?.color || '#6B7280',
+          sortOrder: defined?.sortOrder ?? 999,
+          clients: new Map(),
+        });
+      }
+      const cat = dynamicCategories.get(categoryName)!;
+      if (!cat.clients.has(clientName)) cat.clients.set(clientName, []);
+      cat.clients.get(clientName)!.push(project);
     });
+
+    // Sort categories: defined ones first (by sortOrder), then dynamic ones alphabetically
+    const sortedCategories = Array.from(dynamicCategories.entries())
+      .sort((a, b) => a[1].sortOrder - b[1].sortOrder || a[0].localeCompare(b[0]));
 
     return (
       <div className="space-y-0.5 mt-1">
@@ -397,12 +414,11 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
         </div>
 
         <div className="max-h-[50vh] overflow-y-auto space-y-0.5 scrollbar-thin">
-          {categories.map(cat => {
-            const bucket = categoryMap.get(cat.name);
-            if (!bucket || bucket.clients.size === 0) return null;
+          {sortedCategories.map(([catName, catData]) => {
+            if (catData.clients.size === 0) return null;
             return (
-              <VirtualFolder key={cat.id} name={cat.name} color={cat.color}>
-                {Array.from(bucket.clients.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([clientName, clientProjects]) => (
+              <VirtualFolder key={catName} name={catName} color={catData.color}>
+                {Array.from(catData.clients.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([clientName, clientProjects]) => (
                   <VirtualFolder key={clientName} name={clientName}>
                     {clientProjects.map(p => (
                       <ProjectLink key={p.id} project={p} isActive={currentProjectId === p.id} />

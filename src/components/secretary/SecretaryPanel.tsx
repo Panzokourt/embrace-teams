@@ -1,12 +1,13 @@
 import { useEffect } from "react";
-import { Bot, Activity, Bell, X } from "lucide-react";
+import { Bot, Activity, Bell, MessageSquare, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import SecretaryChat from "./SecretaryChat";
 import { ActivityFeedContent } from "@/components/activity/ActivityFeedContent";
 import { NotificationList } from "@/components/notifications/NotificationList";
+import ChatPanelView from "@/components/chat/ChatPanelView";
 
-export type RightPanelTab = "secretary" | "activity" | "notifications";
+export type RightPanelTab = "secretary" | "activity" | "notifications" | "chat";
 
 interface SecretaryPanelProps {
   activeTab: RightPanelTab;
@@ -18,6 +19,7 @@ const tabs = [
   { id: "secretary" as const, label: "Secretary", icon: Bot },
   { id: "activity" as const, label: "Activity", icon: Activity },
   { id: "notifications" as const, label: "Ειδοποιήσεις", icon: Bell },
+  { id: "chat" as const, label: "Chat", icon: MessageSquare },
 ];
 
 export default function SecretaryPanel({ activeTab, onTabChange, onClose }: SecretaryPanelProps) {
@@ -62,6 +64,7 @@ export default function SecretaryPanel({ activeTab, onTabChange, onClose }: Secr
         {activeTab === "secretary" && <SecretaryChat mode="panel" />}
         {activeTab === "activity" && <ActivityFeedContent active />}
         {activeTab === "notifications" && <NotificationList active />}
+        {activeTab === "chat" && <ChatPanelView />}
       </div>
     </div>
   );

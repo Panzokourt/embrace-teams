@@ -80,6 +80,7 @@ const topNavItems: NavItem[] = [
 
 // Items that go AFTER the expandable Εργασίες group
 const bottomNavItems: NavItem[] = [
+  { title: 'Chat', href: '/chat', icon: MessageSquare },
   { title: 'Αρχείο', href: '/files', icon: FileArchive, permission: 'files.view' },
   { title: 'Timesheets', href: '/timesheets', icon: Timer },
   { title: 'Ευρετήριο', href: '/contacts', icon: BookUser },

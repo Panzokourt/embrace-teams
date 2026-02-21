@@ -6,6 +6,7 @@ import TopBar from './TopBar';
 import SecretaryPanel, { type RightPanelTab } from '@/components/secretary/SecretaryPanel';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { Loader2 } from 'lucide-react';
+import ChatFloatingBubbles from '@/components/chat/ChatFloatingBubbles';
 
 const PANEL_OPEN_KEY = 'secretary-panel-open';
 const PANEL_TAB_KEY = 'secretary-panel-tab';
@@ -121,6 +122,9 @@ export default function AppLayout() {
           </>
         )}
       </ResizablePanelGroup>
+
+      {/* Floating Messenger-style chat windows */}
+      <ChatFloatingBubbles />
     </div>
   );
 }

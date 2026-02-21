@@ -31,8 +31,10 @@ import WorkspaceSelector from "@/pages/WorkspaceSelector";
 import AcceptInvite from "@/pages/AcceptInvite";
 import OrganizationSettings from "@/pages/OrganizationSettings";
 import Secretary from "@/pages/Secretary";
+import Chat from "@/pages/Chat";
 import Contacts from "@/pages/Contacts";
 import ContactDetail from "@/pages/ContactDetail";
+import { ChatProvider } from "@/contexts/ChatContext";
 
 function RedirectUserToEmployee() {
   const { id } = useParams();
@@ -49,46 +51,49 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
-            <Routes>
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/onboarding" element={<Onboarding />} />
-              <Route path="/select-workspace" element={<WorkspaceSelector />} />
-              <Route path="/accept-invite/:token" element={<AcceptInvite />} />
-              <Route path="/accept-invite" element={<AcceptInvite />} />
-              <Route element={<AppLayout />}>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/my-work" element={<MyWork />} />
-                <Route path="/work" element={<Work />} />
-                <Route path="/projects" element={<Navigate to="/work?tab=projects" replace />} />
-                <Route path="/projects/:id" element={<ProjectDetail />} />
-                <Route path="/tasks/:id" element={<TaskDetail />} />
-                <Route path="/tasks" element={<Navigate to="/work?tab=tasks" replace />} />
-                <Route path="/tenders" element={<Navigate to="/work?tab=projects" replace />} />
-                <Route path="/tenders/:id" element={<Navigate to="/work?tab=projects" replace />} />
-                <Route path="/financials" element={<Financials />} />
-                <Route path="/reports" element={<Reports />} />
-                <Route path="/clients" element={<Clients />} />
-                <Route path="/clients/:id" element={<ClientDetail />} />
-                <Route path="/hr" element={<HR />} />
-                <Route path="/hr/employee/:id" element={<EmployeeProfile />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/settings/organization" element={<OrganizationSettings />} />
-                <Route path="/calendar" element={<Navigate to="/work?tab=calendar" replace />} />
-                <Route path="/files" element={<Files />} />
-                <Route path="/blueprints" element={<Blueprints />} />
-                <Route path="/secretary" element={<Secretary />} />
-                <Route path="/contacts" element={<Contacts />} />
-                <Route path="/contacts/:id" element={<ContactDetail />} />
-                {/* Redirects from old routes */}
-                <Route path="/users" element={<Navigate to="/hr?tab=staff" replace />} />
-                <Route path="/users/:id" element={<RedirectUserToEmployee />} />
-                <Route path="/teams" element={<Navigate to="/hr?tab=staff" replace />} />
-                <Route path="/departments" element={<Navigate to="/hr?tab=departments" replace />} />
-                <Route path="/org-chart" element={<Navigate to="/hr?tab=orgchart" replace />} />
-                <Route path="/timesheets" element={<Timesheets />} />
-              </Route>
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <ChatProvider>
+              <Routes>
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/onboarding" element={<Onboarding />} />
+                <Route path="/select-workspace" element={<WorkspaceSelector />} />
+                <Route path="/accept-invite/:token" element={<AcceptInvite />} />
+                <Route path="/accept-invite" element={<AcceptInvite />} />
+                <Route element={<AppLayout />}>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/my-work" element={<MyWork />} />
+                  <Route path="/work" element={<Work />} />
+                  <Route path="/projects" element={<Navigate to="/work?tab=projects" replace />} />
+                  <Route path="/projects/:id" element={<ProjectDetail />} />
+                  <Route path="/tasks/:id" element={<TaskDetail />} />
+                  <Route path="/tasks" element={<Navigate to="/work?tab=tasks" replace />} />
+                  <Route path="/tenders" element={<Navigate to="/work?tab=projects" replace />} />
+                  <Route path="/tenders/:id" element={<Navigate to="/work?tab=projects" replace />} />
+                  <Route path="/financials" element={<Financials />} />
+                  <Route path="/reports" element={<Reports />} />
+                  <Route path="/clients" element={<Clients />} />
+                  <Route path="/clients/:id" element={<ClientDetail />} />
+                  <Route path="/hr" element={<HR />} />
+                  <Route path="/hr/employee/:id" element={<EmployeeProfile />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/settings/organization" element={<OrganizationSettings />} />
+                  <Route path="/calendar" element={<Navigate to="/work?tab=calendar" replace />} />
+                  <Route path="/files" element={<Files />} />
+                  <Route path="/blueprints" element={<Blueprints />} />
+                  <Route path="/secretary" element={<Secretary />} />
+                  <Route path="/chat" element={<Chat />} />
+                  <Route path="/contacts" element={<Contacts />} />
+                  <Route path="/contacts/:id" element={<ContactDetail />} />
+                  {/* Redirects from old routes */}
+                  <Route path="/users" element={<Navigate to="/hr?tab=staff" replace />} />
+                  <Route path="/users/:id" element={<RedirectUserToEmployee />} />
+                  <Route path="/teams" element={<Navigate to="/hr?tab=staff" replace />} />
+                  <Route path="/departments" element={<Navigate to="/hr?tab=departments" replace />} />
+                  <Route path="/org-chart" element={<Navigate to="/hr?tab=orgchart" replace />} />
+                  <Route path="/timesheets" element={<Timesheets />} />
+                </Route>
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </ChatProvider>
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>

@@ -1598,6 +1598,7 @@ export type Database = {
           reports_to: string | null
           status: Database["public"]["Enums"]["user_status"]
           updated_at: string
+          work_status: string
         }
         Insert: {
           avatar_url?: string | null
@@ -1613,6 +1614,7 @@ export type Database = {
           reports_to?: string | null
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
+          work_status?: string
         }
         Update: {
           avatar_url?: string | null
@@ -1628,6 +1630,7 @@ export type Database = {
           reports_to?: string | null
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
+          work_status?: string
         }
         Relationships: [
           {
@@ -3055,6 +3058,117 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      work_day_logs: {
+        Row: {
+          actual_minutes: number
+          auto_started: boolean
+          clock_in: string
+          clock_out: string | null
+          company_id: string
+          created_at: string
+          date: string
+          id: string
+          notes: string | null
+          scheduled_minutes: number
+          status: string
+          user_id: string
+        }
+        Insert: {
+          actual_minutes?: number
+          auto_started?: boolean
+          clock_in?: string
+          clock_out?: string | null
+          company_id: string
+          created_at?: string
+          date?: string
+          id?: string
+          notes?: string | null
+          scheduled_minutes?: number
+          status?: string
+          user_id: string
+        }
+        Update: {
+          actual_minutes?: number
+          auto_started?: boolean
+          clock_in?: string
+          clock_out?: string | null
+          company_id?: string
+          created_at?: string
+          date?: string
+          id?: string
+          notes?: string | null
+          scheduled_minutes?: number
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_day_logs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_day_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_schedules: {
+        Row: {
+          company_id: string
+          created_at: string
+          day_of_week: number
+          end_time: string
+          id: string
+          is_working_day: boolean
+          start_time: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          day_of_week: number
+          end_time?: string
+          id?: string
+          is_working_day?: boolean
+          start_time?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          is_working_day?: boolean
+          start_time?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_schedules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_schedules_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

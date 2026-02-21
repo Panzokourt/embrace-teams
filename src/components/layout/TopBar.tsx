@@ -6,6 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import WorkDayClock from '@/components/topbar/WorkDayClock';
 
 interface SearchResult {
   id: string;
@@ -95,7 +96,12 @@ export default function TopBar({ onPanelToggle, rightPanelOpen }: TopBarProps) {
   }, {});
 
   return (
-    <div className="sticky top-0 z-20 h-14 gap-2 border-b bg-background/80 backdrop-blur-lg md:px-6 mx-0 flex items-center justify-center my-0 px-0 py-[10px]">
+    <div className="sticky top-0 z-20 h-14 gap-2 border-b bg-background/80 backdrop-blur-lg md:px-6 mx-0 flex items-center justify-center my-0 px-2 py-[10px]">
+      {/* Work Day Clock */}
+      <WorkDayClock />
+
+      <div className="hidden md:block w-px h-5 bg-border" />
+
       {/* Search */}
       <div className="flex-1 max-w-xl">
         <Popover open={searchOpen} onOpenChange={setSearchOpen}>

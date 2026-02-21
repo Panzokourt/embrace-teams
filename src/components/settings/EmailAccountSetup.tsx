@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEmailAccount, PROVIDER_PRESETS } from '@/hooks/useEmailAccount';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,7 +30,7 @@ export function EmailAccountSetup() {
   });
 
   // Sync form from account when loaded
-  useState(() => {
+  useEffect(() => {
     if (account) {
       setForm({
         email_address: account.email_address || '',
@@ -44,7 +44,7 @@ export function EmailAccountSetup() {
         use_tls: account.use_tls ?? true,
       });
     }
-  });
+  }, [account]);
 
   const applyPreset = (provider: string) => {
     const preset = PROVIDER_PRESETS[provider];

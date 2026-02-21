@@ -109,10 +109,12 @@ export function useEmailMessages(accountId: string | null) {
         body: { account_id: accountId },
       });
       if (res.error) {
-        toast.error('Σφάλμα συγχρονισμού');
+        toast.error('Σφάλμα συγχρονισμού: ' + (res.error as any)?.message);
+      } else if (res.data?.success === false) {
+        toast.error(res.data.error || 'Σφάλμα συγχρονισμού');
       } else {
         await fetchMessages();
-        toast.success('Τα emails συγχρονίστηκαν');
+        toast.success(res.data?.message || `Συγχρονίστηκαν ${res.data?.count || 0} emails`);
       }
     } catch {
       toast.error('Σφάλμα συγχρονισμού');

@@ -73,6 +73,7 @@ const navItems: NavItem[] = [
 { title: 'Dashboard', href: '/', icon: LayoutDashboard },
 { title: 'Εργασίες', href: '/work', icon: FolderKanban, permission: 'projects.view' },
 { title: 'Αρχείο', href: '/files', icon: FileArchive, permission: 'files.view' },
+{ title: 'Timesheets', href: '/timesheets', icon: Timer },
 { title: 'HR', href: '/hr', icon: UserCog },
 { title: 'Λογιστήριο', href: '/financials', icon: DollarSign, permission: 'financials.view' },
 { title: 'Αναφορές', href: '/reports', icon: BarChart3, permission: 'financials.view' }];

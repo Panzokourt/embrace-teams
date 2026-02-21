@@ -3,40 +3,67 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTimeTracking, TimeEntry } from '@/hooks/useTimeTracking';
 import { TimeEntryForm } from '@/components/time-tracking/TimeEntryForm';
+import { TimesheetFilters, DatePreset, GroupBy } from '@/components/time-tracking/TimesheetFilters';
+import { TimesheetGridView } from '@/components/time-tracking/TimesheetGridView';
+import { TimeEntriesListView } from '@/components/time-tracking/TimeEntriesListView';
 import { exportToCSV, exportToExcel } from '@/utils/exportUtils';
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow
-} from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
-} from '@/components/ui/select';
-import {
-  Timer, Trash2, Download, Loader2, Clock
-} from 'lucide-react';
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, parseISO, isWithinInterval } from 'date-fns';
-import { el } from 'date-fns/locale';
+import { Loader2, Download, Timer, LayoutGrid, List } from 'lucide-react';
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfDay, endOfDay, parseISO, isWithinInterval, subWeeks, subMonths, format } from 'date-fns';
 import { toast } from 'sonner';
 
-type ViewMode = 'day' | 'week' | 'month';
+type ViewMode = 'grid' | 'list';
 
 interface Project { id: string; name: string; }
 interface Task { id: string; title: string; project_id: string; }
 
 export default function Timesheets() {
   const { user, isAdmin, isManager } = useAuth();
-  const { addManualEntry, deleteEntry } = useTimeTracking();
+  const { addManualEntry, deleteEntry, startTimer } = useTimeTracking();
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>('week');
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [users, setUsers] = useState<{ id: string; full_name: string | null }[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+
+  // Filter state
+  const [datePreset, setDatePreset] = useState<DatePreset>('this_week');
+  const [dateRange, setDateRange] = useState(() => {
+    const now = new Date();
+    return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) };
+  });
+  const [groupBy, setGroupBy] = useState<GroupBy>('project');
   const [filterProject, setFilterProject] = useState('all');
   const [filterUser, setFilterUser] = useState('all');
-  const [users, setUsers] = useState<{ id: string; full_name: string | null }[]>([]);
+
+  const handleDatePresetChange = (preset: DatePreset) => {
+    setDatePreset(preset);
+    const now = new Date();
+    switch (preset) {
+      case 'today':
+        setDateRange({ start: startOfDay(now), end: endOfDay(now) });
+        break;
+      case 'this_week':
+        setDateRange({ start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) });
+        break;
+      case 'this_month':
+        setDateRange({ start: startOfMonth(now), end: endOfMonth(now) });
+        break;
+      case 'last_week': {
+        const lw = subWeeks(now, 1);
+        setDateRange({ start: startOfWeek(lw, { weekStartsOn: 1 }), end: endOfWeek(lw, { weekStartsOn: 1 }) });
+        break;
+      }
+      case 'last_month': {
+        const lm = subMonths(now, 1);
+        setDateRange({ start: startOfMonth(lm), end: endOfMonth(lm) });
+        break;
+      }
+      case 'custom':
+        break;
+    }
+  };
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -45,7 +72,7 @@ export default function Timesheets() {
       const [entriesRes, projectsRes, tasksRes, usersRes] = await Promise.all([
         supabase
           .from('time_entries')
-          .select('*, task:tasks(title), project:projects(name)')
+          .select('*, task:tasks(title), project:projects(name), profile:profiles(full_name)')
           .order('start_time', { ascending: false }),
         supabase.from('projects').select('id, name'),
         supabase.from('tasks').select('id, title, project_id'),
@@ -75,13 +102,6 @@ export default function Timesheets() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchData]);
 
-  const dateRange = useMemo(() => {
-    const d = parseISO(selectedDate);
-    if (viewMode === 'day') return { start: d, end: d };
-    if (viewMode === 'week') return { start: startOfWeek(d, { weekStartsOn: 1 }), end: endOfWeek(d, { weekStartsOn: 1 }) };
-    return { start: startOfMonth(d), end: endOfMonth(d) };
-  }, [selectedDate, viewMode]);
-
   const filteredEntries = useMemo(() => {
     return entries.filter(e => {
       const entryDate = parseISO(e.start_time);
@@ -93,8 +113,6 @@ export default function Timesheets() {
   }, [entries, dateRange, filterProject, filterUser]);
 
   const totalMinutes = filteredEntries.reduce((s, e) => s + (e.duration_minutes || 0), 0);
-  const totalHours = Math.floor(totalMinutes / 60);
-  const totalMins = totalMinutes % 60;
 
   const handleManualEntry = async (entry: any) => {
     await addManualEntry(entry);
@@ -136,12 +154,35 @@ export default function Timesheets() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2">
-            <Timer className="h-6 w-6 text-primary" />
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Timer className="h-5 w-5 text-primary" />
+            </div>
             Timesheets
           </h1>
           <p className="text-muted-foreground text-sm mt-1">Καταγραφή & διαχείριση χρόνου εργασίας</p>
         </div>
         <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex items-center border border-border rounded-lg overflow-hidden">
+            <Button
+              variant={viewMode === 'grid' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-none gap-1.5 h-8"
+              onClick={() => setViewMode('grid')}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Timesheet
+            </Button>
+            <Button
+              variant={viewMode === 'list' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-none gap-1.5 h-8"
+              onClick={() => setViewMode('list')}
+            >
+              <List className="h-3.5 w-3.5" />
+              Λίστα
+            </Button>
+          </div>
           <TimeEntryForm projects={projects} tasks={tasks} onSubmit={handleManualEntry} />
           <Button variant="outline" size="sm" onClick={() => handleExport('csv')} className="gap-2">
             <Download className="h-4 w-4" /> CSV
@@ -153,102 +194,41 @@ export default function Timesheets() {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <Input
-          type="date"
-          value={selectedDate}
-          onChange={e => setSelectedDate(e.target.value)}
-          className="w-44"
-        />
-        <Select value={viewMode} onValueChange={(v: ViewMode) => setViewMode(v)}>
-          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="day">Ημέρα</SelectItem>
-            <SelectItem value="week">Εβδομάδα</SelectItem>
-            <SelectItem value="month">Μήνας</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={filterProject} onValueChange={setFilterProject}>
-          <SelectTrigger className="w-44"><SelectValue placeholder="Όλα τα έργα" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Όλα τα έργα</SelectItem>
-            {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        {(isAdmin || isManager) && users.length > 0 && (
-          <Select value={filterUser} onValueChange={setFilterUser}>
-            <SelectTrigger className="w-44"><SelectValue placeholder="Όλοι οι χρήστες" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Όλοι</SelectItem>
-              {users.map(u => <SelectItem key={u.id} value={u.id}>{u.full_name || 'Χωρίς όνομα'}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        )}
-        <Badge variant="secondary" className="text-sm gap-1.5 py-1.5 px-3">
-          <Clock className="h-3.5 w-3.5" />
-          Σύνολο: {totalHours}ω {totalMins}λ
-        </Badge>
-      </div>
+      <TimesheetFilters
+        datePreset={datePreset}
+        onDatePresetChange={handleDatePresetChange}
+        dateRange={dateRange}
+        onDateRangeChange={setDateRange}
+        groupBy={groupBy}
+        onGroupByChange={setGroupBy}
+        filterProject={filterProject}
+        onFilterProjectChange={setFilterProject}
+        filterUser={filterUser}
+        onFilterUserChange={setFilterUser}
+        projects={projects}
+        users={users}
+        showUserFilter={isAdmin || isManager}
+        totalMinutes={totalMinutes}
+      />
 
-      {/* Table */}
-      <div className="rounded-xl border border-border/50 bg-card/50">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Ημερομηνία</TableHead>
-              <TableHead>Ώρες</TableHead>
-              <TableHead>Διάρκεια</TableHead>
-              <TableHead>Έργο</TableHead>
-              <TableHead>Task</TableHead>
-              {(isAdmin || isManager) && <TableHead>Χρήστης</TableHead>}
-              <TableHead>Σημειώσεις</TableHead>
-              <TableHead className="w-12"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredEntries.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={(isAdmin || isManager) ? 8 : 7} className="text-center text-muted-foreground py-12">
-                  Δεν βρέθηκαν καταχωρήσεις
-                </TableCell>
-              </TableRow>
-            ) : filteredEntries.map(entry => (
-              <TableRow key={entry.id}>
-                <TableCell className="text-sm">
-                  {format(parseISO(entry.start_time), 'dd MMM yyyy', { locale: el })}
-                </TableCell>
-                <TableCell className="text-sm font-mono">
-                  {format(parseISO(entry.start_time), 'HH:mm')}
-                  {' → '}
-                  {entry.end_time ? format(parseISO(entry.end_time), 'HH:mm') : (
-                    <span className="text-primary animate-pulse">τρέχει</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline" className="font-mono">
-                    {entry.is_running ? '...' : `${Math.floor(entry.duration_minutes / 60)}ω ${entry.duration_minutes % 60}λ`}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-sm">{(entry as any).project?.name || '-'}</TableCell>
-                <TableCell className="text-sm">{(entry as any).task?.title || '-'}</TableCell>
-                {(isAdmin || isManager) && (
-                  <TableCell className="text-sm">{users.find(u => u.id === entry.user_id)?.full_name || '-'}</TableCell>
-                )}
-                <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
-                  {entry.description || '-'}
-                </TableCell>
-                <TableCell>
-                  {!entry.is_running && (
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(entry.id)}>
-                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      {/* Content */}
+      {viewMode === 'grid' ? (
+        <TimesheetGridView
+          entries={filteredEntries}
+          dateRange={dateRange}
+          groupBy={groupBy}
+          onStartTimer={startTimer}
+          onRefresh={fetchData}
+        />
+      ) : (
+        <TimeEntriesListView
+          entries={filteredEntries}
+          users={users}
+          showUserColumn={isAdmin || isManager}
+          onDelete={handleDelete}
+          onRefresh={fetchData}
+        />
+      )}
     </div>
   );
 }

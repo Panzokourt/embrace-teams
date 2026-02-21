@@ -1,148 +1,170 @@
 
 
-# Chat: Missing Features Implementation
+# Inbox -- Email Integration (IMAP/SMTP)
 
-## 1. Auto-creation of Project Channels
+## Overview
 
-When a project exists (or is created), automatically create a corresponding chat channel with the project team members.
-
-### Approach
-- Create a database trigger function `auto_create_project_channel` that fires on INSERT to `projects` table
-  - Creates a `chat_channel` with `type='public'`, `project_id` set, name = project name
-  - Adds the project creator as channel owner
-- Create a trigger on `project_user_access` INSERT to auto-add team members to the project's chat channel
-- Create a trigger on `project_user_access` DELETE to remove members from channel
-- Add a one-time migration to create channels for ALL existing projects and add their current team members
-- Also create channels for clients: for each client, create a channel and add all users who have access to that client's projects
-
-### Database Changes (Migration)
-- Trigger function: `auto_create_project_channel()` on `projects` INSERT
-- Trigger function: `sync_project_team_to_chat()` on `project_user_access` INSERT/DELETE
-- Backfill: INSERT channels for all existing projects + add current team members
-- Backfill: INSERT channels for all existing clients + add relevant team members
+A new "Inbox" section that allows each user to connect their email account (Gmail, Outlook, or any IMAP/SMTP provider) and view/send emails directly from within the application. Emails are presented in a **messaging-style UI** where each thread looks like a chat conversation -- no signatures, no HTML clutter, just clean message bubbles.
 
 ---
 
-## 2. Mentions (@user, @project, @task)
+## Architecture
 
-### Changes
-- **ChatMessageInput.tsx**: Add `@` mention autocomplete popup
-  - On typing `@`, show dropdown with users, projects, tasks filtered by search
-  - Fetch data from `profiles`, `projects`, `tasks` tables
-  - Insert mention as `@[Name](type:id)` format in content
-  - Store mentions in `metadata.mentions` array: `[{type, id, name}]`
-- **ChatMessageItem.tsx**: Parse and render mentions as clickable badges
-  - User mentions navigate to user profile
-  - Project mentions navigate to `/projects/:id`
-  - Task mentions navigate to `/tasks/:id`
+The system works in 3 layers:
 
-### New Component
-- `src/components/chat/MentionInput.tsx` -- Mention autocomplete dropdown
+1. **User Settings**: Each user stores their email connection details (IMAP/SMTP server, port, email, app password) encrypted in the database
+2. **Edge Functions**: Two backend functions handle the actual IMAP/SMTP connections -- one for fetching emails, one for sending
+3. **Frontend UI**: A messaging-style interface that renders email threads as conversations
 
 ---
 
-## 3. File Sharing
+## Phase 1: Database Schema
 
-### Changes
-- **ChatMessageInput.tsx**: Enable the `onFileUpload` prop (already has Paperclip button but no handler wired)
-- **ChatChannelView.tsx**: Pass file upload handler to ChatMessageInput
-- **useChatMessages.ts**: Add `uploadAttachment()` function
-  - Upload file to `chat-attachments` bucket
-  - Create `chat_message_attachments` record
-  - Send a message of type `file` with attachment metadata
-- **ChatMessageItem.tsx**: Enhance attachment rendering
-  - Image preview (inline thumbnail)
-  - File download link for non-images
+### New Table: `email_accounts`
 
-### Storage
-- Ensure `chat-attachments` bucket exists with proper RLS policies
+Stores each user's email server configuration.
 
----
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid PK | |
+| user_id | uuid FK (profiles) | Owner |
+| company_id | uuid FK | |
+| email_address | text | The connected email |
+| display_name | text | Sender name |
+| imap_host | text | e.g. imap.gmail.com |
+| imap_port | integer | e.g. 993 |
+| smtp_host | text | e.g. smtp.gmail.com |
+| smtp_port | integer | e.g. 587 |
+| username | text | Login username |
+| encrypted_password | text | Encrypted app password |
+| use_tls | boolean, default true | |
+| is_active | boolean, default true | |
+| last_sync_at | timestamptz | Last successful fetch |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
 
-## 4. Full-Text Search
+### New Table: `email_messages`
 
-### Database Changes
-- Add GIN index on `chat_messages.content` for text search
-- Create function `search_chat_messages(query text, company_id uuid)` for full-text search
+Cached emails fetched from the user's mailbox for fast rendering.
 
-### New Component
-- `src/components/chat/ChatSearchDialog.tsx` -- Search dialog with results
-  - Search across messages, filter by channel/user/date
-  - Click result to navigate to the message in its channel
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid PK | |
+| account_id | uuid FK (email_accounts) | |
+| user_id | uuid FK | |
+| message_uid | text | IMAP UID (unique per mailbox) |
+| thread_id | text | For grouping threads (Message-ID/In-Reply-To/References) |
+| subject | text | |
+| from_address | text | |
+| from_name | text | |
+| to_addresses | jsonb | Array of recipients |
+| cc_addresses | jsonb | |
+| body_text | text | Plain text body (cleaned, no signatures) |
+| body_html | text | Original HTML (kept for fallback) |
+| is_read | boolean | |
+| is_starred | boolean | |
+| folder | text | INBOX, Sent, etc. |
+| sent_at | timestamptz | |
+| created_at | timestamptz | |
 
-### Changes
-- **ChatChannelHeader.tsx**: Add search button that opens ChatSearchDialog
-- **ChatSidebar.tsx**: Add global search button
-
----
-
-## 5. Convert Message to Task / Brief
-
-### Changes
-- **ChatMessageItem.tsx**: Add dropdown menu items:
-  - "Μετατροπή σε Task" -- opens task creation dialog pre-filled
-  - "Μετατροπή σε Brief" -- opens brief form dialog pre-filled
-- Link back to original message via `metadata.source_message_id`
-
-### New Imports
-- Use existing task creation patterns from `ProjectTasksManager`
-- Use existing `BriefFormDialog` for brief creation
-
----
-
-## 6. Link Message to Client/Project
-
-### Changes
-- **ChatMessageItem.tsx**: Add "Link to Project/Client" dropdown option
-  - Opens small dialog to select project or client
-  - Stores link in `metadata.linked_project_id` or `metadata.linked_client_id`
-  - Shows linked badge on message
+### RLS Policies
+- Users can only access their own email accounts and messages
+- No cross-user visibility
 
 ---
 
-## 7. Tags on Messages
+## Phase 2: Edge Functions
 
-### Changes
-- **ChatMessageItem.tsx**: Add "Tag" dropdown submenu with options: urgent, approved, pending
-  - Uses existing `chat_message_tags` table
-  - Shows tags as colored badges on the message
-- **useChatMessages.ts**: Fetch tags alongside messages, add `addTag` / `removeTag` functions
+### `email-fetch` Edge Function
 
----
+Connects to the user's IMAP server and fetches recent emails.
 
-## 8. Notifications Integration
+- Receives: `account_id` from the authenticated user
+- Reads credentials from `email_accounts` table (server-side only)
+- Uses `jsr:@workingdevshero/deno-imap` library for IMAP connection
+- Fetches latest emails (configurable: last 50, or since last_sync_at)
+- Strips HTML signatures and quoted text to extract clean message body
+- Groups messages into threads using `Message-ID`, `In-Reply-To`, and `References` headers
+- Stores/updates messages in `email_messages` table
+- Updates `last_sync_at` on the account
 
-### Changes
-- **useChatMessages.ts**: On new message received via realtime, if user is mentioned or channel is not muted, create a notification entry
-- **NotificationBell.tsx**: Include chat message notifications in the list
-- Add notification type `chat_mention` and `chat_message` to the notification system
+### `email-send` Edge Function
 
----
+Sends emails via the user's SMTP server.
 
-## 9. AI Layer (Edge Function)
+- Receives: `account_id`, `to`, `cc`, `subject`, `body`, `reply_to_message_id` (optional)
+- Reads SMTP credentials from `email_accounts`
+- Sends email using Deno's SMTP capabilities
+- Stores the sent message in `email_messages` with `folder = 'Sent'`
+- Sets proper `In-Reply-To` and `References` headers for thread continuity
 
-### New Edge Function: `supabase/functions/chat-ai-assistant/index.ts`
-- Endpoints:
-  - `summarize` -- Summarize recent messages in a channel
-  - `action-items` -- Extract action items from discussion
-  - `weekly-recap` -- Generate weekly project recap
-- Uses Lovable AI (no API key needed)
-
-### Changes
-- **ChatChannelHeader.tsx**: Add AI actions dropdown (Summarize, Extract Actions)
-- Display AI responses as system messages or in a side panel
+### Security Considerations
+- Credentials are stored encrypted; the Edge Function decrypts them server-side
+- JWT verification on both functions ensures only the account owner can access
+- App Passwords recommended (not main passwords) -- guidance provided in UI
 
 ---
 
-## 10. Role-based Channel Permissions
+## Phase 3: Settings -- Email Account Setup
 
-### Changes
-- **ChatChannelHeader.tsx**: Add member management button for channel admins/owners
-- **ChatCreateChannel.tsx**: Add member selection when creating private/group channels
-- **useChatChannels.ts**: Respect `member_role` for edit/delete channel actions
+### New Card in Settings Page: "Email / Inbox"
 
-### New Component
-- `src/components/chat/ChatMemberManager.tsx` -- Add/remove members, change roles
+A new settings card where users configure their email connection:
+
+- **Email Address**: The email they want to connect
+- **Display Name**: Name shown on sent emails
+- **IMAP Settings**: Host, Port (with presets for Gmail, Outlook, Yahoo)
+- **SMTP Settings**: Host, Port
+- **Username & App Password**: For authentication
+- **Test Connection** button: Calls the edge function to verify IMAP connectivity
+- **Provider Presets**: Quick-fill buttons for common providers:
+  - Gmail: imap.gmail.com:993 / smtp.gmail.com:587
+  - Outlook: outlook.office365.com:993 / smtp.office365.com:587
+  - Yahoo: imap.mail.yahoo.com:993 / smtp.mail.yahoo.com:587
+- Helper text explaining how to create an App Password for Gmail (with link)
+
+---
+
+## Phase 4: Inbox UI -- Messaging Style
+
+### Page: `/inbox`
+
+A split-view layout similar to the Chat page:
+
+**Left Panel -- Thread List**
+- List of email threads, sorted by most recent message
+- Each item shows: sender avatar/initials, sender name, subject, preview text, timestamp
+- Unread threads highlighted
+- Star toggle
+- Search bar at top
+- Filter tabs: All | Unread | Starred
+
+**Right Panel -- Conversation View**
+- Selected thread displayed as a conversation (chat bubbles)
+- Incoming messages on the left, sent messages on the right
+- Each bubble shows: sender name, timestamp, clean text content
+- Signatures, disclaimers, and quoted text are stripped/hidden (with "Show original" toggle)
+- Reply input at the bottom (like a chat input)
+- "Reply All" and "Forward" options
+- Attachment indicators (file name + size, download link)
+
+### Visual Design
+- No traditional email layout -- purely conversational
+- Avatar + name + time above each bubble
+- Background color differentiates incoming vs outgoing
+- Minimal chrome, focused on content
+- Empty state: "Connect your email in Settings to get started"
+
+---
+
+## Phase 5: Navigation Integration
+
+### Sidebar
+- Add "Inbox" nav item with `Mail` icon in the sidebar
+- Show unread email count badge
+
+### Route
+- Add `/inbox` route in App.tsx
 
 ---
 
@@ -150,33 +172,46 @@ When a project exists (or is created), automatically create a corresponding chat
 
 | File | Purpose |
 |------|---------|
-| Migration SQL | Triggers for auto-channel creation, backfill, search index |
-| `src/components/chat/MentionInput.tsx` | @ mention autocomplete |
-| `src/components/chat/ChatSearchDialog.tsx` | Full-text search dialog |
-| `src/components/chat/ChatMemberManager.tsx` | Channel member management |
-| `supabase/functions/chat-ai-assistant/index.ts` | AI summaries & actions |
+| Migration SQL | `email_accounts` and `email_messages` tables with RLS |
+| `supabase/functions/email-fetch/index.ts` | IMAP fetch edge function |
+| `supabase/functions/email-send/index.ts` | SMTP send edge function |
+| `src/pages/Inbox.tsx` | Inbox page |
+| `src/components/inbox/InboxThreadList.tsx` | Left panel thread list |
+| `src/components/inbox/InboxConversation.tsx` | Right panel conversation view |
+| `src/components/inbox/InboxMessageBubble.tsx` | Single message bubble |
+| `src/components/inbox/InboxComposeInput.tsx` | Reply/compose input |
+| `src/components/inbox/InboxEmptyState.tsx` | Empty/setup state |
+| `src/components/settings/EmailAccountSetup.tsx` | Settings card for email config |
+| `src/hooks/useEmailAccount.ts` | Hook for email account CRUD |
+| `src/hooks/useEmailMessages.ts` | Hook for fetching/caching emails |
 
 ## Files to Modify
 
 | File | Changes |
-|------|---------|
-| `src/components/chat/ChatMessageInput.tsx` | Mentions, file upload wiring |
-| `src/components/chat/ChatMessageItem.tsx` | Mentions rendering, convert to task/brief, tags, link to project |
-| `src/components/chat/ChatChannelView.tsx` | File upload handler, search button |
-| `src/components/chat/ChatChannelHeader.tsx` | Search, AI actions, member management |
-| `src/components/chat/ChatSidebar.tsx` | Global search button |
-| `src/hooks/useChatMessages.ts` | File upload, tags, search functions |
-| `src/hooks/useChatChannels.ts` | Channel permissions logic |
+|------|--------|
+| `src/App.tsx` | Add `/inbox` route |
+| `src/components/layout/AppSidebar.tsx` | Add Inbox nav item |
+| `src/pages/Settings.tsx` | Add EmailAccountSetup card |
+| `supabase/config.toml` | Add edge function configs |
 
-## Implementation Priority
+---
 
-1. Auto-creation of project/client channels (database triggers + backfill)
-2. File sharing (most requested core feature)
-3. Mentions system
-4. Convert to task/brief + link to project
-5. Tags
-6. Full-text search
-7. Channel member management
-8. Notifications
-9. AI layer
+## Implementation Order
+
+1. Database migration (tables + RLS)
+2. Edge functions (email-fetch, email-send)
+3. Settings UI (email account setup with test connection)
+4. Inbox page (thread list + conversation view)
+5. Navigation updates (sidebar, route)
+
+---
+
+## Technical Notes
+
+- **IMAP Library**: Using `jsr:@workingdevshero/deno-imap` which is a Deno-native IMAP client with TLS support
+- **Signature Stripping**: Simple heuristic -- remove content after common signature markers (`--`, `Sent from`, lines of dashes, etc.)
+- **Thread Grouping**: Uses standard email headers (`In-Reply-To`, `References`) to group messages into conversations
+- **Credentials**: Stored in the database, accessible only server-side via Edge Functions. Users are guided to use App Passwords for security
+- **Sync Strategy**: On-demand fetch (user opens Inbox or clicks refresh). Not real-time polling to avoid excessive IMAP connections
+- **Rate Limiting**: Each fetch fetches the last 50 messages or messages since `last_sync_at`, whichever is fewer
 

@@ -87,6 +87,19 @@ function DraggableProject({ project, isActive }: { project: ProjectItem; isActiv
   );
 }
 
+// Status color indicator
+function statusColor(status: string): string {
+  switch (status) {
+    case 'active': return 'text-green-500';
+    case 'lead': return 'text-blue-400';
+    case 'proposal': return 'text-amber-500';
+    case 'completed': return 'text-muted-foreground/40';
+    case 'on_hold': return 'text-orange-400';
+    case 'cancelled': return 'text-destructive/50';
+    default: return 'text-muted-foreground';
+  }
+}
+
 // Simple project link (no drag) for auto mode
 function ProjectLink({ project, isActive }: { project: ProjectItem; isActive: boolean }) {
   const navigate = useNavigate();
@@ -100,7 +113,7 @@ function ProjectLink({ project, isActive }: { project: ProjectItem; isActive: bo
           : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
       )}
     >
-      <FileText className="h-3 w-3 shrink-0" />
+      <FileText className={cn("h-3 w-3 shrink-0", statusColor(project.status))} />
       <span className="truncate">{project.name}</span>
     </button>
   );

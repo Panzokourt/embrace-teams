@@ -5,11 +5,13 @@ import AppSidebar from './AppSidebar';
 import TopBar from './TopBar';
 import { QuickActionButton } from '@/components/layout/QuickActionButton';
 import { GlobalActivityFeed } from '@/components/activity/GlobalActivityFeed';
+import SecretaryPanel from '@/components/secretary/SecretaryPanel';
 import { Loader2 } from 'lucide-react';
 
 export default function AppLayout() {
   const { user, loading, companyRole, postLoginRoute } = useAuth();
   const [activityOpen, setActivityOpen] = useState(false);
+  const [secretaryOpen, setSecretaryOpen] = useState(false);
 
   if (loading) {
     return (
@@ -47,13 +49,14 @@ export default function AppLayout() {
     <div className="flex h-screen bg-background">
       <AppSidebar />
       <main className="flex-1 overflow-auto flex flex-col">
-        <TopBar onActivityToggle={() => setActivityOpen(true)} />
+        <TopBar onActivityToggle={() => setActivityOpen(true)} onSecretaryToggle={() => setSecretaryOpen(true)} />
         <div className="flex-1">
           <Outlet />
         </div>
       </main>
       <QuickActionButton />
       <GlobalActivityFeed open={activityOpen} onOpenChange={setActivityOpen} />
+      <SecretaryPanel open={secretaryOpen} onOpenChange={setSecretaryOpen} />
     </div>
   );
 }

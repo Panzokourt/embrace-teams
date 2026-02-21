@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Activity, FolderKanban, CheckSquare, FileText, Users, X } from 'lucide-react';
+import { Search, Activity, FolderKanban, CheckSquare, FileText, Users, X, Bot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -22,9 +22,10 @@ const entityConfig = {
 
 interface TopBarProps {
   onActivityToggle: () => void;
+  onSecretaryToggle?: () => void;
 }
 
-export default function TopBar({ onActivityToggle }: TopBarProps) {
+export default function TopBar({ onActivityToggle, onSecretaryToggle }: TopBarProps) {
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -152,6 +153,9 @@ export default function TopBar({ onActivityToggle }: TopBarProps) {
 
       {/* Action icons */}
       <div className="gap-1 px-0 flex items-center justify-end">
+        <Button variant="ghost" size="icon" onClick={onSecretaryToggle} title="Secretary (⌘J)">
+          <Bot className="h-5 w-5" />
+        </Button>
         <Button variant="ghost" size="icon" onClick={onActivityToggle}>
           <Activity className="h-5 w-5" />
         </Button>

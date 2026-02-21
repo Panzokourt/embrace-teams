@@ -3,142 +3,95 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// ─── Minimal IMAP client using Deno.connectTls ───
+// ─── Gmail API helpers ───
 
-class SimpleIMAP {
-  private conn!: Deno.TlsConn;
-  private reader!: ReadableStreamDefaultReader<Uint8Array>;
-  private buffer = "";
-  private tag = 0;
-  private decoder = new TextDecoder();
-  private encoder = new TextEncoder();
+async function refreshAccessToken(refreshToken: string): Promise<{ access_token: string; expires_in: number } | null> {
+  const clientId = Deno.env.get("GOOGLE_CLIENT_ID")!;
+  const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
 
-  async connect(host: string, port: number) {
-    this.conn = await Deno.connectTls({ hostname: host, port });
-    this.reader = this.conn.readable.getReader();
-    // Read greeting
-    await this.readUntilTag("*");
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: "refresh_token",
+    }),
+  });
+
+  if (!res.ok) {
+    console.error("Token refresh failed:", await res.text());
+    return null;
   }
 
-  private nextTag(): string {
-    this.tag++;
-    return `A${this.tag}`;
+  return await res.json();
+}
+
+async function getValidAccessToken(supabase: any, tokenRecord: any): Promise<string | null> {
+  const expiresAt = new Date(tokenRecord.token_expires_at).getTime();
+  const now = Date.now();
+
+  // Refresh if expires within 5 minutes
+  if (now > expiresAt - 5 * 60 * 1000) {
+    const refreshed = await refreshAccessToken(tokenRecord.refresh_token);
+    if (!refreshed) return null;
+
+    const newExpiresAt = new Date(now + refreshed.expires_in * 1000).toISOString();
+    await supabase
+      .from("gmail_oauth_tokens")
+      .update({ access_token: refreshed.access_token, token_expires_at: newExpiresAt })
+      .eq("id", tokenRecord.id);
+
+    return refreshed.access_token;
   }
 
-  private async readMore(): Promise<string> {
-    const { value, done } = await this.reader.read();
-    if (done) throw new Error("Connection closed");
-    return this.decoder.decode(value);
-  }
+  return tokenRecord.access_token;
+}
 
-  private async readUntilTag(tag: string): Promise<string> {
-    let result = this.buffer;
-    const endPattern = `${tag} `;
-
-    while (true) {
-      const lines = result.split("\r\n");
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i].startsWith(endPattern) || lines[i].startsWith("* OK") && tag === "*") {
-          // Found the tagged response
-          this.buffer = lines.slice(i + 1).join("\r\n");
-          return lines.slice(0, i + 1).join("\r\n");
-        }
-      }
-      result += await this.readMore();
-    }
-  }
-
-  private async command(cmd: string): Promise<string> {
-    const tag = this.nextTag();
-    const fullCmd = `${tag} ${cmd}\r\n`;
-    const writer = this.conn.writable.getWriter();
-    await writer.write(this.encoder.encode(fullCmd));
-    writer.releaseLock();
-
-    // Read until we get the tagged response
-    let result = this.buffer;
-    while (true) {
-      const lines = result.split("\r\n");
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i].startsWith(`${tag} `)) {
-          this.buffer = lines.slice(i + 1).join("\r\n");
-          const response = lines.slice(0, i + 1).join("\r\n");
-          if (lines[i].includes("NO") || lines[i].includes("BAD")) {
-            throw new Error(`IMAP error: ${lines[i]}`);
-          }
-          return response;
-        }
-      }
-      result += await this.readMore();
-    }
-  }
-
-  async login(username: string, password: string) {
-    await this.command(`LOGIN "${username}" "${password}"`);
-  }
-
-  async selectInbox(): Promise<number> {
-    const res = await this.command("SELECT INBOX");
-    const match = res.match(/\* (\d+) EXISTS/);
-    return match ? parseInt(match[1]) : 0;
-  }
-
-  async fetchMessages(startSeq: number, endSeq: number): Promise<string> {
-    if (startSeq > endSeq) return "";
-    const res = await this.command(
-      `FETCH ${startSeq}:${endSeq} (UID FLAGS BODY[HEADER.FIELDS (FROM TO CC SUBJECT DATE MESSAGE-ID IN-REPLY-TO REFERENCES)] BODY[TEXT])`
+function decodeBase64Url(data: string): string {
+  const padded = data.replace(/-/g, "+").replace(/_/g, "/");
+  try {
+    return new TextDecoder().decode(
+      Uint8Array.from(atob(padded), (c) => c.charCodeAt(0))
     );
-    return res;
-  }
-
-  async logout() {
-    try {
-      const tag = this.nextTag();
-      const writer = this.conn.writable.getWriter();
-      await writer.write(this.encoder.encode(`${tag} LOGOUT\r\n`));
-      writer.releaseLock();
-    } catch {
-      // ignore
-    }
-    try {
-      this.conn.close();
-    } catch {
-      // ignore
-    }
+  } catch {
+    return "";
   }
 }
 
-// ─── Parse IMAP FETCH response into messages ───
+function extractBody(payload: any): { text: string; html: string } {
+  let text = "";
+  let html = "";
 
-interface ParsedEmail {
-  uid: string;
-  from_address: string;
-  from_name: string;
-  to_addresses: string[];
-  cc_addresses: string[];
-  subject: string;
-  date: string;
-  message_id: string;
-  in_reply_to: string;
-  references: string;
-  body_text: string;
-  is_read: boolean;
+  if (payload.body?.data) {
+    const decoded = decodeBase64Url(payload.body.data);
+    if (payload.mimeType === "text/plain") text = decoded;
+    else if (payload.mimeType === "text/html") html = decoded;
+  }
+
+  if (payload.parts) {
+    for (const part of payload.parts) {
+      const sub = extractBody(part);
+      if (sub.text) text = sub.text;
+      if (sub.html) html = sub.html;
+    }
+  }
+
+  return { text, html };
 }
 
-function parseHeader(headerBlock: string, field: string): string {
-  const regex = new RegExp(`^${field}:\\s*(.+?)(?=\\r?\\n[A-Za-z-]+:|$)`, "ims");
-  const match = headerBlock.match(regex);
-  return match ? match[1].replace(/\r?\n\s+/g, " ").trim() : "";
+function getHeader(headers: any[], name: string): string {
+  const h = headers?.find((h: any) => h.name.toLowerCase() === name.toLowerCase());
+  return h?.value || "";
 }
 
 function parseFromField(from: string): { name: string; address: string } {
   const match = from.match(/^"?([^"<]*)"?\s*<?([^>]+)>?$/);
-  if (match) {
-    return { name: match[1].trim(), address: match[2].trim() };
-  }
+  if (match) return { name: match[1].trim(), address: match[2].trim() };
   return { name: "", address: from.trim() };
 }
 
@@ -151,19 +104,11 @@ function parseAddressList(field: string): string[] {
 }
 
 function stripSignature(text: string): string {
-  const markers = [
-    /^--\s*$/m,
-    /^Sent from my /m,
-    /^Get Outlook for /m,
-    /^_{3,}/m,
-    /^-{3,}/m,
-    /^Στάλθηκε από /m,
-    /^Αποστολή από /m,
-  ];
+  const markers = [/^--\s*$/m, /^Sent from my /m, /^Get Outlook for /m, /^_{3,}/m, /^-{3,}/m, /^Στάλθηκε από /m, /^Αποστολή από /m];
   let cleanText = text;
   for (const marker of markers) {
     const match = cleanText.match(marker);
-    if (match && match.index !== undefined) {
+    if (match?.index !== undefined) {
       cleanText = cleanText.substring(0, match.index).trim();
     }
   }
@@ -182,70 +127,6 @@ function stripQuotedText(text: string): string {
   return cleanLines.join("\n").trim();
 }
 
-function parseFetchResponse(raw: string): ParsedEmail[] {
-  const messages: ParsedEmail[] = [];
-
-  // Split by FETCH boundaries
-  const fetchBlocks = raw.split(/\* \d+ FETCH/);
-
-  for (const block of fetchBlocks) {
-    if (!block.trim()) continue;
-
-    // Extract UID
-    const uidMatch = block.match(/UID (\d+)/);
-    const uid = uidMatch ? uidMatch[1] : "";
-
-    // Extract flags
-    const flagsMatch = block.match(/FLAGS \(([^)]*)\)/);
-    const flags = flagsMatch ? flagsMatch[1] : "";
-    const isRead = flags.includes("\\Seen");
-
-    // Extract header block - between first { and the next {
-    const headerMatch = block.match(/BODY\[HEADER\.FIELDS[^\]]*\]\s*\{(\d+)\}\r?\n([\s\S]*?)(?=BODY\[TEXT\]|\)$)/i);
-    const headerBlock = headerMatch ? headerMatch[2] : "";
-
-    // Extract body text
-    const bodyMatch = block.match(/BODY\[TEXT\]\s*\{(\d+)\}\r?\n([\s\S]*?)(?=\)\r?\n|$)/i);
-    let bodyText = bodyMatch ? bodyMatch[2] : "";
-
-    // Clean body
-    bodyText = stripSignature(stripQuotedText(bodyText));
-
-    const from = parseHeader(headerBlock, "From");
-    const { name, address } = parseFromField(from);
-
-    const email: ParsedEmail = {
-      uid,
-      from_name: name,
-      from_address: address,
-      to_addresses: parseAddressList(parseHeader(headerBlock, "To")),
-      cc_addresses: parseAddressList(parseHeader(headerBlock, "Cc")),
-      subject: parseHeader(headerBlock, "Subject"),
-      date: parseHeader(headerBlock, "Date"),
-      message_id: parseHeader(headerBlock, "Message-ID").replace(/[<>]/g, ""),
-      in_reply_to: parseHeader(headerBlock, "In-Reply-To").replace(/[<>]/g, ""),
-      references: parseHeader(headerBlock, "References"),
-      body_text: bodyText.trim(),
-      is_read: isRead,
-    };
-
-    if (email.uid || email.subject || email.from_address) {
-      messages.push(email);
-    }
-  }
-
-  return messages;
-}
-
-function computeThreadId(email: ParsedEmail): string {
-  if (email.in_reply_to) return email.in_reply_to;
-  if (email.references) {
-    const refs = email.references.split(/\s+/).filter(Boolean);
-    if (refs.length > 0) return refs[0].replace(/[<>]/g, "");
-  }
-  return email.message_id || crypto.randomUUID();
-}
-
 // ─── Main handler ───
 
 Deno.serve(async (req) => {
@@ -255,159 +136,180 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "No authorization header" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // Verify JWT
-    const anonClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!);
-    const { data: { user }, error: authError } = await anonClient.auth.getUser(
-      authHeader.replace("Bearer ", "")
-    );
-    if (authError || !user) {
+    if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { account_id, action } = await req.json();
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabase = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-    // Fetch account
-    const { data: account, error: accErr } = await supabase
-      .from("email_accounts")
+    // Verify JWT
+    const anonClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsErr } = await anonClient.auth.getClaims(token);
+    if (claimsErr || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const userId = claimsData.claims.sub as string;
+
+    const { action } = await req.json();
+
+    // Get Gmail OAuth token
+    const { data: gmailToken, error: tokenErr } = await supabase
+      .from("gmail_oauth_tokens")
       .select("*")
-      .eq("id", account_id)
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
+      .eq("is_active", true)
       .single();
 
-    if (accErr || !account) {
-      return new Response(JSON.stringify({ error: "Account not found" }), {
+    if (tokenErr || !gmailToken) {
+      return new Response(JSON.stringify({ error: "Gmail account not connected" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const configValid = account.imap_host && account.imap_port && account.username && account.encrypted_password;
-    if (!configValid) {
+    const accessToken = await getValidAccessToken(supabase, gmailToken);
+    if (!accessToken) {
       return new Response(
-        JSON.stringify({ success: false, error: "Incomplete configuration." }),
+        JSON.stringify({ success: false, error: "Αποτυχία ανανέωσης token. Παρακαλώ ξανασυνδέστε τον λογαριασμό Gmail." }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     // ─── Test action ───
     if (action === "test") {
-      try {
-        const imap = new SimpleIMAP();
-        await imap.connect(account.imap_host, account.imap_port);
-        await imap.login(account.username, account.encrypted_password);
-        const count = await imap.selectInbox();
-        await imap.logout();
+      const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/profile", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (res.ok) {
+        const profile = await res.json();
         return new Response(
-          JSON.stringify({ success: true, message: `Σύνδεση επιτυχής! ${count} emails στα εισερχόμενα.` }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      } catch (err) {
-        return new Response(
-          JSON.stringify({ success: false, error: `Αποτυχία σύνδεσης: ${String(err)}` }),
+          JSON.stringify({ success: true, message: `Σύνδεση επιτυχής! Email: ${profile.emailAddress}` }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+      const errText = await res.text();
+      return new Response(
+        JSON.stringify({ success: false, error: `Gmail API error: ${errText}` }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    // ─── Fetch/sync emails ───
-    try {
-      const imap = new SimpleIMAP();
-      await imap.connect(account.imap_host, account.imap_port);
-      await imap.login(account.username, account.encrypted_password);
-      const totalMessages = await imap.selectInbox();
+    // ─── Fetch/sync emails via Gmail API ───
+    const listRes = await fetch(
+      "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50&labelIds=INBOX",
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
 
-      if (totalMessages === 0) {
-        await imap.logout();
-        await supabase
-          .from("email_accounts")
-          .update({ last_sync_at: new Date().toISOString() })
-          .eq("id", account_id);
+    if (!listRes.ok) {
+      const errText = await listRes.text();
+      console.error("Gmail list error:", errText);
+      return new Response(
+        JSON.stringify({ success: false, error: `Gmail API error: ${errText}` }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-        return new Response(
-          JSON.stringify({ success: true, count: 0, message: "No emails found." }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+    const listData = await listRes.json();
+    const messageIds: string[] = (listData.messages || []).map((m: any) => m.id);
 
-      // Fetch last 50 messages
-      const startSeq = Math.max(1, totalMessages - 49);
-      const rawFetch = await imap.fetchMessages(startSeq, totalMessages);
-      await imap.logout();
-
-      const parsedEmails = parseFetchResponse(rawFetch);
-
-      // Upsert into email_messages
-      const toInsert = parsedEmails.map((email) => ({
-        account_id: account_id,
-        user_id: user.id,
-        message_uid: email.uid,
-        message_id_header: email.message_id || null,
-        thread_id: computeThreadId(email),
-        subject: email.subject || null,
-        from_address: email.from_address || null,
-        from_name: email.from_name || null,
-        to_addresses: email.to_addresses,
-        cc_addresses: email.cc_addresses,
-        body_text: email.body_text || null,
-        body_html: null,
-        is_read: email.is_read,
-        is_starred: false,
-        folder: "INBOX",
-        sent_at: email.date ? new Date(email.date).toISOString() : null,
-      }));
-
-      if (toInsert.length > 0) {
-        // Delete existing messages for this account to avoid duplicates, then insert fresh
-        await supabase
-          .from("email_messages")
-          .delete()
-          .eq("account_id", account_id)
-          .eq("user_id", user.id);
-
-        // Insert in batches of 50
-        for (let i = 0; i < toInsert.length; i += 50) {
-          const batch = toInsert.slice(i, i + 50);
-          const { error: insertErr } = await supabase
-            .from("email_messages")
-            .insert(batch);
-          if (insertErr) {
-            console.error("Insert error:", insertErr);
-          }
-        }
-      }
-
-      // Update last_sync_at
+    if (messageIds.length === 0) {
       await supabase
-        .from("email_accounts")
+        .from("gmail_oauth_tokens")
         .update({ last_sync_at: new Date().toISOString() })
-        .eq("id", account_id);
+        .eq("id", gmailToken.id);
 
       return new Response(
-        JSON.stringify({ success: true, count: toInsert.length, message: `Synced ${toInsert.length} emails.` }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    } catch (err) {
-      console.error("IMAP fetch error:", err);
-      return new Response(
-        JSON.stringify({ success: false, error: `IMAP error: ${String(err)}` }),
+        JSON.stringify({ success: true, count: 0, message: "Δεν βρέθηκαν emails." }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Fetch each message in detail (batch)
+    const toInsert: any[] = [];
+    const batchSize = 10;
+
+    for (let i = 0; i < messageIds.length; i += batchSize) {
+      const batch = messageIds.slice(i, i + batchSize);
+      const fetches = batch.map(async (msgId) => {
+        const res = await fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msgId}?format=full`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        if (!res.ok) return null;
+        return await res.json();
+      });
+
+      const results = await Promise.all(fetches);
+
+      for (const msg of results) {
+        if (!msg) continue;
+
+        const headers = msg.payload?.headers || [];
+        const from = getHeader(headers, "From");
+        const { name, address } = parseFromField(from);
+        const { text, html } = extractBody(msg.payload);
+        const cleanText = stripSignature(stripQuotedText(text));
+
+        const isRead = !(msg.labelIds || []).includes("UNREAD");
+
+        toInsert.push({
+          account_id: gmailToken.id,
+          user_id: userId,
+          message_uid: msg.id,
+          message_id_header: getHeader(headers, "Message-ID").replace(/[<>]/g, "") || null,
+          thread_id: msg.threadId || msg.id,
+          subject: getHeader(headers, "Subject") || null,
+          from_address: address || null,
+          from_name: name || null,
+          to_addresses: parseAddressList(getHeader(headers, "To")),
+          cc_addresses: parseAddressList(getHeader(headers, "Cc")),
+          body_text: cleanText || null,
+          body_html: html || null,
+          is_read: isRead,
+          is_starred: (msg.labelIds || []).includes("STARRED"),
+          folder: "INBOX",
+          sent_at: msg.internalDate ? new Date(parseInt(msg.internalDate)).toISOString() : null,
+        });
+      }
+    }
+
+    if (toInsert.length > 0) {
+      // Delete existing and insert fresh
+      await supabase
+        .from("email_messages")
+        .delete()
+        .eq("account_id", gmailToken.id)
+        .eq("user_id", userId);
+
+      for (let i = 0; i < toInsert.length; i += 50) {
+        const batch = toInsert.slice(i, i + 50);
+        const { error: insertErr } = await supabase.from("email_messages").insert(batch);
+        if (insertErr) console.error("Insert error:", insertErr);
+      }
+    }
+
+    // Update last sync
+    await supabase
+      .from("gmail_oauth_tokens")
+      .update({ last_sync_at: new Date().toISOString() })
+      .eq("id", gmailToken.id);
+
+    return new Response(
+      JSON.stringify({ success: true, count: toInsert.length, message: `Συγχρονίστηκαν ${toInsert.length} emails.` }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   } catch (err) {
+    console.error("email-fetch error:", err);
     return new Response(JSON.stringify({ error: String(err) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -6,9 +6,11 @@ import { TimeEntryForm } from '@/components/time-tracking/TimeEntryForm';
 import { TimesheetFilters, DatePreset, GroupBy, AggregationLevel } from '@/components/time-tracking/TimesheetFilters';
 import { TimesheetGridView } from '@/components/time-tracking/TimesheetGridView';
 import { TimeEntriesListView } from '@/components/time-tracking/TimeEntriesListView';
+import { AttendanceLog } from '@/components/time-tracking/AttendanceLog';
 import { exportToCSV, exportToExcel } from '@/utils/exportUtils';
 import { Button } from '@/components/ui/button';
-import { Loader2, Download, Timer, LayoutGrid, List } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Loader2, Download, Timer, LayoutGrid, List, CalendarDays } from 'lucide-react';
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfDay, endOfDay, parseISO, isWithinInterval, subWeeks, subMonths, format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -176,77 +178,95 @@ export default function Timesheets() {
           </h1>
           <p className="text-muted-foreground text-sm mt-1">Καταγραφή & διαχείριση χρόνου εργασίας</p>
         </div>
-        <div className="flex items-center gap-2">
-          {/* View toggle */}
-          <div className="flex items-center border border-border rounded-lg overflow-hidden">
-            <Button
-              variant={viewMode === 'grid' ? 'default' : 'ghost'}
-              size="sm"
-              className="rounded-none gap-1.5 h-8"
-              onClick={() => setViewMode('grid')}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              Timesheet
-            </Button>
-            <Button
-              variant={viewMode === 'list' ? 'default' : 'ghost'}
-              size="sm"
-              className="rounded-none gap-1.5 h-8"
-              onClick={() => setViewMode('list')}
-            >
-              <List className="h-3.5 w-3.5" />
-              Λίστα
-            </Button>
-          </div>
-          <TimeEntryForm projects={projects} tasks={tasks} onSubmit={handleManualEntry} />
-          <Button variant="outline" size="sm" onClick={() => handleExport('csv')} className="gap-2">
-            <Download className="h-4 w-4" /> CSV
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => handleExport('excel')} className="gap-2">
-            <Download className="h-4 w-4" /> Excel
-          </Button>
-        </div>
       </div>
 
-      {/* Filters */}
-      <TimesheetFilters
-        datePreset={datePreset}
-        onDatePresetChange={handleDatePresetChange}
-        dateRange={dateRange}
-        onDateRangeChange={setDateRange}
-        groupBy={groupBy}
-        onGroupByChange={setGroupBy}
-        aggregation={aggregation}
-        onAggregationChange={setAggregation}
-        filterProject={filterProject}
-        onFilterProjectChange={setFilterProject}
-        filterUser={filterUser}
-        onFilterUserChange={setFilterUser}
-        projects={projects}
-        users={users}
-        showUserFilter={isAdmin || isManager}
-        totalMinutes={totalMinutes}
-      />
+      <Tabs defaultValue="timesheets" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="timesheets" className="gap-1.5">
+            <Timer className="h-3.5 w-3.5" />
+            Timesheets
+          </TabsTrigger>
+          <TabsTrigger value="attendance" className="gap-1.5">
+            <CalendarDays className="h-3.5 w-3.5" />
+            Παρουσίες
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Content */}
-      {viewMode === 'grid' ? (
-        <TimesheetGridView
-          entries={filteredEntries}
-          dateRange={dateRange}
-          groupBy={groupBy}
-          aggregation={aggregation}
-          onStartTimer={startTimer}
-          onRefresh={fetchData}
-        />
-      ) : (
-        <TimeEntriesListView
-          entries={filteredEntries}
-          users={users}
-          showUserColumn={isAdmin || isManager}
-          onDelete={handleDelete}
-          onRefresh={fetchData}
-        />
-      )}
+        <TabsContent value="timesheets" className="space-y-6">
+          {/* Controls */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center border border-border rounded-lg overflow-hidden">
+              <Button
+                variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                size="sm"
+                className="rounded-none gap-1.5 h-8"
+                onClick={() => setViewMode('grid')}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                Timesheet
+              </Button>
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'ghost'}
+                size="sm"
+                className="rounded-none gap-1.5 h-8"
+                onClick={() => setViewMode('list')}
+              >
+                <List className="h-3.5 w-3.5" />
+                Λίστα
+              </Button>
+            </div>
+            <TimeEntryForm projects={projects} tasks={tasks} onSubmit={handleManualEntry} />
+            <Button variant="outline" size="sm" onClick={() => handleExport('csv')} className="gap-2">
+              <Download className="h-4 w-4" /> CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => handleExport('excel')} className="gap-2">
+              <Download className="h-4 w-4" /> Excel
+            </Button>
+          </div>
+
+          <TimesheetFilters
+            datePreset={datePreset}
+            onDatePresetChange={handleDatePresetChange}
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
+            groupBy={groupBy}
+            onGroupByChange={setGroupBy}
+            aggregation={aggregation}
+            onAggregationChange={setAggregation}
+            filterProject={filterProject}
+            onFilterProjectChange={setFilterProject}
+            filterUser={filterUser}
+            onFilterUserChange={setFilterUser}
+            projects={projects}
+            users={users}
+            showUserFilter={isAdmin || isManager}
+            totalMinutes={totalMinutes}
+          />
+
+          {viewMode === 'grid' ? (
+            <TimesheetGridView
+              entries={filteredEntries}
+              dateRange={dateRange}
+              groupBy={groupBy}
+              aggregation={aggregation}
+              onStartTimer={startTimer}
+              onRefresh={fetchData}
+            />
+          ) : (
+            <TimeEntriesListView
+              entries={filteredEntries}
+              users={users}
+              showUserColumn={isAdmin || isManager}
+              onDelete={handleDelete}
+              onRefresh={fetchData}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="attendance">
+          <AttendanceLog />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

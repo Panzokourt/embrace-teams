@@ -18,9 +18,17 @@ const SECTOR_TO_CATEGORY: Record<string, string> = {
   mixed: 'Μικτός',
 };
 
+// Reverse mapping: display name -> display name (identity)
+const REVERSE_CATEGORY: Set<string> = new Set(Object.values(SECTOR_TO_CATEGORY));
+
 export function sectorToCategory(sector: string | null): string | null {
   if (!sector) return null;
-  return SECTOR_TO_CATEGORY[sector] || sector;
+  // Try key mapping first
+  if (SECTOR_TO_CATEGORY[sector]) return SECTOR_TO_CATEGORY[sector];
+  // If the value is already a display name, return as-is
+  if (REVERSE_CATEGORY.has(sector)) return sector;
+  // Fallback: return sector as-is (custom category name)
+  return sector;
 }
 
 export function useProjectCategories() {

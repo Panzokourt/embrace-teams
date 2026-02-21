@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.seed-dummy-data]
 verify_jwt = false
+
+[functions.secretary-agent]
+verify_jwt = false

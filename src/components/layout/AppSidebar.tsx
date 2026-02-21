@@ -36,7 +36,8 @@ import {
   FileArchive,
   Timer,
   FileStack,
-  BarChart3 } from
+  BarChart3,
+  Bot } from
 'lucide-react';
 
 import { PermissionType } from '@/contexts/AuthContext';
@@ -52,6 +53,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
+{ title: 'Secretary', href: '/secretary', icon: Bot },
 { title: 'My Work', href: '/my-work', icon: LayoutList },
 { title: 'Dashboard', href: '/', icon: LayoutDashboard },
 { title: 'Εργασίες', href: '/work', icon: FolderKanban, permission: 'projects.view' },

@@ -29,6 +29,7 @@ import Onboarding from "@/pages/Onboarding";
 import WorkspaceSelector from "@/pages/WorkspaceSelector";
 import AcceptInvite from "@/pages/AcceptInvite";
 import OrganizationSettings from "@/pages/OrganizationSettings";
+import Secretary from "@/pages/Secretary";
 
 function RedirectUserToEmployee() {
   const { id } = useParams();
@@ -72,7 +73,7 @@ const App = () => (
                 <Route path="/calendar" element={<Navigate to="/work?tab=calendar" replace />} />
                 <Route path="/files" element={<Files />} />
                 <Route path="/blueprints" element={<Blueprints />} />
-                <Route path="/blueprints" element={<Blueprints />} />
+                <Route path="/secretary" element={<Secretary />} />
                 {/* Redirects from old routes */}
                 <Route path="/users" element={<Navigate to="/hr?tab=staff" replace />} />
                 <Route path="/users/:id" element={<RedirectUserToEmployee />} />

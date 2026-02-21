@@ -1,6 +1,8 @@
 import { useState, useEffect, memo } from 'react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Play, Square, Clock, Calendar, Circle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkDay, type WorkStatus } from '@/hooks/useWorkDay';
@@ -49,12 +51,23 @@ function WorkDayClockInner() {
 
   return (
     <div className="flex items-center gap-2 text-sm">
-      {/* Date & Time */}
-      <div className="hidden lg:flex items-center gap-1.5 text-muted-foreground">
-        <Calendar className="h-3.5 w-3.5" />
-        <span className="text-xs">{dateStr}</span>
-        <span className="text-xs font-medium text-foreground">{timeStr}</span>
-      </div>
+      {/* Date & Time — clickable with mini calendar */}
+      <Popover>
+        <PopoverTrigger asChild>
+          <button className="hidden lg:flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+            <Calendar className="h-4 w-4" />
+            <span className="text-sm font-semibold text-foreground">{dateStr}</span>
+            <span className="text-sm font-bold text-foreground">{timeStr}</span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <CalendarComponent
+            mode="single"
+            selected={now}
+            className="p-3 pointer-events-auto"
+          />
+        </PopoverContent>
+      </Popover>
 
       <div className="hidden lg:block w-px h-5 bg-border" />
 

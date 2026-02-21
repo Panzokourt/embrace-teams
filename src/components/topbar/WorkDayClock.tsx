@@ -1,17 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Play, Square, Clock, Calendar, Circle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkDay, type WorkStatus } from '@/hooks/useWorkDay';
+import { useAuth } from '@/contexts/AuthContext';
 
 const statusConfig: Record<WorkStatus, { label: string; color: string }> = {
-  online: { label: 'Ενεργός', color: 'bg-emerald-500' },
-  busy: { label: 'Απασχολημένος', color: 'bg-red-500' },
-  away: { label: 'Εκτός', color: 'bg-yellow-500' },
-  on_leave: { label: 'Σε Άδεια', color: 'bg-blue-500' },
-  offline: { label: 'Εκτός Σύνδεσης', color: 'bg-muted-foreground/50' },
+  online: { label: 'Ενεργός', color: 'text-emerald-500' },
+  busy: { label: 'Απασχολημένος', color: 'text-red-500' },
+  away: { label: 'Εκτός', color: 'text-yellow-500' },
+  on_leave: { label: 'Σε Άδεια', color: 'text-blue-500' },
+  offline: { label: 'Εκτός Σύνδεσης', color: 'text-muted-foreground' },
 };
 
 function formatTime(seconds: number): string {
@@ -21,7 +21,7 @@ function formatTime(seconds: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-export default function WorkDayClock() {
+function WorkDayClockInner() {
   const {
     isClockedIn, clockIn, clockOut,
     elapsedSeconds, scheduledMinutes,
@@ -79,7 +79,7 @@ export default function WorkDayClock() {
         <Button
           size="sm"
           variant="outline"
-          className="h-7 text-xs gap-1 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10"
+          className="h-7 text-xs gap-1"
           onClick={clockIn}
           disabled={loading}
         >
@@ -90,7 +90,7 @@ export default function WorkDayClock() {
         <Button
           size="sm"
           variant="outline"
-          className="h-7 text-xs gap-1 border-red-500/30 text-red-600 hover:bg-red-500/10"
+          className="h-7 text-xs gap-1"
           onClick={clockOut}
         >
           <Square className="h-3 w-3" />
@@ -104,18 +104,18 @@ export default function WorkDayClock() {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
-            <Circle className={cn('h-2.5 w-2.5 fill-current', currentStatus.color.replace('bg-', 'text-'))} />
+            <Circle className={cn('h-2.5 w-2.5 fill-current', currentStatus.color)} />
             <span className="hidden md:inline">{currentStatus.label}</span>
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">
-          {(Object.entries(statusConfig) as [WorkStatus, typeof currentStatus][]).map(([key, cfg]) => (
+          {(Object.entries(statusConfig) as [WorkStatus, { label: string; color: string }][]).map(([key, cfg]) => (
             <DropdownMenuItem
               key={key}
               onClick={() => setWorkStatus(key)}
               className="gap-2 text-xs"
             >
-              <Circle className={cn('h-2.5 w-2.5 fill-current', cfg.color.replace('bg-', 'text-'))} />
+              <Circle className={cn('h-2.5 w-2.5 fill-current', cfg.color)} />
               {cfg.label}
             </DropdownMenuItem>
           ))}
@@ -123,4 +123,11 @@ export default function WorkDayClock() {
       </DropdownMenu>
     </div>
   );
+}
+
+// Guard: only render inner component when user is authenticated
+export default function WorkDayClock() {
+  const { user } = useAuth();
+  if (!user) return null;
+  return <WorkDayClockInner />;
 }

@@ -326,6 +326,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    // Set work status to offline before signing out
+    if (user) {
+      await supabase.from('profiles').update({ work_status: 'offline' }).eq('id', user.id);
+    }
     localStorage.removeItem('activeCompanyId');
     await supabase.auth.signOut();
     resetState();

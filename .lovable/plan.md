@@ -1,121 +1,143 @@
 
-# Timesheets — Ξεχωριστή Σελίδα με Προηγμένες Προβολές
+
+# Ευρετήριο Επαφών — Contacts Directory
 
 ## Επισκόπηση
 
-Αφαίρεση του Timesheets tab από το HR και δημιουργία αυτόνομης σελίδας `/timesheets` με:
-- Weekly grid view (σαν την εικόνα αναφοράς) — tasks σε γραμμές, ημέρες σε στήλες
-- List view (βελτιωμένη τρέχουσα)
-- Φίλτρα ανά χρονικό διάστημα (προεπιλογές + custom range)
-- Ομαδοποίηση ανά έργο, άτομο, task, status
-- Inline editing καταχωρήσεων
-- Navbar link για Timesheets
+Δημιουργία ενός ενιαίου **Ευρετηρίου Επαφών** (`/contacts`) που θα περιλαμβάνει προμηθευτές, συνεργάτες, φορείς, δημοσιογράφους, influencers, εταιρείες, φυσικά πρόσωπα — και τους υπάρχοντες πελάτες. Κάθε επαφή θα έχει δική της καρτέλα, tags, στοιχεία επικοινωνίας, και θα μπορεί να χρησιμοποιηθεί σε ολόκληρη την εφαρμογή (ομάδα έργου, τιμολόγια, κλπ). Εξωτερικοί συνεργάτες θα μπορούν να λάβουν πρόσκληση για περιορισμένη πρόσβαση.
 
 ---
 
-## 1. Routing & Navigation
+## 1. Database — Νέος Πίνακας `contacts`
 
-### App.tsx
-- Αλλαγή: `/timesheets` δείχνει σε `<Timesheets />` αντί για redirect στο HR
-- Αφαίρεση του redirect `/timesheets -> /hr?tab=timesheets`
+Δημιουργία πίνακα `contacts` με τα εξής πεδία:
 
-### HR.tsx
-- Αφαίρεση του Timesheets tab και του `TimesheetsContent` wrapper
-- Αφαίρεση του import `TimesheetsPage`
+| Στήλη | Τύπος | Περιγραφή |
+|-------|-------|-----------|
+| id | uuid PK | |
+| company_id | uuid FK -> companies | Εταιρεία που τον δημιούργησε |
+| name | text NOT NULL | Ονοματεπώνυμο / Επωνυμία |
+| entity_type | text | `person`, `company`, `organization` |
+| email | text | Κύριο email |
+| phone | text | Τηλέφωνο |
+| secondary_phone | text | Δεύτερο τηλέφωνο |
+| address | text | Διεύθυνση |
+| website | text | Ιστοσελίδα |
+| tax_id | text | ΑΦΜ |
+| notes | text | Σημειώσεις |
+| tags | text[] | Tags: freelancer, influencer, journalist, κλπ |
+| category | text | Κατηγορία: supplier, partner, media, government, κλπ |
+| client_id | uuid FK -> clients, nullable | Αν αντιστοιχεί σε υπάρχοντα πελάτη |
+| is_active | boolean default true | |
+| avatar_url | text | Φωτογραφία/Logo |
+| created_at, updated_at | timestamptz | |
 
-### AppSidebar.tsx
-- Προσθήκη νέου nav item: `{ title: 'Timesheets', href: '/timesheets', icon: Timer }`
+Δημιουργία πίνακα `contact_tags` (predefined tags ανά company):
 
----
+| Στήλη | Τύπος |
+|-------|-------|
+| id | uuid PK |
+| company_id | uuid FK |
+| name | text |
+| color | text |
 
-## 2. Weekly Grid View (Timesheet View)
+Σύνδεση contact με έργα — πίνακας `project_contact_access`:
 
-Νέο section στη σελίδα Timesheets, όπως η εικόνα αναφοράς:
+| Στήλη | Τύπος |
+|-------|-------|
+| id | uuid PK |
+| project_id | uuid FK |
+| contact_id | uuid FK |
+| role | text (supplier, collaborator, subcontractor...) |
 
-```text
-< >  Φεβ 16 – Φεβ 22  v
-
-Task / Location          | Δευ 16 | Τρι 17 | Τετ 18 | Πεμ 19 | Παρ 20 | Σαβ 21 | Κυρ 22 | Total
-─────────────────────────┼────────┼────────┼────────┼────────┼────────┼────────┼────────┼──────
-Digitalisation           |   —    | 2h 44m | 1h 21m | 8h 55m | 4h 9m  |   —    |   —    | 17h 11m
-  On Going / Project X   |        |        |        |        |        |        |        |
-Audit Accounts           |   —    | 3h 17m | 6h 18m |   —    |   —    |   —    |   —    | 9h 35m
-  Open / Project Y       |        |        |        |        |        |        |        |
-```
-
-- Γραμμές = tasks (ομαδοποιημένα ανά project)
-- Στήλες = ημέρες της εβδομάδας
-- Κάθε κελί = σύνολο χρόνου για task+ημέρα
-- Click σε κελί = inline edit ή popover για προσθήκη/επεξεργασία χρόνου
-- Header στηλών: ημέρα + σύνολο ωρών ημέρας
-- Τελευταία στήλη: Total ανά task
-- Color bar στο header ανά ημέρα (progress indicator)
-- Play button ανά task row για εκκίνηση timer
-- Πλοήγηση εβδομάδας με < > βελάκια
-
----
-
-## 3. Φίλτρα & Χρονικό Διάστημα
-
-### Προεπιλογές
-- Σήμερα, Αυτή την εβδομάδα, Αυτόν τον μήνα, Προηγούμενη εβδομάδα, Προηγούμενος μήνας
-
-### Custom Range
-- Date range picker (από - έως) για ελεύθερη επιλογή
-
-### Ομαδοποίηση (Group By)
-- Ανά Έργο (default)
-- Ανά Άτομο
-- Ανά Task
-- Ανά Status
-
-### Φίλτρα
-- Έργο (dropdown)
-- Άτομο (dropdown, μόνο admin/manager)
-- Status (todo, in_progress, done, κλπ)
+RLS Policies:
+- SELECT: Ενεργοί χρήστες βλέπουν contacts της εταιρείας τους
+- INSERT/UPDATE/DELETE: Admin/Manager μόνο
+- contact_tags: Ίδια λογική
 
 ---
 
-## 4. View Toggle
+## 2. Μετεγκατάσταση Πελατών
 
-Δύο προβολές με toggle:
-- **Timesheet** (weekly grid) — η κύρια, σαν την εικόνα
-- **Time Entries** (list) — η βελτιωμένη τρέχουσα λίστα
-
----
-
-## 5. Inline Editing
-
-Στη list view, κάθε καταχώρηση θα υποστηρίζει inline edit:
-- Ώρα έναρξης / λήξης
-- Σημειώσεις (description)
-- Task assignment
-- Project
-
-Στη timesheet (grid) view:
-- Click σε κελί ανοίγει popover για edit/add χρόνο
+- Κάθε υπάρχων client θα αποκτήσει αυτόματα μια αντίστοιχη εγγραφή στον πίνακα `contacts` μέσω migration (INSERT...SELECT)
+- Η στήλη `client_id` στο contact θα δείχνει στον αρχικό client
+- Η σελίδα Πελατών (`/clients`) **παραμένει** ως έχει
+- Στο Ευρετήριο, οι πελάτες θα εμφανίζονται με ειδικό badge "Πελάτης"
 
 ---
 
-## Αρχεία που Αλλάζουν
+## 3. Σελίδα Ευρετηρίου — `/contacts`
+
+### Κύρια προβολή
+- Table view με στήλες: Όνομα, Τύπος, Κατηγορία, Tags, Email, Τηλέφωνο, Ενέργειες
+- Αναζήτηση full-text (όνομα, email, tags)
+- Φίλτρα: κατηγορία, entity_type, tags
+- Export CSV
+- Κουμπί "Νέα Επαφή"
+
+### Καρτέλα Επαφής — `/contacts/:id`
+- Header με avatar, όνομα, κατηγορία, tags
+- Στοιχεία επικοινωνίας (email, τηλέφωνα, διεύθυνση, website, ΑΦΜ)
+- Tab "Έργα": λίστα έργων στα οποία συμμετέχει (μέσω project_contact_access)
+- Tab "Τιμολόγια": τιμολόγια που σχετίζονται (αν είναι πελάτης, μέσω client_id)
+- Tab "Σημειώσεις"
+- Αν είναι πελάτης: link προς `/clients/:id`
+
+---
+
+## 4. Ενσωμάτωση στην Εφαρμογή
+
+### Ομάδα Έργου (ProjectTeamManager)
+- Νέο section "Εξωτερικοί Συνεργάτες" κάτω από την ομάδα
+- Dropdown/search για επιλογή contact από το Ευρετήριο
+- Ρόλος (supplier, collaborator, subcontractor, consultant)
+- Αποθήκευση στο `project_contact_access`
+
+### Τιμολόγια (InvoicesManager)
+- Στο dropdown πελάτη, εμφάνιση και contacts που δεν είναι πελάτες (π.χ. προμηθευτές για expenses)
+
+### Global Search (TopBar)
+- Προσθήκη contacts στα αποτελέσματα αναζήτησης
+
+---
+
+## 5. Πρόσκληση Εξωτερικού Συνεργάτη
+
+- Κουμπί "Πρόσκληση" στην καρτέλα contact
+- Χρήση του υπάρχοντος μηχανισμού `invitations` με ρόλο `standard` και `access_scope: assigned`
+- Ανάθεση project_ids: μόνο τα έργα στα οποία ο contact είναι assigned
+- Ο εξωτερικός συνεργάτης βλέπει μόνο τα tasks/deliverables των έργων που του έχουν ανατεθεί
+
+---
+
+## 6. Navigation
+
+- Νέο nav item στο sidebar: `{ title: 'Ευρετήριο', href: '/contacts', icon: BookUser }`
+- Τοποθέτηση κάτω από τα Timesheets, πριν το HR
+
+---
+
+## Αρχεία που Δημιουργούνται / Αλλάζουν
 
 | Αρχείο | Αλλαγή |
 |--------|--------|
-| `src/pages/Timesheets.tsx` | **Rewrite** — Νέα σελίδα με view toggle, grid view, filters |
-| `src/pages/HR.tsx` | Αφαίρεση timesheets tab |
-| `src/App.tsx` | Route `/timesheets` -> `<Timesheets />` αντί redirect |
-| `src/components/layout/AppSidebar.tsx` | Νέο nav item Timesheets |
-| `src/components/time-tracking/TimesheetGridView.tsx` | **Νέο** — Weekly grid component |
-| `src/components/time-tracking/TimesheetFilters.tsx` | **Νέο** — Filters & date range |
-| `src/components/time-tracking/TimeEntriesListView.tsx` | **Νέο** — Βελτιωμένη list view με inline edit |
+| **Migration SQL** | Δημιουργία `contacts`, `contact_tags`, `project_contact_access` + RLS + seed clients |
+| `src/pages/Contacts.tsx` | **Νέο** — Σελίδα ευρετηρίου |
+| `src/pages/ContactDetail.tsx` | **Νέο** — Καρτέλα επαφής |
+| `src/components/contacts/ContactsTableView.tsx` | **Νέο** — Table view |
+| `src/components/contacts/ContactForm.tsx` | **Νέο** — Dialog δημιουργίας/επεξεργασίας |
+| `src/components/contacts/ContactSelector.tsx` | **Νέο** — Reusable dropdown για επιλογή contact |
+| `src/components/projects/ProjectTeamManager.tsx` | Προσθήκη section εξωτερικών συνεργατών |
+| `src/components/layout/AppSidebar.tsx` | Νέο nav item |
+| `src/App.tsx` | Routes `/contacts` και `/contacts/:id` |
+| `src/components/layout/TopBar.tsx` | Contacts στο global search |
 
 ---
 
 ## Τεχνικές Σημειώσεις
 
-- Τα δεδομένα φορτώνονται από τον πίνακα `time_entries` με joins σε `tasks`, `projects`, `profiles`
-- Η grid view υπολογίζει aggregates client-side (group by task+day)
-- Inline edit χρησιμοποιεί το υπάρχον `EnhancedInlineEditCell` component
-- Realtime subscription για live updates παραμένει
-- Export CSV/Excel παραμένει
-- Η σελίδα δεν απαιτεί database migration — χρησιμοποιεί τους υπάρχοντες πίνακες
+- Ο πίνακας `clients` **δεν αλλάζει** — η σχέση γίνεται μέσω `contacts.client_id`
+- Τα tags αποθηκεύονται ως `text[]` στο contact για ταχύτητα, ενώ τα predefined tags είναι στο `contact_tags`
+- Η πρόσκληση χρησιμοποιεί τον υπάρχοντα μηχανισμό invitations (accept_invitation function) χωρίς αλλαγές στο backend
+- RLS policies χρησιμοποιούν τις υπάρχουσες security definer functions (`get_user_company_id`, `is_admin_or_manager`, `is_active_user`)
+

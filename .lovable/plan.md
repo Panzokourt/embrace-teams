@@ -1,199 +1,214 @@
 
-# Secretary — AI Agent Page
+# Secretary v2 — Enhanced AI Agent
 
-## Τι είναι
+## Επισκόπηση 6 Βελτιώσεων
 
-Μια νέα full-page σελίδα `/secretary` με ChatGPT-style interface. Ο AI agent μπορεί να **εκτελεί ενέργειες** στην εφαρμογή (create task, upload file, open client, κλπ.) μέσω tool calling, και να **απαντά σε ερωτήσεις** βάσει real-time δεδομένων.
+1. **@Mentions** στο chat input (άτομα, tasks, projects, αρχεία)
+2. **Ιστορικό συνομιλιών** με DB persistence
+3. **Διαδραστικές επιλογές** (κουμπιά, dropdowns) στις απαντήσεις
+4. **Πληρέστερη συλλογή πληροφοριών** — ο agent ρωτά βήμα-βήμα
+5. **Secretary Panel** (resizable side panel) εκτός από full page
+6. **Δημιουργία & Download αρχείων** (CSV, αναφορές, πίνακες)
 
-## Αρχιτεκτονική
+---
 
-Η κεντρική ιδέα: το AI model χρησιμοποιεί **tool calling** (function calling) για να εκτελεί ενέργειες. Το edge function:
-1. Λαμβάνει τα μηνύματα + user context
-2. Στέλνει στο Gemini **με tools definitions**
-3. Αν το AI καλέσει ένα tool, το edge function **εκτελεί τη λειτουργία** στη βάση (με τα δικαιώματα του χρήστη via RLS) και επιστρέφει το αποτέλεσμα
-4. Το AI συνεχίζει με την απάντηση
+## 1. @Mentions στο Chat Input
 
-```text
-Frontend (Chat UI)
-    │
-    ▼
-Edge Function: secretary-agent
-    │
-    ├── Fetch user context (profile, permissions, projects, tasks...)
-    ├── Send to Gemini with tool definitions
-    │
-    ├── Tool call? ──► Execute via Supabase (RLS-protected)
-    │                   └── Return result to AI
-    │                   └── AI continues response
-    │
-    └── Stream final response to frontend
+### Πώς λειτουργεί
+Ο χρήστης πληκτρολογεί `@` στο textarea και εμφανίζεται popover με αναζήτηση σε:
+- **Άτομα** (profiles) — εικονίδιο user
+- **Projects** — εικονίδιο folder
+- **Tasks** — εικονίδιο check
+- **Αρχεία** — εικονίδιο file
+
+Η επιλογή εισάγει `@[Όνομα](type:id)` στο μήνυμα. Στο rendering, αυτό εμφανίζεται ως styled badge. Στο edge function, αυτά τα mentions αναλύονται και προστίθεται context (π.χ. "ο χρήστης αναφέρθηκε στο project X με id Y").
+
+### Τεχνική Υλοποίηση
+- Νέο component `MentionInput` μέσα στο Secretary — textarea wrapper με popover
+- Κατά την πληκτρολόγηση `@`, debounced search σε profiles/projects/tasks/files
+- Popover εμφανίζεται κάτω από τον cursor (ή πάνω, ανάλογα θέση)
+- Τα mentions μετατρέπονται σε text tokens πριν σταλούν στο edge function
+
+---
+
+## 2. Ιστορικό Συνομιλιών (DB Persistence)
+
+### Database Migration
+
+```sql
+CREATE TABLE public.secretary_conversations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  company_id UUID NOT NULL REFERENCES companies(id),
+  title TEXT DEFAULT 'Νέα συνομιλία',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE public.secretary_messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversation_id UUID NOT NULL REFERENCES secretary_conversations(id) ON DELETE CASCADE,
+  role TEXT NOT NULL, -- 'user' | 'assistant'
+  content TEXT NOT NULL,
+  metadata JSONB DEFAULT '{}', -- για interactive actions, mentions κλπ
+  created_at TIMESTAMPTZ DEFAULT now()
+);
 ```
 
-## Διαθέσιμα Tools (18 tools)
+RLS: ο χρήστης βλέπει μόνο τις δικές του συνομιλίες.
 
-Κάθε tool εκτελείται server-side μέσω Supabase client **με το JWT του χρήστη**, οπότε τα RLS policies εφαρμόζονται αυτόματα.
+### UI: Sidebar ιστορικού
+- Αριστερά στη full-page view: λίστα conversations (ομαδοποιημένα: Σήμερα / Χθες / Παλαιότερα)
+- Click σε conversation → φόρτωση μηνυμάτων
+- "Νέα συνομιλία" δημιουργεί νέο record
+- Auto-title: μετά το 1ο μήνυμα, ο agent δημιουργεί τίτλο (ή χρησιμοποιούμε τα πρώτα 50 chars)
+- Delete conversation
 
-| Tool | Περιγραφή | Παράμετροι |
+---
+
+## 3. Διαδραστικές Επιλογές (Interactive Actions)
+
+### Πώς λειτουργεί
+Ο agent στέλνει structured JSON μαζί με το text response. Το frontend αναγνωρίζει αυτά τα blocks και τα render-άρει ως κουμπιά/dropdowns.
+
+### Format
+Η απάντηση του agent θα περιέχει ειδικά markdown blocks:
+
+```text
+Βρήκα 3 projects. Σε ποιο θέλεις να προσθέσω το task;
+
+:::actions
+[{"type":"button","label":"Rebranding ACME","action":"select_project","data":{"project_id":"abc123"}}]
+[{"type":"button","label":"Website Redesign","action":"select_project","data":{"project_id":"def456"}}]
+[{"type":"button","label":"Social Campaign","action":"select_project","data":{"project_id":"ghi789"}}]
+:::
+```
+
+### Τύποι actions
+| Type | Rendering | Λειτουργία |
 |------|-----------|------------|
-| `create_task` | Δημιουργία task σε project | project_id, title, description, priority, due_date, assigned_to, deliverable_id |
-| `update_task` | Ενημέρωση task (status, priority κλπ) | task_id, fields to update |
-| `list_my_tasks` | Λίστα tasks του χρήστη | status filter, project filter |
-| `list_team_tasks` | Tasks της ομάδας (αν manager) | filters |
-| `create_brief` | Δημιουργία brief οποιουδήποτε τύπου | brief_type, title, data (JSON), project_id, client_id |
-| `list_briefs` | Λίστα briefs | type filter |
-| `create_client` | Δημιουργία πελάτη | name, contact_email, phone, address |
-| `list_clients` | Λίστα πελατών | search |
-| `list_projects` | Λίστα projects | status filter |
-| `create_folder` | Δημιουργία φακέλου στην αρχειοθέτηση | name, parent_folder_id, project_id |
-| `upload_file_to_folder` | Αρχειοθέτηση (metadata only - actual upload γίνεται client-side) | file_name, folder_id, project_id |
-| `request_leave` | Αίτημα άδειας | leave_type_id, start_date, end_date, reason |
-| `list_leave_balance` | Υπόλοιπο αδειών | - |
-| `get_project_summary` | Σύνοψη project (tasks, budget, progress) | project_id |
-| `search_files` | Αναζήτηση αρχείων | query, project_id |
-| `create_deliverable` | Δημιουργία παραδοτέου | project_id, name, description, budget, due_date |
-| `list_team_members` | Λίστα μελών ομάδας/εταιρείας | department filter |
-| `create_expense` | Καταχώρηση εξόδου | project_id, amount, description, category |
+| `button` | Κουμπί | Click στέλνει prompt αυτόματα |
+| `select` | Dropdown | Επιλογή στέλνει prompt |
+| `confirm` | Yes/No buttons | Επιβεβαίωση ενέργειας |
+| `link` | Link button | Πλοήγηση σε σελίδα εφαρμογής |
 
-## Edge Function: `supabase/functions/secretary-agent/index.ts`
+### Τεχνική Υλοποίηση
+- Custom markdown renderer που αναγνωρίζει `:::actions ... :::` blocks
+- Κάθε action button στέλνει αυτόματα ένα pre-formatted message στον agent
+- Η πληροφορία (project_id, task_id κλπ) πηγαίνει embedded στο μήνυμα
 
-Αυτό είναι το μεγαλύτερο κομμάτι. Η δομή:
+### Edge Function αλλαγές
+- Ενημέρωση system prompt ώστε ο agent να χρησιμοποιεί τα `:::actions` blocks
+- Οδηγίες: "Όταν χρειάζεται επιλογή, δώσε κουμπιά αντί να ρωτάς με κείμενο"
+
+---
+
+## 4. Πληρέστερη Συλλογή Πληροφοριών
+
+Αυτό είναι κυρίως αλλαγή στο **system prompt** του edge function:
 
 ```text
-secretary-agent/index.ts
-├── CORS + Auth validation (JWT)
-├── Fetch rich context:
-│   ├── Profile + permissions + company role
-│   ├── Active tasks (top 50)
-│   ├── Active projects (top 30)
-│   ├── Clients list
-│   ├── Brief types available
-│   ├── Leave types + balances
-│   └── Team members (if manager/admin)
-│
-├── Tool definitions (18 tools as JSON Schema)
-│
-├── System prompt (Greek, agency context)
-│
-├── Non-streaming loop:
-│   1. Call Gemini with messages + tools
-│   2. If response has tool_calls:
-│      a. Execute each tool via Supabase
-│      b. Append tool results to messages
-│      c. Call Gemini again (loop)
-│   3. If response is text: return to client
-│
-└── Return final response
+Πριν εκτελέσεις κάποιο tool:
+1. Ρώτα βήμα-βήμα τον χρήστη για ΟΛΕΣ τις παραμέτρους
+2. Για κάθε παράμετρο, δώσε επιλογές (κουμπιά) αν υπάρχουν περιορισμένες τιμές
+3. Για create_task: ρώτα project, τίτλο, περιγραφή, προτεραιότητα, deadline, υπεύθυνο
+4. Για create_brief: ρώτα τύπο, τίτλο, project, πελάτη, και κάθε πεδίο του brief
+5. Πάντα δείξε preview πριν εκτελέσεις (με confirm κουμπί)
+6. Μετά την εκτέλεση, δείξε σύνοψη + link
 ```
 
-**Σημαντικό**: Δεν χρησιμοποιούμε streaming εδώ γιατί το tool calling loop απαιτεί πολλαπλά round-trips με το AI. Αντ' αυτού:
-- Στέλνουμε ένα request, περιμένουμε το πλήρες response
-- Αν υπάρχουν tool calls, τα εκτελούμε και ξαναστέλνουμε
-- Επιστρέφουμε το τελικό text response
+Δεν απαιτεί code αλλαγές, μόνο system prompt refinement.
 
-Αν το tool calling ολοκληρωθεί και θέλουμε streaming στο τελευταίο response, μπορούμε να κάνουμε hybrid: non-streaming για tool loops, streaming για final answer.
+---
 
-## Frontend: Νέα σελίδα `/secretary`
+## 5. Secretary Panel (Side Panel + Resizable)
 
-### UI Layout (ChatGPT-inspired)
+### Αρχιτεκτονική
+- Νέο component `SecretaryPanel` — Sheet/Drawer από δεξιά
+- Χρησιμοποιεί `react-resizable-panels` (ήδη εγκατεστημένο) για resizable width
+- Toggle button στο TopBar ή floating button
+- Κοινό chat engine (shared component) μεταξύ full-page και panel
+
+### Δομή Components
 
 ```text
-┌──────────────────────────────────────────────────────────────┐
-│  ◀  Secretary                                    [+ New Chat]│
-├──────────────────────────────────────────────────────────────┤
-│                                                              │
-│              🤖 Γεια! Είμαι ο Secretary.                     │
-│              Πώς μπορώ να σε βοηθήσω;                       │
-│                                                              │
-│  ┌──────────────────────────────────────────┐                │
-│  │ Δημιούργησε ένα task "Σχεδιασμός logo"   │                │
-│  │ στο project "Rebranding ACME" με         │  ← user msg   │
-│  │ deadline αύριο                            │                │
-│  └──────────────────────────────────────────┘                │
-│                                                              │
-│  ┌──────────────────────────────────────────┐                │
-│  │ ✅ Δημιούργησα το task:                   │                │
-│  │ • Τίτλος: Σχεδιασμός logo                │  ← AI reply   │
-│  │ • Project: Rebranding ACME               │                │
-│  │ • Deadline: 22/02/2026                   │                │
-│  │ • Priority: medium                        │                │
-│  │                                           │                │
-│  │ Θέλεις να το αναθέσω σε κάποιον;         │                │
-│  └──────────────────────────────────────────┘                │
-│                                                              │
-│                                                              │
-├──────────────────────────────────────────────────────────────┤
-│  Quick actions:                                              │
-│  [📋 Tasks μου] [📝 Νέο Brief] [📁 Αρχεία] [🏖 Άδεια]     │
-│                                                              │
-│  ┌────────────────────────────────────┐  [Send]              │
-│  │ Γράψε μήνυμα...                   │                      │
-│  └────────────────────────────────────┘                      │
-└──────────────────────────────────────────────────────────────┘
+SecretaryChat (shared logic + UI)
+├── ConversationSidebar (history list)
+├── MessageList (messages + interactive actions)
+├── MentionInput (input με @mentions)
+└── ActionRenderer (buttons/dropdowns σε messages)
+
+Secretary.tsx (full page) → uses SecretaryChat
+SecretaryPanel.tsx (side panel) → uses SecretaryChat in Sheet
+AppLayout.tsx → renders SecretaryPanel + toggle button
 ```
 
-### Χαρακτηριστικά UI:
-- **Full-page layout** μέσα στο AppLayout (sidebar visible)
-- **Message bubbles** με markdown rendering
-- **Quick action chips** πάνω από το input (shortcut prompts)
-- **Loading indicator** ("Secretary σκέφτεται..." + animated dots) κατά τη διάρκεια tool execution
-- **Tool execution feedback**: Inline badges/cards που δείχνουν τι εκτέλεσε (π.χ. "Task δημιουργήθηκε" με link)
-- **Conversation memory**: Κρατά τα μηνύματα στο local state (δεν αποθηκεύεται σε DB - fresh start κάθε φορά, εκτός αν ζητηθεί αργότερα)
+### Panel UI
+- Ελάχιστο πλάτος: 360px, μέγιστο: 700px, default: 420px
+- Drag handle στην αριστερή πλευρά
+- Header: "Secretary" + minimize + close
+- Κλείνει/ανοίγει με keyboard shortcut (Cmd+J) ή button στο TopBar
+- Σε mobile: full-screen sheet
 
-### Component: `src/pages/Secretary.tsx`
+---
 
-State:
-```typescript
-const [messages, setMessages] = useState<ChatMsg[]>([]);
-const [input, setInput] = useState('');
-const [loading, setLoading] = useState(false);
-```
+## 6. Δημιουργία & Download Αρχείων
 
-Κάθε μήνυμα θα στέλνεται στο edge function `secretary-agent` μαζί με ολόκληρο το conversation history.
+### Νέα Tools στο Edge Function
 
-## Αρχεία που δημιουργούνται/αλλάζουν
+| Tool | Περιγραφή |
+|------|-----------|
+| `generate_csv_report` | Δημιουργεί CSV από δεδομένα (tasks, expenses, κλπ) |
+| `generate_project_report` | Markdown report ενός project |
+| `generate_task_summary_table` | Πίνακας tasks σε markdown + CSV |
 
-| Αρχείο | Τύπος |
-|--------|-------|
-| `supabase/functions/secretary-agent/index.ts` | **Νέο** — Edge function με tool calling |
-| `src/pages/Secretary.tsx` | **Νέο** — Full-page chat UI |
-| `src/App.tsx` | **Edit** — Προσθήκη route `/secretary` |
-| `src/components/layout/AppSidebar.tsx` | **Edit** — Προσθήκη nav item "Secretary" (icon: Bot) |
-| `supabase/config.toml` | **Edit** — Register new function |
-
-## System Prompt (περίληψη)
+### Πώς λειτουργεί
+1. Ο agent καλεί ένα generate tool
+2. Το tool επιστρέφει τα δεδομένα ως string (CSV ή markdown)
+3. Ο agent τα παρουσιάζει inline + κουμπί "Download"
+4. Χρησιμοποιεί ένα ειδικό `:::download` block:
 
 ```text
-Είσαι ο Secretary, ο AI βοηθός της εταιρείας [company name].
-Μπορείς να εκτελείς ενέργειες στο σύστημα χρησιμοποιώντας τα tools σου.
+Ετοίμασα την αναφορά:
 
-Κανόνες:
-- Πάντα ρώτα για επιβεβαίωση πριν εκτελέσεις κάτι σημαντικό
-- Αν λείπουν παράμετροι, ρώτα τον χρήστη
-- Χρησιμοποίησε markdown
-- Μιλάς ελληνικά εκτός αν σε ρωτήσουν αγγλικά
-- Αν δεν μπορείς να κάνεις κάτι, εξήγησε γιατί
-- Αν δεν έχεις δικαιώματα, ενημέρωσε τον χρήστη
+:::download
+{"filename":"tasks_report_2026-02.csv","content_type":"text/csv","data":"...base64..."}
+:::
 
-Context: [user profile, tasks, projects, clients, team...]
+| Task | Status | Priority | Deadline |
+|------|--------|----------|----------|
+| Logo design | In Progress | High | 25/02 |
 ```
 
-## Ασφάλεια
+### Frontend
+- Custom renderer για `:::download` blocks
+- Κουμπί "Κατέβασε" δημιουργεί Blob + `URL.createObjectURL` + `<a download>`
+- Για πίνακες: rendered ως markdown table (ήδη υποστηρίζεται από react-markdown)
 
-- Όλα τα tool executions γίνονται με τον Supabase client που χρησιμοποιεί το JWT του χρήστη
-- Τα RLS policies εφαρμόζονται αυτόματα — αν ο χρήστης δεν έχει δικαίωμα, η query αποτυγχάνει
-- Ο agent δεν μπορεί να κάνει τίποτα που δεν θα μπορούσε να κάνει ο χρήστης χειροκίνητα
-- JWT validation στην αρχή του edge function
+---
 
-## Ροή Εκτέλεσης Tool (παράδειγμα)
+## Αρχεία που Αλλάζουν
 
-```text
-User: "Φτιάξε ένα task Σχεδιασμός Logo στο ACME project"
+| Αρχείο | Αλλαγή |
+|--------|--------|
+| **Migration SQL** | Νέοι πίνακες `secretary_conversations` + `secretary_messages` + RLS |
+| `supabase/functions/secretary-agent/index.ts` | Νέα tools (generate_csv, generate_report), ενημέρωση system prompt, conversation persistence |
+| `src/components/secretary/SecretaryChat.tsx` | **Νέο** — Shared chat component (messages, input, actions) |
+| `src/components/secretary/MentionInput.tsx` | **Νέο** — Textarea με @mention popover |
+| `src/components/secretary/ActionRenderer.tsx` | **Νέο** — Renders interactive buttons/dropdowns/downloads |
+| `src/components/secretary/ConversationSidebar.tsx` | **Νέο** — Ιστορικό συνομιλιών |
+| `src/components/secretary/SecretaryPanel.tsx` | **Νέο** — Resizable side panel wrapper |
+| `src/pages/Secretary.tsx` | **Rewrite** — Χρησιμοποιεί SecretaryChat |
+| `src/components/layout/AppLayout.tsx` | Προσθήκη SecretaryPanel + toggle state |
+| `src/components/layout/TopBar.tsx` | Προσθήκη Secretary toggle button |
 
-1. Edge function fetches context → knows ACME project_id
-2. Sends to Gemini with tools
-3. Gemini calls: create_task({ project_id: "abc", title: "Σχεδιασμός Logo", priority: "medium" })
-4. Edge function executes: supabase.from('tasks').insert(...)
-5. Returns result: { success: true, task_id: "xyz", title: "Σχεδιασμός Logo" }
-6. Gemini gets result, generates final message: "Δημιούργησα το task..."
-7. Response sent to frontend
-```
+---
+
+## Τεχνικές Σημειώσεις
+
+- **Conversation auto-title**: Μετά το 1ο user message, χρησιμοποιούμε τα πρώτα 50 chars σαν τίτλο. Ο agent μπορεί να τον αλλάξει μέσω tool call αργότερα.
+- **Panel state**: Αποθηκεύεται στο localStorage (open/closed, width)
+- **@Mentions search**: Debounced 300ms, max 10 results, queries profiles + projects + tasks + file_attachments
+- **Download files**: Client-side Blob generation, no server storage needed
+- **Interactive actions**: Parsed client-side, δεν χρειάζεται αλλαγή στο AI response format — μόνο system prompt instructions
+- **Shared chat engine**: Ίδιο component για full-page και panel, μόνο CSS differences

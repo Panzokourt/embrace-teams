@@ -238,9 +238,15 @@ export type Database = {
           contact_phone: string | null
           created_at: string
           id: string
+          logo_url: string | null
           name: string
           notes: string | null
+          secondary_phone: string | null
+          sector: string | null
+          tags: string[] | null
+          tax_id: string | null
           updated_at: string
+          website: string | null
         }
         Insert: {
           address?: string | null
@@ -249,9 +255,15 @@ export type Database = {
           contact_phone?: string | null
           created_at?: string
           id?: string
+          logo_url?: string | null
           name: string
           notes?: string | null
+          secondary_phone?: string | null
+          sector?: string | null
+          tags?: string[] | null
+          tax_id?: string | null
           updated_at?: string
+          website?: string | null
         }
         Update: {
           address?: string | null
@@ -260,9 +272,15 @@ export type Database = {
           contact_phone?: string | null
           created_at?: string
           id?: string
+          logo_url?: string | null
           name?: string
           notes?: string | null
+          secondary_phone?: string | null
+          sector?: string | null
+          tags?: string[] | null
+          tax_id?: string | null
           updated_at?: string
+          website?: string | null
         }
         Relationships: [
           {
@@ -413,6 +431,7 @@ export type Database = {
           notes: string | null
           phone: string | null
           secondary_phone: string | null
+          sector: string | null
           tags: string[] | null
           tax_id: string | null
           updated_at: string | null
@@ -433,6 +452,7 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           secondary_phone?: string | null
+          sector?: string | null
           tags?: string[] | null
           tax_id?: string | null
           updated_at?: string | null
@@ -453,6 +473,7 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           secondary_phone?: string | null
+          sector?: string | null
           tags?: string[] | null
           tax_id?: string | null
           updated_at?: string | null

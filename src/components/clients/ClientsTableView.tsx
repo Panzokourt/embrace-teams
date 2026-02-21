@@ -32,8 +32,22 @@ interface Client {
   address: string | null;
   notes: string | null;
   created_at: string;
+  sector: string | null;
+  website: string | null;
+  tax_id: string | null;
+  secondary_phone: string | null;
+  tags: string[] | null;
+  logo_url: string | null;
   projectCount?: number;
 }
+
+const sectorLabels: Record<string, string> = {
+  public: 'Δημόσιος',
+  private: 'Ιδιωτικός',
+  non_profit: 'Μη Κερδοσκ.',
+  government: 'Κυβερνητικός',
+  mixed: 'Μικτός',
+};
 
 interface ClientsTableViewProps {
   clients: Client[];
@@ -159,6 +173,7 @@ export function ClientsTableView({
                   <SortIcon field="contact_email" />
                 </div>
               </TableHead>
+              <TableHead>Τομέας</TableHead>
               <TableHead>Διεύθυνση</TableHead>
               <TableHead 
                 className="cursor-pointer select-none"
@@ -184,7 +199,7 @@ export function ClientsTableView({
           <TableBody>
             {sortedClients.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
                   Δεν βρέθηκαν πελάτες
                 </TableCell>
               </TableRow>
@@ -241,6 +256,13 @@ export function ClientsTableView({
                         <span className="text-muted-foreground/50">-</span>
                       )}
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    {client.sector ? (
+                      <Badge variant="outline">{sectorLabels[client.sector] || client.sector}</Badge>
+                    ) : (
+                      <span className="text-muted-foreground/50">-</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     {client.address ? (

@@ -25,7 +25,11 @@ const briefIcons: Record<string, React.ComponentType<{ className?: string }>> = 
   Palette, Monitor, FileText, Globe, Calendar, MessageSquare,
 };
 
-export function QuickActionButton() {
+interface QuickActionButtonProps {
+  rightPanelOpen?: boolean;
+}
+
+export function QuickActionButton({ rightPanelOpen }: QuickActionButtonProps) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [selectedBriefType, setSelectedBriefType] = useState<string | null>(null);
@@ -57,11 +61,13 @@ export function QuickActionButton() {
           <Button
             size="icon"
             className={cn(
-              "fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-lg",
+              "fixed bottom-6 z-50 h-14 w-14 rounded-full shadow-lg",
               "bg-primary hover:bg-primary/90 text-primary-foreground",
-              "transition-transform duration-200",
-              open && "rotate-45"
+              "transition-all duration-200",
+              open && "rotate-45",
+              rightPanelOpen ? "right-[calc(30%+1.5rem)]" : "right-6"
             )}
+            style={rightPanelOpen ? { right: undefined } : undefined}
           >
             <Plus className="h-6 w-6" />
           </Button>

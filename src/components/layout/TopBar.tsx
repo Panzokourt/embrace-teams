@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Activity, FolderKanban, CheckSquare, FileText, Users, X, Bot } from 'lucide-react';
+import { Search, Activity, FolderKanban, CheckSquare, FileText, Users, Bot, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
 import { supabase } from '@/integrations/supabase/client';
+import { cn } from '@/lib/utils';
+import type { RightPanelTab } from '@/components/secretary/SecretaryPanel';
 
 interface SearchResult {
   id: string;
@@ -22,10 +23,13 @@ const entityConfig = {
 
 interface TopBarProps {
   onActivityToggle: () => void;
-  onSecretaryToggle?: () => void;
+  onSecretaryToggle: () => void;
+  onNotificationsToggle: () => void;
+  rightPanelOpen?: boolean;
+  activeTab?: RightPanelTab;
 }
 
-export default function TopBar({ onActivityToggle, onSecretaryToggle }: TopBarProps) {
+export default function TopBar({ onActivityToggle, onSecretaryToggle, onNotificationsToggle, rightPanelOpen, activeTab }: TopBarProps) {
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -46,26 +50,22 @@ export default function TopBar({ onActivityToggle, onSecretaryToggle }: TopBarPr
   }, []);
 
   const performSearch = useCallback(async (q: string) => {
-    if (!q || q.length < 2) {
-      setResults([]);
-      return;
-    }
+    if (!q || q.length < 2) { setResults([]); return; }
     setLoading(true);
     try {
       const searchTerm = `%${q}%`;
       const [projects, tasks, tenders, clients] = await Promise.all([
-      supabase.from('projects').select('id, name').ilike('name', searchTerm).limit(5),
-      supabase.from('tasks').select('id, title').ilike('title', searchTerm).limit(5),
-      supabase.from('tenders').select('id, name').ilike('name', searchTerm).limit(5),
-      supabase.from('clients').select('id, name').ilike('name', searchTerm).limit(5)]
-      );
-
+        supabase.from('projects').select('id, name').ilike('name', searchTerm).limit(5),
+        supabase.from('tasks').select('id, title').ilike('title', searchTerm).limit(5),
+        supabase.from('tenders').select('id, name').ilike('name', searchTerm).limit(5),
+        supabase.from('clients').select('id, name').ilike('name', searchTerm).limit(5)
+      ]);
       const mapped: SearchResult[] = [
-      ...(projects.data || []).map((p) => ({ id: p.id, name: p.name, type: 'project' as const })),
-      ...(tasks.data || []).map((t) => ({ id: t.id, name: t.title, type: 'task' as const })),
-      ...(tenders.data || []).map((t) => ({ id: t.id, name: t.name, type: 'tender' as const })),
-      ...(clients.data || []).map((c) => ({ id: c.id, name: c.name, type: 'client' as const }))];
-
+        ...(projects.data || []).map((p) => ({ id: p.id, name: p.name, type: 'project' as const })),
+        ...(tasks.data || []).map((t) => ({ id: t.id, name: t.title, type: 'task' as const })),
+        ...(tenders.data || []).map((t) => ({ id: t.id, name: t.name, type: 'tender' as const })),
+        ...(clients.data || []).map((c) => ({ id: c.id, name: c.name, type: 'client' as const }))
+      ];
       setResults(mapped);
     } catch (err) {
       console.error('Search error:', err);
@@ -95,6 +95,8 @@ export default function TopBar({ onActivityToggle, onSecretaryToggle }: TopBarPr
     return acc;
   }, {});
 
+  const isActive = (tab: RightPanelTab) => rightPanelOpen && activeTab === tab;
+
   return (
     <div className="sticky top-0 z-20 h-14 gap-2 border-b bg-background/80 backdrop-blur-lg md:px-6 mx-0 flex items-center justify-center my-0 px-0 py-[10px]">
       {/* Search */}
@@ -103,8 +105,8 @@ export default function TopBar({ onActivityToggle, onSecretaryToggle }: TopBarPr
           <PopoverTrigger asChild>
             <button
               className="flex h-9 w-full items-center gap-2 rounded-lg border border-border/60 px-3 text-sm transition-colors focus:outline-none bg-secondary-foreground text-primary-foreground"
-              onClick={() => setSearchOpen(true)}>
-
+              onClick={() => setSearchOpen(true)}
+            >
               <Search className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Αναζήτηση projects, tasks...</span>
               <span className="sm:hidden">Αναζήτηση...</span>
@@ -115,35 +117,23 @@ export default function TopBar({ onActivityToggle, onSecretaryToggle }: TopBarPr
           </PopoverTrigger>
           <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start" sideOffset={8}>
             <Command shouldFilter={false}>
-              <CommandInput
-                placeholder="Αναζήτηση σε projects, tasks, tenders, clients..."
-                value={query}
-                onValueChange={onQueryChange} />
-
+              <CommandInput placeholder="Αναζήτηση σε projects, tasks, tenders, clients..." value={query} onValueChange={onQueryChange} />
               <CommandList>
-                {query.length >= 2 && !loading && results.length === 0 &&
-                <CommandEmpty>Δεν βρέθηκαν αποτελέσματα.</CommandEmpty>
-                }
-                {loading &&
-                <div className="py-4 text-center text-sm text-muted-foreground">Αναζήτηση...</div>
-                }
+                {query.length >= 2 && !loading && results.length === 0 && <CommandEmpty>Δεν βρέθηκαν αποτελέσματα.</CommandEmpty>}
+                {loading && <div className="py-4 text-center text-sm text-muted-foreground">Αναζήτηση...</div>}
                 {Object.entries(grouped).map(([type, items]) => {
                   const config = entityConfig[type as keyof typeof entityConfig];
                   const Icon = config.icon;
                   return (
                     <CommandGroup key={type} heading={config.label}>
-                      {items.map((item) =>
-                      <CommandItem
-                        key={item.id}
-                        onSelect={() => handleSelect(item)}
-                        className="cursor-pointer">
-
+                      {items.map((item) => (
+                        <CommandItem key={item.id} onSelect={() => handleSelect(item)} className="cursor-pointer">
                           <Icon className={`mr-2 h-4 w-4 ${config.color}`} />
                           <span className="truncate">{item.name}</span>
                         </CommandItem>
-                      )}
-                    </CommandGroup>);
-
+                      ))}
+                    </CommandGroup>
+                  );
                 })}
               </CommandList>
             </Command>
@@ -153,14 +143,32 @@ export default function TopBar({ onActivityToggle, onSecretaryToggle }: TopBarPr
 
       {/* Action icons */}
       <div className="gap-1 px-0 flex items-center justify-end">
-        <Button variant="ghost" size="icon" onClick={onSecretaryToggle} title="Secretary (⌘J)">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onSecretaryToggle}
+          title="Secretary (⌘J)"
+          className={cn(isActive('secretary') && "bg-secondary")}
+        >
           <Bot className="h-5 w-5" />
         </Button>
-        <Button variant="ghost" size="icon" onClick={onActivityToggle}>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onActivityToggle}
+          className={cn(isActive('activity') && "bg-secondary")}
+        >
           <Activity className="h-5 w-5" />
         </Button>
-        <NotificationBell />
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onNotificationsToggle}
+          className={cn(isActive('notifications') && "bg-secondary")}
+        >
+          <Bell className="h-5 w-5" />
+        </Button>
       </div>
-    </div>);
-
+    </div>
+  );
 }

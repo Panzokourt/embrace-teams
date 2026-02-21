@@ -70,7 +70,14 @@ export default function AppLayout() {
   }
 
   if (!companyRole) {
-    window.location.replace('/onboarding');
+    // Use React Router redirect instead of hard reload to avoid race conditions
+    if (postLoginRoute === '/select-workspace') {
+      return <Navigate to="/select-workspace" replace />;
+    }
+    if (postLoginRoute === '/onboarding') {
+      return <Navigate to="/onboarding" replace />;
+    }
+    // postLoginRoute not yet determined — keep showing loader
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -78,13 +85,8 @@ export default function AppLayout() {
     );
   }
 
-  if (postLoginRoute && postLoginRoute !== '/') {
-    window.location.replace(postLoginRoute);
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+  if (postLoginRoute && postLoginRoute === '/select-workspace') {
+    return <Navigate to="/select-workspace" replace />;
   }
 
   return (

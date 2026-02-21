@@ -13,7 +13,9 @@ import {
 import { toast } from 'sonner';
 import { Loader2, X } from 'lucide-react';
 
-const sectorOptions = [
+import { useProjectCategories } from '@/hooks/useProjectCategories';
+
+const defaultSectorOptions = [
   { value: 'public', label: 'Δημόσιος Τομέας' },
   { value: 'private', label: 'Ιδιωτικός Τομέας' },
   { value: 'non_profit', label: 'Μη Κερδοσκοπικός' },
@@ -29,8 +31,14 @@ interface ClientFormProps {
 }
 
 export function ClientForm({ open, onOpenChange, client, onSaved }: ClientFormProps) {
+  const { data: categories = [] } = useProjectCategories();
   const [saving, setSaving] = useState(false);
   const [tagInput, setTagInput] = useState('');
+
+  // Build sector options: use categories if available, else defaults
+  const sectorOptions = categories.length > 0
+    ? categories.map(c => ({ value: c.name, label: c.name }))
+    : defaultSectorOptions;
   const [formData, setFormData] = useState({
     name: '', contact_email: '', contact_phone: '', address: '', notes: '',
     sector: '', website: '', tax_id: '', secondary_phone: '', tags: [] as string[],

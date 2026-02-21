@@ -13,8 +13,9 @@ import { el } from 'date-fns/locale';
 import { 
   ArrowLeft, Building2, Mail, Phone, MapPin, Calendar, 
   FolderKanban, Wallet, FileText, Loader2, TrendingUp, 
-  CheckCircle2, Clock, StickyNote, Globe, Hash, BookUser
+  CheckCircle2, Clock, StickyNote, Globe, Hash, BookUser, Pencil
 } from 'lucide-react';
+import { ClientForm } from '@/components/clients/ClientForm';
 
 const sectorLabels: Record<string, string> = {
   public: 'Δημόσιος Τομέας',
@@ -79,6 +80,7 @@ export default function ClientDetailPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [contactId, setContactId] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
 
   useEffect(() => {
     if (id) fetchClientData();
@@ -194,6 +196,11 @@ export default function ClientDetailPage() {
         {contactId && (
           <Button variant="outline" size="sm" asChild>
             <Link to={`/contacts/${contactId}`}><BookUser className="h-4 w-4 mr-1" />Ευρετήριο</Link>
+          </Button>
+        )}
+        {(isAdmin || isManager) && (
+          <Button size="sm" onClick={() => setEditOpen(true)}>
+            <Pencil className="h-4 w-4 mr-1" />Επεξεργασία
           </Button>
         )}
       </div>
@@ -453,6 +460,8 @@ export default function ClientDetailPage() {
           </Tabs>
         </div>
       </div>
+
+      <ClientForm open={editOpen} onOpenChange={setEditOpen} client={client} onSaved={fetchClientData} />
     </div>
   );
 }

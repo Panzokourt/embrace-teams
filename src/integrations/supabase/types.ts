@@ -3803,7 +3803,122 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      email_accounts_safe: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          display_name: string | null
+          email_address: string | null
+          id: string | null
+          imap_host: string | null
+          imap_port: number | null
+          is_active: boolean | null
+          last_sync_at: string | null
+          smtp_host: string | null
+          smtp_port: number | null
+          updated_at: string | null
+          use_tls: boolean | null
+          user_id: string | null
+          username: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          email_address?: string | null
+          id?: string | null
+          imap_host?: string | null
+          imap_port?: number | null
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          smtp_host?: string | null
+          smtp_port?: number | null
+          updated_at?: string | null
+          use_tls?: boolean | null
+          user_id?: string | null
+          username?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          email_address?: string | null
+          id?: string | null
+          imap_host?: string | null
+          imap_port?: number | null
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          smtp_host?: string | null
+          smtp_port?: number | null
+          updated_at?: string | null
+          use_tls?: boolean | null
+          user_id?: string | null
+          username?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_accounts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_accounts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gmail_accounts_safe: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          display_name: string | null
+          email_address: string | null
+          id: string | null
+          is_active: boolean | null
+          last_sync_at: string | null
+          scopes: string[] | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          email_address?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          scopes?: string[] | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          email_address?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          scopes?: string[] | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gmail_oauth_tokens_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       accept_invitation: { Args: { _token: string }; Returns: Json }

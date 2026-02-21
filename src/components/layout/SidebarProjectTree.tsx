@@ -244,7 +244,6 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
           .from('projects')
           .select('id, name, status, folder_id, client_id, client:clients(id, name, sector)')
           .eq('company_id', companyId)
-          .in('status', ['active', 'lead', 'proposal'])
           .order('name');
         if (error) throw error;
         return (data || []).map((d: any) => ({

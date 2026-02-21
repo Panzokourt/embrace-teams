@@ -50,6 +50,7 @@ import {
   MessageSquare,
   BookUser,
   Briefcase,
+  Mail,
 } from 'lucide-react';
 import { briefDefinitions, getBriefDefinition } from '@/components/blueprints/briefDefinitions';
 import { BriefFormDialog } from '@/components/blueprints/BriefFormDialog';
@@ -80,6 +81,7 @@ const topNavItems: NavItem[] = [
 
 // Items that go AFTER the expandable Εργασίες group
 const bottomNavItems: NavItem[] = [
+  { title: 'Inbox', href: '/inbox', icon: Mail },
   { title: 'Chat', href: '/chat', icon: MessageSquare },
   { title: 'Αρχείο', href: '/files', icon: FileArchive, permission: 'files.view' },
   { title: 'Timesheets', href: '/timesheets', icon: Timer },

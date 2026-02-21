@@ -70,7 +70,18 @@ export function TimesheetGridView({ entries, dateRange, groupBy, onStartTimer, o
           label = (entry as any).task?.title || 'Χωρίς task';
           sublabel = (entry as any).project?.name;
           break;
-        case 'status':
+        case 'status': {
+          const status = entry.is_running ? 'running' : (entry.end_time ? 'completed' : 'pending');
+          const statusLabels: Record<string, string> = {
+            running: '🟢 Σε εξέλιξη',
+            completed: '✅ Ολοκληρωμένο',
+            pending: '⏳ Εκκρεμεί',
+          };
+          key = status;
+          label = statusLabels[status] || status;
+          sublabel = (entry as any).project?.name;
+          break;
+        }
         default:
           key = entry.task_id || entry.project_id;
           label = (entry as any).task?.title || (entry as any).project?.name || '—';

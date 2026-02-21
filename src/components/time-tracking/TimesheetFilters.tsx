@@ -12,6 +12,7 @@ import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addWeeks, sub
 import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
+import { DateRange } from 'react-day-picker';
 
 export type DatePreset = 'today' | 'this_week' | 'this_month' | 'last_week' | 'last_month' | 'custom';
 export type GroupBy = 'project' | 'person' | 'task' | 'status';
@@ -130,6 +131,34 @@ export function TimesheetFilters({
             {users.map(u => <SelectItem key={u.id} value={u.id}>{u.full_name || 'Χωρίς όνομα'}</SelectItem>)}
           </SelectContent>
         </Select>
+      )}
+
+      {/* Custom date range picker */}
+      {datePreset === 'custom' && (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2">
+              <CalendarIcon className="h-3.5 w-3.5" />
+              Επιλογή ημερομηνιών
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0 pointer-events-auto" align="start">
+            <Calendar
+              mode="range"
+              locale={el}
+              selected={{ from: dateRange.start, to: dateRange.end }}
+              onSelect={(range: DateRange | undefined) => {
+                if (range?.from && range?.to) {
+                  onDateRangeChange({ start: range.from, end: range.to });
+                } else if (range?.from) {
+                  onDateRangeChange({ start: range.from, end: range.from });
+                }
+              }}
+              numberOfMonths={2}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
       )}
 
       {/* Total */}

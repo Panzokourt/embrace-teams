@@ -16,6 +16,7 @@ import { DateRange } from 'react-day-picker';
 
 export type DatePreset = 'today' | 'this_week' | 'this_month' | 'last_week' | 'last_month' | 'custom';
 export type GroupBy = 'project' | 'person' | 'task' | 'status';
+export type AggregationLevel = 'day' | 'month' | 'year';
 
 interface TimesheetFiltersProps {
   datePreset: DatePreset;
@@ -24,6 +25,8 @@ interface TimesheetFiltersProps {
   onDateRangeChange: (range: { start: Date; end: Date }) => void;
   groupBy: GroupBy;
   onGroupByChange: (g: GroupBy) => void;
+  aggregation: AggregationLevel;
+  onAggregationChange: (a: AggregationLevel) => void;
   filterProject: string;
   onFilterProjectChange: (v: string) => void;
   filterUser: string;
@@ -45,7 +48,8 @@ const presetLabels: Record<DatePreset, string> = {
 
 export function TimesheetFilters({
   datePreset, onDatePresetChange, dateRange, onDateRangeChange,
-  groupBy, onGroupByChange, filterProject, onFilterProjectChange,
+  groupBy, onGroupByChange, aggregation, onAggregationChange,
+  filterProject, onFilterProjectChange,
   filterUser, onFilterUserChange, projects, users, showUserFilter, totalMinutes
 }: TimesheetFiltersProps) {
   const totalHours = Math.floor(totalMinutes / 60);
@@ -110,6 +114,16 @@ export function TimesheetFilters({
           <SelectItem value="person">Ανά Άτομο</SelectItem>
           <SelectItem value="task">Ανά Task</SelectItem>
           <SelectItem value="status">Ανά Status</SelectItem>
+        </SelectContent>
+      </Select>
+
+      {/* Aggregation level */}
+      <Select value={aggregation} onValueChange={(v) => onAggregationChange(v as AggregationLevel)}>
+        <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="day">Ανά Ημέρα</SelectItem>
+          <SelectItem value="month">Ανά Μήνα</SelectItem>
+          <SelectItem value="year">Ανά Έτος</SelectItem>
         </SelectContent>
       </Select>
 

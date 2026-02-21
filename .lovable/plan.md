@@ -1,143 +1,83 @@
 
 
-# Ευρετήριο Επαφών — Contacts Directory
+# Ενίσχυση Σελίδας Πελατών & Προσθήκη Τομέα (Sector)
 
 ## Επισκόπηση
 
-Δημιουργία ενός ενιαίου **Ευρετηρίου Επαφών** (`/contacts`) που θα περιλαμβάνει προμηθευτές, συνεργάτες, φορείς, δημοσιογράφους, influencers, εταιρείες, φυσικά πρόσωπα — και τους υπάρχοντες πελάτες. Κάθε επαφή θα έχει δική της καρτέλα, tags, στοιχεία επικοινωνίας, και θα μπορεί να χρησιμοποιηθεί σε ολόκληρη την εφαρμογή (ομάδα έργου, τιμολόγια, κλπ). Εξωτερικοί συνεργάτες θα μπορούν να λάβουν πρόσκληση για περιορισμένη πρόσβαση.
+Προσθήκη πεδίου **Τομέας** (Δημόσιος, Ιδιωτικός, Μη Κερδοσκοπικός κλπ.) τόσο στους πελάτες όσο και στο ευρετήριο επαφών, και εμπλουτισμός της σελίδας πελατών με περισσότερα πεδία (ΑΦΜ, ιστοσελίδα, τηλέφωνο 2ο, tags κλπ).
 
 ---
 
-## 1. Database — Νέος Πίνακας `contacts`
+## 1. Database Migration
 
-Δημιουργία πίνακα `contacts` με τα εξής πεδία:
+### Πίνακας `clients` — Νέες στήλες
+- `sector` text (public, private, non_profit, government, mixed) default null
+- `website` text
+- `tax_id` text (ΑΦΜ)
+- `secondary_phone` text
+- `tags` text[] default '{}'
+- `logo_url` text
 
-| Στήλη | Τύπος | Περιγραφή |
-|-------|-------|-----------|
-| id | uuid PK | |
-| company_id | uuid FK -> companies | Εταιρεία που τον δημιούργησε |
-| name | text NOT NULL | Ονοματεπώνυμο / Επωνυμία |
-| entity_type | text | `person`, `company`, `organization` |
-| email | text | Κύριο email |
-| phone | text | Τηλέφωνο |
-| secondary_phone | text | Δεύτερο τηλέφωνο |
-| address | text | Διεύθυνση |
-| website | text | Ιστοσελίδα |
-| tax_id | text | ΑΦΜ |
-| notes | text | Σημειώσεις |
-| tags | text[] | Tags: freelancer, influencer, journalist, κλπ |
-| category | text | Κατηγορία: supplier, partner, media, government, κλπ |
-| client_id | uuid FK -> clients, nullable | Αν αντιστοιχεί σε υπάρχοντα πελάτη |
-| is_active | boolean default true | |
-| avatar_url | text | Φωτογραφία/Logo |
-| created_at, updated_at | timestamptz | |
-
-Δημιουργία πίνακα `contact_tags` (predefined tags ανά company):
-
-| Στήλη | Τύπος |
-|-------|-------|
-| id | uuid PK |
-| company_id | uuid FK |
-| name | text |
-| color | text |
-
-Σύνδεση contact με έργα — πίνακας `project_contact_access`:
-
-| Στήλη | Τύπος |
-|-------|-------|
-| id | uuid PK |
-| project_id | uuid FK |
-| contact_id | uuid FK |
-| role | text (supplier, collaborator, subcontractor...) |
-
-RLS Policies:
-- SELECT: Ενεργοί χρήστες βλέπουν contacts της εταιρείας τους
-- INSERT/UPDATE/DELETE: Admin/Manager μόνο
-- contact_tags: Ίδια λογική
+### Πίνακας `contacts` — Νέα στήλη
+- `sector` text default null
 
 ---
 
-## 2. Μετεγκατάσταση Πελατών
+## 2. Τομέας (Sector) — Τιμές
 
-- Κάθε υπάρχων client θα αποκτήσει αυτόματα μια αντίστοιχη εγγραφή στον πίνακα `contacts` μέσω migration (INSERT...SELECT)
-- Η στήλη `client_id` στο contact θα δείχνει στον αρχικό client
-- Η σελίδα Πελατών (`/clients`) **παραμένει** ως έχει
-- Στο Ευρετήριο, οι πελάτες θα εμφανίζονται με ειδικό badge "Πελάτης"
-
----
-
-## 3. Σελίδα Ευρετηρίου — `/contacts`
-
-### Κύρια προβολή
-- Table view με στήλες: Όνομα, Τύπος, Κατηγορία, Tags, Email, Τηλέφωνο, Ενέργειες
-- Αναζήτηση full-text (όνομα, email, tags)
-- Φίλτρα: κατηγορία, entity_type, tags
-- Export CSV
-- Κουμπί "Νέα Επαφή"
-
-### Καρτέλα Επαφής — `/contacts/:id`
-- Header με avatar, όνομα, κατηγορία, tags
-- Στοιχεία επικοινωνίας (email, τηλέφωνα, διεύθυνση, website, ΑΦΜ)
-- Tab "Έργα": λίστα έργων στα οποία συμμετέχει (μέσω project_contact_access)
-- Tab "Τιμολόγια": τιμολόγια που σχετίζονται (αν είναι πελάτης, μέσω client_id)
-- Tab "Σημειώσεις"
-- Αν είναι πελάτης: link προς `/clients/:id`
+| Τιμή | Ετικέτα |
+|------|---------|
+| public | Δημόσιος Τομέας |
+| private | Ιδιωτικός Τομέας |
+| non_profit | Μη Κερδοσκοπικός |
+| government | Κυβερνητικός |
+| mixed | Μικτός |
 
 ---
 
-## 4. Ενσωμάτωση στην Εφαρμογή
+## 3. Σελίδα Πελατών (`Clients.tsx`)
 
-### Ομάδα Έργου (ProjectTeamManager)
-- Νέο section "Εξωτερικοί Συνεργάτες" κάτω από την ομάδα
-- Dropdown/search για επιλογή contact από το Ευρετήριο
-- Ρόλος (supplier, collaborator, subcontractor, consultant)
-- Αποθήκευση στο `project_contact_access`
+### Φόρμα Δημιουργίας/Επεξεργασίας — Νέα πεδία:
+- Τομέας (Select dropdown)
+- ΑΦΜ
+- Ιστοσελίδα
+- Δεύτερο Τηλέφωνο
+- Tags (ίδια λογική με contacts)
+- Logo URL
 
-### Τιμολόγια (InvoicesManager)
-- Στο dropdown πελάτη, εμφάνιση και contacts που δεν είναι πελάτες (π.χ. προμηθευτές για expenses)
+### Πίνακας (`ClientsTableView.tsx`)
+- Νέα στήλη "Τομέας" με badge
+- Νέα στήλη "Tags"
+- Στήλη "ΑΦΜ" (κρυμμένη by default, sortable)
 
-### Global Search (TopBar)
-- Προσθήκη contacts στα αποτελέσματα αναζήτησης
-
----
-
-## 5. Πρόσκληση Εξωτερικού Συνεργάτη
-
-- Κουμπί "Πρόσκληση" στην καρτέλα contact
-- Χρήση του υπάρχοντος μηχανισμού `invitations` με ρόλο `standard` και `access_scope: assigned`
-- Ανάθεση project_ids: μόνο τα έργα στα οποία ο contact είναι assigned
-- Ο εξωτερικός συνεργάτης βλέπει μόνο τα tasks/deliverables των έργων που του έχουν ανατεθεί
+### Καρτέλα Πελάτη (`ClientDetail.tsx`)
+- Εμφάνιση τομέα, ΑΦΜ, ιστοσελίδας, 2ου τηλεφώνου, tags
+- Link προς αντίστοιχο contact στο Ευρετήριο (αν υπάρχει)
 
 ---
 
-## 6. Navigation
+## 4. Ευρετήριο Επαφών — Sector
 
-- Νέο nav item στο sidebar: `{ title: 'Ευρετήριο', href: '/contacts', icon: BookUser }`
-- Τοποθέτηση κάτω από τα Timesheets, πριν το HR
+### Φόρμα (`ContactForm.tsx`)
+- Νέο πεδίο "Τομέας" (Select dropdown) δίπλα στην Κατηγορία
+
+### Πίνακας (`ContactsTableView.tsx`)
+- Badge τομέα δίπλα στην κατηγορία
+
+### Καρτέλα (`ContactDetail.tsx`)
+- Εμφάνιση τομέα στο header/info
 
 ---
 
-## Αρχεία που Δημιουργούνται / Αλλάζουν
+## Αρχεία που Αλλάζουν
 
 | Αρχείο | Αλλαγή |
 |--------|--------|
-| **Migration SQL** | Δημιουργία `contacts`, `contact_tags`, `project_contact_access` + RLS + seed clients |
-| `src/pages/Contacts.tsx` | **Νέο** — Σελίδα ευρετηρίου |
-| `src/pages/ContactDetail.tsx` | **Νέο** — Καρτέλα επαφής |
-| `src/components/contacts/ContactsTableView.tsx` | **Νέο** — Table view |
-| `src/components/contacts/ContactForm.tsx` | **Νέο** — Dialog δημιουργίας/επεξεργασίας |
-| `src/components/contacts/ContactSelector.tsx` | **Νέο** — Reusable dropdown για επιλογή contact |
-| `src/components/projects/ProjectTeamManager.tsx` | Προσθήκη section εξωτερικών συνεργατών |
-| `src/components/layout/AppSidebar.tsx` | Νέο nav item |
-| `src/App.tsx` | Routes `/contacts` και `/contacts/:id` |
-| `src/components/layout/TopBar.tsx` | Contacts στο global search |
-
----
-
-## Τεχνικές Σημειώσεις
-
-- Ο πίνακας `clients` **δεν αλλάζει** — η σχέση γίνεται μέσω `contacts.client_id`
-- Τα tags αποθηκεύονται ως `text[]` στο contact για ταχύτητα, ενώ τα predefined tags είναι στο `contact_tags`
-- Η πρόσκληση χρησιμοποιεί τον υπάρχοντα μηχανισμό invitations (accept_invitation function) χωρίς αλλαγές στο backend
-- RLS policies χρησιμοποιούν τις υπάρχουσες security definer functions (`get_user_company_id`, `is_admin_or_manager`, `is_active_user`)
+| **Migration SQL** | ALTER TABLE clients ADD COLUMN sector, website, tax_id, secondary_phone, tags, logo_url. ALTER TABLE contacts ADD COLUMN sector |
+| `src/pages/Clients.tsx` | Εμπλουτισμός φόρμας με νέα πεδία (sector, tax_id, website, secondary_phone, tags) |
+| `src/components/clients/ClientsTableView.tsx` | Νέες στήλες: Τομέας, Tags |
+| `src/pages/ClientDetail.tsx` | Εμφάνιση νέων πεδίων στην καρτέλα |
+| `src/components/contacts/ContactForm.tsx` | Νέο πεδίο Τομέας |
+| `src/components/contacts/ContactsTableView.tsx` | Badge τομέα |
+| `src/pages/ContactDetail.tsx` | Εμφάνιση τομέα |
 

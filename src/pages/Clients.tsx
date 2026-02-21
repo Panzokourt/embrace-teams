@@ -27,7 +27,9 @@ import {
   X
 } from 'lucide-react';
 
-const sectorOptions = [
+import { useProjectCategories } from '@/hooks/useProjectCategories';
+
+const defaultSectorOptions = [
   { value: 'public', label: 'Δημόσιος Τομέας' },
   { value: 'private', label: 'Ιδιωτικός Τομέας' },
   { value: 'non_profit', label: 'Μη Κερδοσκοπικός' },
@@ -55,7 +57,13 @@ interface Client {
 export default function ClientsPage() {
   const { isAdmin, isManager } = useAuth();
   const { logCreate, logUpdate, logDelete } = useActivityLogger();
+  const { data: categories = [] } = useProjectCategories();
   const [clients, setClients] = useState<Client[]>([]);
+
+  // Build sector options dynamically
+  const sectorOptions = categories.length > 0
+    ? categories.map(c => ({ value: c.name, label: c.name }))
+    : defaultSectorOptions;
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);

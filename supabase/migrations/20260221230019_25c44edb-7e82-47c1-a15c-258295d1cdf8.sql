@@ -1,0 +1,1 @@
+ALTER TABLE public.email_messages DROP CONSTRAINT IF EXISTS email_messages_account_id_fkey;

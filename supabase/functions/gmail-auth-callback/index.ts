@@ -1,5 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const HTML_HEADERS = { "Content-Type": "text/html; charset=utf-8" };
+
 Deno.serve(async (req) => {
   try {
     const url = new URL(req.url);
@@ -8,15 +10,11 @@ Deno.serve(async (req) => {
     const error = url.searchParams.get("error");
 
     if (error) {
-      return new Response(renderHtml("Σφάλμα σύνδεσης", `Google error: ${error}`, false), {
-        headers: { "Content-Type": "text/html" },
-      });
+      return new Response(renderHtml("Σφάλμα σύνδεσης", `Google error: ${error}`, false), { headers: HTML_HEADERS });
     }
 
     if (!code || !stateParam) {
-      return new Response(renderHtml("Σφάλμα", "Missing code or state", false), {
-        headers: { "Content-Type": "text/html" },
-      });
+      return new Response(renderHtml("Σφάλμα", "Missing code or state", false), { headers: HTML_HEADERS });
     }
 
     let userId: string;
@@ -24,9 +22,7 @@ Deno.serve(async (req) => {
       const state = JSON.parse(atob(stateParam));
       userId = state.user_id;
     } catch {
-      return new Response(renderHtml("Σφάλμα", "Invalid state", false), {
-        headers: { "Content-Type": "text/html" },
-      });
+      return new Response(renderHtml("Σφάλμα", "Invalid state", false), { headers: HTML_HEADERS });
     }
 
     const clientId = Deno.env.get("GOOGLE_CLIENT_ID")!;
@@ -50,9 +46,7 @@ Deno.serve(async (req) => {
     const tokenData = await tokenRes.json();
     if (!tokenRes.ok || !tokenData.access_token) {
       console.error("Token exchange error:", tokenData);
-      return new Response(renderHtml("Σφάλμα", `Token exchange failed: ${tokenData.error_description || tokenData.error}`, false), {
-        headers: { "Content-Type": "text/html" },
-      });
+      return new Response(renderHtml("Σφάλμα", `Token exchange failed: ${tokenData.error_description || tokenData.error}`, false), { headers: HTML_HEADERS });
     }
 
     // Get user profile from Google
@@ -72,9 +66,7 @@ Deno.serve(async (req) => {
       .single();
 
     if (!userRole) {
-      return new Response(renderHtml("Σφάλμα", "User company not found", false), {
-        headers: { "Content-Type": "text/html" },
-      });
+      return new Response(renderHtml("Σφάλμα", "User company not found", false), { headers: HTML_HEADERS });
     }
 
     const expiresAt = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString();
@@ -95,25 +87,19 @@ Deno.serve(async (req) => {
 
     if (upsertErr) {
       console.error("Upsert error:", upsertErr);
-      return new Response(renderHtml("Σφάλμα", `DB error: ${upsertErr.message}`, false), {
-        headers: { "Content-Type": "text/html" },
-      });
+      return new Response(renderHtml("Σφάλμα", `DB error: ${upsertErr.message}`, false), { headers: HTML_HEADERS });
     }
 
-    return new Response(renderHtml("Επιτυχής σύνδεση!", `Ο λογαριασμός ${profile.email} συνδέθηκε. Μπορείτε να κλείσετε αυτό το παράθυρο.`, true), {
-      headers: { "Content-Type": "text/html" },
-    });
+    return new Response(renderHtml("Επιτυχής σύνδεση!", `Ο λογαριασμός ${profile.email} συνδέθηκε. Μπορείτε να κλείσετε αυτό το παράθυρο.`, true), { headers: HTML_HEADERS });
   } catch (err) {
     console.error("gmail-auth-callback error:", err);
-    return new Response(renderHtml("Σφάλμα", String(err), false), {
-      headers: { "Content-Type": "text/html" },
-    });
+    return new Response(renderHtml("Σφάλμα", String(err), false), { headers: HTML_HEADERS });
   }
 });
 
 function renderHtml(title: string, message: string, success: boolean): string {
   return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>${title}</title>
+<html lang="el"><head><meta charset="UTF-8"><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><title>${title}</title>
 <style>
 body { font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f5f5f5; }
 .card { background: white; border-radius: 12px; padding: 2rem; max-width: 400px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }

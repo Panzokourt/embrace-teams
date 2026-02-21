@@ -1071,13 +1071,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "email_messages_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "email_accounts"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "email_messages_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false

@@ -37,6 +37,7 @@ import {
   Clock
 } from 'lucide-react';
 import { ProjectCategoriesManager } from '@/components/settings/ProjectCategoriesManager';
+import { EmailAccountSetup } from '@/components/settings/EmailAccountSetup';
 
 const DAY_LABELS = ['Δευτέρα', 'Τρίτη', 'Τετάρτη', 'Πέμπτη', 'Παρασκευή', 'Σάββατο', 'Κυριακή'];
 const DEFAULT_SCHEDULE = DAY_LABELS.map((_, i) => ({
@@ -496,6 +497,9 @@ export default function SettingsPage() {
 
       {/* Project Categories (Admin only) */}
       {isAdmin && <ProjectCategoriesManager />}
+
+      {/* Email / Inbox */}
+      <EmailAccountSetup />
 
       {/* Work Schedule */}
       <WorkScheduleCard />

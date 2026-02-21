@@ -936,6 +936,156 @@ export type Database = {
           },
         ]
       }
+      email_accounts: {
+        Row: {
+          company_id: string
+          created_at: string
+          display_name: string | null
+          email_address: string
+          encrypted_password: string
+          id: string
+          imap_host: string
+          imap_port: number
+          is_active: boolean
+          last_sync_at: string | null
+          smtp_host: string
+          smtp_port: number
+          updated_at: string
+          use_tls: boolean
+          user_id: string
+          username: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          display_name?: string | null
+          email_address: string
+          encrypted_password: string
+          id?: string
+          imap_host: string
+          imap_port?: number
+          is_active?: boolean
+          last_sync_at?: string | null
+          smtp_host: string
+          smtp_port?: number
+          updated_at?: string
+          use_tls?: boolean
+          user_id: string
+          username: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          display_name?: string | null
+          email_address?: string
+          encrypted_password?: string
+          id?: string
+          imap_host?: string
+          imap_port?: number
+          is_active?: boolean
+          last_sync_at?: string | null
+          smtp_host?: string
+          smtp_port?: number
+          updated_at?: string
+          use_tls?: boolean
+          user_id?: string
+          username?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_accounts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_accounts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_messages: {
+        Row: {
+          account_id: string
+          body_html: string | null
+          body_text: string | null
+          cc_addresses: Json | null
+          created_at: string
+          folder: string
+          from_address: string | null
+          from_name: string | null
+          id: string
+          is_read: boolean
+          is_starred: boolean
+          message_id_header: string | null
+          message_uid: string | null
+          sent_at: string | null
+          subject: string | null
+          thread_id: string | null
+          to_addresses: Json | null
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          body_html?: string | null
+          body_text?: string | null
+          cc_addresses?: Json | null
+          created_at?: string
+          folder?: string
+          from_address?: string | null
+          from_name?: string | null
+          id?: string
+          is_read?: boolean
+          is_starred?: boolean
+          message_id_header?: string | null
+          message_uid?: string | null
+          sent_at?: string | null
+          subject?: string | null
+          thread_id?: string | null
+          to_addresses?: Json | null
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          body_html?: string | null
+          body_text?: string | null
+          cc_addresses?: Json | null
+          created_at?: string
+          folder?: string
+          from_address?: string | null
+          from_name?: string | null
+          id?: string
+          is_read?: boolean
+          is_starred?: boolean
+          message_id_header?: string | null
+          message_uid?: string | null
+          sent_at?: string | null
+          subject?: string | null
+          thread_id?: string | null
+          to_addresses?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_messages_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "email_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expenses: {
         Row: {
           amount: number

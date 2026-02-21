@@ -34,6 +34,7 @@ import Secretary from "@/pages/Secretary";
 import Chat from "@/pages/Chat";
 import Contacts from "@/pages/Contacts";
 import ContactDetail from "@/pages/ContactDetail";
+import Inbox from "@/pages/Inbox";
 import { ChatProvider } from "@/contexts/ChatContext";
 
 function RedirectUserToEmployee() {
@@ -83,6 +84,7 @@ const App = () => (
                   <Route path="/chat" element={<Chat />} />
                   <Route path="/contacts" element={<Contacts />} />
                   <Route path="/contacts/:id" element={<ContactDetail />} />
+                  <Route path="/inbox" element={<Inbox />} />
                   {/* Redirects from old routes */}
                   <Route path="/users" element={<Navigate to="/hr?tab=staff" replace />} />
                   <Route path="/users/:id" element={<RedirectUserToEmployee />} />

@@ -15,7 +15,6 @@ export interface ChatMessage {
   edited_at: string | null;
   deleted_at: string | null;
   created_at: string;
-  // joined
   sender?: {
     full_name: string | null;
     avatar_url: string | null;
@@ -23,6 +22,7 @@ export interface ChatMessage {
   };
   reactions?: { emoji: string; user_id: string }[];
   attachments?: { id: string; file_name: string; file_path: string; file_size: number | null; content_type: string | null }[];
+  tags?: { id: string; tag: string; created_by: string }[];
   reply_count?: number;
 }
 
@@ -54,26 +54,25 @@ export function useChatMessages(channelId: string | null) {
 
       if (error) throw error;
 
-      // Fetch sender profiles
       const userIds = [...new Set((data || []).map(m => m.user_id))];
       const { data: profiles } = userIds.length
         ? await supabase.from('profiles').select('id, full_name, avatar_url, email').in('id', userIds)
         : { data: [] };
-
       const profileMap = new Map((profiles || []).map(p => [p.id, p]));
 
-      // Fetch reactions
       const msgIds = (data || []).map(m => m.id);
       const { data: reactions } = msgIds.length
         ? await supabase.from('chat_message_reactions').select('message_id, emoji, user_id').in('message_id', msgIds)
         : { data: [] };
 
-      // Fetch attachments
       const { data: attachments } = msgIds.length
         ? await supabase.from('chat_message_attachments').select('*').in('message_id', msgIds)
         : { data: [] };
 
-      // Fetch reply counts
+      const { data: tags } = msgIds.length
+        ? await supabase.from('chat_message_tags').select('*').in('message_id', msgIds)
+        : { data: [] };
+
       const { data: replyCounts } = msgIds.length
         ? await supabase.from('chat_messages').select('parent_message_id').in('parent_message_id', msgIds).is('deleted_at', null)
         : { data: [] };
@@ -92,6 +91,7 @@ export function useChatMessages(channelId: string | null) {
         sender: profileMap.get(m.user_id) || { full_name: null, avatar_url: null, email: '' },
         reactions: (reactions || []).filter(r => r.message_id === m.id),
         attachments: (attachments || []).filter(a => a.message_id === m.id),
+        tags: (tags || []).filter(t => t.message_id === m.id),
         reply_count: replyMap.get(m.id) || 0,
       }));
 
@@ -132,7 +132,6 @@ export function useChatMessages(channelId: string | null) {
       }, async (payload) => {
         const newMsg = payload.new as any;
         if (newMsg.parent_message_id) {
-          // Thread reply - update reply count
           setMessages(prev => prev.map(m =>
             m.id === newMsg.parent_message_id
               ? { ...m, reply_count: (m.reply_count || 0) + 1 }
@@ -141,7 +140,6 @@ export function useChatMessages(channelId: string | null) {
           return;
         }
 
-        // Fetch sender profile
         const { data: profile } = await supabase
           .from('profiles')
           .select('id, full_name, avatar_url, email')
@@ -155,6 +153,7 @@ export function useChatMessages(channelId: string | null) {
           sender: profile || { full_name: null, avatar_url: null, email: '' },
           reactions: [],
           attachments: [],
+          tags: [],
           reply_count: 0,
         };
 
@@ -202,7 +201,6 @@ export function useChatMessages(channelId: string | null) {
 
     if (error) throw error;
 
-    // Update channel last_message_at
     await supabase
       .from('chat_channels')
       .update({ last_message_at: new Date().toISOString() })
@@ -242,7 +240,6 @@ export function useChatMessages(channelId: string | null) {
       .from('chat_message_reactions')
       .insert({ message_id: messageId, user_id: user.id, emoji });
     if (error && !error.message.includes('duplicate')) throw error;
-    // Optimistic update
     setMessages(prev => prev.map(m =>
       m.id === messageId
         ? { ...m, reactions: [...(m.reactions || []), { emoji, user_id: user.id }] }
@@ -265,13 +262,72 @@ export function useChatMessages(channelId: string | null) {
     ));
   }, [user]);
 
+  const uploadFile = useCallback(async (file: File) => {
+    if (!channelId || !user) return;
+    const filePath = `${channelId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('chat-attachments')
+      .upload(filePath, file);
+
+    if (uploadError) throw uploadError;
+
+    // Send file message
+    const { data: msg } = await supabase
+      .from('chat_messages')
+      .insert({
+        channel_id: channelId,
+        user_id: user.id,
+        content: `📎 ${file.name}`,
+        message_type: 'file',
+        metadata: { file_name: file.name, file_size: file.size, content_type: file.type },
+      })
+      .select()
+      .single();
+
+    if (msg) {
+      await supabase.from('chat_message_attachments').insert({
+        message_id: msg.id,
+        file_name: file.name,
+        file_path: filePath,
+        file_size: file.size,
+        content_type: file.type,
+      });
+    }
+
+    await supabase.from('chat_channels').update({ last_message_at: new Date().toISOString() }).eq('id', channelId);
+  }, [channelId, user]);
+
+  const addTag = useCallback(async (messageId: string, tag: string) => {
+    if (!user) return;
+    const { data, error } = await supabase
+      .from('chat_message_tags')
+      .insert({ message_id: messageId, tag, created_by: user.id })
+      .select()
+      .single();
+    if (error) { console.error(error); return; }
+    setMessages(prev => prev.map(m =>
+      m.id === messageId
+        ? { ...m, tags: [...(m.tags || []), data] }
+        : m
+    ));
+  }, [user]);
+
+  const removeTag = useCallback(async (tagId: string, messageId: string) => {
+    await supabase.from('chat_message_tags').delete().eq('id', tagId);
+    setMessages(prev => prev.map(m =>
+      m.id === messageId
+        ? { ...m, tags: (m.tags || []).filter(t => t.id !== tagId) }
+        : m
+    ));
+  }, []);
+
   const loadMore = useCallback(() => {
     if (!loading && hasMore) {
       fetchMessages(false);
     }
   }, [loading, hasMore, fetchMessages]);
 
-  // Mark channel as read
   const markAsRead = useCallback(async () => {
     if (!channelId || !user) return;
     await supabase
@@ -291,6 +347,9 @@ export function useChatMessages(channelId: string | null) {
     togglePin,
     addReaction,
     removeReaction,
+    uploadFile,
+    addTag,
+    removeTag,
     loadMore,
     markAsRead,
     refetch: () => fetchMessages(true),

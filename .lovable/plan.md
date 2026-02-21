@@ -1,112 +1,118 @@
 
-# Drag & Drop Έργων, Bulk Actions & Sidebar Scroll
+# Auto-Organization of Projects by Category & Client
 
-## Επισκόπηση
+## Overview
 
-Τρεις βασικές βελτιώσεις: (1) drag & drop projects σε folders στο sidebar + "Move to folder" μέσα στο project detail, (2) bulk actions στη σελίδα Projects με multi-select (Ctrl/Cmd + Shift), (3) collapsible + scrollable project tree στο sidebar.
+The sidebar project tree will support an **auto-organize mode** that automatically creates a virtual folder hierarchy: **Category (Sector) > Client > Projects**. Users can also define custom categories in Settings that will be used as the top-level grouping.
 
 ---
 
-## 1. Sidebar Project Tree -- Drag & Drop + Collapsible + Scroll
+## 1. Database: Custom Project Categories
 
-### Αλλαγές στο `SidebarProjectTree.tsx`:
+### New table: `project_categories`
 
-**Drag & Drop:**
-- Wrap ολόκληρο το tree σε `DndContext` (from `@dnd-kit/core`)
-- Κάθε project item γίνεται draggable (`useSortable`)
-- Κάθε folder γίνεται droppable (`useDroppable`)
-- Η root περιοχή (χωρίς folder) είναι επίσης droppable target ("unfolder")
-- On drop: update `projects.folder_id` στη βάση και invalidate queries
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid PK | |
+| company_id | uuid FK | |
+| name | text | Category name (e.g. "Δημόσιος Τομέας") |
+| color | text, nullable | Color for folder icon |
+| sort_order | integer, default 0 | Display order |
+| created_at | timestamptz | |
 
-**Collapsible "Έργα" section:**
-- Το project tree (folders + projects) τυλίγεται σε collapsible container
-- Κλικ στο "Έργα" στο sidebar expand/collapse
-- Αποθήκευση state σε localStorage
+RLS:
+- SELECT: active users in same company
+- ALL: admin/manager in same company
 
-**Scroll με max height:**
-- `max-h-[300px] overflow-y-auto` στο container
-- Custom scrollbar styling (thin, subtle)
-- Δείχνει μέχρι ~10-12 projects, τα υπόλοιπα με scroll
+### Seed default categories
+On first load (client-side), if no categories exist, the app will offer to create defaults based on the existing sector options (Δημόσιος Τομέας, Ιδιωτικός Τομέας, ΜΚΟ, Startup, Πολυεθνική).
 
-**Mutation:**
-```typescript
-const moveProject = useMutation({
-  mutationFn: async ({ projectId, folderId }: { projectId: string; folderId: string | null }) => {
-    await supabase.from('projects').update({ folder_id: folderId }).eq('id', projectId);
-  },
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['sidebar-projects'] });
-    toast.success('Το έργο μετακινήθηκε');
-  }
-});
+---
+
+## 2. Settings: Category Manager
+
+### New card in Settings page (Admin only): "Κατηγορίες Έργων"
+
+- List of current categories with drag-to-reorder
+- Inline rename (click to edit)
+- Delete button (with confirmation)
+- "Add Category" button at bottom
+- Color picker per category (optional)
+- Explanation text: "Οι κατηγορίες χρησιμοποιούνται για την αυτόματη οργάνωση των έργων στο sidebar."
+
+---
+
+## 3. Sidebar Project Tree: Auto-Organize Mode
+
+### Updated `SidebarProjectTree.tsx`
+
+The tree will now support **two modes** (toggle button at top):
+1. **Manual mode** (current): User-created folders with drag & drop
+2. **Auto mode** (new default): Virtual hierarchy based on categories and clients
+
+### Auto mode structure:
+
+```text
+v Δημόσιος Τομέας
+    v ΕΔΥΤΕ
+        EDYTE Platform
+        EDYTE SEO
+    v Υπ. Παιδείας
+        Ministry Rebranding
+v Ιδιωτικός Τομέας
+    v Alpha Bank
+        Alpha Bank App Launch
+    v Cosmote
+        Cosmote Rebranding
+        Cosmote SEO
+v Χωρίς Κατηγορία
+    v Vodafone
+        Vodafone Social Media 2026
+    Orphan Project (no client)
 ```
 
----
+### Logic:
+1. Fetch `project_categories` for the company
+2. Fetch `projects` with `client:clients(name, sector)` join
+3. Group projects: category (from client.sector mapped to project_categories.name) > client > projects
+4. Projects without a client go under "Χωρίς Κατηγορία" at root level
+5. Clients whose sector doesn't match any category go under "Χωρίς Κατηγορία"
 
-## 2. "Move to Folder" μέσα στο Project Detail
-
-### Αλλαγές στο `ProjectDetail.tsx`:
-
-- Προσθήκη dropdown "Μετακίνηση σε φάκελο" στο header (δίπλα στο status)
-- Fetch τους project_folders
-- Select φάκελο ή "Χωρίς φάκελο"
-- Update `folder_id` στη βάση
-- Ίδιο dropdown και στο `ProjectInfoEditor.tsx`
-
----
-
-## 3. Bulk Actions στη σελίδα Projects
-
-### Αλλαγές στο `ProjectsTableView.tsx`:
-
-**Multi-select:**
-- Checkbox στήλη στην αρχή κάθε row
-- "Select All" checkbox στο header
-- Ctrl/Cmd + Click: toggle individual selection
-- Shift + Click: range selection (απο τελευταίο selected ως current)
-- State: `selectedIds: Set<string>`
-
-**Bulk Actions Toolbar:**
-- Εμφανίζεται πάνω από τον πίνακα όταν `selectedIds.size > 0`
-- Ενέργειες:
-  - **Μετακίνηση σε Φάκελο**: Dialog με select folder
-  - **Αλλαγή Status**: Dialog (χρήση `BulkActionsDialog` pattern)
-  - **Διαγραφή**: Confirmation dialog
-- Design: Floating bar "X επιλεγμένα | [Move] [Status] [Delete]"
-
-**Keyboard shortcuts:**
-- `Ctrl/Cmd + A`: select all visible
-- `Escape`: clear selection
-
-### Νέο component: `ProjectBulkActions.tsx`
-Toolbar component με τα bulk action buttons.
+### Toggle button:
+- Small icon button at top of tree: switch between auto/manual
+- Preference saved in localStorage (`sidebar-project-tree-mode`)
 
 ---
 
-## 4. Αλλαγές στο `SidebarNavGroup` / `AppSidebar`
+## 4. Mapping: Client Sector to Category
 
-### "Έργα" sub-link γίνεται collapsible:
-- Κλικ στο "Έργα" εναλλάσσει expand/collapse του project tree κάτω από αυτό
-- Ξεχωριστό expand state για τα "Έργα" (ανεξάρτητο από το "Εργασίες" group)
+The mapping works by matching `clients.sector` value to `project_categories.name`:
+- `public` -> looks for category named "Δημόσιος Τομέας"
+- `private` -> "Ιδιωτικός Τομέας"
+- etc.
 
----
+A fallback mapping table will be used for the default sector values. For custom categories, the match is by name.
 
-## Αρχεία που αλλάζουν
-
-| Αρχείο | Αλλαγή |
-|--------|--------|
-| `src/components/layout/SidebarProjectTree.tsx` | DnD context, droppable folders, draggable projects, max-height scroll, collapsible |
-| `src/components/projects/ProjectsTableView.tsx` | Checkbox column, multi-select logic (Ctrl/Shift), bulk actions toolbar |
-| `src/components/projects/ProjectBulkActions.tsx` | **Νεο** -- Bulk actions bar (Move, Status, Delete) |
-| `src/pages/ProjectDetail.tsx` | "Move to Folder" dropdown στο header |
-| `src/components/layout/AppSidebar.tsx` | Minor: Κάνει το "Έργα" link collapsible toggle για το tree |
+If the admin adds a new category (e.g. "Ευρωπαϊκά Προγράμματα"), they can then set that sector value on clients, and projects will automatically appear under that category in the sidebar.
 
 ---
 
-## Τεχνικες σημειώσεις
+## Files to Create / Modify
 
-- Χρήση ήδη εγκατεστημένου `@dnd-kit/core` και `@dnd-kit/sortable` για drag & drop
-- Η multi-select λογική (Shift range) κρατά `lastSelectedIndex` ref
-- Τα bulk updates γίνονται σε batch: ένα query per action (π.χ. `.in('id', [...selectedIds])`)
-- Η "Move to Folder" dialog χρησιμοποιεί τα ίδια `project_folders` data (ήδη cached)
-- Scroll area: native CSS `overflow-y: auto` με thin scrollbar styling
+| File | Change |
+|------|--------|
+| **Migration SQL** | Create `project_categories` table with RLS |
+| `src/components/layout/SidebarProjectTree.tsx` | Add auto-organize mode with category > client > project hierarchy, toggle button |
+| `src/pages/Settings.tsx` | Add "Κατηγορίες Έργων" card for managing categories |
+| `src/components/clients/ClientForm.tsx` | Update sector options to pull from `project_categories` dynamically |
+| `src/pages/Clients.tsx` | Same: dynamic sector options |
+
+---
+
+## Technical Notes
+
+- The auto-organize mode is purely a **view layer** -- it does not modify `folder_id` on projects. It creates a virtual grouping based on client.sector matching categories.
+- Manual folders (`project_folders`) remain available in manual mode and for bulk actions.
+- The sidebar query in auto mode fetches: `projects(id, name, status, client_id, client:clients(id, name, sector))` -- a single query with join.
+- Categories are company-scoped so each organization can define their own structure.
+- The toggle between modes is instant (no data refetch needed, just different rendering logic).

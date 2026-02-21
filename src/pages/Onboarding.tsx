@@ -14,8 +14,15 @@ type Step = 'loading' | 'choose' | 'create-org' | 'accept-invite' | 'domain-join
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const { user, profile, signOut, refreshUserData } = useAuth();
+  const { user, profile, companyRole, signOut, refreshUserData } = useAuth();
   const [step, setStep] = useState<Step>('loading');
+
+  // If user already has an active company role, redirect to main app immediately
+  useEffect(() => {
+    if (companyRole) {
+      navigate('/', { replace: true });
+    }
+  }, [companyRole, navigate]);
   const [loading, setLoading] = useState(false);
   const [autoOnboardRan, setAutoOnboardRan] = useState(false);
 

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Table, 
@@ -15,8 +15,10 @@ import { TableToolbar } from '@/components/shared/TableToolbar';
 import { EditDeleteActions } from '@/components/dialogs/EditDeleteActions';
 import { ResizableTableHeader } from '@/components/shared/ResizableTableHeader';
 import { GroupedTableSection } from '@/components/shared/GroupedTableSection';
+import { ProjectBulkActions } from '@/components/projects/ProjectBulkActions';
 import { useTableViews, GroupByField } from '@/hooks/useTableViews';
 import { exportToCSV, exportToExcel, formatters } from '@/utils/exportUtils';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   ArrowUpDown,
   ArrowUp,
@@ -72,6 +74,7 @@ const STATUS_OPTIONS = [
 ];
 
 const DEFAULT_COLUMNS = [
+  { id: 'select', label: '', visible: true, locked: true },
   { id: 'name', label: 'Όνομα', visible: true, locked: true },
   { id: 'client', label: 'Πελάτης', visible: true },
   { id: 'status', label: 'Κατάσταση', visible: true },
@@ -118,6 +121,8 @@ export function ProjectsTableView({
 
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const lastSelectedIndex = useRef<number | null>(null);
 
   // Sort projects
   const sortedProjects = useMemo(() => {
@@ -132,9 +137,9 @@ export function ProjectsTableView({
           bVal = b.name.toLowerCase();
           break;
         case 'status':
-          const statusOrder = { tender: 0, active: 1, completed: 2, cancelled: 3 };
-          aVal = statusOrder[a.status];
-          bVal = statusOrder[b.status];
+          const statusOrder: Record<string, number> = { tender: 0, active: 1, completed: 2, cancelled: 3 };
+          aVal = statusOrder[a.status] ?? 99;
+          bVal = statusOrder[b.status] ?? 99;
           break;
         case 'budget':
           aVal = a.budget ?? 0;
@@ -157,6 +162,22 @@ export function ProjectsTableView({
       return 0;
     });
   }, [projects, sortField, sortDirection]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedIds(new Set());
+        lastSelectedIndex.current = null;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'a' && canManage) {
+        e.preventDefault();
+        setSelectedIds(new Set(sortedProjects.map(p => p.id)));
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [sortedProjects, canManage]);
 
   // Group projects
   const groupedProjects = useMemo(() => {
@@ -232,6 +253,44 @@ export function ProjectsTableView({
 
   const visibleColumnCount = columns.filter(c => c.visible).length;
 
+  const handleRowSelect = (projectId: string, index: number, e: React.MouseEvent) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      
+      if (e.shiftKey && lastSelectedIndex.current !== null) {
+        // Range select
+        const start = Math.min(lastSelectedIndex.current, index);
+        const end = Math.max(lastSelectedIndex.current, index);
+        for (let i = start; i <= end; i++) {
+          next.add(sortedProjects[i].id);
+        }
+      } else if (e.metaKey || e.ctrlKey) {
+        // Toggle individual
+        if (next.has(projectId)) next.delete(projectId);
+        else next.add(projectId);
+      } else {
+        // Single select
+        if (next.has(projectId) && next.size === 1) {
+          next.delete(projectId);
+        } else {
+          next.clear();
+          next.add(projectId);
+        }
+      }
+      
+      lastSelectedIndex.current = index;
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.size === sortedProjects.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(sortedProjects.map(p => p.id)));
+    }
+  };
+
   // Export functions
   const handleExportCSV = useCallback(() => {
     const exportColumns = [
@@ -263,16 +322,39 @@ export function ProjectsTableView({
     toast.success('Εξαγωγή Excel ολοκληρώθηκε!');
   }, [projects]);
 
-  const renderProjectRow = (project: Project) => (
+  const renderProjectRow = (project: Project, flatIndex: number) => (
     <TableRow 
       key={project.id} 
-      className="group hover:bg-muted/50 cursor-pointer"
+      className={cn(
+        "group hover:bg-muted/50 cursor-pointer",
+        selectedIds.has(project.id) && "bg-primary/5"
+      )}
       onClick={(e) => {
         const target = e.target as HTMLElement;
         if (target.closest('button, input, select, [role="checkbox"], [data-inline-edit]')) return;
+        if (e.metaKey || e.ctrlKey || e.shiftKey) {
+          handleRowSelect(project.id, flatIndex, e);
+          return;
+        }
         navigate(`/projects/${project.id}`);
       }}
     >
+      {/* Checkbox */}
+      {canManage && (
+        <TableCell className="w-[40px]" onClick={(e) => e.stopPropagation()}>
+          <Checkbox
+            checked={selectedIds.has(project.id)}
+            onCheckedChange={() => {
+              setSelectedIds(prev => {
+                const next = new Set(prev);
+                next.has(project.id) ? next.delete(project.id) : next.add(project.id);
+                return next;
+              });
+            }}
+          />
+        </TableCell>
+      )}
+
       {/* Name */}
       <TableCell className="font-medium" style={{ width: getColumnWidth('name') }}>
         <div className="flex items-center gap-2">
@@ -411,8 +493,20 @@ export function ProjectsTableView({
     </TableRow>
   );
 
+  // Build flat index for shift-select
+  let flatIndex = 0;
+
   return (
     <div className="space-y-4">
+      {/* Bulk Actions */}
+      {canManage && (
+        <ProjectBulkActions
+          selectedIds={selectedIds}
+          onClearSelection={() => { setSelectedIds(new Set()); lastSelectedIndex.current = null; }}
+          onActionComplete={() => {}}
+        />
+      )}
+
       {/* Toolbar */}
       <TableToolbar
         columns={columns}
@@ -441,6 +535,14 @@ export function ProjectsTableView({
         <Table>
           <TableHeader>
             <TableRow>
+              {canManage && (
+                <TableHead className="w-[40px]">
+                  <Checkbox
+                    checked={selectedIds.size > 0 && selectedIds.size === sortedProjects.length}
+                    onCheckedChange={handleSelectAll}
+                  />
+                </TableHead>
+              )}
               <ResizableTableHeader 
                 width={getColumnWidth('name')}
                 onWidthChange={(w) => setColumnWidth('name', w)}
@@ -555,25 +657,33 @@ export function ProjectsTableView({
           <TableBody>
             {sortedProjects.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={visibleColumnCount} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={visibleColumnCount + (canManage ? 1 : 0)} className="text-center py-8 text-muted-foreground">
                   Δεν υπάρχουν έργα
                 </TableCell>
               </TableRow>
             ) : groupBy === 'none' ? (
-              sortedProjects.map(project => renderProjectRow(project))
+              sortedProjects.map((project, idx) => renderProjectRow(project, idx))
             ) : (
-              groupedProjects.map(group => (
-                <GroupedTableSection
-                  key={group.key}
-                  groupKey={group.key}
-                  groupLabel={group.label}
-                  itemCount={group.projects.length}
-                  colSpan={visibleColumnCount}
-                  badge={group.badge}
-                >
-                  {group.projects.map(project => renderProjectRow(project))}
-                </GroupedTableSection>
-              ))
+              groupedProjects.map(group => {
+                const startIdx = flatIndex;
+                const rows = group.projects.map((project, idx) => {
+                  const row = renderProjectRow(project, startIdx + idx);
+                  return row;
+                });
+                flatIndex += group.projects.length;
+                return (
+                  <GroupedTableSection
+                    key={group.key}
+                    groupKey={group.key}
+                    groupLabel={group.label}
+                    itemCount={group.projects.length}
+                    colSpan={visibleColumnCount + (canManage ? 1 : 0)}
+                    badge={group.badge}
+                  >
+                    {rows}
+                  </GroupedTableSection>
+                );
+              })
             )}
           </TableBody>
         </Table>

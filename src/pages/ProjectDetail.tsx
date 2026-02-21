@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 import { useDocumentParser } from '@/hooks/useDocumentParser';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,6 +38,7 @@ import {
   GanttChartSquare,
   MessageSquare,
   Palette,
+  FolderInput,
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -103,13 +105,28 @@ interface Expense {
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user, isAdmin, isManager, isClient, hasPermission } = useAuth();
+  const { user, company, isAdmin, isManager, isClient, hasPermission } = useAuth();
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Folders query
+  const { data: folders = [] } = useQuery({
+    queryKey: ['project-folders', company?.id],
+    queryFn: async () => {
+      if (!company?.id) return [];
+      const { data } = await supabase
+        .from('project_folders')
+        .select('id, name')
+        .eq('company_id', company.id)
+        .order('name');
+      return data || [];
+    },
+    enabled: !!company?.id,
+  });
   
   // AI Analysis state
   const [aiFiles, setAiFiles] = useState<Array<{ fileName: string; content: string }>>([]);
@@ -388,6 +405,44 @@ export default function ProjectDetailPage() {
               </DropdownMenu>
             ) : (
               <Badge variant="outline" className={statusConfig.className}>{statusConfig.label}</Badge>
+            )}
+
+            {/* Move to Folder */}
+            {canEdit && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-0.5 text-xs font-medium text-muted-foreground transition-colors cursor-pointer hover:text-foreground hover:bg-secondary/50">
+                    <FolderInput className="h-3 w-3" />
+                    {folders.find(f => f.id === (project as any).folder_id)?.name || 'Φάκελος'}
+                    <span className="ml-0.5 opacity-60">▾</span>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      await supabase.from('projects').update({ folder_id: null }).eq('id', project.id);
+                      toast.success('Αφαιρέθηκε από φάκελο');
+                      fetchProjectData();
+                    }}
+                    className={!(project as any).folder_id ? 'font-semibold' : ''}
+                  >
+                    Χωρίς φάκελο
+                  </DropdownMenuItem>
+                  {folders.map(f => (
+                    <DropdownMenuItem
+                      key={f.id}
+                      onClick={async () => {
+                        await supabase.from('projects').update({ folder_id: f.id }).eq('id', project.id);
+                        toast.success(`Μετακινήθηκε στο "${f.name}"`);
+                        fetchProjectData();
+                      }}
+                      className={(project as any).folder_id === f.id ? 'font-semibold' : ''}
+                    >
+                      {f.name}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
 

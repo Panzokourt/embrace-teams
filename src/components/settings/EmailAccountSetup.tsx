@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useGmailAccount } from '@/hooks/useGmailAccount';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,33 +9,53 @@ export function EmailAccountSetup() {
   const { account, loading, startOAuth, disconnectAccount, testConnection, refetch } = useGmailAccount();
   const [connecting, setConnecting] = useState(false);
   const [testing, setTesting] = useState(false);
+  const pollRef = useRef<{ interval: ReturnType<typeof setInterval>; timeout: ReturnType<typeof setTimeout> } | null>(null);
 
   // Listen for OAuth completion from popup
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       if (event.data?.type === 'gmail-oauth-complete' && event.data?.success) {
+        stopPolling();
+        setConnecting(false);
         refetch();
       }
     };
     window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
+    return () => {
+      window.removeEventListener('message', handler);
+      stopPolling();
+    };
   }, [refetch]);
+
+  // Stop polling when account appears
+  useEffect(() => {
+    if (account && connecting) {
+      stopPolling();
+      setConnecting(false);
+    }
+  }, [account, connecting]);
+
+  const stopPolling = () => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current.interval);
+      clearTimeout(pollRef.current.timeout);
+      pollRef.current = null;
+    }
+  };
 
   const handleConnect = async () => {
     setConnecting(true);
     const url = await startOAuth();
     if (url) {
-      // Open in new top-level tab to avoid iframe restrictions
       window.open(url, '_blank');
-      // Poll for account to appear
       const interval = setInterval(async () => {
         await refetch();
-      }, 3000);
-      // Stop polling after 2 minutes
-      setTimeout(() => {
-        clearInterval(interval);
+      }, 4000);
+      const timeout = setTimeout(() => {
+        stopPolling();
         setConnecting(false);
       }, 120000);
+      pollRef.current = { interval, timeout };
     } else {
       setConnecting(false);
     }

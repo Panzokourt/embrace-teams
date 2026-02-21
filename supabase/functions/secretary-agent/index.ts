@@ -269,6 +269,36 @@ const toolDefinitions = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "generate_csv_report",
+      description: "Generate a CSV report from data (tasks, expenses, projects, etc). Returns CSV content.",
+      parameters: {
+        type: "object",
+        properties: {
+          report_type: { type: "string", enum: ["tasks", "expenses", "projects", "team_tasks"], description: "Type of report" },
+          project_id: { type: "string", description: "Optional project filter" },
+          status: { type: "string", description: "Optional status filter" },
+        },
+        required: ["report_type"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "generate_project_report",
+      description: "Generate a comprehensive markdown report for a project including tasks, deliverables, budget",
+      parameters: {
+        type: "object",
+        properties: {
+          project_id: { type: "string", description: "The project ID" },
+        },
+        required: ["project_id"],
+      },
+    },
+  },
 ];
 
 // ── Tool execution ────────────────────────────────────────────────
@@ -516,6 +546,73 @@ async function executeTool(
         return { success: true, expense: data };
       }
 
+      case "generate_csv_report": {
+        let rows: any[] = [];
+        let headers: string[] = [];
+        
+        if (args.report_type === "tasks") {
+          let q = supabase.from("tasks").select("title, status, priority, due_date, assigned_to, project_id, projects(name)").order("created_at", { ascending: false }).limit(200);
+          if (args.project_id) q = q.eq("project_id", args.project_id);
+          if (args.status) q = q.eq("status", args.status);
+          const { data } = await q;
+          headers = ["Τίτλος", "Status", "Priority", "Deadline", "Project"];
+          rows = (data || []).map((t: any) => [t.title, t.status, t.priority, t.due_date || "", t.projects?.name || ""]);
+        } else if (args.report_type === "expenses") {
+          let q = supabase.from("expenses").select("description, amount, category, expense_date, project_id").order("expense_date", { ascending: false }).limit(200);
+          if (args.project_id) q = q.eq("project_id", args.project_id);
+          const { data } = await q;
+          headers = ["Περιγραφή", "Ποσό", "Κατηγορία", "Ημερομηνία"];
+          rows = (data || []).map((e: any) => [e.description, e.amount, e.category || "", e.expense_date]);
+        } else if (args.report_type === "projects") {
+          const { data } = await supabase.from("projects").select("name, status, budget, client_id, clients(name)").order("created_at", { ascending: false }).limit(100);
+          headers = ["Όνομα", "Status", "Budget", "Πελάτης"];
+          rows = (data || []).map((p: any) => [p.name, p.status, p.budget || 0, p.clients?.name || ""]);
+        }
+        
+        const csvLines = [headers.join(","), ...rows.map((r: any) => r.map((c: any) => `"${String(c).replace(/"/g, '""')}"`).join(","))];
+        const csvContent = csvLines.join("\n");
+        const base64 = btoa(unescape(encodeURIComponent(csvContent)));
+        
+        return { 
+          success: true, 
+          csv_base64: base64, 
+          filename: `${args.report_type}_report_${new Date().toISOString().split("T")[0]}.csv`,
+          row_count: rows.length 
+        };
+      }
+
+      case "generate_project_report": {
+        const [projRes, tasksRes, delRes, expRes] = await Promise.all([
+          supabase.from("projects").select("id, name, status, budget, client_id, clients(name), created_at").eq("id", args.project_id).single(),
+          supabase.from("tasks").select("id, title, status, priority, due_date, assigned_to").eq("project_id", args.project_id),
+          supabase.from("deliverables").select("id, name, completed, budget, cost").eq("project_id", args.project_id),
+          supabase.from("expenses").select("amount, category").eq("project_id", args.project_id),
+        ]);
+        if (projRes.error) throw projRes.error;
+        
+        const tasks = tasksRes.data || [];
+        const deliverables = delRes.data || [];
+        const expenses = expRes.data || [];
+        const totalExpenses = expenses.reduce((s: number, e: any) => s + (e.amount || 0), 0);
+        const doneTasks = tasks.filter((t: any) => t.status === "done").length;
+        
+        return {
+          success: true,
+          project: projRes.data,
+          summary: {
+            total_tasks: tasks.length,
+            done_tasks: doneTasks,
+            progress: tasks.length > 0 ? Math.round((doneTasks / tasks.length) * 100) : 0,
+            total_deliverables: deliverables.length,
+            completed_deliverables: deliverables.filter((d: any) => d.completed).length,
+            total_budget: projRes.data?.budget || 0,
+            total_expenses: totalExpenses,
+          },
+          tasks: tasks.slice(0, 20),
+          deliverables,
+        };
+      }
+
       default:
         return { error: `Unknown tool: ${toolName}` };
     }
@@ -592,13 +689,36 @@ serve(async (req) => {
 Μπορείς να εκτελείς ενέργειες στο σύστημα χρησιμοποιώντας τα tools σου.
 
 Κανόνες:
-- Αν λείπουν απαραίτητες παράμετροι, ρώτα τον χρήστη πριν εκτελέσεις
-- Χρησιμοποίησε markdown στις απαντήσεις σου
-- Μιλάς πάντα ελληνικά εκτός αν σε ρωτήσουν σε άλλη γλώσσα
-- Αν δεν μπορείς να κάνεις κάτι, εξήγησε γιατί
-- Αν η ενέργεια αποτύχει (π.χ. λόγω δικαιωμάτων), ενημέρωσε τον χρήστη
-- Όταν δημιουργείς κάτι, επιβεβαίωσε τι δημιούργησες με λεπτομέρειες
-- Να είσαι φιλικός, αποτελεσματικός και συνοπτικός
+- ΠΡΙΝ εκτελέσεις κάποιο tool, ρώτα τον χρήστη βήμα-βήμα για ΟΛΕΣ τις σημαντικές παραμέτρους
+- Για create_task: ρώτα project (δώσε επιλογές), τίτλο, περιγραφή, προτεραιότητα, deadline, υπεύθυνο
+- Για create_brief: ρώτα τύπο, τίτλο, project, πελάτη
+- Για create_client: ρώτα όνομα, email, τηλέφωνο, διεύθυνση
+- Για request_leave: ρώτα τύπο, ημερομηνίες, αιτία
+- ΠΑΝΤΑ δείξε preview/σύνοψη πριν εκτελέσεις, με κουμπί επιβεβαίωσης
+- Μετά την εκτέλεση, δείξε σύνοψη αποτελέσματος
+
+Διαδραστικές Επιλογές:
+Όταν χρειάζεται επιλογή, χρησιμοποίησε :::actions blocks αντί να ρωτάς με κείμενο.
+Format:
+:::actions
+[{"type":"button","label":"Επιλογή 1","action":"select","data":{"key":"value"}},{"type":"button","label":"Επιλογή 2","action":"select","data":{"key":"value2"}}]
+:::
+
+Τύποι actions: button (κουμπί), confirm (Ναι/Όχι), link (πλοήγηση, χρειάζεται href), select (dropdown, χρειάζεται options array).
+
+Download αρχείων:
+Όταν δημιουργείς αναφορά/CSV, χρησιμοποίησε :::download block:
+:::download
+{"filename":"report.csv","content_type":"text/csv","data":"base64_encoded_content"}
+:::
+
+Γλώσσα: Μιλάς πάντα ελληνικά εκτός αν σε ρωτήσουν σε άλλη γλώσσα.
+Αν δεν μπορείς να κάνεις κάτι, εξήγησε γιατί.
+Αν η ενέργεια αποτύχει (π.χ. λόγω δικαιωμάτων), ενημέρωσε τον χρήστη.
+Να είσαι φιλικός, αποτελεσματικός και συνοπτικός.
+Χρησιμοποίησε markdown στις απαντήσεις σου.
+
+Αν ο χρήστης αναφέρει κάποιον/κάτι με @[Όνομα](type:id), αυτό σημαίνει ότι αναφέρεται σε συγκεκριμένο entity. Χρησιμοποίησε το id για να το βρεις.
 
 Context δεδομένων χρήστη:
 ${contextParts.join("\n")}`;

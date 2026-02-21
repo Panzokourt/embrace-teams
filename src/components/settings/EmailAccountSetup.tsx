@@ -25,16 +25,17 @@ export function EmailAccountSetup() {
     setConnecting(true);
     const url = await startOAuth();
     if (url) {
-      // Open popup for OAuth
-      const popup = window.open(url, 'gmail-oauth', 'width=600,height=700,left=200,top=100');
-      // Poll for popup close
-      const interval = setInterval(() => {
-        if (popup?.closed) {
-          clearInterval(interval);
-          setConnecting(false);
-          refetch();
-        }
-      }, 1000);
+      // Open in new top-level tab to avoid iframe restrictions
+      window.open(url, '_blank');
+      // Poll for account to appear
+      const interval = setInterval(async () => {
+        await refetch();
+      }, 3000);
+      // Stop polling after 2 minutes
+      setTimeout(() => {
+        clearInterval(interval);
+        setConnecting(false);
+      }, 120000);
     } else {
       setConnecting(false);
     }

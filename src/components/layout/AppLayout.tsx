@@ -8,6 +8,8 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/componen
 import { Loader2 } from 'lucide-react';
 import ChatFloatingBubbles from '@/components/chat/ChatFloatingBubbles';
 import type { ImperativePanelHandle } from 'react-resizable-panels';
+import { FocusModeProvider } from '@/contexts/FocusContext';
+import FocusOverlay from '@/components/focus/FocusOverlay';
 
 const PANEL_OPEN_KEY = 'secretary-panel-open';
 const PANEL_TAB_KEY = 'secretary-panel-tab';
@@ -131,52 +133,57 @@ export default function AppLayout() {
   }
 
   return (
-    <div className="flex h-screen bg-background">
-      <ResizablePanelGroup direction="horizontal" className="flex-1">
-        {/* Sidebar panel */}
-        <ResizablePanel
-          ref={sidebarRef}
-          defaultSize={sidebarCollapsed ? COLLAPSED_SIZE : DEFAULT_SIZE}
-          minSize={COLLAPSED_SIZE}
-          maxSize={MAX_SIZE}
-          collapsible
-          collapsedSize={COLLAPSED_SIZE}
-          onResize={handleSidebarResize}
-          className="hidden md:block"
-        >
-          <AppSidebar collapsed={sidebarCollapsed} onToggleCollapse={toggleCollapsed} />
-        </ResizablePanel>
-        <ResizableHandle className="hidden md:flex" />
+    <FocusModeProvider>
+      <div className="flex h-screen bg-background">
+        <ResizablePanelGroup direction="horizontal" className="flex-1">
+          {/* Sidebar panel */}
+          <ResizablePanel
+            ref={sidebarRef}
+            defaultSize={sidebarCollapsed ? COLLAPSED_SIZE : DEFAULT_SIZE}
+            minSize={COLLAPSED_SIZE}
+            maxSize={MAX_SIZE}
+            collapsible
+            collapsedSize={COLLAPSED_SIZE}
+            onResize={handleSidebarResize}
+            className="hidden md:block"
+          >
+            <AppSidebar collapsed={sidebarCollapsed} onToggleCollapse={toggleCollapsed} />
+          </ResizablePanel>
+          <ResizableHandle className="hidden md:flex" />
 
-        {/* Main content */}
-        <ResizablePanel defaultSize={rightPanelOpen ? 55 : 85} minSize={30}>
-          <main className="h-full overflow-auto flex flex-col">
-            <TopBar
-              onPanelToggle={togglePanelSimple}
-              rightPanelOpen={rightPanelOpen}
-            />
-            <div className="flex-1">
-              <Outlet />
-            </div>
-          </main>
-        </ResizablePanel>
-
-        {rightPanelOpen && (
-          <>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={30} minSize={20} maxSize={45}>
-              <SecretaryPanel
-                activeTab={activeTab}
-                onTabChange={setActiveTab}
-                onClose={closePanel}
+          {/* Main content */}
+          <ResizablePanel defaultSize={rightPanelOpen ? 55 : 85} minSize={30}>
+            <main className="h-full overflow-auto flex flex-col">
+              <TopBar
+                onPanelToggle={togglePanelSimple}
+                rightPanelOpen={rightPanelOpen}
               />
-            </ResizablePanel>
-          </>
-        )}
-      </ResizablePanelGroup>
+              <div className="flex-1">
+                <Outlet />
+              </div>
+            </main>
+          </ResizablePanel>
 
-      {/* Floating Messenger-style chat windows */}
-      <ChatFloatingBubbles />
-    </div>
+          {rightPanelOpen && (
+            <>
+              <ResizableHandle withHandle />
+              <ResizablePanel defaultSize={30} minSize={20} maxSize={45}>
+                <SecretaryPanel
+                  activeTab={activeTab}
+                  onTabChange={setActiveTab}
+                  onClose={closePanel}
+                />
+              </ResizablePanel>
+            </>
+          )}
+        </ResizablePanelGroup>
+
+        {/* Floating Messenger-style chat windows */}
+        <ChatFloatingBubbles />
+
+        {/* Focus Mode Overlay */}
+        <FocusOverlay />
+      </div>
+    </FocusModeProvider>
   );
 }

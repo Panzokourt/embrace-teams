@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, FolderKanban, CheckSquare, FileText, Users, PanelRightOpen, PanelRightClose, BookUser, Crosshair } from 'lucide-react';
+import { Search, FolderKanban, CheckSquare, FileText, Users, PanelRightOpen, PanelRightClose, BookUser, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
@@ -150,11 +150,13 @@ export default function TopBar({ onPanelToggle, rightPanelOpen }: TopBarProps) {
       <div className="px-1 flex items-center gap-1">
         <Button
           variant="ghost"
-          size="icon"
+          size="sm"
           onClick={() => enterFocus()}
-          title="Focus Mode"
+          title="Work Mode"
+          className="gap-1.5 bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 hover:from-violet-600/30 hover:to-fuchsia-600/30 text-violet-400 hover:text-violet-300 border border-violet-500/20"
         >
-          <Crosshair className="h-5 w-5" />
+          <Zap className="h-4 w-4" />
+          <span className="hidden sm:inline text-xs font-semibold">Work Mode</span>
         </Button>
         <Button
           variant="ghost"

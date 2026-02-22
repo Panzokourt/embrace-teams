@@ -146,7 +146,7 @@ export function FocusModeProvider({ children }: { children: React.ReactNode }) {
 
   const completeCurrentTask = useCallback(async () => {
     if (!currentTaskId) return;
-    await supabase.from('tasks').update({ status: 'completed' }).eq('id', currentTaskId);
+    // Remove current task from queue and advance (DB update handled by caller)
     const remaining = tasks.filter(t => t.id !== currentTaskId);
     setTasks(remaining);
     if (remaining.length > 0) {

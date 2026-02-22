@@ -173,7 +173,7 @@ function DroppableFolder({
 }
 
 // Collapsible virtual folder for auto mode
-function VirtualFolder({ name, color, children, defaultOpen = true }: {
+function VirtualFolder({ name, color, children, defaultOpen = false }: {
   name: string; color?: string | null; children: React.ReactNode; defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -222,6 +222,16 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
+
+  // Listen for storage changes from Settings page
+  useEffect(() => {
+    const handleStorage = () => {
+      const stored = localStorage.getItem('sidebar-project-tree-mode') as TreeMode;
+      if (stored && stored !== mode) setMode(stored);
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, [mode]);
 
   useEffect(() => {
     localStorage.setItem('sidebar-project-tree-mode', mode);
@@ -408,22 +418,6 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
 
     return (
       <div className="space-y-0.5 mt-1">
-        {/* Mode toggle */}
-        <div className="flex justify-end px-1 mb-1">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => setMode('manual')}
-              >
-                <LayoutGrid className="h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right">Χειροκίνητοι φάκελοι</TooltipContent>
-          </Tooltip>
-        </div>
 
         <div className="max-h-[50vh] overflow-y-auto space-y-0.5 scrollbar-thin">
           {sortedCategories.map(([catName, catData]) => {
@@ -473,22 +467,6 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="space-y-0.5 mt-1">
-        {/* Mode toggle + create folder */}
-        <div className="flex justify-between px-1 mb-1">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => setMode('auto')}
-              >
-                <FolderTree className="h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right">Αυτόματη οργάνωση</TooltipContent>
-          </Tooltip>
-        </div>
 
         <div className="max-h-[300px] overflow-y-auto space-y-0.5 scrollbar-thin">
           {/* Create folder */}

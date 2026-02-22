@@ -34,7 +34,9 @@ import {
   Sun,
   Monitor,
   Key,
-  Clock
+  Clock,
+  FolderTree,
+  LayoutGrid
 } from 'lucide-react';
 import { ProjectCategoriesManager } from '@/components/settings/ProjectCategoriesManager';
 import { EmailAccountSetup } from '@/components/settings/EmailAccountSetup';
@@ -168,6 +170,7 @@ export default function SettingsPage() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [saving, setSaving] = useState(false);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [treeMode, setTreeMode] = useState(() => localStorage.getItem('sidebar-project-tree-mode') || 'auto');
   const [changingPassword, setChangingPassword] = useState(false);
 
   // Profile settings
@@ -374,6 +377,43 @@ export default function SettingsPage() {
             </div>
             <p className="text-xs text-muted-foreground">
               Τρέχον θέμα: {resolvedTheme === 'dark' ? 'Σκούρο' : 'Φωτεινό'}
+           </p>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-3">
+            <Label>Οργάνωση Έργων στο Sidebar</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                variant={treeMode === 'auto' ? 'default' : 'outline'}
+                className="flex flex-col gap-2 h-auto py-4"
+                onClick={() => {
+                  localStorage.setItem('sidebar-project-tree-mode', 'auto');
+                  setTreeMode('auto');
+                  toast.success('Αυτόματη οργάνωση ενεργοποιήθηκε');
+                  window.dispatchEvent(new Event('storage'));
+                }}
+              >
+                <FolderTree className="h-5 w-5" />
+                <span className="text-xs">Αυτόματη</span>
+              </Button>
+              <Button
+                variant={treeMode === 'manual' ? 'default' : 'outline'}
+                className="flex flex-col gap-2 h-auto py-4"
+                onClick={() => {
+                  localStorage.setItem('sidebar-project-tree-mode', 'manual');
+                  setTreeMode('manual');
+                  toast.success('Χειροκίνητη οργάνωση ενεργοποιήθηκε');
+                  window.dispatchEvent(new Event('storage'));
+                }}
+              >
+                <LayoutGrid className="h-5 w-5" />
+                <span className="text-xs">Χειροκίνητη</span>
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Αυτόματη: Κατηγορία → Πελάτης → Έργα. Χειροκίνητη: Δικοί σας φάκελοι με drag & drop.
             </p>
           </div>
         </CardContent>

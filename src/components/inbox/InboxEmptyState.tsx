@@ -8,8 +8,8 @@ export function InboxEmptyState() {
   return (
     <div className="flex-1 flex items-center justify-center p-8">
       <div className="text-center max-w-md space-y-4">
-        <div className="mx-auto w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-          <Mail className="h-8 w-8 text-primary" />
+        <div className="mx-auto w-16 h-16 rounded-2xl bg-muted flex items-center justify-center">
+          <Mail className="h-8 w-8 text-foreground" />
         </div>
         <h2 className="text-xl font-semibold">Συνδέστε το email σας</h2>
         <p className="text-muted-foreground text-sm">

@@ -40,8 +40,8 @@ export default function RevenueChart() {
   return (
     <div className="rounded-2xl border border-border/50 bg-card p-6 animate-fade-in shadow-soft h-full">
       <h3 className="text-base font-semibold flex items-center gap-2 mb-4 text-foreground">
-        <span className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-          <BarChart3 className="h-4 w-4 text-primary" />
+        <span className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
+          <BarChart3 className="h-4 w-4 text-foreground" />
         </span>
         Γράφημα Εσόδων {new Date().getFullYear()}
       </h3>

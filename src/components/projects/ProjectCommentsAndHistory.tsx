@@ -28,7 +28,7 @@ interface ProjectCommentsAndHistoryProps {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function getEntityIcon(entityType: string) {
   switch (entityType) {
-    case 'task': return <CheckSquare className="h-3.5 w-3.5 text-primary" />;
+    case 'task': return <CheckSquare className="h-3.5 w-3.5 text-foreground" />;
     case 'deliverable': return <Package className="h-3.5 w-3.5 text-warning" />;
     default: return <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />;
   }
@@ -214,7 +214,7 @@ export function ProjectCommentsAndHistory({ projectId }: ProjectCommentsAndHisto
           <MessageSquare className="h-3.5 w-3.5" />
           Σχόλια
           {commentCount > 0 && (
-            <span className="ml-1 bg-primary/10 text-primary text-[10px] font-bold rounded-full px-1.5 py-0">
+            <span className="ml-1 bg-muted text-foreground text-[10px] font-bold rounded-full px-1.5 py-0">
               {commentCount}
             </span>
           )}

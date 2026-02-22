@@ -178,7 +178,7 @@ export default function Onboarding() {
 
         {step === 'loading' && (
           <div className="flex flex-col items-center justify-center py-16">
-            <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+            <Loader2 className="h-8 w-8 animate-spin text-foreground mb-4" />
             <p className="text-muted-foreground">Ρύθμιση λογαριασμού...</p>
           </div>
         )}
@@ -192,7 +192,7 @@ export default function Onboarding() {
 
             <Card className="cursor-pointer hover:border-primary/40 transition-colors border-border/40" onClick={() => setStep('create-org')}>
               <CardContent className="flex items-center gap-4 p-6">
-                <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary"><Building2 className="h-6 w-6" /></div>
+                <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center text-foreground"><Building2 className="h-6 w-6" /></div>
                 <div>
                   <h3 className="font-semibold text-foreground">Δημιουργία εταιρείας</h3>
                   <p className="text-sm text-muted-foreground">Δημιουργήστε νέο workspace και γίνετε Owner</p>
@@ -202,7 +202,7 @@ export default function Onboarding() {
 
             <Card className="cursor-pointer hover:border-primary/40 transition-colors border-border/40" onClick={() => setStep('accept-invite')}>
               <CardContent className="flex items-center gap-4 p-6">
-                <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary"><Mail className="h-6 w-6" /></div>
+                <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center text-foreground"><Mail className="h-6 w-6" /></div>
                 <div>
                   <h3 className="font-semibold text-foreground">Αποδοχή πρόσκλησης</h3>
                   <p className="text-sm text-muted-foreground">Εισάγετε κωδικό πρόσκλησης</p>
@@ -213,7 +213,7 @@ export default function Onboarding() {
             {!isPersonalEmail && (
               <Card className="cursor-pointer hover:border-primary/40 transition-colors border-border/40" onClick={() => { setStep('domain-join'); handleCheckDomain(); }}>
                 <CardContent className="flex items-center gap-4 p-6">
-                  <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary"><Link2 className="h-6 w-6" /></div>
+                  <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center text-foreground"><Link2 className="h-6 w-6" /></div>
                   <div>
                     <h3 className="font-semibold text-foreground">Αίτημα μέσω domain</h3>
                     <p className="text-sm text-muted-foreground">Βρείτε εταιρεία με domain @{emailDomain}</p>
@@ -289,7 +289,7 @@ export default function Onboarding() {
               <CardDescription>Εταιρείες με domain @{emailDomain}</CardDescription>
             </CardHeader>
             <CardContent>
-              {loading && <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>}
+              {loading && <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-foreground" /></div>}
               {domainChecked && !loading && domainCompanies.length === 0 && (
                 <p className="text-center text-muted-foreground py-8">Δεν βρέθηκαν εταιρείες με αυτό το domain</p>
               )}

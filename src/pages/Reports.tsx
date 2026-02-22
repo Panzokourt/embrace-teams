@@ -114,7 +114,7 @@ export default function Reports() {
   if (data.loading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader2 className="h-8 w-8 animate-spin text-foreground" />
       </div>
     );
   }
@@ -123,7 +123,7 @@ export default function Reports() {
     <div className="p-4 md:p-6 space-y-6 max-w-[1400px] mx-auto" id="reports-content">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <BarChart3 className="h-6 w-6 text-primary" />
+          <BarChart3 className="h-6 w-6 text-foreground" />
           <h1 className="text-2xl font-semibold tracking-tight">Αναφορές</h1>
         </div>
         <div className="flex flex-wrap items-center gap-3 print:hidden">

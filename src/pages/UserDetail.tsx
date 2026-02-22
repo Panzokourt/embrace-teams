@@ -263,7 +263,7 @@ export default function UserDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader2 className="h-8 w-8 animate-spin text-foreground" />
       </div>
     );
   }
@@ -288,9 +288,9 @@ export default function UserDetailPage() {
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex items-center gap-4 flex-1">
-          <Avatar className="h-16 w-16 ring-2 ring-primary/20 ring-offset-2">
+          <Avatar className="h-16 w-16 ring-2 ring-foreground/20 ring-offset-2">
             <AvatarImage src={user.avatar_url || undefined} />
-            <AvatarFallback className="text-xl bg-primary/10 text-primary">
+            <AvatarFallback className="text-xl bg-muted text-foreground">
               {getInitials(user.full_name, user.email)}
             </AvatarFallback>
           </Avatar>

@@ -158,7 +158,7 @@ function ConversationGroup({
           className={cn(
             "group w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left text-sm transition-colors",
             activeId === c.id
-              ? "bg-primary/10 text-primary"
+              ? "bg-accent text-foreground"
               : "text-foreground/80 hover:bg-accent/50"
           )}
         >

@@ -36,7 +36,7 @@ export default function Contacts() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-primary/10"><BookUser className="h-6 w-6 text-primary" /></div>
+          <div className="p-2.5 rounded-xl bg-muted"><BookUser className="h-6 w-6 text-foreground" /></div>
           <div>
             <h1 className="text-2xl font-bold">Ευρετήριο Επαφών</h1>
             <p className="text-sm text-muted-foreground">{contacts.length} επαφές</p>

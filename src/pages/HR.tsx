@@ -40,8 +40,8 @@ export default function HRPage() {
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <UsersRound className="h-5 w-5 text-primary" />
+           <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center">
+            <UsersRound className="h-5 w-5 text-foreground" />
           </div>
           HR - Ανθρώπινο Δυναμικό
         </h1>

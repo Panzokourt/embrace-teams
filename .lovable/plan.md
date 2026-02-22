@@ -1,166 +1,86 @@
 
 
-# Focus Mode -- Zen Productivity Experience
+# Focus Mode -- Enhanced Task Details & Bug Fixes
 
 ## Summary
 
-A full-screen, distraction-free "Focus Mode" that overlays the entire app with a dark, immersive workspace. The user works on one task at a time with Spotify-style playback controls and a discreet sidebar of upcoming tasks.
+Enhance the Focus Mode overlay to show full task details in organized sections, fix the sidebar visibility, fix the auto-starting timer bug, add a visible "Complete" button, and center the Play button within the progress ring.
 
 ---
 
-## Architecture
+## Changes
 
-Focus Mode will be a new full-screen overlay component rendered at the `AppLayout` level. It uses existing `useTimeTracking` for timer functionality and fetches the user's daily task queue from Supabase.
+### 1. Enhanced Task Details in Center Workspace (`src/components/focus/FocusOverlay.tsx`)
 
-**Entry points:**
-- A permanent button in the TopBar (next to the panel toggle)
-- A "Focus Mode" action in My Work page
+Replace the current minimal center view with a sectioned layout showing full task information, similar to the TaskDetail page but styled for the dark Focus Mode aesthetic.
 
-**State:** Managed via React context (`FocusContext`) so any component can trigger it.
+**Sections (scrollable, max-width container, left-aligned text):**
 
----
+- **Header Section:** Project name (subtitle), task title (large), priority badge, due date, status
+- **Description Section:** Full task description in a bordered card with `bg-white/5` background
+- **Properties Section:** Key properties in a compact grid (Assignee, Start/Due dates, Estimated hours, Progress bar) -- read-only display, not editable
+- **Subtasks Section:** Fetched via `parent_task_id`, shown as a list with status icons and completion states. Each subtask shows its title, status icon, and a strikethrough if completed
+- **Files Section:** Fetched from `file_attachments` table filtered by `task_id`, shown as a compact file list with download links
 
-## New Files
+Data fetching: Add queries in FocusContext to also fetch subtasks and file attachments for the current task. Alternatively, fetch them directly in FocusOverlay using `useEffect` when `currentTask` changes.
 
-### 1. `src/contexts/FocusContext.tsx`
-- `FocusModeProvider` wrapping the app inside `AppLayout`
-- Exports: `useFocusMode()` with `{ isActive, enterFocus(taskId?), exitFocus, currentTask, upNextTasks }`
-- State: `isActive`, `currentTaskId`, `sessionStartTime`, `isPaused`, `pomodoroMinutes` (default 25)
-- On enter: fetches user's today tasks (reusing MyWork logic), sets first task as current
-- On exit: stops any running timer, restores normal view
+### 2. Fix Sidebar Always Visible (`src/components/focus/FocusOverlay.tsx`)
 
-### 2. `src/components/focus/FocusOverlay.tsx`
-The main full-screen overlay with 3 zones:
+The sidebar currently only renders when `upNextTasks.length > 0`. Change this to **always render** the sidebar (even if empty, show "No more tasks" placeholder). Apply the glassmorphism styling properly: `bg-white/5 backdrop-blur-xl border-l border-white/10`.
 
-**a) Status Shield (Top bar - thin)**
-- "Shield Active: Notifications Muted" indicator
-- Emergency Exit "X" button (top-right)
-- Current time display
+### 3. Add "Complete Task" Button (`src/components/focus/FocusOverlay.tsx` or `FocusControlBar.tsx`)
 
-**b) Main Workspace (Center)**
-- Current task title in large typography (text-3xl/4xl)
-- Project name subtitle
-- Task description (if any) in muted text
-- Priority badge
-- Due date display
-- Progress indicator (if task has progress %)
+The Stop/Finish button (Square icon) already calls `handleFinish` which triggers the success animation and then `completeCurrentTask()`. The issue is the icon is not clear enough. Solutions:
+- Add a visible label or tooltip "Ολοκληρώθηκε" next to the Square button
+- Or add a separate prominent "Mark Complete" button with a CheckCircle icon in the center workspace area, above the control bar
+- Best approach: Add a labeled "Complete" button with CheckCircle icon inside the control bar, replacing the ambiguous Square icon with `Check` + text label
 
-**c) Up Next Sidebar (Right - ~280px)**
-- Glassmorphism styling: `bg-white/5 backdrop-blur-xl border border-white/10`
-- Tasks listed with low opacity (opacity-40), becoming opacity-100 on hover
-- Each task shows title, project, due date
-- Drag-and-drop support: user can drag a task from sidebar to center to switch focus
-- Clicking a task switches focus to it
+### 4. Fix Timer Auto-Starting Bug (`src/contexts/FocusContext.tsx` + `src/components/focus/FocusControlBar.tsx`)
 
-**d) Control Bar (Bottom Center - Floating Dock)**
-- Floating pill shape: `rounded-full bg-white/10 backdrop-blur-xl`
-- Large circular Play/Pause button (center, 64px)
-- Stop/Finish button (completes current task)
-- Forward/Skip button (next task)
-- Progress Ring around Play button (SVG circle that fills based on Pomodoro timer)
-- Elapsed time display (font-mono)
-- Pomodoro countdown display
+**Problem:** `enterFocus` sets `sessionStartTime = Date.now()` and `isPaused = false`, which causes the Pomodoro timer in FocusControlBar to start counting immediately (the `useEffect` at line 24 fires because `isPaused` is false and `sessionStartTime` is set).
 
-### 3. `src/components/focus/FocusControlBar.tsx`
-Extracted control bar component:
-- Play: starts timer via `useTimeTracking.startTimer()`, updates user `work_status` to 'busy'
-- Pause: stops timer, changes dock color from blue tint to amber tint
-- Stop/Finish: marks task as completed, triggers confetti/success animation, auto-advances to next task
-- Forward: skips to next task in queue without completing current
-- Progress Ring: SVG `<circle>` with `stroke-dashoffset` animated based on elapsed vs Pomodoro duration
+**Fix:** 
+- In `FocusContext.enterFocus`: set `isPaused = true` initially (start in paused state)
+- `sessionStartTime` should only be set when the user presses Play
+- In FocusControlBar: on `handlePlay`, if `sessionStartTime` is null, set it via a new context method `startSession()`
+- Add `startSession` to FocusContext that sets `sessionStartTime = Date.now()` and `isPaused = false`
 
-### 4. `src/components/focus/FocusSuccessAnimation.tsx`
-- Brief celebratory animation on task completion (checkmark scale-in with particle burst)
-- Auto-dismisses after 1.5s, transitions to next task
+### 5. Center Play Button in Progress Ring (`src/components/focus/FocusControlBar.tsx`)
+
+**Problem:** The SVG ring is positioned with `absolute -inset-1` making it 82x82px, but the button is 64x64px (w-16 h-16). The offset is: (82-64)/2 = 9px on each side, but `-inset-1` only gives 4px. This causes misalignment.
+
+**Fix:** Change the SVG positioning. The button is 64px, the ring viewBox is 82px. We need the SVG to be centered around the button:
+- Make the ring container `relative flex items-center justify-center`
+- Set SVG to `absolute` with proper centering: `absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[76px] h-[76px]`
+- Or adjust the `-inset` value to properly center: use `absolute -inset-[9px]` and adjust SVG size to `w-[82px] h-[82px]`
+
+### 6. Fetch Subtasks & Files for Current Task (`src/components/focus/FocusOverlay.tsx`)
+
+Add state and effects to fetch:
+- **Subtasks:** `supabase.from('tasks').select('id, title, status, priority').eq('parent_task_id', currentTask.id)`
+- **Files:** `supabase.from('file_attachments').select('id, file_name, file_url, file_type').eq('task_id', currentTask.id)`
+- **Assignee name:** `supabase.from('profiles').select('full_name').eq('id', currentTask.assigned_to).single()`
+
+These queries fire when `currentTask.id` changes.
 
 ---
 
-## Modified Files
+## Files Modified
 
-### 5. `src/components/layout/AppLayout.tsx`
-- Import and render `FocusModeProvider` wrapping the content
-- Render `<FocusOverlay />` conditionally when `isActive`
-- When active, the overlay covers everything (fixed inset-0 z-50)
-
-### 6. `src/components/layout/TopBar.tsx`
-- Add a "Focus" button (with `Target` or `Crosshair` icon from lucide) next to the panel toggle
-- On click: `enterFocus()` from context
-
-### 7. `src/pages/MyWork.tsx`
-- Add a "Focus Mode" button in the header area
-- On click: `enterFocus()` starting with the first today task
+| File | Changes |
+|------|---------|
+| `src/components/focus/FocusOverlay.tsx` | Sectioned task detail view (description, properties, subtasks, files), always-visible sidebar |
+| `src/components/focus/FocusControlBar.tsx` | Fix Play button centering in ring, rename Stop to "Complete" with Check icon, fix timer logic |
+| `src/contexts/FocusContext.tsx` | Start in paused state, add `startSession` method, don't auto-set sessionStartTime |
 
 ---
 
-## Visual Design
+## Technical Notes
 
-**Color Palette (Focus Mode only):**
-- Background: `bg-[#0f1219]` (deep blue-charcoal, hardcoded for zen experience)
-- Text: `text-white`, `text-white/60` for muted
-- Accent: cool blue `#3b82f6` for active/playing state
-- Pause accent: warm amber `#f59e0b`
-- Success: green `#22c55e`
-- Glassmorphism: `bg-white/5 backdrop-blur-xl border border-white/10`
-
-**Typography:**
-- Current task title: `text-4xl font-bold tracking-tight` (Plus Jakarta Sans)
-- Timer: `text-6xl font-mono font-light`
-- Sidebar tasks: `text-sm`
-
-**Transitions:**
-- Enter/exit Focus Mode: `animate-fade-in` (0.5s ease-out) on overlay
-- Task switch: crossfade animation (fade out old, fade in new)
-- Pause state: background subtly shifts from blue-tint to amber-tint (CSS transition 0.5s)
-- Success animation: checkmark scales in, brief confetti particles via CSS
-
-**Control Bar styling:**
-- `fixed bottom-8 left-1/2 -translate-x-1/2`
-- `rounded-full px-6 py-3 bg-white/10 backdrop-blur-xl border border-white/10`
-- Play button: `w-16 h-16 rounded-full bg-white text-[#0f1219]` with hover scale
-- Other buttons: `w-10 h-10 rounded-full bg-white/10 text-white hover:bg-white/20`
-
----
-
-## Progress Ring Implementation
-
-SVG circle around the Play button:
-- Radius ~36px, stroke-width 3px
-- `stroke-dasharray = circumference`
-- `stroke-dashoffset = circumference * (1 - elapsed/total)`
-- Color transitions from blue to amber when nearing end
-- Smooth CSS transition on stroke-dashoffset
-
----
-
-## Drag and Drop
-
-- Reuse existing `@dnd-kit` setup
-- Sidebar tasks are `Sortable` items
-- "Center zone" is a `Droppable` area
-- On drop: switch `currentTaskId` to dropped task
-
----
-
-## Notification Muting
-
-- When Focus Mode activates, set a flag in `FocusContext`
-- `NotificationBell` component checks this flag and suppresses toast notifications
-- The "Shield Active" banner provides visual confirmation
-- On exit, notifications resume normally
-
----
-
-## Files Summary
-
-| File | Action |
-|------|--------|
-| `src/contexts/FocusContext.tsx` | **New** - Focus mode state management |
-| `src/components/focus/FocusOverlay.tsx` | **New** - Main full-screen overlay |
-| `src/components/focus/FocusControlBar.tsx` | **New** - Spotify-style playback controls |
-| `src/components/focus/FocusSuccessAnimation.tsx` | **New** - Task completion animation |
-| `src/components/layout/AppLayout.tsx` | **Edit** - Add FocusProvider + overlay render |
-| `src/components/layout/TopBar.tsx` | **Edit** - Add Focus button |
-| `src/pages/MyWork.tsx` | **Edit** - Add Focus Mode entry button |
-
-No database changes needed. No new dependencies needed (uses existing dnd-kit, lucide, framer-free CSS animations).
+- Subtasks query uses existing `parent_task_id` column on tasks table
+- Files query uses existing `task_id` column on `file_attachments` table
+- No database changes needed
+- No new dependencies needed
+- The center workspace becomes scrollable (`overflow-y-auto`) since it now has more content
+- All new sections use the dark theme styling: `bg-white/5`, `border-white/10`, `text-white/60` etc.
 

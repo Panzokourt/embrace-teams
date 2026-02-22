@@ -45,7 +45,7 @@ export function SidebarNavGroup({ id, icon, label, collapsed, isActive, children
           onClick={toggle}
           className={cn(
             "flex items-center justify-center w-full rounded-xl px-2 py-2.5 transition-all duration-200",
-            isActive ? "bg-accent text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            isActive ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted"
           )}
         >
           {icon}
@@ -63,7 +63,7 @@ export function SidebarNavGroup({ id, icon, label, collapsed, isActive, children
           isActive ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted"
         )}
       >
-        <span className={cn("transition-transform duration-200", isActive && "text-primary")}>{icon}</span>
+        <span className={cn("transition-transform duration-200", isActive && "text-foreground")}>{icon}</span>
         <span className="text-sm font-medium flex-1 text-left">{label}</span>
         <ChevronRight className={cn(
           "h-3.5 w-3.5 transition-transform duration-200 text-muted-foreground/50",
@@ -106,7 +106,7 @@ export function SidebarSubLink({
           : "text-muted-foreground hover:text-foreground hover:bg-muted"
       )}
     >
-      <span className={cn("transition-transform duration-200", active && "text-primary")}>{icon}</span>
+      <span className={cn("transition-transform duration-200", active && "text-foreground")}>{icon}</span>
       <span>{label}</span>
     </a>
   );

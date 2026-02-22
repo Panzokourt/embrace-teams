@@ -422,8 +422,8 @@ export default function DepartmentsPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-4 flex items-center gap-4">
-            <div className="p-3 bg-primary/10 rounded-lg">
-              <Building2 className="h-6 w-6 text-primary" />
+            <div className="p-3 bg-muted rounded-lg">
+              <Building2 className="h-6 w-6 text-foreground" />
             </div>
             <div>
               <p className="text-2xl font-bold">{getAllDepartments().length}</p>
@@ -673,7 +673,7 @@ export default function DepartmentsPage() {
                   <label 
                     key={profile.id} 
                     className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
-                      isSelected ? 'bg-primary/10' : 'hover:bg-secondary'
+                      isSelected ? 'bg-muted' : 'hover:bg-secondary'
                     }`}
                   >
                     <Checkbox

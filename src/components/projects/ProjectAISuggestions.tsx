@@ -256,7 +256,7 @@ export function ProjectAISuggestions({
     return (
       <Card className="border-dashed">
         <CardContent className="flex flex-col items-center justify-center py-8">
-          <Sparkles className="h-12 w-12 text-primary/50 mb-4" />
+          <Sparkles className="h-12 w-12 text-muted-foreground mb-4" />
           <h3 className="font-semibold mb-2">AI Ανάλυση Αρχείων</h3>
           <p className="text-sm text-muted-foreground text-center mb-4 max-w-md">
             Ανεβάστε αρχεία (προκηρύξεις, συμβάσεις, RFPs) και το AI θα προτείνει 
@@ -287,7 +287,7 @@ export function ProjectAISuggestions({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
+          <Sparkles className="h-5 w-5 text-foreground" />
           Προτάσεις AI
         </CardTitle>
         <CardDescription>
@@ -299,7 +299,7 @@ export function ProjectAISuggestions({
         <Collapsible open={expandedSections.deliverables} onOpenChange={() => toggleSection('deliverables')}>
           <CollapsibleTrigger className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-muted">
             <div className="flex items-center gap-2">
-              <Package className="h-4 w-4 text-primary" />
+              <Package className="h-4 w-4 text-foreground" />
               <span className="font-medium">Παραδοτέα ({suggestions.deliverables.length})</span>
               <Badge variant="secondary">{selectedDeliverables.length} επιλεγμένα</Badge>
             </div>
@@ -409,7 +409,7 @@ export function ProjectAISuggestions({
                 <div className="flex-1">
                   <p className="font-medium">{inv.description}</p>
                   <div className="flex gap-4 mt-1 text-sm">
-                    <span className="text-primary font-medium">€{inv.amount.toLocaleString()}</span>
+                    <span className="text-foreground font-medium">€{inv.amount.toLocaleString()}</span>
                     {(() => {
                       const fd = safeFormatDate(inv.due_date);
                       return fd ? (

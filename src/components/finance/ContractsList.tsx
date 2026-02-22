@@ -30,7 +30,7 @@ const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-muted text-muted-foreground',
   active: 'bg-emerald-500/10 text-emerald-500',
   ended: 'bg-destructive/10 text-destructive',
-  renewed: 'bg-primary/10 text-primary',
+  renewed: 'bg-foreground/10 text-foreground',
 };
 
 export default function ContractsList() {

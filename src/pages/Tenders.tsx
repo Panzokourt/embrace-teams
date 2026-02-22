@@ -91,7 +91,7 @@ interface Tender {
 
 const stageConfig: Record<TenderStage, { icon: React.ReactNode; label: string; className: string }> = {
   identification: { icon: <Search className="h-3 w-3" />, label: 'Εντοπισμός', className: 'bg-muted text-muted-foreground' },
-  preparation: { icon: <Edit3 className="h-3 w-3" />, label: 'Προετοιμασία', className: 'bg-primary/10 text-primary border-primary/20' },
+  preparation: { icon: <Edit3 className="h-3 w-3" />, label: 'Προετοιμασία', className: 'bg-foreground/10 text-foreground border-foreground/20' },
   submitted: { icon: <Send className="h-3 w-3" />, label: 'Υποβλήθηκε', className: 'bg-accent/10 text-accent border-accent/20' },
   evaluation: { icon: <Clock className="h-3 w-3" />, label: 'Αξιολόγηση', className: 'bg-warning/10 text-warning border-warning/20' },
   won: { icon: <Trophy className="h-3 w-3" />, label: 'Κερδήθηκε', className: 'bg-success/10 text-success border-success/20' },
@@ -467,7 +467,7 @@ export default function TendersPage() {
               </p>
             )}
             <div className="flex items-center justify-between text-xs mt-3 pt-3 border-t border-border/30">
-              <span className="text-primary font-semibold">
+              <span className="text-foreground font-semibold">
                 €{tender.budget.toLocaleString()}
               </span>
               {tender.submission_deadline && (
@@ -600,8 +600,8 @@ export default function TendersPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-3">
-            <span className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <FileText className="h-5 w-5 text-primary" />
+            <span className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center">
+              <FileText className="h-5 w-5 text-foreground" />
             </span>
             Διαγωνισμοί
           </h1>
@@ -761,7 +761,7 @@ export default function TendersPage() {
             placeholder="Αναζήτηση διαγωνισμών..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-card border-border/50 focus:border-primary/30"
+            className="pl-10 bg-card border-border/50 focus:border-foreground/30"
           />
         </div>
         {viewMode !== 'kanban' && (

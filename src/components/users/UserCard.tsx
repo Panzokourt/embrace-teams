@@ -41,14 +41,14 @@ interface UserCardProps {
 const ROLE_CONFIG: Record<CompanyRole, { label: string; icon: React.ReactNode; className: string }> = {
   owner: { label: 'Owner', icon: <Crown className="h-3 w-3" />, className: 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-600 border-amber-500/30' },
   admin: { label: 'Admin', icon: <Shield className="h-3 w-3" />, className: 'bg-destructive/10 text-destructive border-destructive/20' },
-  manager: { label: 'Manager', icon: <Briefcase className="h-3 w-3" />, className: 'bg-primary/10 text-primary border-primary/20' },
+  manager: { label: 'Manager', icon: <Briefcase className="h-3 w-3" />, className: 'bg-foreground/10 text-foreground border-foreground/20' },
   member: { label: 'Member', icon: <Users className="h-3 w-3" />, className: 'bg-secondary text-secondary-foreground border-border' },
   viewer: { label: 'Viewer', icon: <Users className="h-3 w-3" />, className: 'bg-muted text-muted-foreground border-border' },
   billing: { label: 'Billing', icon: <Users className="h-3 w-3" />, className: 'bg-success/10 text-success border-success/20' },
 };
 
 const STATUS_CONFIG: Record<UserStatus, { label: string; icon: React.ReactNode; className: string }> = {
-  invited: { label: 'Προσκλήθηκε', icon: <Clock className="h-3 w-3" />, className: 'bg-primary/10 text-primary border-primary/20' },
+  invited: { label: 'Προσκλήθηκε', icon: <Clock className="h-3 w-3" />, className: 'bg-foreground/10 text-foreground border-foreground/20' },
   pending: { label: 'Αναμονή', icon: <Clock className="h-3 w-3" />, className: 'bg-warning/10 text-warning border-warning/20' },
   active: { label: 'Ενεργός', icon: <UserCheck className="h-3 w-3" />, className: 'bg-success/10 text-success border-success/20' },
   suspended: { label: 'Ανεσταλμένος', icon: <Ban className="h-3 w-3" />, className: 'bg-destructive/10 text-destructive border-destructive/20' },

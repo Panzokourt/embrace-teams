@@ -101,7 +101,7 @@ export function ContactsTableView({ contacts, loading, onEdit, onRefresh }: Cont
                     <div className="flex items-center gap-3">
                       <Avatar className="h-8 w-8">
                         <AvatarImage src={contact.avatar_url} />
-                        <AvatarFallback className="text-xs bg-primary/10 text-primary">{getInitials(contact.name)}</AvatarFallback>
+                        <AvatarFallback className="text-xs bg-muted text-foreground">{getInitials(contact.name)}</AvatarFallback>
                       </Avatar>
                       <div>
                         <div className="font-medium flex items-center gap-1.5">

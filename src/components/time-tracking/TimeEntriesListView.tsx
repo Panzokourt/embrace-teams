@@ -119,7 +119,7 @@ export function TimeEntriesListView({ entries, users, showUserColumn, onDelete, 
                       {format(parseISO(entry.start_time), 'HH:mm')}
                       {' → '}
                       {entry.end_time ? format(parseISO(entry.end_time), 'HH:mm') : (
-                        <span className="text-primary animate-pulse">τρέχει</span>
+                        <span className="text-foreground animate-pulse">τρέχει</span>
                       )}
                     </>
                   )}
@@ -152,7 +152,7 @@ export function TimeEntriesListView({ entries, users, showUserColumn, onDelete, 
                   {isEditing ? (
                     <div className="flex items-center gap-1">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => saveEdit(entry)}>
-                        <Check className="h-3.5 w-3.5 text-primary" />
+                        <Check className="h-3.5 w-3.5 text-success" />
                       </Button>
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={cancelEdit}>
                         <X className="h-3.5 w-3.5" />

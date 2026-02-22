@@ -203,7 +203,7 @@ export default function SecretaryChat({ mode }: SecretaryChatProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
           <div className="flex items-center gap-2">
-            <Bot className="h-5 w-5 text-primary" />
+            <Bot className="h-5 w-5 text-foreground" />
             <h1 className="text-base font-semibold text-foreground">Secretary</h1>
           </div>
           <Button variant="ghost" size="sm" onClick={startNewConversation} className="gap-1.5 text-muted-foreground">
@@ -216,8 +216,8 @@ export default function SecretaryChat({ mode }: SecretaryChatProps) {
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
           {messages.length === 0 && !loading && (
             <div className="flex flex-col items-center justify-center h-full text-center space-y-6">
-              <div className="p-4 rounded-2xl bg-primary/10">
-                <Bot className="h-12 w-12 text-primary" />
+              <div className="p-4 rounded-2xl bg-muted">
+                <Bot className="h-12 w-12 text-foreground" />
               </div>
               <div className="space-y-2">
                 <h2 className="text-2xl font-bold text-foreground">
@@ -248,8 +248,8 @@ export default function SecretaryChat({ mode }: SecretaryChatProps) {
             >
               {msg.role === "assistant" && (
                 <div className="flex-shrink-0 mt-1">
-                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <Bot className="h-4 w-4 text-primary" />
+                  <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
+                    <Bot className="h-4 w-4 text-foreground" />
                   </div>
                 </div>
               )}
@@ -273,12 +273,12 @@ export default function SecretaryChat({ mode }: SecretaryChatProps) {
           {loading && (
             <div className="flex gap-3 justify-start">
               <div className="flex-shrink-0 mt-1">
-                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Bot className="h-4 w-4 text-primary" />
+                <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
+                   <Bot className="h-4 w-4 text-foreground" />
                 </div>
               </div>
               <div className="bg-card border border-border/40 rounded-2xl px-4 py-3 flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                <Loader2 className="h-4 w-4 animate-spin text-foreground" />
                 <span className="text-sm text-muted-foreground">Ο Secretary σκέφτεται...</span>
               </div>
             </div>

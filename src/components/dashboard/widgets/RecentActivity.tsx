@@ -80,8 +80,8 @@ export default function RecentActivity() {
   return (
     <div className="rounded-2xl border border-border/50 bg-card p-6 animate-fade-in shadow-soft h-full">
       <h3 className="text-base font-semibold flex items-center gap-2 mb-4 text-foreground">
-        <span className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-          <Activity className="h-4 w-4 text-primary" />
+        <span className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
+          <Activity className="h-4 w-4 text-foreground" />
         </span>
         Πρόσφατη Δραστηριότητα
       </h3>
@@ -97,12 +97,12 @@ export default function RecentActivity() {
               key={item.id}
               className={cn(
                 "flex items-start gap-3 p-2.5 rounded-xl hover:bg-secondary/50 transition-all duration-300",
-                newIds.has(item.id) && "animate-fade-in bg-primary/5"
+                newIds.has(item.id) && "animate-fade-in bg-muted/50"
               )}
             >
               <div className={cn(
                 "h-2 w-2 rounded-full mt-1.5 shrink-0 transition-colors",
-                newIds.has(item.id) ? "bg-primary animate-pulse" : "bg-primary/50"
+                newIds.has(item.id) ? "bg-foreground animate-pulse" : "bg-foreground/50"
               )} />
               <div className="min-w-0 flex-1">
                 <p className="text-sm text-foreground/90 truncate">

@@ -234,8 +234,8 @@ export function FilesTableView({
 
   const getSortIcon = (field: SortField) => {
     if (sortField !== field) return <ArrowUpDown className="h-4 w-4 text-muted-foreground" />;
-    if (sortDirection === 'asc') return <ArrowUp className="h-4 w-4 text-primary" />;
-    return <ArrowDown className="h-4 w-4 text-primary" />;
+    if (sortDirection === 'asc') return <ArrowUp className="h-4 w-4 text-foreground" />;
+    return <ArrowDown className="h-4 w-4 text-foreground" />;
   };
 
   const handleSelectAll = (checked: boolean) => {

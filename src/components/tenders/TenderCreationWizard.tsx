@@ -397,7 +397,7 @@ export function TenderCreationWizard({
                     key={type.type}
                     className={cn(
                       "cursor-pointer transition-all duration-200 hover:shadow-soft",
-                      isSelected && "ring-2 ring-primary border-primary"
+                      isSelected && "ring-2 ring-foreground border-foreground"
                     )}
                     onClick={() => setTenderType(type.type)}
                   >

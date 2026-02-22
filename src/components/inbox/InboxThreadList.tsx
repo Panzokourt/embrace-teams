@@ -116,7 +116,7 @@ export function InboxThreadList({
                 >
                   <div className="flex items-start gap-3">
                     <Avatar className="h-9 w-9 shrink-0">
-                      <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                      <AvatarFallback className="bg-muted text-foreground text-xs">
                         {getInitials(sender)}
                       </AvatarFallback>
                     </Avatar>

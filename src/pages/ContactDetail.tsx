@@ -83,7 +83,7 @@ export default function ContactDetail() {
         <div className="flex items-center gap-4">
           <Avatar className="h-16 w-16">
             <AvatarImage src={contact.avatar_url} />
-            <AvatarFallback className="text-lg bg-primary/10 text-primary">{getInitials(contact.name)}</AvatarFallback>
+            <AvatarFallback className="text-lg bg-muted text-foreground">{getInitials(contact.name)}</AvatarFallback>
           </Avatar>
           <div>
             <div className="flex items-center gap-2">

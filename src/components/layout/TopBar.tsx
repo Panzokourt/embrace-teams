@@ -96,7 +96,7 @@ export default function TopBar({ onPanelToggle, rightPanelOpen }: TopBarProps) {
   }, {});
 
   return (
-    <div className="sticky top-0 z-20 h-14 gap-2 border-b bg-background/80 backdrop-blur-lg md:px-6 mx-0 flex items-center justify-center my-0 px-2 py-[10px]">
+    <div className="sticky top-0 z-20 h-14 gap-2 border-b border-border/40 bg-card/80 backdrop-blur-lg md:px-6 mx-0 flex items-center justify-center my-0 px-2 py-[10px]">
       {/* Work Day Clock */}
       <WorkDayClock />
 
@@ -107,7 +107,7 @@ export default function TopBar({ onPanelToggle, rightPanelOpen }: TopBarProps) {
         <Popover open={searchOpen} onOpenChange={setSearchOpen}>
           <PopoverTrigger asChild>
             <button
-              className="flex h-9 w-full items-center gap-2 rounded-lg border border-border/60 px-3 text-sm transition-colors focus:outline-none bg-secondary-foreground text-primary-foreground"
+              className="flex h-9 w-full items-center gap-2 rounded-xl border border-border/60 px-3 text-sm transition-colors focus:outline-none bg-muted text-muted-foreground hover:bg-muted/80"
               onClick={() => setSearchOpen(true)}
             >
               <Search className="h-4 w-4 shrink-0" />

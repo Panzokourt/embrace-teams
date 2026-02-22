@@ -286,8 +286,8 @@ export default function AppSidebar({ collapsed, onToggleCollapse }: { collapsed:
           to="/secretary"
           onClick={() => isMobile && setMobileOpen(false)}
           className={cn(
-            "flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 ease-apple",
-            "bg-gradient-to-r from-violet-500 to-indigo-500 text-white hover:from-violet-600 hover:to-indigo-600 shadow-md",
+            "flex items-center gap-3 rounded-2xl px-3 py-2.5 transition-all duration-200 ease-apple",
+            "bg-primary text-primary-foreground hover:brightness-95 shadow-soft",
             collapsed && !isMobile && "justify-center px-2",
             (!collapsed || isMobile) && "w-full"
           )}
@@ -406,7 +406,7 @@ export default function AppSidebar({ collapsed, onToggleCollapse }: { collapsed:
       </div>
 
       {/* Desktop Sidebar - rendered inside ResizablePanel in AppLayout */}
-      <div className="h-screen bg-card/50 backdrop-blur-sm flex-col hidden md:flex overflow-hidden">
+      <div className="h-screen bg-card border-r border-border/40 flex-col hidden md:flex overflow-hidden">
         <SidebarContent />
       </div>
 
@@ -443,17 +443,20 @@ function SidebarLink({
       to={to}
       onClick={onClick}
       className={cn(
-        "group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 ease-apple",
+        "group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 ease-apple relative",
         active ?
-        "bg-primary text-primary-foreground" :
-        "text-muted-foreground hover:text-primary-foreground hover:bg-primary",
+        "bg-accent text-foreground font-semibold" :
+        "text-muted-foreground hover:text-foreground hover:bg-muted",
         collapsed && "justify-center px-2"
       )}
       style={{ animationDelay: `${delay}ms` }}>
 
+      {active && !collapsed && (
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-full bg-primary" />
+      )}
       <span className={cn(
         "transition-transform duration-200",
-        active && "scale-105",
+        active && "scale-105 text-primary",
         !active && "group-hover:scale-105"
       )}>
         {icon}
@@ -465,9 +468,6 @@ function SidebarLink({
       )}>
           {label}
         </span>
-      }
-      {active && !collapsed &&
-      <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
       }
     </NavLink>);
 

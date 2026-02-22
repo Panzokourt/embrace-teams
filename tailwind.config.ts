@@ -15,7 +15,7 @@ export default {
   	extend: {
   		fontFamily: {
   			sans: [
-  				'Source Sans Pro',
+  				'Inter',
   				'ui-sans-serif',
   				'system-ui',
   				'-apple-system',
@@ -24,28 +24,25 @@ export default {
   				'Roboto',
   				'Helvetica Neue',
   				'Arial',
-  				'Noto Sans',
   				'sans-serif'
   			],
   			display: [
-  				'Geist',
+  				'Plus Jakarta Sans',
+  				'Inter',
   				'-apple-system',
   				'BlinkMacSystemFont',
-  				'SF Pro Display',
   				'system-ui',
   				'sans-serif'
   			],
   			serif: [
-  				'Source Serif Pro',
+  				'Plus Jakarta Sans',
   				'ui-serif',
   				'Georgia',
   				'Cambria',
   				'Times New Roman',
-  				'Times',
   				'serif'
   			],
   			mono: [
-  				'Source Code Pro',
   				'ui-monospace',
   				'SFMono-Regular',
   				'Menlo',
@@ -117,6 +114,7 @@ export default {
   			}
   		},
   		borderRadius: {
+  			'3xl': 'calc(var(--radius) + 8px)',
   			'2xl': 'calc(var(--radius) + 4px)',
   			xl: 'calc(var(--radius) + 2px)',
   			lg: 'var(--radius)',
@@ -124,10 +122,10 @@ export default {
   			sm: 'calc(var(--radius) - 4px)'
   		},
   		boxShadow: {
-  			soft: '0 1px 2px 0 rgb(0 0 0 / 0.03), 0 2px 8px -2px rgb(0 0 0 / 0.06)',
-  			'soft-lg': '0 2px 4px 0 rgb(0 0 0 / 0.03), 0 8px 24px -4px rgb(0 0 0 / 0.08)',
-  			'soft-xl': '0 4px 8px 0 rgb(0 0 0 / 0.03), 0 16px 40px -8px rgb(0 0 0 / 0.1)',
-  			'inner-soft': 'inset 0 1px 2px 0 rgb(0 0 0 / 0.05)',
+  			soft: '0 2px 8px -2px rgb(0 0 0 / 0.04), 0 4px 16px -4px rgb(0 0 0 / 0.06)',
+  			'soft-lg': '0 4px 12px -4px rgb(0 0 0 / 0.06), 0 8px 24px -8px rgb(0 0 0 / 0.08)',
+  			'soft-xl': '0 8px 20px -6px rgb(0 0 0 / 0.08), 0 16px 40px -12px rgb(0 0 0 / 0.1)',
+  			'inner-soft': 'inset 0 1px 2px 0 rgb(0 0 0 / 0.04)',
   			'2xs': 'var(--shadow-2xs)',
   			xs: 'var(--shadow-xs)',
   			sm: 'var(--shadow-sm)',
@@ -138,78 +136,36 @@ export default {
   		},
   		keyframes: {
   			'accordion-down': {
-  				from: {
-  					height: '0',
-  					opacity: '0'
-  				},
-  				to: {
-  					height: 'var(--radix-accordion-content-height)',
-  					opacity: '1'
-  				}
+  				from: { height: '0', opacity: '0' },
+  				to: { height: 'var(--radix-accordion-content-height)', opacity: '1' }
   			},
   			'accordion-up': {
-  				from: {
-  					height: 'var(--radix-accordion-content-height)',
-  					opacity: '1'
-  				},
-  				to: {
-  					height: '0',
-  					opacity: '0'
-  				}
+  				from: { height: 'var(--radix-accordion-content-height)', opacity: '1' },
+  				to: { height: '0', opacity: '0' }
   			},
   			'fade-in': {
-  				from: {
-  					opacity: '0',
-  					transform: 'translateY(8px)'
-  				},
-  				to: {
-  					opacity: '1',
-  					transform: 'translateY(0)'
-  				}
+  				from: { opacity: '0', transform: 'translateY(8px)' },
+  				to: { opacity: '1', transform: 'translateY(0)' }
   			},
   			'fade-out': {
-  				from: {
-  					opacity: '1',
-  					transform: 'translateY(0)'
-  				},
-  				to: {
-  					opacity: '0',
-  					transform: 'translateY(8px)'
-  				}
+  				from: { opacity: '1', transform: 'translateY(0)' },
+  				to: { opacity: '0', transform: 'translateY(8px)' }
   			},
   			'scale-in': {
-  				from: {
-  					opacity: '0',
-  					transform: 'scale(0.96)'
-  				},
-  				to: {
-  					opacity: '1',
-  					transform: 'scale(1)'
-  				}
+  				from: { opacity: '0', transform: 'scale(0.96)' },
+  				to: { opacity: '1', transform: 'scale(1)' }
   			},
   			'slide-in-right': {
-  				from: {
-  					transform: 'translateX(100%)'
-  				},
-  				to: {
-  					transform: 'translateX(0)'
-  				}
+  				from: { transform: 'translateX(100%)' },
+  				to: { transform: 'translateX(0)' }
   			},
   			'slide-out-right': {
-  				from: {
-  					transform: 'translateX(0)'
-  				},
-  				to: {
-  					transform: 'translateX(100%)'
-  				}
+  				from: { transform: 'translateX(0)' },
+  				to: { transform: 'translateX(100%)' }
   			},
   			shimmer: {
-  				'0%': {
-  					backgroundPosition: '-200% 0'
-  				},
-  				'100%': {
-  					backgroundPosition: '200% 0'
-  				}
+  				'0%': { backgroundPosition: '-200% 0' },
+  				'100%': { backgroundPosition: '200% 0' }
   			}
   		},
   		animation: {

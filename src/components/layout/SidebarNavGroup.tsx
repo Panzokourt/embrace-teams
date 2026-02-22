@@ -45,7 +45,7 @@ export function SidebarNavGroup({ id, icon, label, collapsed, isActive, children
           onClick={toggle}
           className={cn(
             "flex items-center justify-center w-full rounded-xl px-2 py-2.5 transition-all duration-200",
-            isActive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-primary-foreground hover:bg-primary"
+            isActive ? "bg-accent text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
           )}
         >
           {icon}
@@ -60,10 +60,10 @@ export function SidebarNavGroup({ id, icon, label, collapsed, isActive, children
         onClick={toggle}
         className={cn(
           "group flex items-center gap-3 w-full rounded-xl px-3 py-2.5 transition-all duration-200 ease-apple",
-          isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+          isActive ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted"
         )}
       >
-        <span className="transition-transform duration-200">{icon}</span>
+        <span className={cn("transition-transform duration-200", isActive && "text-primary")}>{icon}</span>
         <span className="text-sm font-medium flex-1 text-left">{label}</span>
         <ChevronRight className={cn(
           "h-3.5 w-3.5 transition-transform duration-200 text-muted-foreground/50",
@@ -92,7 +92,6 @@ export function SidebarSubLink({
   active: boolean;
   onClick?: () => void;
 }) {
-  // Using an anchor-like approach with navigate
   return (
     <a
       href={to}
@@ -103,11 +102,11 @@ export function SidebarSubLink({
       className={cn(
         "group flex items-center gap-2.5 rounded-lg px-2.5 py-2 transition-all duration-200 ease-apple text-sm cursor-pointer",
         active
-          ? "bg-primary text-primary-foreground font-semibold"
-          : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+          ? "bg-accent text-foreground font-semibold"
+          : "text-muted-foreground hover:text-foreground hover:bg-muted"
       )}
     >
-      <span className="transition-transform duration-200">{icon}</span>
+      <span className={cn("transition-transform duration-200", active && "text-primary")}>{icon}</span>
       <span>{label}</span>
     </a>
   );

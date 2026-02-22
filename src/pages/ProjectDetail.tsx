@@ -18,7 +18,6 @@ import { ProjectAISuggestions } from '@/components/projects/ProjectAISuggestions
 import { ProjectInfoEditor } from '@/components/projects/ProjectInfoEditor';
 import { ProjectTeamManager } from '@/components/projects/ProjectTeamManager';
 import { FileExplorer } from '@/components/files/FileExplorer';
-import { ProjectGanttView } from '@/components/projects/ProjectGanttView';
 import { ProjectCommentsAndHistory } from '@/components/projects/ProjectCommentsAndHistory';
 import { toast } from 'sonner';
 import { 
@@ -35,10 +34,9 @@ import {
   BarChart3,
   Megaphone,
   TrendingUp,
-  GanttChartSquare,
-  MessageSquare,
   Palette,
   FolderInput,
+  Timer,
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -127,10 +125,25 @@ export default function ProjectDetailPage() {
     },
     enabled: !!company?.id,
   });
+
+  // Total tracked time query
+  const { data: totalTrackedMinutes = 0 } = useQuery({
+    queryKey: ['project-total-time', id],
+    queryFn: async () => {
+      if (!id) return 0;
+      const { data } = await supabase
+        .from('time_entries')
+        .select('duration_minutes')
+        .eq('project_id', id)
+        .eq('is_running', false);
+      return (data || []).reduce((sum, e) => sum + (e.duration_minutes || 0), 0);
+    },
+    enabled: !!id,
+  });
   
   // AI Analysis state
   const [aiFiles, setAiFiles] = useState<Array<{ fileName: string; content: string }>>([]);
-  const [aiRawFiles, setAiRawFiles] = useState<File[]>([]); // Keep raw files for storage
+  const [aiRawFiles, setAiRawFiles] = useState<File[]>([]);
   
   const { parsing: uploadingForAi, parseFiles } = useDocumentParser({
     saveToStorage: true,
@@ -156,7 +169,6 @@ export default function ProjectDetailPage() {
     if (!id) return;
     
     try {
-      // Fetch project
       const { data: projectData, error: projectError } = await supabase
         .from('projects')
         .select('*, client:clients(name)')
@@ -166,7 +178,6 @@ export default function ProjectDetailPage() {
       if (projectError) throw projectError;
       setProject(projectData);
 
-      // Fetch tasks
       const { data: tasksData } = await supabase
         .from('tasks')
         .select('id, title, status, due_date, assigned_to')
@@ -174,14 +185,12 @@ export default function ProjectDetailPage() {
         .order('due_date', { ascending: true, nullsFirst: false });
       setTasks(tasksData || []);
 
-      // Fetch deliverables
       const { data: deliverablesData } = await supabase
         .from('deliverables')
         .select('id, name, completed, budget, cost')
         .eq('project_id', id);
       setDeliverables(deliverablesData || []);
 
-      // Fetch invoices (if can view financials)
       if (canViewFinancials || isClient) {
         const { data: invoicesData } = await supabase
           .from('invoices')
@@ -191,7 +200,6 @@ export default function ProjectDetailPage() {
         setInvoices(invoicesData || []);
       }
 
-      // Fetch expenses (only for admin/manager)
       if (canViewFinancials) {
         const { data: expensesData } = await supabase
           .from('expenses')
@@ -210,28 +218,19 @@ export default function ProjectDetailPage() {
     }
   };
 
-  // Handle AI file uploads with document parsing
   const handleAiFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-
-    // Store raw files for later storage
     setAiRawFiles(prev => [...prev, ...Array.from(files)]);
-    
-    // Parse the files using the hook
     const parsed = await parseFiles(files);
-    
     if (parsed.length > 0) {
       toast.success(`${parsed.length} αρχείο(α) αναλύθηκαν και είναι έτοιμα`);
     }
-    
     e.target.value = '';
   };
 
-  // Save AI files to storage when suggestions are applied
   const saveAiFilesToStorage = async () => {
     if (!id || !user || aiRawFiles.length === 0) return;
-
     try {
       for (const file of aiRawFiles) {
         const fileName = createProjectFilesObjectKey({
@@ -239,18 +238,10 @@ export default function ProjectDetailPage() {
           originalName: file.name,
           prefix: `projects/${id}`,
         });
-
-        // Upload to storage
         const { error: uploadError } = await supabase.storage
           .from('project-files')
           .upload(fileName, file);
-
-        if (uploadError) {
-          console.error('Error uploading file to storage:', uploadError);
-          continue;
-        }
-
-        // Save file metadata
+        if (uploadError) { console.error('Error uploading file to storage:', uploadError); continue; }
         await supabase.from('file_attachments').insert({
           file_name: file.name,
           file_path: fileName,
@@ -266,7 +257,6 @@ export default function ProjectDetailPage() {
     }
   };
 
-  // Handle suggestions applied - refresh data and save files
   const handleSuggestionsApplied = useCallback(async () => {
     await saveAiFilesToStorage();
     setAiFiles([]);
@@ -359,6 +349,8 @@ export default function ProjectDetailPage() {
   const overallProgress = Math.round((taskProgress + deliverableProgress) / 2);
   const statusConfig = getStatusConfig(project.status);
 
+  const totalTrackedHours = Math.round((totalTrackedMinutes / 60) * 10) / 10;
+
   const getTaskStatusIcon = (status: TaskStatus) => {
     switch (status) {
       case 'completed': return <CheckCircle2 className="h-4 w-4 text-success" />;
@@ -444,6 +436,12 @@ export default function ProjectDetailPage() {
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
+
+            {/* Total tracked time */}
+            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground ml-auto">
+              <Timer className="h-3 w-3" />
+              {totalTrackedHours}h
+            </span>
           </div>
 
           {/* Sub-info row */}
@@ -477,84 +475,18 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
-      {/* ── QUICK STATS (3 KPIs) ──────────────────────────────────────────── */}
-      <div className="grid gap-4 grid-cols-3">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-muted">
-                <DollarSign className="h-5 w-5 text-foreground" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Budget</p>
-                <p className="text-lg font-bold">€{project.budget.toLocaleString()}</p>
-                {project.agency_fee_percentage > 0 && (
-                  <p className="text-xs text-muted-foreground">Fee: {project.agency_fee_percentage}%</p>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-success/10">
-                <TrendingUp className="h-5 w-5 text-success" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Πρόοδος</p>
-                <p className="text-lg font-bold">{overallProgress}%</p>
-                <p className="text-xs text-muted-foreground">
-                  {completedTasks}/{tasks.length} tasks · {completedDeliverables}/{deliverables.length} παραδοτέα
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-muted">
-                <Calendar className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Λήξη</p>
-                <p className="text-lg font-bold">
-                  {project.end_date 
-                    ? format(new Date(project.end_date), 'd MMM', { locale: el })
-                    : '-'}
-                </p>
-                {dueDateInfo && (
-                  <p className={cn('text-xs', dueDateInfo.className)}>{dueDateInfo.label}</p>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ── TABS ──────────────────────────────────────────────────────────── */}
+      {/* ── TABS (wrap everything below header) ───────────────────────────── */}
       <Tabs defaultValue="overview" className="space-y-6">
         <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-1 -mx-6 px-6 pt-2 border-b">
           <TabsList className="flex-wrap h-auto gap-1">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="deliverables">Παραδοτέα</TabsTrigger>
             <TabsTrigger value="tasks">Tasks</TabsTrigger>
-            <TabsTrigger value="timeline">
-              <GanttChartSquare className="h-4 w-4 mr-1.5" />
-              Timeline
-            </TabsTrigger>
             <TabsTrigger value="media-plan">
               <Megaphone className="h-4 w-4 mr-1.5" />
               Media Plan
             </TabsTrigger>
             <TabsTrigger value="files">Αρχεία</TabsTrigger>
-            <TabsTrigger value="comments">
-              <MessageSquare className="h-4 w-4 mr-1.5" />
-              Σχόλια
-            </TabsTrigger>
             <TabsTrigger value="creatives">
               <Palette className="h-4 w-4 mr-1.5" />
               Δημιουργικά
@@ -570,9 +502,66 @@ export default function ProjectDetailPage() {
 
         {/* ── OVERVIEW TAB ─────────────────────────────────────────────────── */}
         <TabsContent value="overview" className="space-y-4 mt-4">
+          {/* KPI Cards */}
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-muted">
+                    <DollarSign className="h-5 w-5 text-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Budget</p>
+                    <p className="text-lg font-bold">€{project.budget.toLocaleString()}</p>
+                    {project.agency_fee_percentage > 0 && (
+                      <p className="text-xs text-muted-foreground">Fee: {project.agency_fee_percentage}%</p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-success/10">
+                    <TrendingUp className="h-5 w-5 text-success" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Πρόοδος</p>
+                    <p className="text-lg font-bold">{overallProgress}%</p>
+                    <p className="text-xs text-muted-foreground">
+                      {completedTasks}/{tasks.length} tasks · {completedDeliverables}/{deliverables.length} παραδοτέα
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-muted">
+                    <Calendar className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Λήξη</p>
+                    <p className="text-lg font-bold">
+                      {project.end_date 
+                        ? format(new Date(project.end_date), 'd MMM', { locale: el })
+                        : '-'}
+                    </p>
+                    {dueDateInfo && (
+                      <p className={cn('text-xs', dueDateInfo.className)}>{dueDateInfo.label}</p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
           {/* ROW 1: Info + Team/Progress */}
           <div className="grid gap-4 lg:grid-cols-3">
-            {/* Left: Project Info */}
             <Card className="lg:col-span-2">
               <CardContent className="pt-6">
                 <ProjectInfoEditor
@@ -583,9 +572,7 @@ export default function ProjectDetailPage() {
               </CardContent>
             </Card>
 
-            {/* Right: Team + Progress */}
             <div className="space-y-4">
-              {/* Compact Team */}
               <Card>
                 <CardContent className="pt-4 pb-4">
                   <ProjectTeamManager
@@ -596,7 +583,6 @@ export default function ProjectDetailPage() {
                 </CardContent>
               </Card>
 
-              {/* Progress bars */}
               <Card>
                 <CardContent className="pt-4 pb-4 space-y-4">
                   <p className="text-sm font-medium">Πρόοδος</p>
@@ -625,7 +611,6 @@ export default function ProjectDetailPage() {
 
           {/* ROW 2: Recent Tasks + AI */}
           <div className="grid gap-4 lg:grid-cols-3">
-            {/* Recent Tasks */}
             <Card className="lg:col-span-2">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Πρόσφατα Tasks</CardTitle>
@@ -656,7 +641,6 @@ export default function ProjectDetailPage() {
               </CardContent>
             </Card>
 
-            {/* AI Analysis — compact */}
             <Card className="border-foreground/20">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -710,6 +694,16 @@ export default function ProjectDetailPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Comments & History at bottom of Overview */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Σχόλια & Ιστορικό</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ProjectCommentsAndHistory projectId={project.id} />
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Deliverables Tab */}
@@ -722,23 +716,9 @@ export default function ProjectDetailPage() {
           <TasksPage embedded projectId={project.id} />
         </TabsContent>
 
-        {/* Timeline Tab */}
-        <TabsContent value="timeline" className="mt-4">
-          <ProjectGanttView
-            projectId={project.id}
-            projectStartDate={project.start_date}
-            projectEndDate={project.end_date}
-          />
-        </TabsContent>
-
         {/* Files Tab */}
         <TabsContent value="files">
           <FileExplorer projectId={project.id} />
-        </TabsContent>
-
-        {/* Comments & History Tab */}
-        <TabsContent value="comments" className="mt-4">
-          <ProjectCommentsAndHistory projectId={project.id} />
         </TabsContent>
 
         {/* Media Plan Tab */}

@@ -10,23 +10,35 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import { EnhancedInlineEditCell } from '@/components/shared/EnhancedInlineEditCell';
 import { TableToolbar } from '@/components/shared/TableToolbar';
 import { ResizableTableHeader } from '@/components/shared/ResizableTableHeader';
 import { useTableViews } from '@/hooks/useTableViews';
 import { exportToCSV, exportToExcel, formatters } from '@/utils/exportUtils';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { EditDeleteActions } from '@/components/dialogs/EditDeleteActions';
 import { toast } from 'sonner';
-import { Package, Plus, DollarSign, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Package, Plus, DollarSign, Loader2, ArrowUpDown, ArrowUp, ArrowDown, ChevronRight, CheckCircle2, Circle, Clock, AlertCircle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Deliverable = Tables<'deliverables'>;
+
+interface LinkedTask {
+  id: string;
+  title: string;
+  status: string;
+  priority: string | null;
+  due_date: string | null;
+  assigned_to: string | null;
+  parent_task_id: string | null;
+}
 
 interface ProjectDeliverablesTableProps {
   projectId: string;
@@ -47,6 +59,86 @@ const DEFAULT_COLUMNS = [
 type SortField = 'name' | 'budget' | 'cost' | 'due_date' | 'completed';
 type SortDirection = 'asc' | 'desc' | null;
 
+function TaskStatusIcon({ status }: { status: string }) {
+  switch (status) {
+    case 'completed': return <CheckCircle2 className="h-3.5 w-3.5 text-success" />;
+    case 'in_progress': return <Clock className="h-3.5 w-3.5 text-foreground" />;
+    case 'review': case 'internal_review': case 'client_review': return <AlertCircle className="h-3.5 w-3.5 text-warning" />;
+    default: return <Circle className="h-3.5 w-3.5 text-muted-foreground" />;
+  }
+}
+
+function TaskStatusLabel({ status }: { status: string }) {
+  const labels: Record<string, string> = {
+    todo: 'To Do', in_progress: 'In Progress', review: 'Review',
+    completed: 'Done', internal_review: 'Internal Review', client_review: 'Client Review',
+  };
+  return <span className="text-xs text-muted-foreground">{labels[status] || status}</span>;
+}
+
+function DeliverableTasksPanel({ deliverableId }: { deliverableId: string }) {
+  const [tasks, setTasks] = useState<LinkedTask[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from('tasks')
+        .select('id, title, status, priority, due_date, assigned_to, parent_task_id')
+        .eq('deliverable_id', deliverableId)
+        .order('created_at');
+      setTasks((data || []) as LinkedTask[]);
+      setLoading(false);
+    })();
+  }, [deliverableId]);
+
+  if (loading) return <div className="py-3 px-4"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>;
+  if (tasks.length === 0) return <p className="text-xs text-muted-foreground py-3 px-6">Δεν υπάρχουν συνδεδεμένα tasks</p>;
+
+  // Separate parent tasks and subtasks
+  const parentTasks = tasks.filter(t => !t.parent_task_id);
+  const subtaskMap = new Map<string, LinkedTask[]>();
+  tasks.filter(t => t.parent_task_id).forEach(t => {
+    const arr = subtaskMap.get(t.parent_task_id!) || [];
+    arr.push(t);
+    subtaskMap.set(t.parent_task_id!, arr);
+  });
+
+  // If there are no parent tasks but there are subtasks, show all as flat
+  const displayTasks = parentTasks.length > 0 ? parentTasks : tasks;
+
+  return (
+    <div className="py-2 px-4 space-y-1">
+      {displayTasks.map(task => (
+        <div key={task.id}>
+          <div className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-muted/30">
+            <TaskStatusIcon status={task.status} />
+            <span className={cn("text-sm flex-1 truncate", task.status === 'completed' && "line-through text-muted-foreground")}>
+              {task.title}
+            </span>
+            <TaskStatusLabel status={task.status} />
+            {task.due_date && (
+              <span className="text-xs text-muted-foreground shrink-0">
+                {format(parseISO(task.due_date), 'd MMM', { locale: el })}
+              </span>
+            )}
+          </div>
+          {/* Subtasks */}
+          {subtaskMap.get(task.id)?.map(sub => (
+            <div key={sub.id} className="flex items-center gap-2 py-1 px-2 ml-6 rounded-md hover:bg-muted/30">
+              <TaskStatusIcon status={sub.status} />
+              <span className={cn("text-xs flex-1 truncate", sub.status === 'completed' && "line-through text-muted-foreground")}>
+                {sub.title}
+              </span>
+              <TaskStatusLabel status={sub.status} />
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeliverablesTableProps) {
   const { isAdmin, isManager, hasPermission } = useAuth();
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
@@ -57,6 +149,7 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+  const [expandedDeliverables, setExpandedDeliverables] = useState<Set<string>>(new Set());
 
   const {
     columns, setColumns, columnWidths, setColumnWidth,
@@ -120,6 +213,14 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
     if (sortField !== field) return <ArrowUpDown className="h-3 w-3 text-muted-foreground" />;
     if (sortDirection === 'asc') return <ArrowUp className="h-3 w-3" />;
     return <ArrowDown className="h-3 w-3" />;
+  };
+
+  const toggleExpanded = (id: string) => {
+    setExpandedDeliverables(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -257,6 +358,8 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
   const totalBudget = deliverables.reduce((sum, d) => sum + (Number(d.budget) || 0), 0);
   const totalCost = deliverables.reduce((sum, d) => sum + (Number(d.cost) || 0), 0);
 
+  const visibleColumnCount = columns.filter(c => c.visible).length;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -327,6 +430,8 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
           <Table>
             <TableHeader>
               <TableRow>
+                {/* Expand column */}
+                <TableHead className="w-[32px]" />
                 {isColumnVisible('select') && (
                   <TableHead className="w-[40px]">
                     <Checkbox
@@ -381,96 +486,119 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedDeliverables.map(deliverable => (
-                <TableRow
-                  key={deliverable.id}
-                  className={cn(
-                    "group hover:bg-muted/50",
-                    deliverable.completed && "opacity-60",
-                    selectedItems.has(deliverable.id) && "bg-primary/5"
-                  )}
-                >
-                  {isColumnVisible('select') && (
-                    <TableCell>
-                      <Checkbox checked={selectedItems.has(deliverable.id)} onCheckedChange={() => toggleSelectItem(deliverable.id)} />
-                    </TableCell>
-                  )}
-                  {isColumnVisible('name') && (
-                    <TableCell style={{ width: getColumnWidth('name') }}>
-                      <EnhancedInlineEditCell
-                        value={deliverable.name}
-                        onSave={(val) => handleInlineUpdate(deliverable.id, 'name', val as string)}
-                        disabled={!canManage}
-                        className={cn(deliverable.completed && "line-through")}
-                      />
-                    </TableCell>
-                  )}
-                  {isColumnVisible('description') && (
-                    <TableCell style={{ width: getColumnWidth('description') }}>
-                      <EnhancedInlineEditCell
-                        value={deliverable.description || ''}
-                        onSave={(val) => handleInlineUpdate(deliverable.id, 'description', val as string || null)}
-                        disabled={!canManage}
-                        placeholder="-"
-                        className="text-muted-foreground"
-                      />
-                    </TableCell>
-                  )}
-                  {isColumnVisible('budget') && (
-                    <TableCell style={{ width: getColumnWidth('budget') }}>
-                      <EnhancedInlineEditCell
-                        value={Number(deliverable.budget) || 0}
-                        onSave={(val) => handleInlineUpdate(deliverable.id, 'budget', Number(val) || 0)}
-                        type="number"
-                        disabled={!canManage}
-                        displayValue={`€${(Number(deliverable.budget) || 0).toLocaleString()}`}
-                      />
-                    </TableCell>
-                  )}
-                  {isColumnVisible('cost') && (
-                    <TableCell style={{ width: getColumnWidth('cost') }}>
-                      <EnhancedInlineEditCell
-                        value={Number(deliverable.cost) || 0}
-                        onSave={(val) => handleInlineUpdate(deliverable.id, 'cost', Number(val) || 0)}
-                        type="number"
-                        disabled={!canManage}
-                        displayValue={`€${(Number(deliverable.cost) || 0).toLocaleString()}`}
-                      />
-                    </TableCell>
-                  )}
-                  {isColumnVisible('due_date') && (
-                    <TableCell style={{ width: getColumnWidth('due_date') }}>
-                      <EnhancedInlineEditCell
-                        value={deliverable.due_date || ''}
-                        onSave={(val) => handleInlineUpdate(deliverable.id, 'due_date', val as string || null)}
-                        type="date"
-                        disabled={!canManage}
-                        displayValue={deliverable.due_date ? format(parseISO(deliverable.due_date), 'd MMM yyyy', { locale: el }) : '-'}
-                      />
-                    </TableCell>
-                  )}
-                  {isColumnVisible('completed') && (
-                    <TableCell style={{ width: getColumnWidth('completed') }}>
-                      <Checkbox
-                        checked={deliverable.completed || false}
-                        onCheckedChange={() => toggleCompleted(deliverable)}
-                        disabled={!canManage}
-                      />
-                    </TableCell>
-                  )}
-                  {isColumnVisible('actions') && (
-                    <TableCell>
-                      {canManage && (
-                        <EditDeleteActions
-                          onEdit={() => handleEdit(deliverable)}
-                          onDelete={() => handleDelete(deliverable.id)}
-                          itemName={`το παραδοτέο "${deliverable.name}"`}
-                        />
-                      )}
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))}
+              {sortedDeliverables.map(deliverable => {
+                const isExpanded = expandedDeliverables.has(deliverable.id);
+                return (
+                  <Collapsible key={deliverable.id} open={isExpanded} onOpenChange={() => toggleExpanded(deliverable.id)} asChild>
+                    <>
+                      <TableRow
+                        className={cn(
+                          "group hover:bg-muted/50 cursor-pointer",
+                          deliverable.completed && "opacity-60",
+                          selectedItems.has(deliverable.id) && "bg-primary/5",
+                          isExpanded && "bg-muted/30"
+                        )}
+                      >
+                        <TableCell className="w-[32px] px-2">
+                          <CollapsibleTrigger asChild>
+                            <button className="p-0.5 rounded hover:bg-muted" onClick={e => e.stopPropagation()}>
+                              <ChevronRight className={cn("h-3.5 w-3.5 transition-transform duration-200", isExpanded && "rotate-90")} />
+                            </button>
+                          </CollapsibleTrigger>
+                        </TableCell>
+                        {isColumnVisible('select') && (
+                          <TableCell>
+                            <Checkbox checked={selectedItems.has(deliverable.id)} onCheckedChange={() => toggleSelectItem(deliverable.id)} />
+                          </TableCell>
+                        )}
+                        {isColumnVisible('name') && (
+                          <TableCell style={{ width: getColumnWidth('name') }}>
+                            <EnhancedInlineEditCell
+                              value={deliverable.name}
+                              onSave={(val) => handleInlineUpdate(deliverable.id, 'name', val as string)}
+                              disabled={!canManage}
+                              className={cn(deliverable.completed && "line-through")}
+                            />
+                          </TableCell>
+                        )}
+                        {isColumnVisible('description') && (
+                          <TableCell style={{ width: getColumnWidth('description') }}>
+                            <EnhancedInlineEditCell
+                              value={deliverable.description || ''}
+                              onSave={(val) => handleInlineUpdate(deliverable.id, 'description', val as string || null)}
+                              disabled={!canManage}
+                              placeholder="-"
+                              className="text-muted-foreground"
+                            />
+                          </TableCell>
+                        )}
+                        {isColumnVisible('budget') && (
+                          <TableCell style={{ width: getColumnWidth('budget') }}>
+                            <EnhancedInlineEditCell
+                              value={Number(deliverable.budget) || 0}
+                              onSave={(val) => handleInlineUpdate(deliverable.id, 'budget', Number(val) || 0)}
+                              type="number"
+                              disabled={!canManage}
+                              displayValue={`€${(Number(deliverable.budget) || 0).toLocaleString()}`}
+                            />
+                          </TableCell>
+                        )}
+                        {isColumnVisible('cost') && (
+                          <TableCell style={{ width: getColumnWidth('cost') }}>
+                            <EnhancedInlineEditCell
+                              value={Number(deliverable.cost) || 0}
+                              onSave={(val) => handleInlineUpdate(deliverable.id, 'cost', Number(val) || 0)}
+                              type="number"
+                              disabled={!canManage}
+                              displayValue={`€${(Number(deliverable.cost) || 0).toLocaleString()}`}
+                            />
+                          </TableCell>
+                        )}
+                        {isColumnVisible('due_date') && (
+                          <TableCell style={{ width: getColumnWidth('due_date') }}>
+                            <EnhancedInlineEditCell
+                              value={deliverable.due_date || ''}
+                              onSave={(val) => handleInlineUpdate(deliverable.id, 'due_date', val as string || null)}
+                              type="date"
+                              disabled={!canManage}
+                              displayValue={deliverable.due_date ? format(parseISO(deliverable.due_date), 'd MMM yyyy', { locale: el }) : '-'}
+                            />
+                          </TableCell>
+                        )}
+                        {isColumnVisible('completed') && (
+                          <TableCell style={{ width: getColumnWidth('completed') }}>
+                            <Checkbox
+                              checked={deliverable.completed || false}
+                              onCheckedChange={() => toggleCompleted(deliverable)}
+                              disabled={!canManage}
+                            />
+                          </TableCell>
+                        )}
+                        {isColumnVisible('actions') && (
+                          <TableCell>
+                            {canManage && (
+                              <EditDeleteActions
+                                onEdit={() => handleEdit(deliverable)}
+                                onDelete={() => handleDelete(deliverable.id)}
+                                itemName={`το παραδοτέο "${deliverable.name}"`}
+                              />
+                            )}
+                          </TableCell>
+                        )}
+                      </TableRow>
+                      <CollapsibleContent asChild>
+                        <tr>
+                          <td colSpan={visibleColumnCount + 1} className="p-0 border-b">
+                            <div className="bg-muted/20 border-l-2 border-foreground/10 ml-4">
+                              <DeliverableTasksPanel deliverableId={deliverable.id} />
+                            </div>
+                          </td>
+                        </tr>
+                      </CollapsibleContent>
+                    </>
+                  </Collapsible>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
@@ -494,7 +622,7 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
               <Label htmlFor="description">Περιγραφή</Label>
               <Textarea id="description" value={formData.description} onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))} rows={2} />
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="budget">Budget (€)</Label>
                 <Input id="budget" type="number" value={formData.budget} onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))} placeholder="0" />

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -172,15 +172,14 @@ function DroppableFolder({
   );
 }
 
-// Collapsible virtual folder for auto mode
-function VirtualFolder({ name, color, children, defaultOpen = false }: {
-  name: string; color?: string | null; children: React.ReactNode; defaultOpen?: boolean;
+// Collapsible virtual folder for auto mode — controlled open state
+function VirtualFolder({ name, color, children, open, onToggle }: {
+  name: string; color?: string | null; children: React.ReactNode; open: boolean; onToggle: () => void;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
   return (
     <div>
       <button
-        onClick={() => setOpen(!open)}
+        onClick={onToggle}
         className="flex items-center gap-2 w-full rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
       >
         <ChevronRight className={cn("h-3 w-3 transition-transform duration-200 shrink-0", open && "rotate-90")} />
@@ -213,6 +212,10 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
       return new Set(stored);
     } catch { return new Set(); }
   });
+
+  // Expanded virtual folders for auto mode (keyed by "cat::client" or "cat")
+  const [expandedVirtual, setExpandedVirtual] = useState<Set<string>>(new Set());
+
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -287,6 +290,53 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
     enabled: !!companyId,
   });
 
+  const currentProjectId = location.pathname.match(/\/projects\/(.+)/)?.[1];
+
+  // Auto-expand folders containing the active project (manual mode)
+  useEffect(() => {
+    if (mode !== 'manual' || !currentProjectId || projects.length === 0) return;
+    const activeProject = projects.find(p => p.id === currentProjectId);
+    if (activeProject?.folder_id && !expandedFolders.has(activeProject.folder_id)) {
+      setExpandedFolders(prev => {
+        const next = new Set(prev);
+        next.add(activeProject.folder_id!);
+        return next;
+      });
+    }
+  }, [currentProjectId, projects, mode]);
+
+  // Auto-expand virtual folders containing the active project (auto mode)
+  useEffect(() => {
+    if (mode !== 'auto' || !currentProjectId || projects.length === 0) return;
+    const activeProject = projects.find(p => p.id === currentProjectId);
+    if (!activeProject) return;
+
+    const keysToExpand: string[] = [];
+
+    if (activeProject.client) {
+      const categoryName = sectorToCategory(activeProject.client.sector);
+      const clientName = activeProject.client.name;
+      if (categoryName) {
+        keysToExpand.push(`cat::${categoryName}`);
+        keysToExpand.push(`cat::${categoryName}::${clientName}`);
+      } else {
+        keysToExpand.push('cat::__uncategorized__');
+        keysToExpand.push(`cat::__uncategorized__::${clientName}`);
+      }
+    } else {
+      keysToExpand.push('cat::__uncategorized__');
+    }
+
+    setExpandedVirtual(prev => {
+      const next = new Set(prev);
+      let changed = false;
+      for (const key of keysToExpand) {
+        if (!next.has(key)) { next.add(key); changed = true; }
+      }
+      return changed ? next : prev;
+    });
+  }, [currentProjectId, projects, mode]);
+
   // Manual mode mutations
   const createFolder = useMutation({
     mutationFn: async (name: string) => {
@@ -346,6 +396,14 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
     });
   };
 
+  const toggleVirtual = (key: string) => {
+    setExpandedVirtual(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
+
   const handleDragStart = (event: DragStartEvent) => { setActiveDragId(event.active.id as string); };
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveDragId(null);
@@ -366,12 +424,8 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
 
   if (collapsed) return null;
 
-  const currentProjectId = location.pathname.match(/\/projects\/(.+)/)?.[1];
-
   // --- AUTO MODE ---
   if (mode === 'auto') {
-    // Build hierarchy: category > client > projects
-    // Use ALL sectors found in data, not just project_categories
     const categoryLookup = new Map<string, { color: string | null; sortOrder: number }>();
     categories.forEach(cat => {
       categoryLookup.set(cat.name, { color: cat.color, sortOrder: cat.sort_order });
@@ -392,13 +446,11 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
       const categoryName = sectorToCategory(project.client.sector);
 
       if (!categoryName) {
-        // Client has no sector
         if (!uncategorized.clients.has(clientName)) uncategorized.clients.set(clientName, []);
         uncategorized.clients.get(clientName)!.push(project);
         return;
       }
 
-      // Get or create dynamic category bucket
       if (!dynamicCategories.has(categoryName)) {
         const defined = categoryLookup.get(categoryName);
         dynamicCategories.set(categoryName, {
@@ -412,39 +464,65 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
       cat.clients.get(clientName)!.push(project);
     });
 
-    // Sort categories: defined ones first (by sortOrder), then dynamic ones alphabetically
     const sortedCategories = Array.from(dynamicCategories.entries())
       .sort((a, b) => a[1].sortOrder - b[1].sortOrder || a[0].localeCompare(b[0]));
 
     return (
       <div className="space-y-0.5 mt-1">
-
         <div className="max-h-[50vh] overflow-y-auto space-y-0.5 scrollbar-thin">
           {sortedCategories.map(([catName, catData]) => {
             if (catData.clients.size === 0) return null;
+            const catKey = `cat::${catName}`;
             return (
-              <VirtualFolder key={catName} name={catName} color={catData.color}>
-                {Array.from(catData.clients.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([clientName, clientProjects]) => (
-                  <VirtualFolder key={clientName} name={clientName}>
-                    {clientProjects.map(p => (
-                      <ProjectLink key={p.id} project={p} isActive={currentProjectId === p.id} />
-                    ))}
-                  </VirtualFolder>
-                ))}
+              <VirtualFolder
+                key={catName}
+                name={catName}
+                color={catData.color}
+                open={expandedVirtual.has(catKey)}
+                onToggle={() => toggleVirtual(catKey)}
+              >
+                {Array.from(catData.clients.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([clientName, clientProjects]) => {
+                  const clientKey = `cat::${catName}::${clientName}`;
+                  return (
+                    <VirtualFolder
+                      key={clientName}
+                      name={clientName}
+                      open={expandedVirtual.has(clientKey)}
+                      onToggle={() => toggleVirtual(clientKey)}
+                    >
+                      {clientProjects.map(p => (
+                        <ProjectLink key={p.id} project={p} isActive={currentProjectId === p.id} />
+                      ))}
+                    </VirtualFolder>
+                  );
+                })}
               </VirtualFolder>
             );
           })}
 
           {/* Uncategorized */}
           {(uncategorized.clients.size > 0 || uncategorized.orphans.length > 0) && (
-            <VirtualFolder name="Χωρίς Κατηγορία" color="#9CA3AF">
-              {Array.from(uncategorized.clients.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([clientName, clientProjects]) => (
-                <VirtualFolder key={clientName} name={clientName}>
-                  {clientProjects.map(p => (
-                    <ProjectLink key={p.id} project={p} isActive={currentProjectId === p.id} />
-                  ))}
-                </VirtualFolder>
-              ))}
+            <VirtualFolder
+              name="Χωρίς Κατηγορία"
+              color="#9CA3AF"
+              open={expandedVirtual.has('cat::__uncategorized__')}
+              onToggle={() => toggleVirtual('cat::__uncategorized__')}
+            >
+              {Array.from(uncategorized.clients.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([clientName, clientProjects]) => {
+                const clientKey = `cat::__uncategorized__::${clientName}`;
+                return (
+                  <VirtualFolder
+                    key={clientName}
+                    name={clientName}
+                    open={expandedVirtual.has(clientKey)}
+                    onToggle={() => toggleVirtual(clientKey)}
+                  >
+                    {clientProjects.map(p => (
+                      <ProjectLink key={p.id} project={p} isActive={currentProjectId === p.id} />
+                    ))}
+                  </VirtualFolder>
+                );
+              })}
               {uncategorized.orphans.map(p => (
                 <ProjectLink key={p.id} project={p} isActive={currentProjectId === p.id} />
               ))}

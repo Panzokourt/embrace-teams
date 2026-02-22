@@ -39,10 +39,17 @@ interface FocusContextValue {
 
 const FocusContext = createContext<FocusContextValue | null>(null);
 
+const NOOP_CONTEXT: FocusContextValue = {
+  isActive: false, isPaused: true, currentTask: null, upNextTasks: [],
+  pomodoroMinutes: 25, sessionStartTime: null,
+  enterFocus: async () => {}, exitFocus: () => {}, startSession: () => {},
+  setCurrentTaskById: () => {}, skipToNext: () => {},
+  completeCurrentTask: async () => {}, setIsPaused: () => {}, reorderTasks: () => {},
+};
+
 export function useFocusMode() {
   const ctx = useContext(FocusContext);
-  if (!ctx) throw new Error('useFocusMode must be used within FocusModeProvider');
-  return ctx;
+  return ctx ?? NOOP_CONTEXT;
 }
 
 const TASK_SELECT = 'id, title, description, status, priority, due_date, start_date, progress, estimated_hours, actual_hours, assigned_to, project_id, task_category, project:projects(name)';

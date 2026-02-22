@@ -22,16 +22,16 @@ export default function StatCard({
   variant = 'default',
 }: StatCardProps) {
   const variantStyles = {
-    default: 'bg-card border-border/50',
-    primary: 'bg-primary/[0.03] border-primary/10',
-    success: 'bg-success/[0.03] border-success/10',
-    warning: 'bg-warning/[0.03] border-warning/10',
-    destructive: 'bg-destructive/[0.03] border-destructive/10',
+    default: 'bg-card border-border/40',
+    primary: 'bg-card border-primary/20',
+    success: 'bg-card border-success/20',
+    warning: 'bg-card border-warning/20',
+    destructive: 'bg-card border-destructive/20',
   };
 
   const iconStyles = {
-    default: 'bg-secondary/50 text-muted-foreground',
-    primary: 'bg-primary/10 text-primary',
+    default: 'bg-muted text-muted-foreground',
+    primary: 'bg-primary/10 text-primary-foreground',
     success: 'bg-success/10 text-success',
     warning: 'bg-warning/10 text-warning',
     destructive: 'bg-destructive/10 text-destructive',
@@ -39,17 +39,17 @@ export default function StatCard({
 
   return (
     <div className={cn(
-      "group relative rounded-2xl border p-5 transition-all duration-300 ease-apple",
+      "group relative rounded-3xl border p-6 transition-all duration-300 ease-apple",
       "hover:shadow-soft hover:border-border hover:-translate-y-0.5",
       "animate-fade-in",
       variantStyles[variant]
     )}>
       <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70">
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             {title}
           </p>
-          <p className="text-2xl font-semibold tracking-tight text-foreground">
+          <p className="text-2xl font-bold tracking-tight text-foreground">
             {value}
           </p>
           {subtitle && (
@@ -68,7 +68,7 @@ export default function StatCard({
           )}
         </div>
         <div className={cn(
-          "h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0",
+          "h-11 w-11 rounded-2xl flex items-center justify-center flex-shrink-0",
           "transition-transform duration-300 ease-apple group-hover:scale-105",
           iconStyles[variant]
         )}>

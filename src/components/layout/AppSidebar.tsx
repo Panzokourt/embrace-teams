@@ -99,12 +99,11 @@ const adminNavItems: NavItem[] = [
 ];
 
 
-export default function AppSidebar() {
+export default function AppSidebar({ collapsed, onToggleCollapse }: { collapsed: boolean; onToggleCollapse: () => void }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { profile, roles, signOut, isAdmin, isManager, isClient, hasPermission, isSuperAdmin, isCompanyAdmin } = useAuth();
   const { resolvedTheme, setTheme } = useTheme();
-  const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
   const [selectedBriefType, setSelectedBriefType] = useState<string | null>(null);
@@ -155,7 +154,7 @@ export default function AppSidebar() {
           "h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-secondary/80 hidden md:flex transition-all duration-200",
           collapsed && "absolute right-2 top-4"
         )}
-        onClick={() => setCollapsed(!collapsed)}>
+        onClick={() => onToggleCollapse()}>
 
             {collapsed ? <Menu className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </Button>

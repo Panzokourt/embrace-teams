@@ -27,10 +27,11 @@ import {
   ChevronRight, Palmtree, Check, X, GripVertical, ExternalLink,
   Palette, Monitor, Globe, Calendar, MessageSquare, BarChart3,
   FileArchive, Bot, Send, Loader2, Minimize2, Maximize2, Flag,
-  ChevronDown,
+  ChevronDown, Crosshair,
 } from 'lucide-react';
 import { format, isBefore, startOfDay, endOfWeek, startOfTomorrow, isAfter } from 'date-fns';
 import { el } from 'date-fns/locale';
+import { useFocusMode } from '@/contexts/FocusContext';
 
 // ── Types ──────────────────────────────────────────
 interface TaskWithProject {
@@ -484,6 +485,7 @@ function AIChatWidget() {
 export default function MyWork() {
   const { user, profile, isAdmin, isManager } = useAuth();
   const navigate = useNavigate();
+  const { enterFocus } = useFocusMode();
   const { activeTimer, elapsed, formatElapsed, startTimer, stopTimer } = useTimeTracking();
   const { balances, pendingApprovals, approveRequest, rejectRequest } = useLeaveManagement();
 
@@ -694,9 +696,20 @@ export default function MyWork() {
     <div className="flex-1 p-4 md:p-6 lg:p-8 space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">{greeting}, {firstName}</h1>
-          <p className="text-muted-foreground capitalize">{todayStr}</p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">{greeting}, {firstName}</h1>
+            <p className="text-muted-foreground capitalize">{todayStr}</p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="ml-2 gap-1.5"
+            onClick={() => enterFocus()}
+          >
+            <Crosshair className="h-4 w-4" />
+            <span className="hidden sm:inline">Focus Mode</span>
+          </Button>
         </div>
         {activeTimer && (
           <div className="flex items-center gap-3 bg-primary/10 border border-primary/20 rounded-xl px-4 py-2.5">

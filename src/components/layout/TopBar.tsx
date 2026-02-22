@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, FolderKanban, CheckSquare, FileText, Users, PanelRightOpen, PanelRightClose, BookUser } from 'lucide-react';
+import { Search, FolderKanban, CheckSquare, FileText, Users, PanelRightOpen, PanelRightClose, BookUser, Crosshair } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import WorkDayClock from '@/components/topbar/WorkDayClock';
+import { useFocusMode } from '@/contexts/FocusContext';
 
 interface SearchResult {
   id: string;
@@ -29,6 +30,7 @@ interface TopBarProps {
 
 export default function TopBar({ onPanelToggle, rightPanelOpen }: TopBarProps) {
   const navigate = useNavigate();
+  const { enterFocus } = useFocusMode();
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -144,8 +146,16 @@ export default function TopBar({ onPanelToggle, rightPanelOpen }: TopBarProps) {
         </Popover>
       </div>
 
-      {/* Panel toggle */}
-      <div className="px-1 flex items-center">
+      {/* Focus + Panel toggle */}
+      <div className="px-1 flex items-center gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => enterFocus()}
+          title="Focus Mode"
+        >
+          <Crosshair className="h-5 w-5" />
+        </Button>
         <Button
           variant="ghost"
           size="icon"

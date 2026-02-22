@@ -10,9 +10,14 @@ interface FocusTask {
   status: string;
   priority: string;
   due_date: string | null;
+  start_date: string | null;
   progress: number | null;
+  estimated_hours: number | null;
+  actual_hours: number | null;
+  assigned_to: string | null;
   project_id: string;
   project_name?: string;
+  task_category?: string | null;
 }
 
 interface FocusContextValue {
@@ -24,6 +29,7 @@ interface FocusContextValue {
   sessionStartTime: number | null;
   enterFocus: (taskId?: string) => Promise<void>;
   exitFocus: () => void;
+  startSession: () => void;
   setCurrentTaskById: (id: string) => void;
   skipToNext: () => void;
   completeCurrentTask: () => Promise<void>;
@@ -39,10 +45,23 @@ export function useFocusMode() {
   return ctx;
 }
 
+const TASK_SELECT = 'id, title, description, status, priority, due_date, start_date, progress, estimated_hours, actual_hours, assigned_to, project_id, task_category, project:projects(name)';
+
+function mapTask(t: any): FocusTask {
+  return {
+    id: t.id, title: t.title, description: t.description, status: t.status,
+    priority: t.priority, due_date: t.due_date, start_date: t.start_date,
+    progress: t.progress, estimated_hours: t.estimated_hours,
+    actual_hours: t.actual_hours, assigned_to: t.assigned_to,
+    project_id: t.project_id, project_name: t.project?.name || '',
+    task_category: t.task_category,
+  };
+}
+
 export function FocusModeProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [isActive, setIsActive] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
+  const [isPaused, setIsPaused] = useState(true);
   const [tasks, setTasks] = useState<FocusTask[]>([]);
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
@@ -56,7 +75,7 @@ export function FocusModeProvider({ children }: { children: React.ReactNode }) {
     const today = new Date();
     const { data } = await supabase
       .from('tasks')
-      .select('id, title, description, status, priority, due_date, progress, project_id, project:projects(name)')
+      .select(TASK_SELECT)
       .eq('assigned_to', user.id)
       .in('status', ['todo', 'in_progress', 'review'])
       .lte('due_date', format(endOfDay(today), 'yyyy-MM-dd'))
@@ -64,67 +83,57 @@ export function FocusModeProvider({ children }: { children: React.ReactNode }) {
       .order('due_date', { ascending: true })
       .limit(20);
 
-    return (data || []).map((t: any) => ({
-      id: t.id,
-      title: t.title,
-      description: t.description,
-      status: t.status,
-      priority: t.priority,
-      due_date: t.due_date,
-      progress: t.progress,
-      project_id: t.project_id,
-      project_name: t.project?.name || '',
-    }));
+    return (data || []).map(mapTask);
   }, [user]);
 
   const enterFocus = useCallback(async (taskId?: string) => {
     const fetched = await fetchTodayTasks();
     if (fetched.length === 0) {
-      // fallback: fetch any open tasks
       if (!user) return;
       const { data } = await supabase
         .from('tasks')
-        .select('id, title, description, status, priority, due_date, progress, project_id, project:projects(name)')
+        .select(TASK_SELECT)
         .eq('assigned_to', user.id)
         .in('status', ['todo', 'in_progress'])
         .order('priority', { ascending: false })
         .limit(10);
-      const mapped = (data || []).map((t: any) => ({
-        id: t.id, title: t.title, description: t.description, status: t.status,
-        priority: t.priority, due_date: t.due_date, progress: t.progress,
-        project_id: t.project_id, project_name: t.project?.name || '',
-      }));
+      const mapped = (data || []).map(mapTask);
       setTasks(mapped);
       setCurrentTaskId(taskId || mapped[0]?.id || null);
     } else {
       setTasks(fetched);
       setCurrentTaskId(taskId || fetched[0]?.id || null);
     }
-    setSessionStartTime(Date.now());
-    setIsPaused(false);
+    // Start in paused state - timer only begins when user presses Play
+    setSessionStartTime(null);
+    setIsPaused(true);
     setIsActive(true);
   }, [fetchTodayTasks, user]);
 
   const exitFocus = useCallback(() => {
     setIsActive(false);
-    setIsPaused(false);
+    setIsPaused(true);
     setCurrentTaskId(null);
     setSessionStartTime(null);
   }, []);
 
-  const setCurrentTaskById = useCallback((id: string) => {
-    setCurrentTaskId(id);
+  const startSession = useCallback(() => {
     setSessionStartTime(Date.now());
     setIsPaused(false);
   }, []);
 
+  const setCurrentTaskById = useCallback((id: string) => {
+    setCurrentTaskId(id);
+    setSessionStartTime(null);
+    setIsPaused(true);
+  }, []);
+
   const skipToNext = useCallback(() => {
-    const idx = tasks.findIndex(t => t.id === currentTaskId);
     const remaining = tasks.filter(t => t.id !== currentTaskId);
     if (remaining.length > 0) {
       setCurrentTaskId(remaining[0].id);
-      setSessionStartTime(Date.now());
-      setIsPaused(false);
+      setSessionStartTime(null);
+      setIsPaused(true);
     }
   }, [tasks, currentTaskId]);
 
@@ -135,7 +144,8 @@ export function FocusModeProvider({ children }: { children: React.ReactNode }) {
     setTasks(remaining);
     if (remaining.length > 0) {
       setCurrentTaskId(remaining[0].id);
-      setSessionStartTime(Date.now());
+      setSessionStartTime(null);
+      setIsPaused(true);
     } else {
       exitFocus();
     }
@@ -151,7 +161,7 @@ export function FocusModeProvider({ children }: { children: React.ReactNode }) {
   return (
     <FocusContext.Provider value={{
       isActive, isPaused, currentTask, upNextTasks, pomodoroMinutes,
-      sessionStartTime, enterFocus, exitFocus, setCurrentTaskById,
+      sessionStartTime, enterFocus, exitFocus, startSession, setCurrentTaskById,
       skipToNext, completeCurrentTask, setIsPaused, reorderTasks,
     }}>
       {children}

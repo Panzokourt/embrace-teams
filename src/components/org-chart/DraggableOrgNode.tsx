@@ -85,7 +85,7 @@ export function DraggableOrgNode({
       {/* Card */}
       <div
         className={`relative group bg-card border rounded-xl p-4 shadow-sm hover:shadow-md transition-all min-w-[200px] max-w-[280px] ${
-          isDragging ? 'ring-2 ring-primary shadow-lg' : ''
+          isDragging ? 'ring-2 ring-foreground shadow-lg' : ''
         }`}
         style={{ borderColor: node.color + '40' }}
       >

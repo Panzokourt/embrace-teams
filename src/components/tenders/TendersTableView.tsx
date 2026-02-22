@@ -285,7 +285,7 @@ export function TendersTableView({
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 shrink-0 text-muted-foreground hover:text-primary"
+              className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
               onClick={() => navigate(`/tenders/${tender.id}`)}
               title="Άνοιγμα διαγωνισμού"
             >

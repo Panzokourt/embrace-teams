@@ -74,7 +74,7 @@ function DraggableProject({ project, isActive }: { project: ProjectItem; isActiv
         "flex items-center gap-2 w-full rounded-lg px-2 py-1 text-xs transition-colors truncate group",
         isDragging && "opacity-30",
         isActive
-          ? "bg-primary/10 text-primary font-medium"
+          ? "bg-muted text-foreground font-medium"
           : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
       )}
     >
@@ -109,8 +109,8 @@ function ProjectLink({ project, isActive }: { project: ProjectItem; isActive: bo
       className={cn(
         "flex items-center gap-2 w-full rounded-lg px-2 py-1 text-xs transition-colors truncate",
         isActive
-          ? "bg-primary/10 text-primary font-medium"
-          : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
+           ? "bg-muted text-foreground font-medium"
+           : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
       )}
     >
       <FileText className={cn("h-3 w-3 shrink-0", statusColor(project.status))} />
@@ -143,7 +143,7 @@ function DroppableFolder({
             onClick={onToggle}
             className={cn(
               "flex items-center gap-2 w-full rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors group",
-              isOver && "bg-primary/10 ring-1 ring-primary/30"
+              isOver && "bg-muted ring-1 ring-foreground/20"
             )}
           >
             <ChevronRight className={cn("h-3 w-3 transition-transform duration-200 shrink-0", isOpen && "rotate-90")} />
@@ -533,7 +533,7 @@ function RootDropZone({ children }: { children: React.ReactNode }) {
     data: { type: 'root' },
   });
   return (
-    <div ref={setNodeRef} className={cn("space-y-0.5 transition-colors rounded-lg", isOver && "bg-secondary/30 ring-1 ring-primary/20")}>
+    <div ref={setNodeRef} className={cn("space-y-0.5 transition-colors rounded-lg", isOver && "bg-secondary/30 ring-1 ring-foreground/20")}>
       {children}
     </div>
   );

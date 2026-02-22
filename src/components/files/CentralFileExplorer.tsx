@@ -624,7 +624,7 @@ export function CentralFileExplorer() {
             {filesByClient.map(group => (
               <div key={group.client.id} className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5 text-primary" />
+                  <Building2 className="h-5 w-5 text-foreground" />
                   <h3 className="font-semibold text-lg">{group.client.name}</h3>
                   <Badge variant="secondary">{group.files.length} αρχεία</Badge>
                 </div>
@@ -657,7 +657,7 @@ export function CentralFileExplorer() {
             {filesByProject.map(group => (
               <div key={group.key} className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <FolderKanban className="h-5 w-5 text-primary" />
+                  <FolderKanban className="h-5 w-5 text-foreground" />
                   <h3 className="font-semibold text-lg">{group.name}</h3>
                   <Badge variant={group.type === 'tender' ? 'outline' : 'secondary'}>
                     {group.type === 'tender' ? 'Διαγωνισμός' : 'Έργο'}
@@ -693,7 +693,7 @@ export function CentralFileExplorer() {
             {filesByDate.map(group => (
               <div key={group.key} className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-primary" />
+                  <Calendar className="h-5 w-5 text-foreground" />
                   <h3 className="font-semibold text-lg capitalize">{group.label}</h3>
                   <Badge variant="secondary">{group.files.length} αρχεία</Badge>
                 </div>

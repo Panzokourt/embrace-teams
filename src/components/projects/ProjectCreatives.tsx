@@ -471,7 +471,7 @@ function CreativeCard({
     <div
       className={cn(
         'group relative border rounded-xl overflow-hidden bg-card transition-all duration-150',
-        selected && 'ring-2 ring-primary border-primary'
+        selected && 'ring-2 ring-foreground border-foreground'
       )}
     >
       {/* Thumbnail area */}

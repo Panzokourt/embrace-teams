@@ -190,7 +190,7 @@ export function TenderDeliverables({ tenderId, tenderName }: TenderDeliverablesP
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <Loader2 className="h-6 w-6 animate-spin text-foreground" />
       </div>
     );
   }
@@ -315,7 +315,7 @@ export function TenderDeliverables({ tenderId, tenderName }: TenderDeliverablesP
                 >
                   {deliverable.completed 
                     ? <CheckCircle2 className="h-5 w-5 text-success" />
-                    : <Circle className="h-5 w-5 text-muted-foreground hover:text-primary" />
+                    : <Circle className="h-5 w-5 text-muted-foreground hover:text-foreground" />
                   }
                 </button>
                 <div className="flex-1 min-w-0">

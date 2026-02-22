@@ -32,7 +32,7 @@ export default function TaskList({ tasks, title, showProject = true }: TaskListP
         return <CheckCircle2 className="h-4 w-4 text-success" />;
       case 'in_progress':
       case 'review':
-        return <Circle className="h-4 w-4 text-primary fill-primary/20" />;
+        return <Circle className="h-4 w-4 text-foreground fill-foreground/20" />;
       default:
         return <Circle className="h-4 w-4 text-muted-foreground/50" />;
     }
@@ -44,7 +44,7 @@ export default function TaskList({ tasks, title, showProject = true }: TaskListP
     <div className="rounded-2xl border border-border/50 bg-card p-6 animate-fade-in shadow-soft">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-base font-semibold flex items-center gap-2 text-foreground">
-          <span className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+          <span className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
             📅
           </span>
           {title}

@@ -452,11 +452,11 @@ function SidebarLink({
       style={{ animationDelay: `${delay}ms` }}>
 
       {active && !collapsed && (
-        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-full bg-primary" />
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-full bg-foreground" />
       )}
       <span className={cn(
         "transition-transform duration-200",
-        active && "scale-105 text-primary",
+        active && "scale-105 text-foreground",
         !active && "group-hover:scale-105"
       )}>
         {icon}

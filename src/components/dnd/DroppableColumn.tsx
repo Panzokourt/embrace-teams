@@ -17,7 +17,7 @@ export function DroppableColumn({ id, items, children, className }: DroppableCol
       ref={setNodeRef}
       className={cn(
         "min-h-[200px] rounded-lg transition-colors",
-        isOver && "bg-primary/5 ring-2 ring-primary/20",
+        isOver && "bg-muted/50 ring-2 ring-foreground/20",
         className
       )}
     >

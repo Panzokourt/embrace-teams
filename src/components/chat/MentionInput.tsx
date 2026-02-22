@@ -133,7 +133,7 @@ export default function MentionInput({ query, position, onSelect, onClose }: Men
           key={`${s.type}-${s.id}`}
           className={cn(
             "flex items-center gap-2 w-full px-3 py-1.5 text-xs text-left transition-colors",
-            i === selectedIndex ? "bg-primary/10 text-primary" : "hover:bg-muted/40"
+            i === selectedIndex ? "bg-muted text-foreground" : "hover:bg-muted/40"
           )}
           onClick={() => onSelect(s)}
           onMouseEnter={() => setSelectedIndex(i)}

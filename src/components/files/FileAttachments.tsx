@@ -215,7 +215,7 @@ export function FileAttachments({ projectId, taskId, deliverableId }: FileAttach
 
   const getFileIcon = (contentType: string | null) => {
     if (!contentType) return <File className="h-5 w-5" />;
-    if (contentType.startsWith('image/')) return <Image className="h-5 w-5 text-primary" />;
+    if (contentType.startsWith('image/')) return <Image className="h-5 w-5 text-foreground" />;
     if (contentType.startsWith('video/')) return <FileVideo className="h-5 w-5 text-secondary-foreground" />;
     if (contentType.startsWith('audio/')) return <FileAudio className="h-5 w-5 text-success" />;
     if (contentType.includes('pdf')) return <FileText className="h-5 w-5 text-destructive" />;

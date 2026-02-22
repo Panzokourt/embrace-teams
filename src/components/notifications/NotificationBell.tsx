@@ -139,7 +139,7 @@ export function NotificationBell() {
       case 'task_due':
         return <CheckSquare className="h-4 w-4 text-warning" />;
       case 'tender_deadline':
-        return <FileText className="h-4 w-4 text-primary" />;
+        return <FileText className="h-4 w-4 text-foreground" />;
       default:
         return <Bell className="h-4 w-4" />;
     }

@@ -139,7 +139,7 @@ export function ProjectBulkActions({ selectedIds, onClearSelection, onActionComp
 
   return (
     <>
-      <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
+      <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border border-border">
         <Badge variant="secondary" className="text-xs">
           {selectedIds.size} επιλεγμένα
         </Badge>

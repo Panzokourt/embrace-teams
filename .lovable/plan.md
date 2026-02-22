@@ -1,139 +1,80 @@
 
 
-# Inbox UI Overhaul & Feature Expansion
+# UI Fixes: Work Section, Sidebar & Project Tasks
 
 ## Overview
-Comprehensive upgrade of the Inbox module with resizable panels, improved message rendering, attachments support, reply options, and cross-entity linking (clients, projects, tasks, chat).
+Five targeted fixes addressing navigation, settings, and UI consistency issues.
 
 ---
 
-## 1. Resizable Thread List Panel
-**What:** Replace the fixed-width thread list (`w-96`) with a `ResizablePanelGroup` so users can drag the divider to resize.
+## 1. Remove Tabs from Work Page -- Use Route-Based Sub-Pages
 
-**Technical:**
-- Use `react-resizable-panels` (already installed) in `Inbox.tsx`
-- Left panel: `InboxThreadList` (default 30%, min 20%)
-- Right panel: conversation view (fills remaining space)
+**Problem:** The `/work` page uses a `Tabs` component, showing tabs (Erga, Tasks, Imeroologio) inline. They should be separate sub-pages navigated via the sidebar only.
 
----
+**Fix:**
+- Replace the `Tabs` component in `src/pages/Work.tsx` with a simple router that reads the `tab` query param and renders the correct page component directly (no tab bar UI).
+- The `TabsList` will be completely removed -- navigation happens only via sidebar sub-links.
 
-## 2. Message Bubble UI Improvements
-
-### 2a. White background for incoming messages
-Replace `bg-muted` with `bg-white dark:bg-card border border-border/40` on incoming message bubbles.
-
-### 2b. Left-align incoming messages
-Remove `max-w-[85%]` restriction on incoming messages and align them to the left edge of the conversation area. Remove `max-w-3xl mx-auto` centering from the messages container.
-
-### 2c. Strip signatures and clutter from display
-Enhance the `stripSignature` and `stripQuotedText` functions used during sync. Additionally, add frontend-side stripping to handle edge cases (e.g., "Unsubscribe" links, address blocks, disclaimer footers).
-
-### 2d. Show images from emails
-Parse `body_html` to extract `<img>` tags and display them below the text content as clickable thumbnails. Also handle Gmail inline image attachments (CID references) by extracting image parts from the Gmail API response.
+**File:** `src/pages/Work.tsx`
 
 ---
 
-## 3. Show Outgoing Messages
-Currently outgoing messages (folder = "Sent") are only visible if they share a thread_id. The `email-fetch` edge function only fetches `INBOX` label. 
+## 2. Fix Sidebar Sub-Page Navigation
 
-**Fix:** Also fetch `SENT` label messages from Gmail API to include outgoing messages in threads. Add a second API call for sent messages or use `labelIds=INBOX,SENT` query.
+**Problem:** Clicking "Tasks" or "Imeroologio" in the sidebar doesn't change the page content.
 
----
+**Root Cause:** The sidebar links navigate to `/work?tab=tasks` etc., but the `Work.tsx` component reads the `tab` from `useSearchParams` only at initial render via `useState`. Subsequent URL changes don't update `activeTab`.
 
-## 4. Attachment Support
+**Fix:** In `src/pages/Work.tsx`, derive the active tab directly from `searchParams` instead of using local `useState`. Since we're removing the TabsList (fix 1), the component will simply read `searchParams.get('tab')` and render the corresponding page.
 
-### 4a. Database: New `email_attachments` table
-```sql
-CREATE TABLE public.email_attachments (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  message_id uuid REFERENCES public.email_messages(id) ON DELETE CASCADE,
-  user_id uuid REFERENCES public.profiles(id),
-  filename text NOT NULL,
-  mime_type text,
-  size_bytes integer,
-  gmail_attachment_id text,
-  storage_path text,
-  created_at timestamptz DEFAULT now()
-);
-```
-
-### 4b. Backend: Extract attachments during sync
-Update `email-fetch` to detect attachment parts in Gmail payload and store metadata in `email_attachments`. Download on-demand via a new endpoint or lazy-load from Gmail API.
-
-### 4c. Frontend: Display attachment chips
-Show small clickable buttons/chips below each message bubble with filename and file icon. Clicking downloads the attachment.
-
-### 4d. Send attachments
-Update `InboxComposeInput` to support file upload (via a Paperclip button). Encode as base64 multipart MIME in `email-send`. Store sent attachments in the `email_attachments` table.
+**File:** `src/pages/Work.tsx`
 
 ---
 
-## 5. Reply / Reply All / Forward Actions
-Add a dropdown or button group per message with:
-- **Reply** (current behavior, to sender only)
-- **Reply All** (includes all To + CC recipients)
-- **Forward** (opens compose with body prefilled)
+## 3. Move "Auto/Manual Organization" Toggle to Settings
 
-Update `InboxConversation` to pass the selected reply mode to `InboxComposeInput`, which will pre-fill the To/CC fields accordingly.
+**Problem:** The auto/manual project tree mode toggle button is in the sidebar's project tree. User wants it in Settings.
 
----
+**Fix:**
+- Remove the mode toggle buttons (LayoutGrid / FolderTree icons) from `SidebarProjectTree.tsx`.
+- Read the mode from `localStorage` only (no toggle in sidebar).
+- Add a new setting card in `src/pages/Settings.tsx` under the Appearance section with a radio/button group to choose between "Automatic Organization" and "Manual Folders".
+- The setting saves to `localStorage` key `sidebar-project-tree-mode`.
 
-## 6. Link Email to Client / Project / Task
-
-### 6a. Database: New `email_entity_links` table
-```sql
-CREATE TABLE public.email_entity_links (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  email_message_id uuid REFERENCES public.email_messages(id) ON DELETE CASCADE,
-  thread_id text,
-  entity_type text NOT NULL, -- 'client', 'project', 'task'
-  entity_id uuid NOT NULL,
-  user_id uuid REFERENCES public.profiles(id),
-  created_at timestamptz DEFAULT now()
-);
-```
-
-### 6b. Frontend: Link action button
-Add a "Link" button in the conversation header or per-message menu. Opens a dialog/popover where the user can search and select a Client, Project, or Task. Show linked entities as badges in the thread header.
+**Files:** `src/components/layout/SidebarProjectTree.tsx`, `src/pages/Settings.tsx`
 
 ---
 
-## 7. Mention Email Thread in Chat
-Add email as a mentionable entity type in the Chat `MentionInput`. When a user types `@email`, show recent threads. Insert a special mention that renders as a clickable card linking to the Inbox thread.
+## 4. Match Project Tasks Tab to Global Tasks Page
+
+**Problem:** Tasks inside a project (ProjectDetail > Tasks tab) use `ProjectTasksTable` which has a different, simpler appearance than the global `TasksTableView` used on the `/work?tab=tasks` page.
+
+**Fix:**
+- Replace `ProjectTasksTable` usage in `ProjectDetail.tsx` Tasks tab with the full `TasksTableView` component, passing `projectId` as a filter prop.
+- Update `TasksTableView` to accept an optional `projectId` prop that pre-filters tasks to that project (hiding the project column when filtered).
+
+**Files:** `src/pages/ProjectDetail.tsx`, `src/components/tasks/TasksTableView.tsx`
+
+---
+
+## 5. Folders Closed by Default in Sidebar Project Tree
+
+**Problem:** Virtual folders in auto mode start open (`defaultOpen = true`).
+
+**Fix:**
+- Change `VirtualFolder` default from `defaultOpen = true` to `defaultOpen = false`.
+
+**File:** `src/components/layout/SidebarProjectTree.tsx`
 
 ---
 
 ## Implementation Order
 
-| Step | Component | Dependencies |
-|------|-----------|-------------|
-| 1 | Resizable panels | None |
-| 2 | Message bubble UI (white bg, left-align, strip sigs, images) | None |
-| 3 | Fetch sent messages | Backend change |
-| 4 | `email_attachments` table + sync + display + send | DB migration |
-| 5 | Reply/Reply All/Forward | None |
-| 6 | `email_entity_links` table + link UI | DB migration |
-| 7 | Chat email mention | Step 6 |
-
----
-
-## Files to Create/Modify
-
-**New files:**
-- None (all changes in existing components)
-
-**Modified files:**
-- `src/pages/Inbox.tsx` - ResizablePanelGroup layout
-- `src/components/inbox/InboxMessageBubble.tsx` - White bg, left-align, images, attachment chips, reply actions
-- `src/components/inbox/InboxConversation.tsx` - Remove centering, reply mode, link button
-- `src/components/inbox/InboxComposeInput.tsx` - Reply All/Forward support, file attachments
-- `src/components/inbox/InboxThreadList.tsx` - Minor adjustments
-- `src/hooks/useEmailMessages.ts` - Add attachment types, entity link types
-- `supabase/functions/email-fetch/index.ts` - Fetch SENT, extract attachments
-- `supabase/functions/email-send/index.ts` - Multipart MIME for attachments
-- `src/components/chat/MentionInput.tsx` - Email mention type
-
-**New migrations:**
-- `email_attachments` table with RLS
-- `email_entity_links` table with RLS
+| Step | Change | File(s) |
+|------|--------|---------|
+| 1 | Remove tabs UI from Work page, use query param routing | `Work.tsx` |
+| 2 | (Covered by step 1) | `Work.tsx` |
+| 3 | Remove toggle from sidebar, add to Settings | `SidebarProjectTree.tsx`, `Settings.tsx` |
+| 4 | Use TasksTableView in ProjectDetail with projectId filter | `ProjectDetail.tsx`, `TasksTableView.tsx` |
+| 5 | Set defaultOpen=false for VirtualFolder | `SidebarProjectTree.tsx` |
 

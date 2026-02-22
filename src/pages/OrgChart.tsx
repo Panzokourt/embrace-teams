@@ -479,8 +479,8 @@ export default function OrgChartPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Network className="h-5 w-5 text-primary" />
+            <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center">
+              <Network className="h-5 w-5 text-foreground" />
             </div>
             Οργανόγραμμα
           </h1>
@@ -528,7 +528,7 @@ export default function OrgChartPage() {
         <CardContent className="p-8">
           {loading ? (
             <div className="flex items-center justify-center py-20">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <Loader2 className="h-8 w-8 animate-spin text-foreground" />
             </div>
           ) : tree.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">

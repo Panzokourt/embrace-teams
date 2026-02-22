@@ -110,7 +110,7 @@ function BudgetOverview({
           value={fmt(projectBudget)}
           sub={agencyFeePercentage > 0 ? `Fee: ${agencyFeePercentage}%` : undefined}
           icon={DollarSign}
-          iconClass="bg-primary/10 text-primary"
+          iconClass="bg-muted text-foreground"
         />
         <StatKPI
           label="Agency Fee"
@@ -154,7 +154,7 @@ function BudgetOverview({
           value={fmt(kpi.totalPaid - kpi.totalExpenses)}
           sub={`Περιθώριο: ${profitMargin.toFixed(1)}%`}
           icon={BarChart3}
-          iconClass="bg-primary/10 text-primary"
+          iconClass="bg-muted text-foreground"
         />
         <StatKPI
           label="Budget Αξιοποίηση"

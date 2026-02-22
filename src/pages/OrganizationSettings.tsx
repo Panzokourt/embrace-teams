@@ -148,7 +148,7 @@ export default function OrganizationSettings() {
   };
 
   if (!company) {
-    return <div className="flex items-center justify-center h-96"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+    return <div className="flex items-center justify-center h-96"><Loader2 className="h-8 w-8 animate-spin text-foreground" /></div>;
   }
 
   return (
@@ -207,7 +207,7 @@ export default function OrganizationSettings() {
             </CardHeader>
             <CardContent>
               {loading ? (
-                <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+                <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-foreground" /></div>
               ) : (
                 <Table>
                   <TableHeader>
@@ -225,7 +225,7 @@ export default function OrganizationSettings() {
                           <div className="flex items-center gap-3">
                             <Avatar className="h-8 w-8">
                               <AvatarImage src={u.avatar_url || undefined} />
-                              <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                              <AvatarFallback className="bg-muted text-foreground text-xs">
                                 {u.full_name?.charAt(0) || u.email.charAt(0).toUpperCase()}
                               </AvatarFallback>
                             </Avatar>

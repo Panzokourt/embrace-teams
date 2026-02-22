@@ -277,7 +277,7 @@ export default function ProjectDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader2 className="h-8 w-8 animate-spin text-foreground" />
       </div>
     );
   }
@@ -313,7 +313,7 @@ export default function ProjectDetailPage() {
       negotiation: { className: 'bg-orange-500/10 text-orange-500 border-orange-500/20', label: 'Διαπραγμάτευση' },
       won: { className: 'bg-success/10 text-success border-success/20', label: 'Κερδήθηκε' },
       active: { className: 'bg-success/10 text-success border-success/20', label: 'Ενεργό' },
-      completed: { className: 'bg-primary/10 text-primary border-primary/20', label: 'Ολοκληρώθηκε' },
+      completed: { className: 'bg-foreground/10 text-foreground border-foreground/20', label: 'Ολοκληρώθηκε' },
       cancelled: { className: 'bg-muted text-muted-foreground', label: 'Ακυρώθηκε' },
       lost: { className: 'bg-destructive/10 text-destructive border-destructive/20', label: 'Χάθηκε' },
       tender: { className: 'bg-warning/10 text-warning border-warning/20', label: 'Διαγωνισμός' },
@@ -362,7 +362,7 @@ export default function ProjectDetailPage() {
   const getTaskStatusIcon = (status: TaskStatus) => {
     switch (status) {
       case 'completed': return <CheckCircle2 className="h-4 w-4 text-success" />;
-      case 'in_progress': return <Clock className="h-4 w-4 text-primary" />;
+      case 'in_progress': return <Clock className="h-4 w-4 text-foreground" />;
       case 'review': return <AlertCircle className="h-4 w-4 text-warning" />;
       default: return <Circle className="h-4 w-4 text-muted-foreground" />;
     }
@@ -482,8 +482,8 @@ export default function ProjectDetailPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <DollarSign className="h-5 w-5 text-primary" />
+              <div className="p-2 rounded-lg bg-muted">
+                <DollarSign className="h-5 w-5 text-foreground" />
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Budget</p>
@@ -657,10 +657,10 @@ export default function ProjectDetailPage() {
             </Card>
 
             {/* AI Analysis — compact */}
-            <Card className="border-primary/20">
+            <Card className="border-foreground/20">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-primary" />
+                  <Sparkles className="h-4 w-4 text-foreground" />
                   AI Ανάλυση
                 </CardTitle>
                 <CardDescription className="text-xs">

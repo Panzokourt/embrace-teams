@@ -192,7 +192,7 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
                       )}
                     >
                       <div className="flex items-center gap-2">
-                        <Shield className={cn("h-4 w-4", role === r ? "text-primary" : "text-muted-foreground")} />
+                        <Shield className={cn("h-4 w-4", role === r ? "text-foreground" : "text-muted-foreground")} />
                         <span className="font-medium">{ROLE_LABELS[r]}</span>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">{ROLE_DESCRIPTIONS[r]}</p>

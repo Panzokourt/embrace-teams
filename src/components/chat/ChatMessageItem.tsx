@@ -56,7 +56,7 @@ function renderContent(content: string, metadata?: Record<string, any>) {
     if (idx >= 0) {
       if (idx > lastIndex) parts.push(result.slice(lastIndex, idx));
       parts.push(
-        <span key={i} className="inline-flex items-center gap-0.5 bg-primary/15 text-primary rounded px-1 py-0.5 text-xs font-medium cursor-pointer hover:bg-primary/25" data-mention-type={m.type} data-mention-id={m.id}>
+        <span key={i} className="inline-flex items-center gap-0.5 bg-foreground/15 text-foreground rounded px-1 py-0.5 text-xs font-medium cursor-pointer hover:bg-foreground/25" data-mention-type={m.type} data-mention-id={m.id}>
           @{m.name}
         </span>
       );
@@ -126,7 +126,7 @@ export default function ChatMessageItem({
       className={cn(
         "group flex gap-2 px-3 py-1.5 transition-colors hover:bg-muted/20 relative",
         compact && "px-2 py-1",
-        message.is_pinned && "bg-primary/5 border-l-2 border-primary"
+        message.is_pinned && "bg-muted/30 border-l-2 border-foreground"
       )}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
@@ -213,7 +213,7 @@ export default function ChatMessageItem({
                 className={cn(
                   "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs border transition-colors",
                   users.includes(user?.id || '')
-                    ? "border-primary/40 bg-primary/10"
+                    ? "border-foreground/40 bg-foreground/10"
                     : "border-border/40 hover:bg-muted/40"
                 )}
               >

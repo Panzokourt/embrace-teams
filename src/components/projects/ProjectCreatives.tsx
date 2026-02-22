@@ -114,7 +114,7 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   client_review: { label: 'Πελάτης Review', className: 'bg-orange-500/10 text-orange-600 border-orange-500/20' },
   approved: { label: 'Εγκρίθηκε', className: 'bg-success/10 text-success border-success/20' },
   rejected: { label: 'Απορρίφθηκε', className: 'bg-destructive/10 text-destructive border-destructive/20' },
-  active: { label: 'Ενεργό', className: 'bg-primary/10 text-primary border-primary/20' },
+  active: { label: 'Ενεργό', className: 'bg-foreground/10 text-foreground border-foreground/20' },
   archived: { label: 'Αρχείο', className: 'bg-muted/50 text-muted-foreground border-border' },
 };
 
@@ -129,7 +129,7 @@ function isImageType(contentType: string | null): boolean {
 
 function getFileIcon(contentType: string | null) {
   if (!contentType) return <File className="h-8 w-8 text-muted-foreground" />;
-  if (contentType.startsWith('image/')) return <Image className="h-8 w-8 text-primary" />;
+  if (contentType.startsWith('image/')) return <Image className="h-8 w-8 text-foreground" />;
   if (contentType === 'application/pdf') return <FileText className="h-8 w-8 text-red-500" />;
   return <File className="h-8 w-8 text-muted-foreground" />;
 }
@@ -1079,7 +1079,7 @@ export function ProjectCreatives({
 
       {/* ── Bulk Actions Bar ─────────────────────────────────────────────────── */}
       {selectedIds.length > 0 && (
-        <div className="flex items-center gap-3 p-2.5 bg-primary/5 border border-primary/20 rounded-lg">
+        <div className="flex items-center gap-3 p-2.5 bg-muted/50 border border-foreground/20 rounded-lg">
           <span className="text-sm font-medium">{selectedIds.length} επιλεγμένα</span>
           <div className="flex items-center gap-2 ml-auto">
             <DropdownMenu>
@@ -1133,7 +1133,7 @@ export function ProjectCreatives({
               {/* Group header */}
               {groupBy !== 'none' && (
                 <button
-                  className="flex items-center gap-2 mb-3 text-sm font-medium hover:text-primary transition-colors w-full"
+                  className="flex items-center gap-2 mb-3 text-sm font-medium hover:text-foreground transition-colors w-full"
                   onClick={() => toggleGroup(groupKey)}
                 >
                   {collapsedGroups.has(groupKey) ? (

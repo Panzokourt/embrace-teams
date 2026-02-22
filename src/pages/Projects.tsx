@@ -427,7 +427,7 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
       negotiation: { className: 'bg-orange-500/10 text-orange-500 border-orange-500/20', label: 'Διαπραγμάτευση' },
       won: { className: 'bg-success/10 text-success border-success/20', label: 'Κερδήθηκε' },
       active: { className: 'bg-success/10 text-success border-success/20', label: 'Ενεργό' },
-      completed: { className: 'bg-primary/10 text-primary border-primary/20', label: 'Ολοκληρώθηκε' },
+      completed: { className: 'bg-foreground/10 text-foreground border-foreground/20', label: 'Ολοκληρώθηκε' },
       cancelled: { className: 'bg-muted text-muted-foreground', label: 'Ακυρώθηκε' },
       lost: { className: 'bg-destructive/10 text-destructive border-destructive/20', label: 'Χάθηκε' },
       tender: { className: 'bg-warning/10 text-warning border-warning/20', label: 'Διαγωνισμός' },
@@ -550,7 +550,7 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
             </p>
           )}
           <div className="flex items-center justify-between text-xs mt-3 pt-3 border-t border-border/30">
-            <span className="text-primary font-semibold">
+            <span className="text-foreground font-semibold">
               €{project.budget?.toLocaleString() || 0}
             </span>
             {project.end_date && (
@@ -604,7 +604,7 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
             )}
           </div>
           <div className="px-5 py-3 bg-secondary/30 border-t border-border/30 flex items-center justify-between text-sm">
-            <div className="flex items-center gap-1.5 text-primary font-semibold">
+            <div className="flex items-center gap-1.5 text-foreground font-semibold">
               <DollarSign className="h-4 w-4 opacity-60" />
               <span>€{project.budget?.toLocaleString() || 0}</span>
             </div>
@@ -700,8 +700,8 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
         {!embedded && (
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-3">
-              <span className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                <FolderKanban className="h-5 w-5 text-primary" />
+              <span className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center">
+                <FolderKanban className="h-5 w-5 text-foreground" />
               </span>
               Έργα
             </h1>
@@ -1052,7 +1052,7 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
       {/* Projects Grid/Table */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-16">
-          <Loader2 className="h-8 w-8 animate-spin text-primary/60" />
+          <Loader2 className="h-8 w-8 animate-spin text-foreground/60" />
           <p className="text-sm text-muted-foreground mt-3">Φόρτωση...</p>
         </div>
       ) : filteredProjects.length === 0 ? (

@@ -82,7 +82,7 @@ export function EmailAccountSetup() {
           <Mail className="h-5 w-5" />
           <CardTitle>Email / Inbox</CardTitle>
           {account && (
-            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+            <Badge variant="outline" className="bg-success/10 text-success border-success/20">
               <CheckCircle2 className="h-3 w-3 mr-1" />
               Συνδεδεμένο
             </Badge>
@@ -97,7 +97,7 @@ export function EmailAccountSetup() {
           <>
             <div className="rounded-lg bg-muted/50 p-4 space-y-2">
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-primary" />
+                <CheckCircle2 className="h-5 w-5 text-success" />
                 <span className="font-medium">{account.email_address}</span>
               </div>
               {account.display_name && (

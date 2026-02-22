@@ -84,13 +84,13 @@ interface UserProfile {
 
 const ROLE_CONFIG: Record<AppRole, { label: string; icon: React.ReactNode; className: string }> = {
   admin: { label: 'Admin', icon: <Shield className="h-3 w-3" />, className: 'bg-destructive/10 text-destructive border-destructive/20' },
-  manager: { label: 'Manager', icon: <Briefcase className="h-3 w-3" />, className: 'bg-primary/10 text-primary border-primary/20' },
+  manager: { label: 'Manager', icon: <Briefcase className="h-3 w-3" />, className: 'bg-foreground/10 text-foreground border-foreground/20' },
   employee: { label: 'Employee', icon: <Users className="h-3 w-3" />, className: 'bg-secondary text-secondary-foreground border-border' },
   client: { label: 'Client', icon: <Users className="h-3 w-3" />, className: 'bg-success/10 text-success border-success/20' },
 };
 
 const STATUS_CONFIG: Record<UserStatus, { label: string; icon: React.ReactNode; className: string }> = {
-  invited: { label: 'Προσκλήθηκε', icon: <UserPlus className="h-3 w-3" />, className: 'bg-primary/10 text-primary border-primary/20' },
+  invited: { label: 'Προσκλήθηκε', icon: <UserPlus className="h-3 w-3" />, className: 'bg-foreground/10 text-foreground border-foreground/20' },
   pending: { label: 'Αναμονή', icon: <Clock className="h-3 w-3" />, className: 'bg-warning/10 text-warning border-warning/20' },
   active: { label: 'Ενεργός', icon: <CheckCircle2 className="h-3 w-3" />, className: 'bg-success/10 text-success border-success/20' },
   suspended: { label: 'Ανεσταλμένος', icon: <Ban className="h-3 w-3" />, className: 'bg-destructive/10 text-destructive border-destructive/20' },
@@ -382,8 +382,8 @@ export default function UsersPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Users className="h-6 w-6 text-primary" />
+              <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center">
+                <Users className="h-6 w-6 text-foreground" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{users.length}</p>
@@ -470,7 +470,7 @@ export default function UsersPage() {
         <CardContent>
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <Loader2 className="h-8 w-8 animate-spin text-foreground" />
             </div>
           ) : filteredUsers.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">

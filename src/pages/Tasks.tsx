@@ -105,7 +105,7 @@ const statusConfig: Record<TaskStatus, { icon: React.ReactNode; label: string; c
   completed: { icon: <CheckCircle2 className="h-4 w-4" />, label: 'Ολοκληρώθηκε', className: 'bg-success/10 text-success border-success/20' },
 };
 
-export default function TasksPage({ embedded = false }: { embedded?: boolean }) {
+export default function TasksPage({ embedded = false, projectId }: { embedded?: boolean; projectId?: string }) {
   const navigate = useNavigate();
   const { isAdmin, isManager } = useAuth();
   const { logCreate, logUpdate, logDelete, logStatusChange } = useActivityLogger();
@@ -149,7 +149,7 @@ export default function TasksPage({ embedded = false }: { embedded?: boolean }) 
 
   const fetchTasks = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('tasks')
         .select(`
           *,
@@ -157,6 +157,11 @@ export default function TasksPage({ embedded = false }: { embedded?: boolean }) 
         `)
         .order('due_date', { ascending: true, nullsFirst: false });
 
+      if (projectId) {
+        query = query.eq('project_id', projectId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       
       // Fetch assignee names separately
@@ -179,7 +184,7 @@ export default function TasksPage({ embedded = false }: { embedded?: boolean }) 
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [projectId]);
 
   const fetchProjects = async () => {
     try {
@@ -695,7 +700,7 @@ export default function TasksPage({ embedded = false }: { embedded?: boolean }) 
       onCreateSubtask={handleCreateSubtask}
       onBulkUpdate={handleBulkUpdate}
       canManage={canManage}
-      showProject={true}
+      showProject={!projectId}
     />
   );
 

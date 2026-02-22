@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ProjectDeliverablesTable } from '@/components/projects/ProjectDeliverablesTable';
-import { ProjectTasksTable } from '@/components/projects/ProjectTasksTable';
+import TasksPage from '@/pages/Tasks';
 import { ProjectFinancialsHub } from '@/components/projects/ProjectFinancialsHub';
 import { ProjectCreatives } from '@/components/projects/ProjectCreatives';
 import { ProjectMediaPlan } from '@/components/projects/ProjectMediaPlan';
@@ -719,7 +719,7 @@ export default function ProjectDetailPage() {
 
         {/* Tasks Tab */}
         <TabsContent value="tasks">
-          <ProjectTasksTable projectId={project.id} />
+          <TasksPage embedded projectId={project.id} />
         </TabsContent>
 
         {/* Timeline Tab */}

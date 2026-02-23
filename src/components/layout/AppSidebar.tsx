@@ -51,6 +51,7 @@ import {
   BookUser,
   Briefcase,
   Mail,
+  Trophy,
 } from 'lucide-react';
 import { briefDefinitions, getBriefDefinition } from '@/components/blueprints/briefDefinitions';
 import { BriefFormDialog } from '@/components/blueprints/BriefFormDialog';
@@ -89,6 +90,7 @@ const bottomNavItems: NavItem[] = [
   { title: 'HR', href: '/hr', icon: UserCog },
   { title: 'Λογιστήριο', href: '/financials', icon: DollarSign, permission: 'financials.view' },
   { title: 'Αναφορές', href: '/reports', icon: BarChart3, permission: 'financials.view' },
+  { title: 'Leaderboard', href: '/leaderboard', icon: Trophy },
 ];
 
 

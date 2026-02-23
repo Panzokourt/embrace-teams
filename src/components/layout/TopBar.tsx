@@ -8,6 +8,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import WorkDayClock from '@/components/topbar/WorkDayClock';
 import { useFocusMode } from '@/contexts/FocusContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { XPBadge } from '@/components/gamification/XPBadge';
 
 interface SearchResult {
   id: string;
@@ -31,6 +33,7 @@ interface TopBarProps {
 export default function TopBar({ onPanelToggle, rightPanelOpen }: TopBarProps) {
   const navigate = useNavigate();
   const { enterFocus } = useFocusMode();
+  const { user } = useAuth();
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -146,8 +149,9 @@ export default function TopBar({ onPanelToggle, rightPanelOpen }: TopBarProps) {
         </Popover>
       </div>
 
-      {/* Focus + Panel toggle */}
-      <div className="px-1 flex items-center gap-1">
+      {/* XP Badge + Focus + Panel toggle */}
+      <div className="px-1 flex items-center gap-1.5">
+        <XPBadge userId={user?.id} size="sm" showXP />
         <Button
           variant="ghost"
           size="sm"

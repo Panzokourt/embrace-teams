@@ -1,63 +1,123 @@
 
 
-# My Work -- Backlog Panel, XP Display & XP Bug Fix
+# Sidebar Icon Rail -- Two-Column Navigation
 
 ## Summary
 
-Three changes: (1) Add a Backlog panel next to "Tasks Today" showing all unscheduled/future tasks that can be dragged into Today, (2) Add XP/Level display in the My Work header, (3) Fix the bug where completing tasks doesn't award XP.
+Add a narrow icon rail (dark strip) on the left side of the existing sidebar. Each icon represents a category. Clicking a category reveals the corresponding navigation items in the adjacent panel (the existing sidebar area). This eliminates scrolling and organizes navigation into logical groups.
 
 ---
 
-## 1. Fix XP Not Awarded on Task Completion (Bug Fix)
+## Category Structure
 
-**Problem:** In `src/pages/MyWork.tsx`, the functions `toggleTaskComplete` (line 621) and `approveTask` (line 626) update the task status to "completed" but never call `awardTaskXP`. Only the Focus Mode control bar (`FocusControlBar.tsx`) awards XP.
+The icon rail will contain these category icons (top to bottom):
 
-**Fix:** 
-- Import `useXPEngine` in MyWork
-- In `toggleTaskComplete`: after successful DB update, call `awardTaskXP(user.id, task.id, task.due_date)`
-- In `approveTask`: same treatment when status becomes "completed"
-- In `approveInternalReview`: when `newStatus === 'completed'`, also award XP
+| Icon | Category ID | Label | Contains |
+|------|-------------|-------|----------|
+| LayoutDashboard | home | Αρχική | My Work, Dashboard |
+| Briefcase | work | Εργασίες | Projects, Tasks, Calendar (with Project Tree) |
+| MessageSquare | comms | Επικοινωνία | Inbox, Chat |
+| FileArchive | files | Αρχείο | Files |
+| Timer | time | Χρόνος | Timesheets |
+| Users | people | Ομάδα | Contacts, HR, Leaderboard |
+| DollarSign | finance | Οικονομικά | Financials, Reports |
+| Settings | admin | Διαχείριση | Clients, Blueprints, Settings |
 
-## 2. XP/Level Display in My Work Header
-
-Add the `LevelProgressBar` component (already built) in the header area, right after the greeting or in the KPI strip. Specifically:
-- Add a 5th KPI card (or replace/extend the header) showing the user's Level, XP badge, and a small progress bar to the next level
-- Use the existing `useUserXP` hook and `XPBadge` / `LevelProgressBar` components
-
-**Implementation:** Add an XP KPI card in the grid (making it 5 columns on large screens, or placing it inline in the header next to the greeting).
-
-## 3. Backlog Panel with Drag-and-Drop to Today
-
-**Concept:** A collapsible "Backlog" section next to "Tasks Today" showing all tasks assigned to the user that have no due_date or have a due_date far in the future (not in today/week/upcoming). Users can drag tasks from Backlog into the Today list, which automatically sets `due_date` to today.
-
-**Data:** 
-- In `fetchAll`, add a new query for backlog tasks: tasks assigned to user, not completed, where `due_date IS NULL`
-- Store in `backlogTasks` state
-
-**UI Layout:**
-- Change the "Tasks Today" section into a 2-column layout on desktop: left = Today tasks (existing), right = Backlog panel
-- Both columns are `DndContext` droppable zones
-- Use `@dnd-kit/core` `DndContext` with `onDragEnd` that detects cross-container drops
-- When a task is dragged from Backlog to Today: update `due_date = today` in DB, move it to todayTasks state
-- When a task is dragged from Today to Backlog: set `due_date = null`, move to backlog
-
-**Implementation approach:**
-- Wrap both Today and Backlog in a single `DndContext`
-- Use `useDroppable` for each container (id: "today" and "backlog")
-- Each task row uses `useSortable` (already does)
-- On `onDragEnd`: check if `over.id` is in the other container; if so, update DB and move task between states
+The active category is determined either by: (a) user click, or (b) auto-detected from current route. The selected category icon gets a highlight (bg-accent or pill indicator).
 
 ---
 
-## Files Modified
+## Layout Change
+
+```text
+BEFORE:
++------------------+
+| Logo + Collapse  |
+| Nav Item 1       |
+| Nav Item 2       |
+| ...scroll...     |
+| Nav Item N       |
+| Secretary / New  |
+| User Menu        |
++------------------+
+
+AFTER:
++----+-------------+
+|Icon| Logo        |
+|    |             |
+| H  | My Work     |
+| W  | Dashboard   |
+| C  |             |
+| F  |             |
+| T  |             |
+| P  |             |
+| $  |             |
+|    | Secretary   |
+| S  | New...      |
+|    | Theme       |
+|User| User Menu   |
++----+-------------+
+```
+
+The icon rail is ~48px wide with a slightly darker background. The right panel shows only the items for the selected category -- no scrolling needed.
+
+When the sidebar is **collapsed**, only the icon rail is visible (same as current collapsed behavior but now with category icons instead of all nav icons). When a category is clicked in collapsed mode, the sidebar expands to show that category's items.
+
+---
+
+## Behavior Details
+
+- **Active category auto-detection**: Based on current route, the matching category highlights automatically (e.g., `/inbox` highlights "comms")
+- **Persist selected category**: Store in state (not localStorage -- ephemeral, auto-detected is enough)
+- **Collapsed mode**: Only the icon rail shows. Clicking an icon expands sidebar and selects that category
+- **Mobile**: Keep current Sheet behavior but add the icon rail inside the sheet
+- **Bottom items on rail**: Logo at top, Settings icon at bottom of rail, user avatar at very bottom
+
+---
+
+## Technical Details
+
+### Modified Files
 
 | File | Changes |
 |------|---------|
-| `src/pages/MyWork.tsx` | Add `useXPEngine` import and calls in completion functions; add `useUserXP` for header XP display; add backlog state + fetch; restructure Today section as 2-column with Backlog; handle cross-container drag |
+| `src/components/layout/AppSidebar.tsx` | Major refactor: add category definitions, icon rail component, category-based filtering of nav items, auto-detection logic |
 
-## Technical Notes
+### Implementation in AppSidebar.tsx
 
-- No database changes needed
-- No new files needed -- all components (`XPBadge`, `LevelProgressBar`, `useXPEngine`, `useUserXP`) already exist
-- The backlog query filters for `due_date IS NULL` tasks assigned to the user
-- Cross-container DnD uses `@dnd-kit/core`'s collision detection to identify the target container
+1. **Define categories array** mapping category IDs to icons, labels, route prefixes (for auto-detect), and which nav items belong to each
+
+2. **Add `activeCategory` state** initialized by route detection
+
+3. **Add `IconRail` component** rendered as a narrow flex column on the left of the sidebar content:
+   - Logo icon at top
+   - Category icons in the middle (with tooltip on hover showing category name)
+   - Theme toggle icon and user avatar at bottom
+   - Active category gets a pill/highlight indicator
+
+4. **Filter displayed nav items** based on `activeCategory` -- only render the items belonging to the selected category in the right panel
+
+5. **Wrap sidebar content** in a horizontal flex: `flex flex-row` with icon rail on left and existing content panel on right
+
+6. **Collapsed behavior**: When collapsed, only the icon rail is visible (width ~48px). The category panel hides. Clicking a category icon expands the sidebar.
+
+### Route-to-Category Mapping
+
+```text
+/my-work, /         -> home
+/work, /projects/*, /tasks/* -> work
+/inbox, /chat       -> comms
+/files              -> files
+/timesheets         -> time
+/contacts, /hr, /leaderboard -> people
+/financials, /reports -> finance
+/clients, /blueprints, /settings -> admin
+```
+
+### Visual Design
+
+- Icon rail background: `bg-sidebar` or slightly darker than sidebar (`bg-card/80` with a subtle right border)
+- Active category: small rounded pill behind icon (`bg-accent`) or a left border indicator
+- Icons: 20px, `text-muted-foreground`, active = `text-foreground`
+- Tooltip on hover for each category icon (using existing Tooltip component)
+- Smooth transition when switching categories

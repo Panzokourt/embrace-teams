@@ -9,6 +9,8 @@ import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { XPBadge } from '@/components/gamification/XPBadge';
+import { KudosDialog } from '@/components/gamification/KudosDialog';
 
 interface EmployeeHeaderProps {
   user: {
@@ -174,6 +176,7 @@ export function EmployeeHeader({ user, departmentName, roleName, canEdit = false
                 {statusLabels[user.status] || user.status}
               </Badge>
               {roleName && <Badge variant="outline">{roleName}</Badge>}
+              <XPBadge userId={user.id} size="md" />
             </div>
             <div className="flex items-center gap-4 flex-wrap text-sm text-muted-foreground">
               {renderEditable('job_title', user.job_title, user.job_title || 'Προσθήκη θέσης', <Briefcase className="h-3.5 w-3.5" />)}
@@ -197,10 +200,13 @@ export function EmployeeHeader({ user, departmentName, roleName, canEdit = false
               )}
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => navigate('/hr')}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Επιστροφή
-          </Button>
+          <div className="flex items-center gap-2">
+            <KudosDialog recipientId={user.id} recipientName={user.full_name || 'Χρήστης'} />
+            <Button variant="outline" size="sm" onClick={() => navigate('/hr')}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Επιστροφή
+            </Button>
+          </div>
         </div>
       </div>
     </div>

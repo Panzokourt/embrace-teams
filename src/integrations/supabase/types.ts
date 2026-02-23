@@ -2930,6 +2930,41 @@ export type Database = {
           },
         ]
       }
+      skill_tags: {
+        Row: {
+          color: string | null
+          company_id: string
+          created_at: string
+          icon: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          color?: string | null
+          company_id: string
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          color?: string | null
+          company_id?: string
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "skill_tags_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_templates: {
         Row: {
           assigned_role: string | null
@@ -3690,6 +3725,118 @@ export type Database = {
         }
         Relationships: []
       }
+      user_xp: {
+        Row: {
+          company_id: string
+          created_at: string
+          given_by: string | null
+          id: string
+          points: number
+          reason: string
+          skill_tag: string | null
+          source_entity_id: string | null
+          source_type: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          given_by?: string | null
+          id?: string
+          points?: number
+          reason: string
+          skill_tag?: string | null
+          source_entity_id?: string | null
+          source_type?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          given_by?: string | null
+          id?: string
+          points?: number
+          reason?: string
+          skill_tag?: string | null
+          source_entity_id?: string | null
+          source_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_xp_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_xp_given_by_fkey"
+            columns: ["given_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_xp_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_xp_summary: {
+        Row: {
+          company_id: string
+          id: string
+          kudos_received: number
+          level: number
+          on_time_streak: number
+          tasks_completed: number
+          total_xp: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          id?: string
+          kudos_received?: number
+          level?: number
+          on_time_streak?: number
+          tasks_completed?: number
+          total_xp?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          id?: string
+          kudos_received?: number
+          level?: number
+          on_time_streak?: number
+          tasks_completed?: number
+          total_xp?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_xp_summary_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_xp_summary_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       work_day_logs: {
         Row: {
           actual_minutes: number
@@ -3930,6 +4077,19 @@ export type Database = {
         Returns: Json
       }
       auto_onboard_user: { Args: never; Returns: Json }
+      award_xp: {
+        Args: {
+          p_company_id: string
+          p_given_by?: string
+          p_points: number
+          p_reason: string
+          p_skill_tag?: string
+          p_source_entity_id?: string
+          p_source_type?: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
       create_company_with_owner: {
         Args: { _domain: string; _name: string }
         Returns: string

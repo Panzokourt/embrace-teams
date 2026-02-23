@@ -4,6 +4,8 @@ import { useFocusMode } from '@/contexts/FocusContext';
 import { useTimeTracking } from '@/hooks/useTimeTracking';
 import FocusSuccessAnimation from './FocusSuccessAnimation';
 import { supabase } from '@/integrations/supabase/client';
+import { useXPEngine } from '@/hooks/useXPEngine';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from '@/components/ui/dropdown-menu';
@@ -23,6 +25,8 @@ export default function FocusControlBar() {
     sessionStartTime, startSession, skipToNext, completeCurrentTask, upNextTasks,
   } = useFocusMode();
   const { activeTimer, startTimer, stopTimer, elapsed, formatElapsed } = useTimeTracking();
+  const { awardTaskXP } = useXPEngine();
+  const { user } = useAuth();
 
   const [showSuccess, setShowSuccess] = useState(false);
   const [pomodoroElapsed, setPomodoroElapsed] = useState(0);
@@ -72,7 +76,9 @@ export default function FocusControlBar() {
     // Update in DB
     await supabase.from('tasks').update({ status: newStatus as any }).eq('id', currentTask.id);
 
-    if (newStatus === 'completed') {
+    // Award XP on completion
+    if (newStatus === 'completed' && user?.id) {
+      awardTaskXP(user.id, currentTask.id, currentTask.due_date);
       setShowSuccess(true);
     } else {
       // Just update local state and move on

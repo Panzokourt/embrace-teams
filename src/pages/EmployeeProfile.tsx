@@ -14,6 +14,9 @@ import { LeaveRequestsList } from '@/components/hr/LeaveRequestsList';
 import { HRDocuments } from '@/components/hr/HRDocuments';
 import { useLeaveManagement } from '@/hooks/useLeaveManagement';
 import { toast } from 'sonner';
+import { LevelProgressBar } from '@/components/gamification/LevelProgressBar';
+import { SkillRadar } from '@/components/gamification/SkillRadar';
+import { XPActivityFeed } from '@/components/gamification/XPActivityFeed';
 
 interface UserData {
   id: string;
@@ -139,6 +142,7 @@ export default function EmployeeProfile() {
           <TabsTrigger value="timesheets">Timesheets</TabsTrigger>
           <TabsTrigger value="leaves">Άδειες</TabsTrigger>
           <TabsTrigger value="documents">Έγγραφα</TabsTrigger>
+          <TabsTrigger value="gamification">🏆 Score</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
 
@@ -255,6 +259,16 @@ export default function EmployeeProfile() {
 
         <TabsContent value="documents">
           <HRDocuments userId={id!} />
+        </TabsContent>
+
+        <TabsContent value="gamification">
+          <div className="space-y-6">
+            <LevelProgressBar userId={id} />
+            <div className="grid gap-6 lg:grid-cols-2">
+              <SkillRadar userId={id!} />
+              <XPActivityFeed userId={id!} />
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="activity">

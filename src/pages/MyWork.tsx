@@ -4,6 +4,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useTimeTracking } from '@/hooks/useTimeTracking';
 import { useLeaveManagement } from '@/hooks/useLeaveManagement';
+import { useXPEngine } from '@/hooks/useXPEngine';
+import { useUserXP } from '@/hooks/useUserXP';
+import { XPBadge } from '@/components/gamification/XPBadge';
+import { LevelProgressBar } from '@/components/gamification/LevelProgressBar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,11 +19,12 @@ import { briefDefinitions } from '@/components/blueprints/briefDefinitions';
 import { BriefFormDialog } from '@/components/blueprints/BriefFormDialog';
 import { getBriefDefinition } from '@/components/blueprints/briefDefinitions';
 import {
-  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
+  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragOverlay, rectIntersection,
 } from '@dnd-kit/core';
 import {
   arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable,
 } from '@dnd-kit/sortable';
+import { useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import {
   CheckSquare, Clock, AlertTriangle, Play, Square, ArrowRight,
@@ -27,7 +32,7 @@ import {
   ChevronRight, Palmtree, Check, X, GripVertical, ExternalLink,
   Palette, Monitor, Globe, Calendar, MessageSquare, BarChart3,
   FileArchive, Bot, Send, Loader2, Minimize2, Maximize2, Flag,
-  ChevronDown, Crosshair,
+  ChevronDown, Crosshair, Inbox, Zap,
 } from 'lucide-react';
 import { format, isBefore, startOfDay, endOfWeek, startOfTomorrow, isAfter } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -198,6 +203,55 @@ function SortableTaskRow({
         <FlagButton task={task} onToggle={onFlagToggle} />
       </td>
     </tr>
+  );
+}
+
+// ── Backlog Task Row (simpler, draggable) ──────────
+function BacklogTaskRow({
+  task, today, onComplete, onOpenSheet, activeTimer, startTimer, stopTimer, onFlagToggle,
+}: {
+  task: TaskWithProject; today: Date; onComplete: (t: TaskWithProject) => void;
+  onOpenSheet: (t: TaskWithProject) => void; activeTimer: any; startTimer: any; stopTimer: any;
+  onFlagToggle: (task: TaskWithProject) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-2 px-3 py-2.5 border-b border-border/50 hover:bg-muted/30 transition-colors ${isDragging ? 'opacity-50 z-50' : ''}`}
+    >
+      <button {...attributes} {...listeners} className="cursor-grab touch-none text-muted-foreground hover:text-foreground shrink-0">
+        <GripVertical className="h-4 w-4" />
+      </button>
+      <Checkbox className="h-4 w-4 shrink-0" onCheckedChange={() => onComplete(task)} />
+      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onOpenSheet(task)}>
+        <p className="text-sm font-medium text-foreground hover:text-primary truncate">{task.title}</p>
+        <p className="text-xs text-muted-foreground truncate">{(task.project as any)?.name || '-'}</p>
+      </div>
+      <Badge variant={getPriorityColor(task.priority)} className="text-[10px] shrink-0 hidden sm:flex">{task.priority}</Badge>
+      {!activeTimer?.is_running || activeTimer.task_id !== task.id ? (
+        <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-primary shrink-0" onClick={() => startTimer(task.id, task.project_id)}>
+          <Play className="h-3.5 w-3.5" />
+        </Button>
+      ) : (
+        <Button size="icon" variant="ghost" className="h-7 w-7 text-primary shrink-0" onClick={() => stopTimer()}>
+          <Square className="h-3.5 w-3.5" />
+        </Button>
+      )}
+    </div>
+  );
+}
+
+// ── Droppable Container ────────────────────────────
+function DroppableContainer({ id, children, className }: { id: string; children: React.ReactNode; className?: string }) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div ref={setNodeRef} className={`min-h-[100px] transition-colors rounded-lg ${isOver ? 'bg-primary/5 ring-2 ring-primary/20' : ''} ${className || ''}`}>
+      {children}
+    </div>
   );
 }
 
@@ -488,18 +542,21 @@ export default function MyWork() {
   const { enterFocus } = useFocusMode();
   const { activeTimer, elapsed, formatElapsed, startTimer, stopTimer } = useTimeTracking();
   const { balances, pendingApprovals, approveRequest, rejectRequest } = useLeaveManagement();
+  const { awardTaskXP } = useXPEngine();
 
   const [todayTasks, setTodayTasks] = useState<TaskWithProject[]>([]);
   const [weekTasks, setWeekTasks] = useState<TaskWithProject[]>([]);
   const [upcomingTasks, setUpcomingTasks] = useState<TaskWithProject[]>([]);
-  const [approvalTasks, setApprovalTasks] = useState<TaskWithProject[]>([]); // client_review (approver)
-  const [internalReviewTasks, setInternalReviewTasks] = useState<TaskWithProject[]>([]); // internal_review
+  const [backlogTasks, setBacklogTasks] = useState<TaskWithProject[]>([]);
+  const [approvalTasks, setApprovalTasks] = useState<TaskWithProject[]>([]);
+  const [internalReviewTasks, setInternalReviewTasks] = useState<TaskWithProject[]>([]);
   const [myProjects, setMyProjects] = useState<MyProject[]>([]);
   const [todayHours, setTodayHours] = useState(0);
   const [loading, setLoading] = useState(true);
   const [orderedIds, setOrderedIds] = useState<string[]>([]);
   const [selectedTask, setSelectedTask] = useState<TaskWithProject | null>(null);
   const [selectedBriefType, setSelectedBriefType] = useState<string | null>(null);
+  const [backlogOpen, setBacklogOpen] = useState(true);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -584,9 +641,13 @@ export default function MyWork() {
       return isAfter(dd, startOfDay(new Date(weekEnd)));
     });
 
+    // Backlog: tasks with no due_date
+    const backlogFiltered = allTasks.filter(t => !t.due_date && !todayIds.has(t.id));
+
     setTodayTasks(todayFiltered);
     setWeekTasks(weekFiltered);
     setUpcomingTasks(upcomingFiltered.slice(0, 20));
+    setBacklogTasks(backlogFiltered);
 
     const activeProjects = (projects.data || []).map((p: any) => p.project).filter((p: any) => p && p.status === 'active') as MyProject[];
     setMyProjects(activeProjects);
@@ -620,20 +681,33 @@ export default function MyWork() {
 
   async function toggleTaskComplete(task: TaskWithProject) {
     const { error } = await supabase.from('tasks').update({ status: 'completed' }).eq('id', task.id);
-    if (!error) { toast.success('Task ολοκληρώθηκε!'); fetchAll(); }
+    if (!error) {
+      toast.success('Task ολοκληρώθηκε!');
+      // Award XP for task completion
+      if (user) await awardTaskXP(user.id, task.id, task.due_date);
+      fetchAll();
+    }
   }
 
   async function approveTask(task: TaskWithProject) {
-    // Internal review: approve → client_review (if approver) or completed
     const { error } = await supabase.from('tasks').update({ status: 'completed' as any }).eq('id', task.id);
-    if (!error) { toast.success('Task εγκρίθηκε!'); fetchAll(); }
+    if (!error) {
+      toast.success('Task εγκρίθηκε!');
+      // Award XP — task is now completed
+      if (task.assigned_to) await awardTaskXP(task.assigned_to, task.id, task.due_date);
+      fetchAll();
+    }
   }
 
   async function approveInternalReview(task: TaskWithProject) {
-    // If task has an approver, go to client_review; otherwise completed
     const newStatus = task.approver ? 'client_review' : 'completed';
     const { error } = await supabase.from('tasks').update({ status: newStatus as any }).eq('id', task.id);
-    if (!error) { toast.success(newStatus === 'client_review' ? 'Προχωρά σε Έγκριση Πελάτη!' : 'Task εγκρίθηκε!'); fetchAll(); }
+    if (!error) {
+      toast.success(newStatus === 'client_review' ? 'Προχωρά σε Έγκριση Πελάτη!' : 'Task εγκρίθηκε!');
+      // Award XP if completed
+      if (newStatus === 'completed' && task.assigned_to) await awardTaskXP(task.assigned_to, task.id, task.due_date);
+      fetchAll();
+    }
   }
 
   async function rejectInternalReview(task: TaskWithProject) {
@@ -655,16 +729,66 @@ export default function MyWork() {
     }
   }
 
+  // Unified drag handler for Today reorder + cross-container Backlog↔Today
   function handleDragEnd(event: any) {
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    setOrderedIds(prev => {
-      const oldIdx = prev.indexOf(active.id);
-      const newIdx = prev.indexOf(over.id);
-      const newOrder = arrayMove(prev, oldIdx, newIdx);
-      if (user) localStorage.setItem(getOrderKey(user.id), JSON.stringify(newOrder));
-      return newOrder;
-    });
+    if (!active || !over) return;
+
+    const activeId = active.id as string;
+    const overId = over.id as string;
+
+    const isActiveInToday = orderedIds.includes(activeId);
+    const isActiveInBacklog = backlogTasks.some(t => t.id === activeId);
+
+    // Check if dropping onto a container
+    const isOverTodayContainer = overId === 'today-drop';
+    const isOverBacklogContainer = overId === 'backlog-drop';
+    const isOverInToday = orderedIds.includes(overId) || isOverTodayContainer;
+    const isOverInBacklog = backlogTasks.some(t => t.id === overId) || isOverBacklogContainer;
+
+    // Cross-container: Backlog → Today
+    if (isActiveInBacklog && isOverInToday) {
+      const task = backlogTasks.find(t => t.id === activeId);
+      if (!task) return;
+      const todayISO = format(new Date(), 'yyyy-MM-dd');
+      // Optimistic update
+      setBacklogTasks(prev => prev.filter(t => t.id !== activeId));
+      setTodayTasks(prev => [...prev, { ...task, due_date: todayISO }]);
+      // DB update
+      supabase.from('tasks').update({ due_date: todayISO } as any).eq('id', activeId).then(({ error }) => {
+        if (error) { toast.error('Σφάλμα ενημέρωσης'); fetchAll(); }
+        else toast.success('Task μεταφέρθηκε στο Σήμερα!');
+      });
+      return;
+    }
+
+    // Cross-container: Today → Backlog
+    if (isActiveInToday && isOverInBacklog) {
+      const task = todayTasks.find(t => t.id === activeId);
+      if (!task) return;
+      // Optimistic update
+      setTodayTasks(prev => prev.filter(t => t.id !== activeId));
+      setOrderedIds(prev => prev.filter(id => id !== activeId));
+      setBacklogTasks(prev => [...prev, { ...task, due_date: null }]);
+      // DB update
+      supabase.from('tasks').update({ due_date: null } as any).eq('id', activeId).then(({ error }) => {
+        if (error) { toast.error('Σφάλμα ενημέρωσης'); fetchAll(); }
+        else toast.success('Task μεταφέρθηκε στο Backlog!');
+      });
+      return;
+    }
+
+    // Same container reorder (Today only)
+    if (isActiveInToday && isOverInToday && activeId !== overId && !isOverTodayContainer) {
+      setOrderedIds(prev => {
+        const oldIdx = prev.indexOf(activeId);
+        const newIdx = prev.indexOf(overId);
+        if (oldIdx === -1 || newIdx === -1) return prev;
+        const newOrder = arrayMove(prev, oldIdx, newIdx);
+        if (user) localStorage.setItem(getOrderKey(user.id), JSON.stringify(newOrder));
+        return newOrder;
+      });
+    }
   }
 
   const weekTasksByDay = useMemo(() => {
@@ -680,6 +804,8 @@ export default function MyWork() {
 
   const briefIcons: Record<string, any> = { Palette, Monitor, FileText, Globe, Calendar, MessageSquare };
   const selectedDef = selectedBriefType ? getBriefDefinition(selectedBriefType) : null;
+
+  const backlogIds = useMemo(() => backlogTasks.map(t => t.id), [backlogTasks]);
 
   if (loading) {
     return (
@@ -711,22 +837,25 @@ export default function MyWork() {
             <span className="hidden sm:inline">Focus Mode</span>
           </Button>
         </div>
-        {activeTimer && (
-          <div className="flex items-center gap-3 bg-primary/10 border border-primary/20 rounded-xl px-4 py-2.5">
-            <Timer className="h-4 w-4 text-primary animate-pulse" />
-            <div className="text-sm">
-              <span className="font-mono font-semibold text-primary">{formatElapsed(elapsed)}</span>
-              <span className="text-muted-foreground ml-2 hidden sm:inline">{activeTimer.task?.title || 'Timer'}</span>
+        <div className="flex items-center gap-3">
+          {activeTimer && (
+            <div className="flex items-center gap-3 bg-primary/10 border border-primary/20 rounded-xl px-4 py-2.5">
+              <Timer className="h-4 w-4 text-primary animate-pulse" />
+              <div className="text-sm">
+                <span className="font-mono font-semibold text-primary">{formatElapsed(elapsed)}</span>
+                <span className="text-muted-foreground ml-2 hidden sm:inline">{activeTimer.task?.title || 'Timer'}</span>
+              </div>
+              <Button size="sm" variant="ghost" className="h-7 text-destructive" onClick={() => stopTimer()}>
+                <Square className="h-3.5 w-3.5 mr-1" /> Stop
+              </Button>
             </div>
-            <Button size="sm" variant="ghost" className="h-7 text-destructive" onClick={() => stopTimer()}>
-              <Square className="h-3.5 w-3.5 mr-1" /> Stop
-            </Button>
-          </div>
-        )}
+          )}
+          <XPBadge userId={user?.id} size="md" showXP />
+        </div>
       </div>
 
-      {/* KPI Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      {/* KPI Strip + XP */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         <Card className="border-border/50">
           <CardContent className="p-4 flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center"><CheckSquare className="h-5 w-5 text-primary" /></div>
@@ -755,6 +884,12 @@ export default function MyWork() {
             <div><p className="text-2xl font-bold text-foreground">{internalReviewTasks.length + approvalTasks.length}</p><p className="text-xs text-muted-foreground">Προς Έγκριση</p></div>
           </CardContent>
         </Card>
+        {/* XP Card */}
+        <Card className="border-border/50 col-span-2 sm:col-span-1">
+          <CardContent className="p-4">
+            <LevelProgressBar userId={user?.id} />
+          </CardContent>
+        </Card>
       </div>
 
       {/* Απαιτούν Προσοχή — Unified Panel */}
@@ -777,36 +912,75 @@ export default function MyWork() {
         />
       )}
 
-      {/* Today Tasks - Drag & Drop */}
-      <Card className="border-border/50">
-        <CardHeader className="pb-3 flex flex-row items-center justify-between">
-          <CardTitle className="text-base font-semibold">Tasks Σήμερα</CardTitle>
-          <Link to="/work?tab=tasks" className="text-xs text-primary hover:underline flex items-center gap-1">Δες όλα <ArrowRight className="h-3 w-3" /></Link>
-        </CardHeader>
-        <CardContent className="p-0 overflow-x-auto">
-          {orderedTodayTasks.length === 0 ? (
-            <p className="text-sm text-muted-foreground px-6 pb-4">Κανένα task για σήμερα 🎉</p>
-          ) : (
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
-                <table className="w-full text-sm">
-                  <TaskTableHeader draggable />
-                  <tbody>
-                    {orderedTodayTasks.map(task => (
-                      <SortableTaskRow
-                        key={task.id} task={task} today={today} draggable
-                        onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
-                        activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
-                        onFlagToggle={toggleFlagPriority}
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </SortableContext>
-            </DndContext>
-          )}
-        </CardContent>
-      </Card>
+      {/* Today Tasks + Backlog - Drag & Drop */}
+      <DndContext sensors={sensors} collisionDetection={rectIntersection} onDragEnd={handleDragEnd}>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Today Tasks */}
+          <Card className="border-border/50 lg:col-span-2">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="text-base font-semibold">Tasks Σήμερα</CardTitle>
+              <Link to="/work?tab=tasks" className="text-xs text-primary hover:underline flex items-center gap-1">Δες όλα <ArrowRight className="h-3 w-3" /></Link>
+            </CardHeader>
+            <CardContent className="p-0 overflow-x-auto">
+              <DroppableContainer id="today-drop">
+                {orderedTodayTasks.length === 0 ? (
+                  <p className="text-sm text-muted-foreground px-6 py-4">Κανένα task για σήμερα 🎉</p>
+                ) : (
+                  <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
+                    <table className="w-full text-sm">
+                      <TaskTableHeader draggable />
+                      <tbody>
+                        {orderedTodayTasks.map(task => (
+                          <SortableTaskRow
+                            key={task.id} task={task} today={today} draggable
+                            onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
+                            activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
+                            onFlagToggle={toggleFlagPriority}
+                          />
+                        ))}
+                      </tbody>
+                    </table>
+                  </SortableContext>
+                )}
+              </DroppableContainer>
+            </CardContent>
+          </Card>
+
+          {/* Backlog Panel */}
+          <Card className="border-border/50 border-dashed">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <Inbox className="h-4 w-4 text-muted-foreground" />
+                Backlog
+                <Badge variant="secondary" className="text-xs ml-1">{backlogTasks.length}</Badge>
+              </CardTitle>
+              <button onClick={() => setBacklogOpen(v => !v)}>
+                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${backlogOpen ? '' : '-rotate-90'}`} />
+              </button>
+            </CardHeader>
+            {backlogOpen && (
+              <CardContent className="p-0">
+                <DroppableContainer id="backlog-drop">
+                  {backlogTasks.length === 0 ? (
+                    <p className="text-sm text-muted-foreground px-4 py-4">Κανένα task χωρίς ημερομηνία</p>
+                  ) : (
+                    <SortableContext items={backlogIds} strategy={verticalListSortingStrategy}>
+                      {backlogTasks.map(task => (
+                        <BacklogTaskRow
+                          key={task.id} task={task} today={today}
+                          onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
+                          activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
+                          onFlagToggle={toggleFlagPriority}
+                        />
+                      ))}
+                    </SortableContext>
+                  )}
+                </DroppableContainer>
+              </CardContent>
+            )}
+          </Card>
+        </div>
+      </DndContext>
 
       {/* Week Tasks */}
       {Object.keys(weekTasksByDay).length > 0 && (

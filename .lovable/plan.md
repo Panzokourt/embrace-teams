@@ -1,77 +1,107 @@
 
 
-# Sidebar Icon Rail -- Two-Column Navigation
+# Task Detail Page -- UX Restructuring
 
 ## Summary
 
-Add a narrow icon rail (dark strip) on the left side of the existing sidebar. Each icon represents a category. Clicking a category reveals the corresponding navigation items in the adjacent panel (the existing sidebar area). This eliminates scrolling and organizes navigation into logical groups.
+Complete restructure of the Task Detail page from the current vertical form layout to a modern 2-column smart layout with a sticky action bar, prioritized subtasks, and consolidated activity tabs.
 
 ---
 
-## Category Structure
-
-The icon rail will contain these category icons (top to bottom):
-
-| Icon | Category ID | Label | Contains |
-|------|-------------|-------|----------|
-| LayoutDashboard | home | Αρχική | My Work, Dashboard |
-| Briefcase | work | Εργασίες | Projects, Tasks, Calendar (with Project Tree) |
-| MessageSquare | comms | Επικοινωνία | Inbox, Chat |
-| FileArchive | files | Αρχείο | Files |
-| Timer | time | Χρόνος | Timesheets |
-| Users | people | Ομάδα | Contacts, HR, Leaderboard |
-| DollarSign | finance | Οικονομικά | Financials, Reports |
-| Settings | admin | Διαχείριση | Clients, Blueprints, Settings |
-
-The active category is determined either by: (a) user click, or (b) auto-detected from current route. The selected category icon gets a highlight (bg-accent or pill indicator).
-
----
-
-## Layout Change
+## New Layout Structure
 
 ```text
-BEFORE:
-+------------------+
-| Logo + Collapse  |
-| Nav Item 1       |
-| Nav Item 2       |
-| ...scroll...     |
-| Nav Item N       |
-| Secretary / New  |
-| User Menu        |
-+------------------+
-
-AFTER:
-+----+-------------+
-|Icon| Logo        |
-|    |             |
-| H  | My Work     |
-| W  | Dashboard   |
-| C  |             |
-| F  |             |
-| T  |             |
-| P  |             |
-| $  |             |
-|    | Secretary   |
-| S  | New...      |
-|    | Theme       |
-|User| User Menu   |
-+----+-------------+
++------------------------------------------------------------------+
+| [<] Task Title (inline edit)           [Timer] [Status▼] [Priority] [Due] [Avatar] [Actions...] |
++------------------------------------------------------------------+
+|                                        |                          |
+|  MAIN WORK AREA (70%)                  |  META PANEL (30%)        |
+|                                        |                          |
+|  A. Overview Card                      |  1. Assignment Card      |
+|  - Description (inline edit)           |     - Assignee           |
+|  - Deliverable                         |     - (future: collabs)  |
+|  - Project link                        |                          |
+|  - Tags (type, category)              |  2. Timeline Card        |
+|                                        |     - Start date         |
+|  B. Subtasks                           |     - Due date           |
+|  - Checkbox list with progress         |     - Created at         |
+|  - Add subtask inline                  |     - Estimated time     |
+|  - Auto-calculated progress bar        |     - Actual time        |
+|                                        |                          |
+|  C. Activity Tabs                      |  3. Status Flow Card     |
+|  - Discussion (default)               |     - Visual workflow     |
+|  - Files                              |     - Clickable stages   |
+|  - Time                               |                          |
+|  - Activity Log (moved from right)    |                          |
+|                                        |                          |
++------------------------------------------------------------------+
 ```
-
-The icon rail is ~48px wide with a slightly darker background. The right panel shows only the items for the selected category -- no scrolling needed.
-
-When the sidebar is **collapsed**, only the icon rail is visible (same as current collapsed behavior but now with category icons instead of all nav icons). When a category is clicked in collapsed mode, the sidebar expands to show that category's items.
 
 ---
 
-## Behavior Details
+## Detailed Changes
 
-- **Active category auto-detection**: Based on current route, the matching category highlights automatically (e.g., `/inbox` highlights "comms")
-- **Persist selected category**: Store in state (not localStorage -- ephemeral, auto-detected is enough)
-- **Collapsed mode**: Only the icon rail shows. Clicking an icon expands sidebar and selects that category
-- **Mobile**: Keep current Sheet behavior but add the icon rail inside the sheet
-- **Bottom items on rail**: Logo at top, Settings icon at bottom of rail, user avatar at very bottom
+### 1. Sticky Top Header (Action Bar)
+
+Replace the current header + status pill buttons + properties grid with a single compact horizontal bar:
+
+- **Left**: Back button, Task Title (inline editable), Timer button
+- **Right**: Status dropdown (colored badge, click to change), Priority indicator (colored dot), Due date chip, Assignee avatar, Quick action buttons (Add subtask, Attach file, Mark complete)
+- Sticky positioning (`sticky top-0 z-10 bg-background`)
+- Single horizontal row, no wrapping to 2 lines
+
+### 2. Left Column -- Main Work Area (flex-1, ~70%)
+
+**A. Overview Block (Compact summary card)**
+- Description: inline editable text area (click to edit, no separate section header needed -- just the text with a hover pencil icon)
+- Deliverable: inline select
+- Project link: clickable chip
+- Type & Category: inline tag selectors
+- All in a single compact card with subtle borders
+
+**B. Subtasks Section (Promoted -- shown before tabs)**
+- Always visible (not hidden when empty)
+- Checkbox list with status icons
+- Auto-calculated progress bar based on completed subtasks ratio
+- "Add subtask" inline input at the bottom
+- Click to navigate to subtask detail
+- Smart empty state: "Add your first subtask" CTA
+
+**C. Activity Tabs (4 tabs)**
+- Discussion (default) -- existing CommentsSection
+- Files -- existing FileExplorer
+- Time -- existing TaskTimer + time stats
+- Activity Log -- **moved from right sidebar** to here as a tab
+
+### 3. Right Column -- Smart Meta Panel (w-80, ~30%)
+
+Three compact cards stacked vertically:
+
+**Card 1: Assignment**
+- Assignee with avatar and inline select to change
+
+**Card 2: Timeline**
+- Start date (inline date picker)
+- Due date (inline date picker)
+- Created at (read-only)
+- Estimated hours (inline edit)
+- Actual hours (read-only)
+
+**Card 3: Status Flow**
+- Visual horizontal workflow: To Do > In Progress > Review > Internal > Client > Done
+- Current stage highlighted
+- Clickable to change status
+- Small connected dots/steps visualization
+
+---
+
+## What Gets Removed/Simplified
+
+- **Remove**: Large properties grid (vertical form layout) -- fields distributed to header bar and right panel
+- **Remove**: Status pill buttons row (replaced by dropdown in header + flow card)
+- **Remove**: Right sidebar "Ιστορικό" panel (moved to Activity Log tab)
+- **Remove**: Separate progress manual slider (auto-calculated from subtasks)
+- **Remove**: "Σήμανση ως Επείγον" button (priority handled via header indicator)
 
 ---
 
@@ -81,43 +111,37 @@ When the sidebar is **collapsed**, only the icon rail is visible (same as curren
 
 | File | Changes |
 |------|---------|
-| `src/components/layout/AppSidebar.tsx` | Major refactor: add category definitions, icon rail component, category-based filtering of nav items, auto-detection logic |
+| `src/pages/TaskDetail.tsx` | Complete restructure of the render layout; add inline subtask creation; add subtask-based progress; move activity log to tab; new sticky header; new right panel cards; new status flow component |
 
-### Implementation in AppSidebar.tsx
+### New Sub-Components (inline in TaskDetail.tsx or extracted)
 
-1. **Define categories array** mapping category IDs to icons, labels, route prefixes (for auto-detect), and which nav items belong to each
+- `TaskActionBar` -- sticky header with all quick controls
+- `OverviewCard` -- description + deliverable + tags
+- `SubtasksBlock` -- checkbox list + progress + add inline
+- `AssignmentCard` -- right panel assignee
+- `TimelineCard` -- right panel dates/hours
+- `StatusFlowCard` -- visual workflow steps
 
-2. **Add `activeCategory` state** initialized by route detection
-
-3. **Add `IconRail` component** rendered as a narrow flex column on the left of the sidebar content:
-   - Logo icon at top
-   - Category icons in the middle (with tooltip on hover showing category name)
-   - Theme toggle icon and user avatar at bottom
-   - Active category gets a pill/highlight indicator
-
-4. **Filter displayed nav items** based on `activeCategory` -- only render the items belonging to the selected category in the right panel
-
-5. **Wrap sidebar content** in a horizontal flex: `flex flex-row` with icon rail on left and existing content panel on right
-
-6. **Collapsed behavior**: When collapsed, only the icon rail is visible (width ~48px). The category panel hides. Clicking a category icon expands the sidebar.
-
-### Route-to-Category Mapping
+### Subtask Progress Auto-Calculation
 
 ```text
-/my-work, /         -> home
-/work, /projects/*, /tasks/* -> work
-/inbox, /chat       -> comms
-/files              -> files
-/timesheets         -> time
-/contacts, /hr, /leaderboard -> people
-/financials, /reports -> finance
-/clients, /blueprints, /settings -> admin
+progress = (completedSubtasks / totalSubtasks) * 100
 ```
 
-### Visual Design
+If no subtasks exist, fall back to manual progress field. When subtasks exist, the progress is always auto-calculated and the manual slider is hidden.
 
-- Icon rail background: `bg-sidebar` or slightly darker than sidebar (`bg-card/80` with a subtle right border)
-- Active category: small rounded pill behind icon (`bg-accent`) or a left border indicator
-- Icons: 20px, `text-muted-foreground`, active = `text-foreground`
-- Tooltip on hover for each category icon (using existing Tooltip component)
-- Smooth transition when switching categories
+### Add Subtask Inline
+
+- Text input at the bottom of subtasks list
+- Enter to create with: `parent_task_id = task.id`, `project_id = task.project_id`, `status = 'todo'`
+- Immediately appears in the list
+
+### Status Flow Visual
+
+A horizontal stepper showing all 6 statuses as connected dots/nodes. The current status is highlighted with its color. Clicking a different node changes the status (calls existing `handleStatusChange`).
+
+### Keyboard Shortcuts
+
+- `Cmd/Ctrl + Enter` in description = save
+- `/` = focus quick action (future enhancement, not blocking)
+

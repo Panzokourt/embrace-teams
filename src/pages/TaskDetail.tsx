@@ -6,8 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { EnhancedInlineEditCell } from '@/components/shared/EnhancedInlineEditCell';
 import { CommentsSection } from '@/components/comments/CommentsSection';
 import { FileExplorer } from '@/components/files/FileExplorer';
@@ -15,7 +21,8 @@ import { TaskTimer } from '@/components/time-tracking/TaskTimer';
 import { toast } from 'sonner';
 import {
   ArrowLeft, Loader2, CheckCircle2, Clock, Circle, AlertCircle,
-  FolderOpen, MessageSquare, Timer, ChevronRight, Flag
+  FolderOpen, MessageSquare, Timer, ChevronRight, Flag, Plus,
+  Paperclip, Check, Pencil, CalendarIcon, History, User
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -69,14 +76,16 @@ interface ActivityEntry {
   user_name?: string;
 }
 
-const STATUS_CONFIG: Record<TaskStatus, { icon: React.ReactNode; label: string; className: string }> = {
-  todo: { icon: <Circle className="h-3.5 w-3.5" />, label: 'Προς Υλοποίηση', className: 'bg-muted text-muted-foreground' },
-  in_progress: { icon: <Clock className="h-3.5 w-3.5" />, label: 'Σε Εξέλιξη', className: 'bg-primary/10 text-primary border-primary/20' },
-  review: { icon: <AlertCircle className="h-3.5 w-3.5" />, label: 'Αναθεώρηση', className: 'bg-warning/10 text-warning border-warning/20' },
-  internal_review: { icon: <AlertCircle className="h-3.5 w-3.5" />, label: 'Εσωτερική Έγκριση', className: 'bg-violet-500/10 text-violet-600 border-violet-500/20' },
-  client_review: { icon: <AlertCircle className="h-3.5 w-3.5" />, label: 'Έγκριση Πελάτη', className: 'bg-orange-500/10 text-orange-600 border-orange-500/20' },
-  completed: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: 'Ολοκληρώθηκε', className: 'bg-success/10 text-success border-success/20' },
+const STATUS_CONFIG: Record<TaskStatus, { icon: React.ReactNode; label: string; color: string; dotColor: string }> = {
+  todo: { icon: <Circle className="h-3.5 w-3.5" />, label: 'Προς Υλοποίηση', color: 'bg-muted text-muted-foreground', dotColor: 'bg-muted-foreground' },
+  in_progress: { icon: <Clock className="h-3.5 w-3.5" />, label: 'Σε Εξέλιξη', color: 'bg-primary/10 text-primary', dotColor: 'bg-primary' },
+  review: { icon: <AlertCircle className="h-3.5 w-3.5" />, label: 'Αναθεώρηση', color: 'bg-warning/10 text-warning', dotColor: 'bg-warning' },
+  internal_review: { icon: <AlertCircle className="h-3.5 w-3.5" />, label: 'Εσωτερική', color: 'bg-violet-500/10 text-violet-600', dotColor: 'bg-violet-500' },
+  client_review: { icon: <AlertCircle className="h-3.5 w-3.5" />, label: 'Πελάτης', color: 'bg-orange-500/10 text-orange-600', dotColor: 'bg-orange-500' },
+  completed: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: 'Ολοκληρώθηκε', color: 'bg-success/10 text-success', dotColor: 'bg-success' },
 };
+
+const STATUS_ORDER: TaskStatus[] = ['todo', 'in_progress', 'review', 'internal_review', 'client_review', 'completed'];
 
 const PRIORITY_OPTIONS = [
   { value: 'low', label: 'Χαμηλή', color: 'hsl(var(--success))' },
@@ -112,6 +121,8 @@ export default function TaskDetailPage() {
   const [loading, setLoading] = useState(true);
   const [editingDescription, setEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState('');
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+  const [addingSubtask, setAddingSubtask] = useState(false);
 
   const fetchTask = useCallback(async () => {
     if (!id) return;
@@ -219,7 +230,6 @@ export default function TaskDetailPage() {
     try {
       let updateData: Record<string, string | null> = { status: newStatus };
 
-      // Auto-assign internal_reviewer when moving to internal_review
       if (newStatus === 'internal_review' && task.assigned_to) {
         const { data: assigneeProfile } = await supabase
           .from('profiles')
@@ -260,23 +270,55 @@ export default function TaskDetailPage() {
     }
   };
 
+  const addSubtask = async () => {
+    if (!task || !newSubtaskTitle.trim()) return;
+    setAddingSubtask(true);
+    try {
+      const { error } = await supabase.from('tasks').insert({
+        title: newSubtaskTitle.trim(),
+        parent_task_id: task.id,
+        project_id: task.project_id,
+        status: 'todo',
+        created_by: user?.id,
+      });
+      if (error) throw error;
+      setNewSubtaskTitle('');
+      fetchTask();
+      toast.success('Subtask δημιουργήθηκε!');
+    } catch {
+      toast.error('Σφάλμα δημιουργίας');
+    } finally {
+      setAddingSubtask(false);
+    }
+  };
+
+  const toggleSubtaskStatus = async (subtask: TaskData) => {
+    const newStatus: TaskStatus = subtask.status === 'completed' ? 'todo' : 'completed';
+    try {
+      const { error } = await supabase.from('tasks').update({ status: newStatus }).eq('id', subtask.id);
+      if (error) throw error;
+      fetchTask();
+    } catch {
+      toast.error('Σφάλμα');
+    }
+  };
+
   const getActivityDescription = (activity: ActivityEntry) => {
     const details = activity.details;
     switch (activity.action) {
-      case 'created':
-        return 'δημιούργησε αυτό το task';
-      case 'updated':
-        return 'ενημέρωσε αυτό το task';
-      case 'status_change':
-        return `άλλαξε κατάσταση: ${details?.old_status || '?'} → ${details?.new_status || '?'}`;
-      case 'completed':
-        return 'ολοκλήρωσε αυτό το task';
-      case 'deleted':
-        return 'διέγραψε αυτό το task';
-      default:
-        return activity.action;
+      case 'created': return 'δημιούργησε αυτό το task';
+      case 'updated': return 'ενημέρωσε αυτό το task';
+      case 'status_change': return `άλλαξε κατάσταση: ${details?.old_status || '?'} → ${details?.new_status || '?'}`;
+      case 'completed': return 'ολοκλήρωσε αυτό το task';
+      case 'deleted': return 'διέγραψε αυτό το task';
+      default: return activity.action;
     }
   };
+
+  // Subtask progress calculation
+  const completedSubtasks = subtasks.filter(s => s.status === 'completed').length;
+  const subtaskProgress = subtasks.length > 0 ? Math.round((completedSubtasks / subtasks.length) * 100) : null;
+  const displayProgress = subtaskProgress !== null ? subtaskProgress : (task?.progress || 0);
 
   if (loading) {
     return (
@@ -304,296 +346,266 @@ export default function TaskDetailPage() {
     value: d.id,
     label: d.name,
   }));
+  const priorityColor = PRIORITY_OPTIONS.find(p => p.value === (task.priority || 'medium'))?.color || 'hsl(var(--warning))';
 
   return (
-    <div className="p-4 lg:p-6 h-full">
-      {/* Header */}
-      <div className="flex items-start gap-3 mb-5">
-        <Button variant="ghost" size="icon" className="shrink-0 mt-0.5" onClick={() => navigate(-1)}>
+    <div className="h-full flex flex-col">
+      {/* ===== STICKY ACTION BAR ===== */}
+      <div className="sticky top-0 z-10 bg-background border-b px-4 py-2.5 flex items-center gap-3 min-h-[52px]">
+        {/* Left: Back + Title + Timer */}
+        <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div className="flex-1 min-w-0">
-          <h1
-            className="text-2xl font-bold tracking-tight cursor-pointer hover:bg-muted/50 px-2 py-0.5 rounded -mx-2 transition-colors truncate"
-            onClick={() => {
-              const newTitle = prompt('Τίτλος Task:', task.title);
-              if (newTitle && newTitle !== task.title) {
-                updateField('title', newTitle);
-              }
-            }}
-            title="Κλικ για επεξεργασία"
-          >
-            {task.title}
-          </h1>
-          {task.project && (
-            <Button
-              variant="link"
-              className="p-0 h-auto text-xs text-muted-foreground hover:text-primary"
-              onClick={() => navigate(`/projects/${task.project_id}`)}
-            >
-              📁 {task.project.name}
+        <h1
+          className="text-base font-semibold truncate cursor-pointer hover:bg-muted/50 px-1.5 py-0.5 rounded transition-colors max-w-[300px]"
+          onClick={() => {
+            const newTitle = prompt('Τίτλος Task:', task.title);
+            if (newTitle && newTitle !== task.title) updateField('title', newTitle);
+          }}
+          title="Κλικ για επεξεργασία"
+        >
+          {task.title}
+        </h1>
+        <TaskTimer taskId={task.id} projectId={task.project_id} compact />
+
+        <div className="flex-1" />
+
+        {/* Right: Status, Priority, Due, Assignee, Actions */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className={cn("gap-1.5 h-7 text-xs font-medium", statusConfig.color)}>
+              {statusConfig.icon}
+              {statusConfig.label}
             </Button>
-          )}
+          </PopoverTrigger>
+          <PopoverContent className="w-48 p-1" align="end">
+            {STATUS_ORDER.map(s => (
+              <button
+                key={s}
+                onClick={() => { handleStatusChange(s); }}
+                className={cn(
+                  "w-full flex items-center gap-2 px-3 py-1.5 text-xs rounded-md transition-colors hover:bg-muted",
+                  task.status === s && "bg-muted font-medium"
+                )}
+              >
+                {STATUS_CONFIG[s].icon}
+                {STATUS_CONFIG[s].label}
+              </button>
+            ))}
+          </PopoverContent>
+        </Popover>
+
+        {/* Priority dot */}
+        <div className="flex items-center gap-1" title={`Προτεραιότητα: ${task.priority || 'medium'}`}>
+          <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: priorityColor }} />
+        </div>
+
+        {/* Due date chip */}
+        {task.due_date && (
+          <Badge variant="outline" className="text-[10px] h-6 gap-1 font-normal">
+            <CalendarIcon className="h-3 w-3" />
+            {format(new Date(task.due_date), 'd MMM', { locale: el })}
+          </Badge>
+        )}
+
+        {/* Assignee avatar */}
+        <Avatar className="h-7 w-7">
+          <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+            {task.assignee?.full_name?.[0]?.toUpperCase() || <User className="h-3 w-3" />}
+          </AvatarFallback>
+        </Avatar>
+
+        {/* Quick actions */}
+        <div className="flex items-center gap-0.5 border-l pl-2 ml-1">
+          <Button variant="ghost" size="icon" className="h-7 w-7" title="Προσθήκη subtask" onClick={() => document.getElementById('subtask-input')?.focus()}>
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn("h-7 w-7", task.status === 'completed' && "text-success")}
+            title="Ολοκλήρωση"
+            onClick={() => handleStatusChange(task.status === 'completed' ? 'todo' : 'completed')}
+          >
+            <Check className="h-3.5 w-3.5" />
+          </Button>
         </div>
       </div>
 
-      {/* Two-column layout */}
-      <div className="flex gap-6 items-start">
-        {/* Left column - Main content */}
-        <div className="flex-1 min-w-0 space-y-5">
+      {/* ===== TWO-COLUMN LAYOUT ===== */}
+      <div className="flex-1 overflow-auto">
+        <div className="flex gap-5 p-4 lg:p-5 items-start">
+          {/* LEFT: Main Work Area */}
+          <div className="flex-1 min-w-0 space-y-4">
 
-      {/* Status quick-change */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {(Object.entries(STATUS_CONFIG) as [TaskStatus, typeof STATUS_CONFIG['todo']][]).map(([status, config]) => (
-              <Button
-                key={status}
-                variant={task.status === status ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => handleStatusChange(status)}
-                className="gap-1 h-8 text-xs"
-              >
-                {config.icon} {config.label}
-              </Button>
-            ))}
-            <Button
-              variant={task.priority === 'urgent' ? 'destructive' : 'outline'}
-              size="sm"
-              onClick={() => updateField('priority', task.priority === 'urgent' ? 'medium' : 'urgent')}
-              className="gap-1.5 h-8 text-xs ml-auto"
-            >
-              <Flag className="h-3.5 w-3.5" />
-              {task.priority === 'urgent' ? 'Επείγον ✓' : 'Σήμανση ως Επείγον'}
-            </Button>
-          </div>
+            {/* A. Overview Card */}
+            <Card>
+              <CardContent className="p-4 space-y-3">
+                {/* Description */}
+                {editingDescription ? (
+                  <div className="space-y-2">
+                    <Textarea
+                      value={descriptionDraft}
+                      onChange={(e) => setDescriptionDraft(e.target.value)}
+                      rows={3}
+                      placeholder="Περιγραφή..."
+                      autoFocus
+                      className="text-sm"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) saveDescription();
+                      }}
+                    />
+                    <div className="flex gap-2 justify-end">
+                      <Button variant="ghost" size="sm" onClick={() => { setEditingDescription(false); setDescriptionDraft(task.description || ''); }}>Ακύρωση</Button>
+                      <Button size="sm" onClick={saveDescription}>Αποθήκευση</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className="group relative text-sm text-muted-foreground whitespace-pre-wrap cursor-pointer hover:bg-muted/30 p-2 rounded-lg transition-colors min-h-[36px]"
+                    onClick={() => setEditingDescription(true)}
+                  >
+                    {task.description || 'Κλικ για να προσθέσετε περιγραφή...'}
+                    <Pencil className="h-3 w-3 absolute top-2 right-2 opacity-0 group-hover:opacity-50 transition-opacity" />
+                  </div>
+                )}
 
-          {/* Properties Grid */}
-          <div className="rounded-lg border bg-card">
-            <div className="divide-y">
-              {/* Υπεύθυνος */}
-              <PropertyRow label="Υπεύθυνος">
-                <EnhancedInlineEditCell
-                  value={task.assigned_to}
-                  onSave={async (v) => { await updateField('assigned_to', v); }}
-                  type="select"
-                  options={assigneeOptions}
-                  placeholder="Χωρίς ανάθεση"
-                  displayValue={task.assignee?.full_name || undefined}
-                />
-              </PropertyRow>
-
-              {/* Ημερομηνίες */}
-              <PropertyRow label="Έναρξη">
-                <EnhancedInlineEditCell
-                  value={task.start_date}
-                  onSave={async (v) => { await updateField('start_date', v); }}
-                  type="date"
-                  placeholder="—"
-                />
-              </PropertyRow>
-
-              <PropertyRow label="Προθεσμία">
-                <EnhancedInlineEditCell
-                  value={task.due_date}
-                  onSave={async (v) => { await updateField('due_date', v); }}
-                  type="date"
-                  placeholder="—"
-                />
-              </PropertyRow>
-
-              {/* Προτεραιότητα */}
-              <PropertyRow label="Προτεραιότητα">
-                <EnhancedInlineEditCell
-                  value={task.priority || 'medium'}
-                  onSave={async (v) => { await updateField('priority', v); }}
-                  type="select"
-                  options={PRIORITY_OPTIONS}
-                />
-              </PropertyRow>
-
-              {/* Εκτίμηση */}
-              <PropertyRow label="Εκτίμηση">
-                <EnhancedInlineEditCell
-                  value={task.estimated_hours}
-                  onSave={async (v) => { await updateField('estimated_hours', v ? Number(v) : null); }}
-                  type="number"
-                  placeholder="—"
-                  displayValue={task.estimated_hours ? `${task.estimated_hours}h` : undefined}
-                />
-              </PropertyRow>
-
-              {/* Πραγματικός */}
-              <PropertyRow label="Πραγματικός">
-                <span className="text-sm px-2 py-1">{task.actual_hours ? `${task.actual_hours}h` : '—'}</span>
-              </PropertyRow>
-
-              {/* Πρόοδος */}
-              <PropertyRow label="Πρόοδος">
-                <EnhancedInlineEditCell
-                  value={task.progress || 0}
-                  onSave={async (v) => { await updateField('progress', v ? Number(v) : 0); }}
-                  type="progress"
-                />
-              </PropertyRow>
-
-              {/* Τύπος */}
-              <PropertyRow label="Τύπος">
-                <EnhancedInlineEditCell
-                  value={task.task_type || 'task'}
-                  onSave={async (v) => { await updateField('task_type', v); }}
-                  type="select"
-                  options={TYPE_OPTIONS}
-                />
-              </PropertyRow>
-
-              {/* Κατηγορία */}
-              <PropertyRow label="Κατηγορία">
-                <EnhancedInlineEditCell
-                  value={task.task_category}
-                  onSave={async (v) => { await updateField('task_category', v); }}
-                  type="select"
-                  options={CATEGORY_OPTIONS}
-                  placeholder="—"
-                />
-              </PropertyRow>
-
-              {/* Παραδοτέο */}
-              <PropertyRow label="Παραδοτέο">
-                <EnhancedInlineEditCell
-                  value={task.deliverable_id}
-                  onSave={async (v) => { await updateField('deliverable_id', v); }}
-                  type="select"
-                  options={deliverableOptions}
-                  placeholder="—"
-                  displayValue={task.deliverable?.name || undefined}
-                />
-              </PropertyRow>
-
-              {/* Δημιουργήθηκε */}
-              <PropertyRow label="Δημιουργήθηκε">
-                <span className="text-sm px-2 py-1">
-                  {format(new Date(task.created_at), 'd MMM yyyy', { locale: el })}
-                </span>
-              </PropertyRow>
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Description */}
-          <div>
-            <h3 className="text-sm font-semibold text-muted-foreground mb-2">Περιγραφή</h3>
-            {editingDescription ? (
-              <div className="space-y-2">
-                <Textarea
-                  value={descriptionDraft}
-                  onChange={(e) => setDescriptionDraft(e.target.value)}
-                  rows={4}
-                  placeholder="Προσθέστε περιγραφή..."
-                  autoFocus
-                  className="text-sm"
-                />
-                <div className="flex gap-2 justify-end">
-                  <Button variant="ghost" size="sm" onClick={() => { setEditingDescription(false); setDescriptionDraft(task.description || ''); }}>
-                    Ακύρωση
-                  </Button>
-                  <Button size="sm" onClick={saveDescription}>Αποθήκευση</Button>
+                {/* Tags row */}
+                <div className="flex items-center gap-2 flex-wrap text-xs">
+                  {task.project && (
+                    <Badge
+                      variant="outline"
+                      className="cursor-pointer hover:bg-muted gap-1 font-normal"
+                      onClick={() => navigate(`/projects/${task.project_id}`)}
+                    >
+                      <FolderOpen className="h-3 w-3" />
+                      {task.project.name}
+                    </Badge>
+                  )}
+                  {task.deliverable && (
+                    <Badge variant="secondary" className="font-normal">{task.deliverable.name}</Badge>
+                  )}
+                  {task.task_type && task.task_type !== 'task' && (
+                    <Badge variant="secondary" className="font-normal capitalize">{task.task_type}</Badge>
+                  )}
+                  {task.task_category && (
+                    <Badge variant="outline" className="font-normal">
+                      {CATEGORY_OPTIONS.find(c => c.value === task.task_category)?.label || task.task_category}
+                    </Badge>
+                  )}
                 </div>
-              </div>
-            ) : (
-              <p
-                className="text-sm text-muted-foreground whitespace-pre-wrap cursor-pointer hover:bg-muted/50 p-3 rounded-lg border border-transparent hover:border-border transition-colors min-h-[48px]"
-                onClick={() => setEditingDescription(true)}
-                title="Κλικ για επεξεργασία"
-              >
-                {task.description || 'Κλικ για να προσθέσετε περιγραφή...'}
-              </p>
-            )}
-          </div>
+              </CardContent>
+            </Card>
 
-          {/* Subtasks */}
-          {subtasks.length > 0 && (
-            <>
-              <Separator />
-              <div>
-                <h3 className="text-sm font-semibold text-muted-foreground mb-2">
-                  Subtasks ({subtasks.length})
-                </h3>
-                <div className="space-y-1">
+            {/* B. Subtasks */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold">Subtasks</h3>
+                  {subtasks.length > 0 && (
+                    <span className="text-xs text-muted-foreground">{completedSubtasks}/{subtasks.length}</span>
+                  )}
+                </div>
+
+                {subtasks.length > 0 && (
+                  <Progress value={displayProgress} className="h-1.5 mb-3" />
+                )}
+
+                <div className="space-y-0.5">
                   {subtasks.map(sub => (
                     <div
                       key={sub.id}
-                      className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors text-sm"
-                      onClick={() => navigate(`/tasks/${sub.id}`)}
+                      className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-muted/50 transition-colors group"
                     >
-                      {STATUS_CONFIG[sub.status].icon}
-                      <span className={cn("flex-1", sub.status === 'completed' && "line-through text-muted-foreground")}>
+                      <Checkbox
+                        checked={sub.status === 'completed'}
+                        onCheckedChange={() => toggleSubtaskStatus(sub)}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span
+                        className={cn(
+                          "flex-1 text-sm cursor-pointer",
+                          sub.status === 'completed' && "line-through text-muted-foreground"
+                        )}
+                        onClick={() => navigate(`/tasks/${sub.id}`)}
+                      >
                         {sub.title}
                       </span>
-                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                      <ChevronRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                   ))}
                 </div>
-              </div>
-            </>
-          )}
 
-          <Separator />
+                {/* Add subtask inline */}
+                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border/50">
+                  <Plus className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <Input
+                    id="subtask-input"
+                    value={newSubtaskTitle}
+                    onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') addSubtask(); }}
+                    placeholder="Προσθήκη subtask..."
+                    className="h-7 text-sm border-0 bg-transparent shadow-none focus:ring-0 px-0"
+                    disabled={addingSubtask}
+                  />
+                </div>
 
-          {/* Bottom Tabs */}
-          <Tabs defaultValue="comments" className="space-y-4">
-            <TabsList className="h-9 gap-1">
-              <TabsTrigger value="comments" className="text-xs gap-1.5">
-                <MessageSquare className="h-3.5 w-3.5" />
-                Σχόλια
-              </TabsTrigger>
-              <TabsTrigger value="files" className="text-xs gap-1.5">
-                <FolderOpen className="h-3.5 w-3.5" />
-                Αρχεία
-              </TabsTrigger>
-              <TabsTrigger value="time" className="text-xs gap-1.5">
-                <Timer className="h-3.5 w-3.5" />
-                Χρόνος
-              </TabsTrigger>
-            </TabsList>
+                {subtasks.length === 0 && !newSubtaskTitle && (
+                  <p className="text-xs text-muted-foreground text-center py-3">
+                    Προσθέστε το πρώτο subtask
+                  </p>
+                )}
+              </CardContent>
+            </Card>
 
-            <TabsContent value="comments">
-              <CommentsSection taskId={task.id} />
-            </TabsContent>
+            {/* C. Activity Tabs */}
+            <Tabs defaultValue="comments" className="space-y-3">
+              <TabsList className="h-9 gap-1">
+                <TabsTrigger value="comments" className="text-xs gap-1.5">
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  Σχόλια
+                </TabsTrigger>
+                <TabsTrigger value="files" className="text-xs gap-1.5">
+                  <FolderOpen className="h-3.5 w-3.5" />
+                  Αρχεία
+                </TabsTrigger>
+                <TabsTrigger value="time" className="text-xs gap-1.5">
+                  <Timer className="h-3.5 w-3.5" />
+                  Χρόνος
+                </TabsTrigger>
+                <TabsTrigger value="activity" className="text-xs gap-1.5">
+                  <History className="h-3.5 w-3.5" />
+                  Ιστορικό
+                </TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="files">
-              <FileExplorer projectId={task.project_id} />
-            </TabsContent>
+              <TabsContent value="comments">
+                <CommentsSection taskId={task.id} />
+              </TabsContent>
 
-            <TabsContent value="time">
-              <div className="space-y-4">
-                <TaskTimer taskId={task.id} projectId={task.project_id} />
-                <div className="grid grid-cols-2 gap-4 pt-3 border-t">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Εκτιμώμενος</p>
-                    <p className="text-lg font-semibold">{task.estimated_hours ? `${task.estimated_hours}h` : '—'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Πραγματικός</p>
-                    <p className="text-lg font-semibold">{task.actual_hours ? `${task.actual_hours}h` : '—'}</p>
+              <TabsContent value="files">
+                <FileExplorer projectId={task.project_id} />
+              </TabsContent>
+
+              <TabsContent value="time">
+                <div className="space-y-4">
+                  <TaskTimer taskId={task.id} projectId={task.project_id} />
+                  <div className="grid grid-cols-2 gap-4 pt-3 border-t">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Εκτιμώμενος</p>
+                      <p className="text-lg font-semibold">{task.estimated_hours ? `${task.estimated_hours}h` : '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Πραγματικός</p>
+                      <p className="text-lg font-semibold">{task.actual_hours ? `${task.actual_hours}h` : '—'}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </div>
+              </TabsContent>
 
-        {/* Right column - Activity Sidebar */}
-        <div className="hidden lg:block w-80 shrink-0 sticky top-6">
-          <div className="rounded-lg border bg-card overflow-hidden">
-            <div className="px-4 py-3 border-b bg-muted/30">
-              <h3 className="text-sm font-semibold">Ιστορικό</h3>
-            </div>
-            <ScrollArea className="h-[calc(100vh-220px)]">
-              <div className="p-3">
+              <TabsContent value="activity">
                 {activities.length === 0 ? (
-                  <p className="text-xs text-muted-foreground text-center py-6">
-                    Δεν υπάρχουν ενέργειες.
-                  </p>
+                  <p className="text-xs text-muted-foreground text-center py-6">Δεν υπάρχουν ενέργειες.</p>
                 ) : (
                   <div className="space-y-0.5">
                     {activities.map(activity => (
@@ -612,8 +624,145 @@ export default function TaskDetailPage() {
                     ))}
                   </div>
                 )}
-              </div>
-            </ScrollArea>
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          {/* RIGHT: Smart Meta Panel */}
+          <div className="hidden lg:flex flex-col gap-4 w-72 shrink-0 sticky top-[60px]">
+            {/* Assignment Card */}
+            <Card>
+              <CardContent className="p-4 space-y-2">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ανάθεση</h4>
+                <EnhancedInlineEditCell
+                  value={task.assigned_to}
+                  onSave={async (v) => { await updateField('assigned_to', v); }}
+                  type="select"
+                  options={assigneeOptions}
+                  placeholder="Χωρίς ανάθεση"
+                  displayValue={task.assignee?.full_name || undefined}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Timeline Card */}
+            <Card>
+              <CardContent className="p-4 space-y-2.5">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Χρονοδιάγραμμα</h4>
+                <MetaRow label="Έναρξη">
+                  <EnhancedInlineEditCell
+                    value={task.start_date}
+                    onSave={async (v) => { await updateField('start_date', v); }}
+                    type="date"
+                    placeholder="—"
+                  />
+                </MetaRow>
+                <MetaRow label="Προθεσμία">
+                  <EnhancedInlineEditCell
+                    value={task.due_date}
+                    onSave={async (v) => { await updateField('due_date', v); }}
+                    type="date"
+                    placeholder="—"
+                  />
+                </MetaRow>
+                <MetaRow label="Δημιουργία">
+                  <span className="text-xs px-1">{format(new Date(task.created_at), 'd MMM yyyy', { locale: el })}</span>
+                </MetaRow>
+                <MetaRow label="Εκτίμηση">
+                  <EnhancedInlineEditCell
+                    value={task.estimated_hours}
+                    onSave={async (v) => { await updateField('estimated_hours', v ? Number(v) : null); }}
+                    type="number"
+                    placeholder="—"
+                    displayValue={task.estimated_hours ? `${task.estimated_hours}h` : undefined}
+                  />
+                </MetaRow>
+                <MetaRow label="Πραγματικός">
+                  <span className="text-xs px-1">{task.actual_hours ? `${task.actual_hours}h` : '—'}</span>
+                </MetaRow>
+              </CardContent>
+            </Card>
+
+            {/* Status Flow Card */}
+            <Card>
+              <CardContent className="p-4">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Ροή Κατάστασης</h4>
+                <div className="flex items-center gap-0.5">
+                  {STATUS_ORDER.map((s, i) => {
+                    const conf = STATUS_CONFIG[s];
+                    const isCurrent = task.status === s;
+                    const isPast = STATUS_ORDER.indexOf(task.status) > i;
+                    return (
+                      <div key={s} className="flex items-center gap-0.5 flex-1">
+                        <button
+                          onClick={() => handleStatusChange(s)}
+                          className={cn(
+                            "h-6 w-6 rounded-full flex items-center justify-center transition-all shrink-0 text-[9px]",
+                            isCurrent && cn("ring-2 ring-offset-1 ring-offset-background", conf.dotColor, "ring-current text-background scale-110"),
+                            isPast && !isCurrent && "bg-success/20 text-success",
+                            !isCurrent && !isPast && "bg-muted text-muted-foreground hover:bg-muted/80"
+                          )}
+                          style={isCurrent ? { backgroundColor: 'currentColor' } : undefined}
+                          title={conf.label}
+                        >
+                          {isPast && !isCurrent && <Check className="h-3 w-3" />}
+                          {isCurrent && <div className="h-2 w-2 rounded-full bg-background" />}
+                        </button>
+                        {i < STATUS_ORDER.length - 1 && (
+                          <div className={cn("h-px flex-1", isPast ? "bg-success/40" : "bg-border")} />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex justify-between mt-2">
+                  <span className="text-[9px] text-muted-foreground">Todo</span>
+                  <span className="text-[9px] text-muted-foreground">Done</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Priority & Tags Card */}
+            <Card>
+              <CardContent className="p-4 space-y-2.5">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ιδιότητες</h4>
+                <MetaRow label="Προτεραιότητα">
+                  <EnhancedInlineEditCell
+                    value={task.priority || 'medium'}
+                    onSave={async (v) => { await updateField('priority', v); }}
+                    type="select"
+                    options={PRIORITY_OPTIONS}
+                  />
+                </MetaRow>
+                <MetaRow label="Τύπος">
+                  <EnhancedInlineEditCell
+                    value={task.task_type || 'task'}
+                    onSave={async (v) => { await updateField('task_type', v); }}
+                    type="select"
+                    options={TYPE_OPTIONS}
+                  />
+                </MetaRow>
+                <MetaRow label="Κατηγορία">
+                  <EnhancedInlineEditCell
+                    value={task.task_category}
+                    onSave={async (v) => { await updateField('task_category', v); }}
+                    type="select"
+                    options={CATEGORY_OPTIONS}
+                    placeholder="—"
+                  />
+                </MetaRow>
+                <MetaRow label="Παραδοτέο">
+                  <EnhancedInlineEditCell
+                    value={task.deliverable_id}
+                    onSave={async (v) => { await updateField('deliverable_id', v); }}
+                    type="select"
+                    options={deliverableOptions}
+                    placeholder="—"
+                    displayValue={task.deliverable?.name || undefined}
+                  />
+                </MetaRow>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
@@ -621,11 +770,11 @@ export default function TaskDetailPage() {
   );
 }
 
-/* Property row helper */
-function PropertyRow({ label, children }: { label: string; children: React.ReactNode }) {
+/* Meta row helper for right panel */
+function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center px-4 py-2 gap-4 hover:bg-muted/30 transition-colors">
-      <span className="text-xs font-medium text-muted-foreground w-28 shrink-0">{label}</span>
+    <div className="flex items-center gap-3">
+      <span className="text-[11px] text-muted-foreground w-20 shrink-0">{label}</span>
       <div className="flex-1 min-w-0">{children}</div>
     </div>
   );

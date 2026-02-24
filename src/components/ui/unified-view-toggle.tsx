@@ -62,7 +62,7 @@ export function UnifiedViewToggle({
   };
 
   return (
-    <div className={cn("flex items-center gap-1 p-1 rounded-lg bg-secondary-foreground", className)}>
+    <div className={cn("flex items-center gap-1 p-1 rounded-lg bg-secondary shadow-md opacity-85", className)}>
       <Button
         variant={viewMode === 'card' ? 'default' : 'ghost'}
         size="sm"

@@ -4307,6 +4307,10 @@ export type Database = {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
+      is_company_admin_or_manager: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       reject_join_request: { Args: { _request_id: string }; Returns: Json }
       search_chat_messages: {

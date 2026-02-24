@@ -3,8 +3,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
-// Helper to get company_id from auth context
-
 export interface CalendarEvent {
   id: string;
   company_id: string;
@@ -24,6 +22,8 @@ export interface CalendarEvent {
   google_event_id: string | null;
   created_at: string;
   updated_at: string;
+  // Virtual flag for items from other tables
+  _source?: 'calendar' | 'task' | 'deliverable' | 'project';
 }
 
 export interface CalendarEventAttendee {
@@ -62,6 +62,7 @@ export function useCalendarEvents() {
     if (!companyId) return;
     setLoading(true);
     try {
+      // 1. Calendar events from DB
       let query = supabase
         .from('calendar_events')
         .select('*')
@@ -71,9 +72,119 @@ export function useCalendarEvents() {
       if (startDate) query = query.gte('start_time', startDate);
       if (endDate) query = query.lte('end_time', endDate);
 
-      const { data, error } = await query;
-      if (error) throw error;
-      setEvents((data || []) as CalendarEvent[]);
+      const { data: calEvents, error: calError } = await query;
+      if (calError) console.error('Calendar events error:', calError);
+
+      // 2. Tasks with due_date
+      const { data: tasks } = await supabase
+        .from('tasks')
+        .select('id, title, due_date, status, priority, project_id')
+        .not('due_date', 'is', null);
+
+      // 3. Deliverables with due_date
+      const { data: deliverables } = await supabase
+        .from('deliverables')
+        .select('id, name, due_date, project_id, completed');
+
+      // 4. Projects with end_date (deadlines)
+      const { data: projects } = await supabase
+        .from('projects')
+        .select('id, name, end_date, status, client_id')
+        .not('end_date', 'is', null);
+
+      // Build unified list
+      const allEvents: CalendarEvent[] = [];
+
+      // Calendar events
+      (calEvents || []).forEach((ev: any) => {
+        allEvents.push({ ...ev, _source: 'calendar' });
+      });
+
+      // Tasks as events
+      (tasks || []).forEach((t: any) => {
+        if (!t.due_date) return;
+        const dueDate = new Date(t.due_date);
+        allEvents.push({
+          id: `task-${t.id}`,
+          company_id: companyId,
+          title: t.title,
+          description: null,
+          event_type: 'task',
+          start_time: dueDate.toISOString(),
+          end_time: dueDate.toISOString(),
+          all_day: true,
+          location: null,
+          video_link: null,
+          color: t.priority === 'high' ? '#EF4444' : t.priority === 'medium' ? '#F59E0B' : '#3B82F6',
+          created_by: null,
+          project_id: t.project_id,
+          client_id: null,
+          recurrence_rule: null,
+          google_event_id: null,
+          created_at: '',
+          updated_at: '',
+          _source: 'task',
+        });
+      });
+
+      // Deliverables as events
+      (deliverables || []).forEach((d: any) => {
+        if (!d.due_date) return;
+        const dueDate = new Date(d.due_date);
+        allEvents.push({
+          id: `del-${d.id}`,
+          company_id: companyId,
+          title: `📦 ${d.name}`,
+          description: null,
+          event_type: 'deliverable',
+          start_time: dueDate.toISOString(),
+          end_time: dueDate.toISOString(),
+          all_day: true,
+          location: null,
+          video_link: null,
+          color: d.completed ? '#10B981' : '#8B5CF6',
+          created_by: null,
+          project_id: d.project_id,
+          client_id: null,
+          recurrence_rule: null,
+          google_event_id: null,
+          created_at: '',
+          updated_at: '',
+          _source: 'deliverable',
+        });
+      });
+
+      // Projects deadlines
+      (projects || []).forEach((p: any) => {
+        if (!p.end_date) return;
+        const endDate = new Date(p.end_date);
+        allEvents.push({
+          id: `proj-${p.id}`,
+          company_id: companyId,
+          title: `🏗 ${p.name}`,
+          description: null,
+          event_type: 'project',
+          start_time: endDate.toISOString(),
+          end_time: endDate.toISOString(),
+          all_day: true,
+          location: null,
+          video_link: null,
+          color: '#6366F1',
+          created_by: null,
+          project_id: p.id,
+          client_id: p.client_id,
+          recurrence_rule: null,
+          google_event_id: null,
+          created_at: '',
+          updated_at: '',
+          _source: 'project',
+        });
+      });
+
+      // Sort by start_time
+      allEvents.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
+      setEvents(allEvents);
     } catch (err: any) {
       console.error('Error fetching calendar events:', err);
     } finally {
@@ -106,7 +217,6 @@ export function useCalendarEvents() {
 
       if (error) throw error;
 
-      // Add attendees if provided
       if (input.attendee_ids?.length && data) {
         const attendees = input.attendee_ids.map(uid => ({
           event_id: data.id,
@@ -122,7 +232,7 @@ export function useCalendarEvents() {
       toast({ title: 'Σφάλμα', description: err.message, variant: 'destructive' });
       return null;
     }
-  }, [profile, toast]);
+  }, [companyId, userId, toast]);
 
   const updateEvent = useCallback(async (id: string, updates: Partial<CalendarEvent>) => {
     try {

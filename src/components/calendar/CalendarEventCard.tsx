@@ -2,15 +2,18 @@ import { cn } from '@/lib/utils';
 import { CalendarEvent } from '@/hooks/useCalendarEvents';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
-import { Video, MapPin, Phone, Calendar as CalIcon } from 'lucide-react';
+import { Video, MapPin, Phone, Calendar as CalIcon, CheckSquare, Package, FolderKanban, Bell, Megaphone } from 'lucide-react';
 
 const typeIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   meeting: CalIcon,
   call: Phone,
   event: CalIcon,
-  reminder: CalIcon,
+  reminder: Bell,
   pr: CalIcon,
-  campaign: CalIcon,
+  campaign: Megaphone,
+  task: CheckSquare,
+  deliverable: Package,
+  project: FolderKanban,
 };
 
 const defaultColors: Record<string, string> = {
@@ -20,6 +23,9 @@ const defaultColors: Record<string, string> = {
   reminder: 'bg-amber-500/15 border-amber-500/30 text-amber-700 dark:text-amber-300',
   pr: 'bg-pink-500/15 border-pink-500/30 text-pink-700 dark:text-pink-300',
   campaign: 'bg-cyan-500/15 border-cyan-500/30 text-cyan-700 dark:text-cyan-300',
+  task: 'bg-blue-500/15 border-blue-500/30 text-blue-700 dark:text-blue-300',
+  deliverable: 'bg-violet-500/15 border-violet-500/30 text-violet-700 dark:text-violet-300',
+  project: 'bg-indigo-500/15 border-indigo-500/30 text-indigo-700 dark:text-indigo-300',
 };
 
 interface Props {

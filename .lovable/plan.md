@@ -1,106 +1,212 @@
 
 
-# Project Detail Page -- Corrections
+# Ημερολόγιο -- Ολική Αναδιαμόρφωση (Φάση 1)
 
-## Changes Overview
+## Σύνοψη
 
-1. **Remove progress bars** from both the sticky header and the deliverables tab area
-2. **Restore top-level tabs** including Tasks as a tab alongside Deliverables (like the original layout)
-3. **Team card: show full names** with visible Lead and Account Manager roles (assignable)
-4. **Merge "Σύνοψη" and "Λεπτομέρειες"** into a single card at the top of the right sidebar, including tracked hours
-5. **Remove AI Analysis card** entirely
-6. **Remove the two buttons** (+Task, +Παραδοτέο) from the sticky header top-right
+Το Ημερολόγιο γίνεται αυτόνομη ενότητα στο sidebar (νέα κατηγορία) με δικές του υποσελίδες, zoom-based navigation (Ετος → Μήνας → Εβδομάδα → Ημέρα), δημιουργία meetings, backlog panel, και context menu / drag-and-drop. Η σύνδεση με Google Calendar θα γίνει σε Φάση 2.
 
 ---
 
-## Detailed Changes
+## Δομή Navigation
 
-### File: `src/pages/ProjectDetail.tsx`
+Νέα κατηγορία "Ημερολόγιο" στο Icon Rail του sidebar, μεταξύ "Εργασίες" και "Επικοινωνία":
 
-**1. Sticky Header -- Remove buttons and progress bar**
-- Remove the `+ Task` and `+ Παραδοτέο` buttons from the header right side
-- Remove the progress bar and percentage display from the header
-- Keep: project name, status dropdown, folder dropdown, client, date range, days remaining, timer badge
+```text
+Icon Rail:
+  Αρχική
+  Εργασίες      (αφαιρείται το Calendar sub-link)
+  Ημερολόγιο    ← ΝΕΟ (CalendarDays icon)
+  Επικοινωνία
+  ...
+```
 
-**2. Restore top-level Tabs**
-- Replace the current layout (TasksPage always visible + secondary tabs below) with a proper `Tabs` component
-- Tab items: **Παραδοτέα** | **Tasks** | **Αρχεία** | **Media Plan** | **Δημιουργικά** | **Οικονομικά** | **Σχόλια**
-- Tasks tab renders embedded `TasksPage`
-- Deliverables tab renders `ProjectDeliverablesTable` (without the progress summary row that currently shows "Πρόοδος: 0/3 παραδοτέα 0%")
-- Other tabs render existing components as before
+Υποσελίδες στο Category Panel:
+- **Όλα** (`/calendar`) -- Ενοποιημένο ημερολόγιο (tasks + deliverables + projects + meetings)
+- **Campaigns** (`/calendar/campaigns`) -- Digital campaigns timeline
+- **Tasks** (`/calendar/tasks`) -- Μόνο tasks
+- **Έργα** (`/calendar/projects`) -- Project deadlines και milestones
+- **PR & Events** (`/calendar/events`) -- Events, media, PR activities
+- **Backlog** (`/calendar/backlog`) -- Items χωρίς ημερομηνία
 
-**3. Right sidebar -- Merge Summary + Details into one card**
-- Combine "Σύνοψη" and "Λεπτομέρειες" into a single card titled "Πληροφορίες Έργου"
-- Content order:
-  - Description (inline editable)
-  - Client (display)
-  - Budget (inline editable)
-  - Agency Fee (inline editable)
-  - Start date / End date (inline date pickers)
-  - Days remaining
-  - Tracked hours (moved here from header -- keep the timer badge in header too for quick glance)
-  - Tasks: X/Y completed (text only, no progress bar)
-  - Deliverables: X/Y completed (text only, no progress bar)
-- No progress bars anywhere in this card
+---
 
-**4. Team card -- Full names + Lead/Account Manager**
-- Replace avatar-only compact display with a list showing full names
-- Each member row: Avatar + Full Name + Role badge
-- Add two special role designators at the top:
-  - **Project Lead** -- selectable from team members
-  - **Account Manager** -- selectable from team members
-- These are stored as metadata on the `project_user_access` table (or a new field on the project itself)
-- Display Lead and Account Manager prominently at the top of the team card with their names
+## Zoom-Based Views με Smooth Animation
 
-**5. Remove AI Analysis**
-- Remove the entire collapsible AI Analysis card from the right sidebar
-- Remove related state variables (`aiFiles`, `aiRawFiles`, `aiOpen`) and handler functions
-- Remove `useDocumentParser` import and usage
+4 επίπεδα zoom: **Year → Month → Week → Day**
+
+Η αλλαγή view γίνεται με:
+1. **Click σε κελί** -- zoom in (π.χ. click μήνα στο Year view → Month view εκείνου του μήνα)
+2. **Breadcrumb navigation** -- zoom out (π.χ. "2026 > Φεβρουάριος > Εβδ. 8" -- click "2026" → Year view)
+3. **Keyboard**: scroll wheel ή +/- για zoom in/out
+
+Κάθε transition χρησιμοποιεί CSS `transform: scale()` + `opacity` animation (~300ms) για smooth zoom effect.
+
+### Year View
+- 12 μήνες σε grid 4x3
+- Κάθε μήνας δείχνει mini calendar + event count dots
+- Click σε μήνα → zoom in σε Month view
+
+### Month View (υπάρχον, βελτιωμένο)
+- Κλασικό grid 7 στηλών
+- Events σαν colored bars
+- Click σε ημέρα → zoom in σε Day view
+- Double-click σε κενό → δημιουργία meeting
+
+### Week View
+- 7 στήλες, ώρες στον κατακόρυφο άξονα (08:00-22:00)
+- Time blocks για meetings
+- Drag to create meeting
+- Drag to reschedule
+
+### Day View
+- Λεπτομερές ωράριο (30min slots)
+- Timeline αριστερά με ώρες
+- Δεξί panel με λεπτομέρειες επιλεγμένου event
+
+---
+
+## Database: Meetings Table
+
+```sql
+CREATE TABLE public.calendar_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id uuid NOT NULL REFERENCES companies(id),
+  title text NOT NULL,
+  description text,
+  event_type text NOT NULL DEFAULT 'meeting',
+    -- 'meeting', 'call', 'event', 'reminder', 'pr', 'campaign'
+  start_time timestamptz NOT NULL,
+  end_time timestamptz NOT NULL,
+  all_day boolean DEFAULT false,
+  location text,
+  video_link text,
+  color text,
+  created_by uuid REFERENCES profiles(id),
+  project_id uuid REFERENCES projects(id),
+  client_id uuid REFERENCES clients(id),
+  recurrence_rule text,   -- RRULE string (φάση 2)
+  google_event_id text,   -- Google Calendar sync (φάση 2)
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE public.calendar_event_attendees (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id uuid NOT NULL REFERENCES calendar_events(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES profiles(id),
+  status text DEFAULT 'pending', -- 'accepted', 'declined', 'pending', 'tentative'
+  created_at timestamptz DEFAULT now(),
+  UNIQUE(event_id, user_id)
+);
+
+-- Enable realtime
+ALTER PUBLICATION supabase_realtime ADD TABLE public.calendar_events;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.calendar_event_attendees;
+```
+
+RLS policies για company-scoped access + attendee visibility.
+
+---
+
+## Interactions
+
+### Click
+- Click σε event → side panel με λεπτομέρειες
+- Click σε κενό slot → quick create meeting dialog
+- Click σε ημέρα (Month/Year view) → zoom in
+
+### Right Click (Context Menu)
+- Σε event: Edit, Delete, Duplicate, Αλλαγή χρώματος, Link to Project
+- Σε κενό: New Meeting, New Reminder, Paste Event
+
+### Drag & Drop
+- Drag event σε άλλη ημέρα/ώρα → reschedule (update start_time/end_time)
+- Drag from backlog → assign date
+- Drag edge of event → resize duration (Week/Day view)
+
+---
+
+## Backlog Panel
+
+Slide-out panel (δεξιά) ή dedicated page (`/calendar/backlog`):
+- Tasks χωρίς due_date
+- Deliverables χωρίς due_date
+- Draft meetings χωρίς ημερομηνία
+- Drag from backlog → calendar = assign date
+- Filter by project, type
+
+---
+
+## Meeting Creation Dialog
+
+Fields:
+- Τίτλος
+- Τύπος (Meeting, Call, Event, Reminder)
+- Ημερομηνία/Ώρα έναρξης - λήξης
+- Ολοήμερο toggle
+- Τοποθεσία / Video link
+- Attendees (multi-select from team, sends notification)
+- Linked Project (optional)
+- Linked Client (optional)
+- Χρώμα
+- Περιγραφή
 
 ---
 
 ## Technical Details
 
-### Database Change
+### Νέα αρχεία
 
-Add two columns to the `projects` table for Lead and Account Manager:
+| File | Purpose |
+|------|---------|
+| `src/pages/CalendarHub.tsx` | Main calendar page with sub-routing |
+| `src/components/calendar/CalendarZoomView.tsx` | Core zoom engine (Year/Month/Week/Day) |
+| `src/components/calendar/CalendarYearView.tsx` | Year grid (12 months) |
+| `src/components/calendar/CalendarMonthView.tsx` | Enhanced month grid |
+| `src/components/calendar/CalendarWeekView.tsx` | Week view with time slots |
+| `src/components/calendar/CalendarDayView.tsx` | Day detail view |
+| `src/components/calendar/CalendarEventDialog.tsx` | Create/edit meeting dialog |
+| `src/components/calendar/CalendarBacklog.tsx` | Backlog panel |
+| `src/components/calendar/CalendarContextMenu.tsx` | Right-click context menu |
+| `src/components/calendar/CalendarEventCard.tsx` | Event display component |
+| `src/components/calendar/CalendarFilterTabs.tsx` | Sub-page filter tabs |
+| `src/hooks/useCalendarEvents.ts` | CRUD hook for calendar_events |
 
-```sql
-ALTER TABLE projects ADD COLUMN project_lead_id uuid REFERENCES profiles(id);
-ALTER TABLE projects ADD COLUMN account_manager_id uuid REFERENCES profiles(id);
-```
-
-This approach stores the lead/account manager at the project level rather than on team access records, making it simpler to query and display.
-
-### Team Card Layout (New)
-
-```text
-+----------------------------------+
-| Ομάδα Έργου          [Προσθήκη] |
-|                                  |
-| Project Lead:                    |
-| [Avatar] Πέτρος Νικολάου  [▼]   |
-|                                  |
-| Account Manager:                 |
-| [Avatar] Σοφία Μαυρίδου   [▼]   |
-|                                  |
-| Μέλη:                            |
-| [Avatar] Μαρία Παπαδοπούλου      |
-| [Avatar] Γιώργος Νικολάου        |
-| [Avatar] Δημήτρης Αλεξίου        |
-+----------------------------------+
-```
-
-### Modified Files
+### Τροποποιημένα αρχεία
 
 | File | Changes |
 |------|---------|
-| `src/pages/ProjectDetail.tsx` | Remove header buttons and progress; restore top-level tabs with Tasks tab; merge Summary+Details cards; remove AI block; update team card usage |
-| `src/components/projects/ProjectTeamManager.tsx` | Update compact mode to show full names instead of avatar-only; add Lead/Account Manager display and selection dropdowns |
+| `src/App.tsx` | Add `/calendar/*` routes, remove `/calendar` redirect to work |
+| `src/components/layout/AppSidebar.tsx` | Add "calendar" category to icon rail, remove calendar from work sub-links |
+| `src/pages/Work.tsx` | Remove calendar tab |
 
-### Removed Code
-- AI Analysis collapsible card and all related state/handlers
-- `useDocumentParser` hook usage
-- `ProjectAISuggestions` import
-- Progress bars from summary card
-- `+ Task` and `+ Παραδοτέο` buttons from header
+### Zoom Animation CSS
+
+```css
+.calendar-zoom-enter {
+  animation: zoom-in 300ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.calendar-zoom-exit {
+  animation: zoom-out 300ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+@keyframes zoom-in {
+  from { transform: scale(0.85); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes zoom-out {
+  from { transform: scale(1); opacity: 1; }
+  to { transform: scale(1.15); opacity: 0; }
+}
+```
+
+---
+
+## Φάση 2 (Μελλοντική)
+
+- Google Calendar bi-directional sync
+- Recurring events (RRULE)
+- Calendar sharing / permissions
+- Email invitations σε εξωτερικούς
+- Agenda print view
+

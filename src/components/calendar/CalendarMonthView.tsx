@@ -1,9 +1,8 @@
 import { useMemo } from 'react';
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
-  eachDayOfInterval, isSameMonth, isSameDay, isToday, addDays,
+  eachDayOfInterval, isSameMonth, isToday,
 } from 'date-fns';
-import { el } from 'date-fns/locale';
 import { CalendarEvent } from '@/hooks/useCalendarEvents';
 import { CalendarEventCard } from './CalendarEventCard';
 import { cn } from '@/lib/utils';
@@ -44,6 +43,8 @@ export function CalendarMonthView({ date, events, onDayClick, onEventClick, onEv
     return map;
   }, [events]);
 
+  const numWeeks = weeks.length;
+
   return (
     <div className="flex flex-col h-full">
       {/* Day headers */}
@@ -55,10 +56,13 @@ export function CalendarMonthView({ date, events, onDayClick, onEventClick, onEv
         ))}
       </div>
 
-      {/* Weeks */}
-      <div className="flex-1 grid grid-rows-[repeat(auto-fill,minmax(0,1fr))]">
+      {/* Weeks - use explicit row count so grid fills the space evenly */}
+      <div
+        className="flex-1 grid"
+        style={{ gridTemplateRows: `repeat(${numWeeks}, 1fr)` }}
+      >
         {weeks.map((week, wi) => (
-          <div key={wi} className="grid grid-cols-7 border-b border-border/20 last:border-b-0">
+          <div key={wi} className="grid grid-cols-7 border-b border-border/20 last:border-b-0 min-h-0">
             {week.map((day) => {
               const key = format(day, 'yyyy-MM-dd');
               const dayEvents = eventsByDay[key] || [];
@@ -68,9 +72,9 @@ export function CalendarMonthView({ date, events, onDayClick, onEventClick, onEv
                 <div
                   key={key}
                   className={cn(
-                    'relative min-h-[80px] border-r border-border/20 last:border-r-0 p-1 cursor-pointer transition-colors',
+                    'relative border-r border-border/20 last:border-r-0 p-1.5 cursor-pointer transition-colors overflow-hidden',
                     'hover:bg-accent/30',
-                    !inMonth && 'opacity-40'
+                    !inMonth && 'opacity-35 bg-muted/20'
                   )}
                   onClick={() => onDayClick(day)}
                   onDoubleClick={(e) => {
@@ -80,7 +84,7 @@ export function CalendarMonthView({ date, events, onDayClick, onEventClick, onEv
                 >
                   <div className={cn(
                     'text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full mb-0.5',
-                    isToday(day) && 'bg-primary text-primary-foreground',
+                    isToday(day) && 'bg-primary text-primary-foreground font-bold',
                   )}>
                     {format(day, 'd')}
                   </div>

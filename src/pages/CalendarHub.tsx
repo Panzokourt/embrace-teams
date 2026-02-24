@@ -34,14 +34,17 @@ export default function CalendarHub() {
   // Filter events by type
   const filteredEvents = useMemo(() => {
     if (activeFilter === 'all' || activeFilter === 'backlog') return events;
-    const typeMap: Record<string, string[]> = {
+    const sourceMap: Record<string, string[]> = {
       campaigns: ['campaign'],
-      tasks: ['reminder'],
-      projects: ['meeting', 'call'],
-      events: ['event', 'pr'],
+      tasks: ['task'],
+      projects: ['project', 'deliverable'],
+      events: ['event', 'pr', 'meeting', 'call', 'reminder'],
     };
-    const types = typeMap[activeFilter] || [];
-    return events.filter(e => types.includes(e.event_type));
+    const sources = sourceMap[activeFilter] || [];
+    return events.filter(e => {
+      // Check both event_type and _source
+      return sources.includes(e.event_type) || sources.includes(e._source || '');
+    });
   }, [events, activeFilter]);
 
   const handleFilterChange = (f: CalendarFilter) => {

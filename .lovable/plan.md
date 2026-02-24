@@ -1,10 +1,10 @@
 
 
-# Task Detail Page -- UX Restructuring
+# Project Detail Page -- Task-Centric Restructuring
 
 ## Summary
 
-Complete restructure of the Task Detail page from the current vertical form layout to a modern 2-column smart layout with a sticky action bar, prioritized subtasks, and consolidated activity tabs.
+Transform the Project Detail page from a tab-heavy dashboard layout to a task-centric 2-column workspace. Tasks become the core of the page (always visible), while project metadata moves to a compact right panel. Tabs are reduced to secondary views only.
 
 ---
 
@@ -12,27 +12,29 @@ Complete restructure of the Task Detail page from the current vertical form layo
 
 ```text
 +------------------------------------------------------------------+
-| [<] Task Title (inline edit)           [Timer] [Status▼] [Priority] [Due] [Avatar] [Actions...] |
+| [<] Project Name     [Status▼] [Folder▼]  [Progress] [Timer]     |
+|     Client · 1 Jan → 30 Jun · Σε 126 ημέρες                      |
+|     [Add Task] [Add Deliverable]                                  |
 +------------------------------------------------------------------+
 |                                        |                          |
-|  MAIN WORK AREA (70%)                  |  META PANEL (30%)        |
+|  MAIN TASK ENGINE (75%)                |  PROJECT PANEL (25%)     |
 |                                        |                          |
-|  A. Overview Card                      |  1. Assignment Card      |
-|  - Description (inline edit)           |     - Assignee           |
-|  - Deliverable                         |     - (future: collabs)  |
-|  - Project link                        |                          |
-|  - Tags (type, category)              |  2. Timeline Card        |
-|                                        |     - Start date         |
-|  B. Subtasks                           |     - Due date           |
-|  - Checkbox list with progress         |     - Created at         |
-|  - Add subtask inline                  |     - Estimated time     |
-|  - Auto-calculated progress bar        |     - Actual time        |
-|                                        |                          |
-|  C. Activity Tabs                      |  3. Status Flow Card     |
-|  - Discussion (default)               |     - Visual workflow     |
-|  - Files                              |     - Clickable stages   |
-|  - Time                               |                          |
-|  - Activity Log (moved from right)    |                          |
+|  A. View Switcher                      |  1. Summary Card         |
+|  [List] [Kanban] [Timeline]            |     - Progress bars      |
+|                                        |     - Tasks X/Y          |
+|  B. Quick Filter Bar (sticky)          |     - Deliverables X/Y   |
+|  All | My Tasks | Overdue | This Week  |     - Days remaining     |
+|  | Completed | By Deliverable          |                          |
+|                                        |  2. Team Card            |
+|  C. Task List                          |     - Avatars + roles    |
+|  [x] Task title  @user  15 Feb  ●High  |     - Active tasks count |
+|  [ ] Task title  @user  20 Mar  ●Med   |                          |
+|  [ ] Task title  @user  -       ●Low   |  3. Description Card     |
+|  ...                                   |     - Inline editable    |
+|                                        |     - Budget, dates      |
+|  D. Secondary Tabs (below tasks)       |                          |
+|  Deliverables | Files | Media Plan     |  4. AI Analysis (mini)   |
+|  | Creatives | Financials              |     - Upload trigger     |
 |                                        |                          |
 +------------------------------------------------------------------+
 ```
@@ -41,67 +43,79 @@ Complete restructure of the Task Detail page from the current vertical form layo
 
 ## Detailed Changes
 
-### 1. Sticky Top Header (Action Bar)
+### 1. Sticky Header (Simplified)
 
-Replace the current header + status pill buttons + properties grid with a single compact horizontal bar:
+Keep the existing header structure but make it sticky:
+- Project Name, Status dropdown, Folder dropdown, Timer badge (already exist)
+- Add primary "Add Task" button and secondary "Add Deliverable" button
+- Keep client name, date range, due date countdown
+- Keep progress bar
+- Make the entire header `sticky top-0 z-10`
 
-- **Left**: Back button, Task Title (inline editable), Timer button
-- **Right**: Status dropdown (colored badge, click to change), Priority indicator (colored dot), Due date chip, Assignee avatar, Quick action buttons (Add subtask, Attach file, Mark complete)
-- Sticky positioning (`sticky top-0 z-10 bg-background`)
-- Single horizontal row, no wrapping to 2 lines
+### 2. Remove Tab-First Architecture
 
-### 2. Left Column -- Main Work Area (flex-1, ~70%)
+The current page uses Tabs as the primary navigation (Overview, Deliverables, Tasks, etc.). The new layout:
+- **Remove the top-level Tabs wrapper** that controls the entire page
+- Tasks are **always visible** as the main content area (no tab needed)
+- Secondary features (Deliverables, Files, Media Plan, Creatives, Financials) move to **secondary tabs below the task list**
+- Comments/History moves into the secondary tabs as well
 
-**A. Overview Block (Compact summary card)**
-- Description: inline editable text area (click to edit, no separate section header needed -- just the text with a hover pencil icon)
-- Deliverable: inline select
-- Project link: clickable chip
-- Type & Category: inline tag selectors
-- All in a single compact card with subtle borders
+### 3. Left Column -- Main Task Engine (flex-1, ~75%)
 
-**B. Subtasks Section (Promoted -- shown before tabs)**
-- Always visible (not hidden when empty)
-- Checkbox list with status icons
-- Auto-calculated progress bar based on completed subtasks ratio
-- "Add subtask" inline input at the bottom
-- Click to navigate to subtask detail
-- Smart empty state: "Add your first subtask" CTA
+**A. View Switcher**
+- Reuse existing `UnifiedViewToggle` or simple toggle buttons: List | Kanban | Timeline
+- Default to List view
+- Store preference in localStorage
 
-**C. Activity Tabs (4 tabs)**
-- Discussion (default) -- existing CommentsSection
-- Files -- existing FileExplorer
-- Time -- existing TaskTimer + time stats
-- Activity Log -- **moved from right sidebar** to here as a tab
+**B. Quick Filter Bar (sticky below header)**
+- Horizontal pill buttons: All | My Tasks | Overdue | Due This Week | Completed | By Deliverable
+- "By Deliverable" groups tasks under their deliverable headers
+- Filters applied client-side on the task list
 
-### 3. Right Column -- Smart Meta Panel (w-80, ~30%)
+**C. Task List (Enhanced inline)**
+- Embed `TasksPage` (already exists as `embedded` mode) with the project filter
+- Each task row shows: Checkbox, Title (inline edit), Assignee avatar, Due date, Priority dot, Status dropdown, Subtask progress
+- Hover reveals quick actions (comment, attach, log time)
+- This is essentially the existing Tasks page in embedded mode with filters on top
 
-Three compact cards stacked vertically:
+**D. Secondary Tabs (Below the task area)**
+- Smaller tab bar for: Παραδοτέα | Αρχεία | Media Plan | Δημιουργικά | Οικονομικά | Σχόλια
+- These render the existing components: `ProjectDeliverablesTable`, `FileExplorer`, `ProjectMediaPlan`, `ProjectCreatives`, `ProjectFinancialsHub`, `ProjectCommentsAndHistory`
 
-**Card 1: Assignment**
-- Assignee with avatar and inline select to change
+### 4. Right Column -- Compact Project Panel (w-80, ~25%)
 
-**Card 2: Timeline**
-- Start date (inline date picker)
-- Due date (inline date picker)
-- Created at (read-only)
-- Estimated hours (inline edit)
-- Actual hours (read-only)
+**Card 1: Project Summary**
+- Overall progress (combined bar)
+- Tasks: X/Y completed with mini progress bar
+- Deliverables: X/Y completed with mini progress bar
+- Days remaining (with color coding)
+- Budget display
 
-**Card 3: Status Flow**
-- Visual horizontal workflow: To Do > In Progress > Review > Internal > Client > Done
-- Current stage highlighted
-- Clickable to change status
-- Small connected dots/steps visualization
+**Card 2: Team**
+- Compact `ProjectTeamManager` (already has `compact` prop)
+- Show active tasks count per member (future enhancement)
+
+**Card 3: Description & Details**
+- Inline editable description
+- Budget, Agency Fee (inline edit)
+- Start/End dates (inline date pickers)
+- This replaces the large `ProjectInfoEditor` card
+
+**Card 4: AI Analysis (Mini)**
+- Collapsed by default, expandable
+- File upload trigger
+- Shows AI suggestions when files are uploaded
 
 ---
 
 ## What Gets Removed/Simplified
 
-- **Remove**: Large properties grid (vertical form layout) -- fields distributed to header bar and right panel
-- **Remove**: Status pill buttons row (replaced by dropdown in header + flow card)
-- **Remove**: Right sidebar "Ιστορικό" panel (moved to Activity Log tab)
-- **Remove**: Separate progress manual slider (auto-calculated from subtasks)
-- **Remove**: "Σήμανση ως Επείγον" button (priority handled via header indicator)
+- **Remove**: Top-level Tabs as page architecture (replaced by always-visible tasks + secondary tabs)
+- **Remove**: "Overview" tab concept (its contents are distributed: KPIs to right panel, tasks to main area, comments to secondary tab)
+- **Remove**: Large "Πληροφορίες Έργου" card (replaced by compact description card in right panel)
+- **Remove**: "Πρόσφατα Tasks" card (redundant -- full task list is always visible)
+- **Remove**: KPI cards row (data moves to right panel summary card)
+- **Simplify**: AI Analysis block (moves to collapsible mini card in right panel)
 
 ---
 
@@ -111,37 +125,50 @@ Three compact cards stacked vertically:
 
 | File | Changes |
 |------|---------|
-| `src/pages/TaskDetail.tsx` | Complete restructure of the render layout; add inline subtask creation; add subtask-based progress; move activity log to tab; new sticky header; new right panel cards; new status flow component |
+| `src/pages/ProjectDetail.tsx` | Complete restructure: remove top-level Tabs, implement 2-column layout with tasks as main content, add quick filter bar, move metadata to right panel, add secondary tabs below task area |
 
-### New Sub-Components (inline in TaskDetail.tsx or extracted)
-
-- `TaskActionBar` -- sticky header with all quick controls
-- `OverviewCard` -- description + deliverable + tags
-- `SubtasksBlock` -- checkbox list + progress + add inline
-- `AssignmentCard` -- right panel assignee
-- `TimelineCard` -- right panel dates/hours
-- `StatusFlowCard` -- visual workflow steps
-
-### Subtask Progress Auto-Calculation
+### Task Filter Implementation
 
 ```text
-progress = (completedSubtasks / totalSubtasks) * 100
+Filters (client-side on fetched tasks):
+- All: no filter
+- My Tasks: task.assigned_to === user.id
+- Overdue: task.due_date < today && status !== 'completed'
+- Due This Week: task.due_date within current week
+- Completed: task.status === 'completed'
+- By Deliverable: group tasks by deliverable_id
 ```
 
-If no subtasks exist, fall back to manual progress field. When subtasks exist, the progress is always auto-calculated and the manual slider is hidden.
+### Layout Structure (JSX)
 
-### Add Subtask Inline
+```text
+<div sticky header />
+<div className="flex gap-6">
+  <div className="flex-1">   <!-- 75% -->
+    <ViewSwitcher />
+    <FilterBar />
+    <TasksPage embedded projectId={id} />
+    <SecondaryTabs>
+      <Deliverables />
+      <Files />
+      <MediaPlan />
+      <Creatives />
+      <Financials />
+      <Comments />
+    </SecondaryTabs>
+  </div>
+  <div className="w-80 shrink-0">  <!-- 25% -->
+    <SummaryCard />
+    <TeamCard />
+    <DescriptionCard />
+    <AICard />
+  </div>
+</div>
+```
 
-- Text input at the bottom of subtasks list
-- Enter to create with: `parent_task_id = task.id`, `project_id = task.project_id`, `status = 'todo'`
-- Immediately appears in the list
+### Add Task / Add Deliverable Buttons
 
-### Status Flow Visual
-
-A horizontal stepper showing all 6 statuses as connected dots/nodes. The current status is highlighted with its color. Clicking a different node changes the status (calls existing `handleStatusChange`).
-
-### Keyboard Shortcuts
-
-- `Cmd/Ctrl + Enter` in description = save
-- `/` = focus quick action (future enhancement, not blocking)
+- "Add Task" opens the task creation flow (navigate to task creation or inline dialog)
+- "Add Deliverable" opens deliverable creation (existing flow in `ProjectDeliverablesTable`)
+- Both pre-fill `project_id`
 

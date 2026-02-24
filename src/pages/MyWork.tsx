@@ -31,7 +31,7 @@ import {
   Plus, CalendarDays, Timer, FileText, FolderKanban,
   ChevronRight, Palmtree, Check, X, GripVertical, ExternalLink,
   Palette, Monitor, Globe, Calendar, MessageSquare, BarChart3,
-  FileArchive, Bot, Send, Loader2, Minimize2, Maximize2, Flag,
+  FileArchive, Flag,
   ChevronDown, Crosshair, Inbox, Zap,
 } from 'lucide-react';
 import { format, isBefore, startOfDay, endOfWeek, startOfTomorrow, isAfter } from 'date-fns';
@@ -68,7 +68,7 @@ interface MyProject {
   client?: { name: string } | null;
 }
 
-type ChatMsg = { role: 'user' | 'assistant'; content: string };
+
 
 const TASK_SELECT = 'id, title, status, priority, due_date, start_date, estimated_hours, actual_hours, progress, task_type, task_category, project_id, description, assigned_to, internal_reviewer, project:projects(name)';
 
@@ -404,136 +404,7 @@ function AttentionPanel({
   );
 }
 
-// ── AI Chat Widget ─────────────────────────────────
-function AIChatWidget() {
-  const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMsg[]>([]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
 
-  const send = async () => {
-    if (!input.trim() || loading) return;
-    const userMsg: ChatMsg = { role: 'user', content: input.trim() };
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
-    setInput('');
-    setLoading(true);
-
-    let assistantSoFar = '';
-    const upsertAssistant = (chunk: string) => {
-      assistantSoFar += chunk;
-      setMessages(prev => {
-        const last = prev[prev.length - 1];
-        if (last?.role === 'assistant') {
-          return prev.map((m, i) => i === prev.length - 1 ? { ...m, content: assistantSoFar } : m);
-        }
-        return [...prev, { role: 'assistant', content: assistantSoFar }];
-      });
-    };
-
-    try {
-      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/my-work-ai-chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({ messages: newMessages }),
-      });
-
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        toast.error(err.error || 'AI error');
-        setLoading(false);
-        return;
-      }
-
-      const reader = resp.body!.getReader();
-      const decoder = new TextDecoder();
-      let buf = '';
-      let done = false;
-
-      while (!done) {
-        const { done: rd, value } = await reader.read();
-        if (rd) break;
-        buf += decoder.decode(value, { stream: true });
-        let nl: number;
-        while ((nl = buf.indexOf('\n')) !== -1) {
-          let line = buf.slice(0, nl);
-          buf = buf.slice(nl + 1);
-          if (line.endsWith('\r')) line = line.slice(0, -1);
-          if (!line.startsWith('data: ')) continue;
-          const json = line.slice(6).trim();
-          if (json === '[DONE]') { done = true; break; }
-          try {
-            const p = JSON.parse(json);
-            const c = p.choices?.[0]?.delta?.content;
-            if (c) upsertAssistant(c);
-          } catch { buf = line + '\n' + buf; break; }
-        }
-      }
-    } catch (e) {
-      console.error(e);
-      toast.error('Σφάλμα σύνδεσης');
-    }
-    setLoading(false);
-  };
-
-  if (!open) {
-    return (
-      <Button
-        onClick={() => setOpen(true)}
-        size="icon"
-        className="fixed bottom-6 right-24 z-50 h-14 w-14 rounded-full shadow-lg bg-secondary text-secondary-foreground hover:bg-secondary/80"
-      >
-        <Bot className="h-6 w-6" />
-      </Button>
-    );
-  }
-
-  return (
-    <div className="fixed bottom-6 right-6 z-50 w-96 max-w-[calc(100vw-2rem)] bg-background border border-border rounded-2xl shadow-2xl flex flex-col" style={{ height: 480 }}>
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <div className="flex items-center gap-2">
-          <Bot className="h-5 w-5 text-primary" />
-          <span className="text-sm font-semibold">AI Βοηθός</span>
-        </div>
-        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setOpen(false)}>
-          <Minimize2 className="h-4 w-4" />
-        </Button>
-      </div>
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
-        {messages.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center mt-8">Ρώτησέ με οτιδήποτε για τα tasks και τα projects σου!</p>
-        )}
-        {messages.map((m, i) => (
-          <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[80%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap ${m.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'}`}>
-              {m.content}
-            </div>
-          </div>
-        ))}
-        {loading && messages[messages.length - 1]?.role !== 'assistant' && (
-          <div className="flex justify-start">
-            <div className="bg-muted rounded-xl px-3 py-2"><Loader2 className="h-4 w-4 animate-spin" /></div>
-          </div>
-        )}
-      </div>
-      <div className="border-t border-border p-3 flex gap-2">
-        <input
-          className="flex-1 bg-muted rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-          placeholder="Γράψε μήνυμα..."
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
-        />
-        <Button size="icon" className="h-9 w-9 shrink-0" onClick={send} disabled={loading || !input.trim()}>
-          <Send className="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 // ── Main Page ──────────────────────────────────────
 export default function MyWork() {
@@ -1213,8 +1084,6 @@ export default function MyWork() {
         <BriefFormDialog open={true} onOpenChange={() => setSelectedBriefType(null)} definition={selectedDef} />
       )}
 
-      {/* AI Chat Widget */}
-      <AIChatWidget />
     </div>
   );
 }

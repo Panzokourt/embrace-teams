@@ -12,7 +12,9 @@ import {
   Users,
   Search,
   X,
-  Settings2
+  Settings2,
+  Crown,
+  Briefcase,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
@@ -25,11 +27,12 @@ import {
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface TeamMember {
   id: string;
@@ -56,15 +59,22 @@ interface AvailableUser {
 interface ProjectTeamManagerProps {
   projectId: string;
   canEdit: boolean;
-}
-
-interface ProjectTeamManagerProps {
-  projectId: string;
-  canEdit: boolean;
   compact?: boolean;
+  showFullNames?: boolean;
+  projectLeadId?: string | null;
+  accountManagerId?: string | null;
+  onUpdateProjectRole?: (field: string, value: string | null) => void;
 }
 
-export function ProjectTeamManager({ projectId, canEdit, compact = false }: ProjectTeamManagerProps) {
+export function ProjectTeamManager({
+  projectId,
+  canEdit,
+  compact = false,
+  showFullNames = false,
+  projectLeadId,
+  accountManagerId,
+  onUpdateProjectRole,
+}: ProjectTeamManagerProps) {
   const { company } = useAuth();
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [availableUsers, setAvailableUsers] = useState<AvailableUser[]>([]);
@@ -96,13 +106,11 @@ export function ProjectTeamManager({ projectId, canEdit, compact = false }: Proj
       if (data && data.length > 0) {
         const userIds = data.map(d => d.user_id);
         
-        // Fetch profiles
         const { data: profiles } = await supabase
           .from('profiles')
           .select('id, full_name, email, avatar_url')
           .in('id', userIds);
 
-        // Fetch roles
         const { data: roles } = await supabase
           .from('user_company_roles')
           .select('user_id, role')
@@ -132,7 +140,6 @@ export function ProjectTeamManager({ projectId, canEdit, compact = false }: Proj
     if (!company?.id) return;
 
     try {
-      // Get users from the same company
       const { data: companyUsers } = await supabase
         .from('user_company_roles')
         .select('user_id, role')
@@ -146,13 +153,11 @@ export function ProjectTeamManager({ projectId, canEdit, compact = false }: Proj
 
       const userIds = companyUsers.map(u => u.user_id);
 
-      // Fetch profiles
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, full_name, email, avatar_url')
         .in('id', userIds);
 
-      // Filter out already assigned users
       const assignedIds = new Set(teamMembers.map(m => m.user_id));
       const rolesMap = new Map(companyUsers.map(u => [u.user_id, u.role]));
 
@@ -174,13 +179,9 @@ export function ProjectTeamManager({ projectId, canEdit, compact = false }: Proj
     try {
       const { error } = await supabase
         .from('project_user_access')
-        .insert({
-          project_id: projectId,
-          user_id: userId,
-        });
+        .insert({ project_id: projectId, user_id: userId });
 
       if (error) throw error;
-
       toast.success('Το μέλος προστέθηκε στην ομάδα!');
       fetchTeamMembers();
       fetchAvailableUsers();
@@ -201,7 +202,6 @@ export function ProjectTeamManager({ projectId, canEdit, compact = false }: Proj
         .eq('id', accessId);
 
       if (error) throw error;
-
       toast.success('Το μέλος αφαιρέθηκε από την ομάδα!');
       setTeamMembers(prev => prev.filter(m => m.id !== accessId));
     } catch (error) {
@@ -248,181 +248,292 @@ export function ProjectTeamManager({ projectId, canEdit, compact = false }: Proj
     );
   }
 
-  const MAX_VISIBLE = 4;
+  // ─── Dialog content (shared between compact and full modes) ─────────
+  const manageDialogContent = (
+    <DialogContent className="max-w-lg">
+      <DialogHeader>
+        <DialogTitle>Διαχείριση Ομάδας</DialogTitle>
+        <DialogDescription>Προσθήκη ή αφαίρεση μελών από την ομάδα του έργου</DialogDescription>
+      </DialogHeader>
 
-  // ─── COMPACT MODE (avatar stack) ───────────────────────────────────────────
-  if (compact) {
-    const visibleMembers = teamMembers.slice(0, MAX_VISIBLE);
-    const extraCount = teamMembers.length - MAX_VISIBLE;
-
-    return (
-      <TooltipProvider>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Ομάδα Έργου</span>
-              <Badge variant="secondary" className="text-xs">{teamMembers.length}</Badge>
+      {/* Current members */}
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-muted-foreground">Τρέχοντα μέλη ({teamMembers.length})</p>
+        <div className="space-y-1.5 max-h-48 overflow-y-auto">
+          {teamMembers.map(member => (
+            <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg border bg-card">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={member.profile.avatar_url || ''} />
+                <AvatarFallback className="text-xs">
+                  {getInitials(member.profile.full_name, member.profile.email)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">
+                  {member.profile.full_name || member.profile.email.split('@')[0]}
+                </p>
+              </div>
+              {getRoleBadge(member.role?.role)}
+              {canEdit && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-destructive"
+                  onClick={() => removeMember(member.id)}
+                  disabled={removing === member.id}
+                >
+                  {removing === member.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <UserMinus className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              )}
             </div>
-            {canEdit && (
+          ))}
+        </div>
+      </div>
+
+      {/* Add member search */}
+      {canEdit && (
+        <div className="space-y-2 border-t pt-3">
+          <p className="text-sm font-medium text-muted-foreground">Προσθήκη μέλους</p>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Αναζήτηση χρήστη..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
+            />
+            {searchTerm && (
               <Button
                 variant="ghost"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={() => setAddDialogOpen(true)}
+                size="icon"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                onClick={() => setSearchTerm('')}
               >
-                <UserPlus className="h-3.5 w-3.5 mr-1" />
-                Προσθήκη
+                <X className="h-4 w-4" />
               </Button>
             )}
           </div>
+          <ScrollArea className="h-[200px] pr-2">
+            {filteredUsers.length === 0 ? (
+              <p className="text-center text-sm text-muted-foreground py-4">
+                Δεν βρέθηκαν διαθέσιμοι χρήστες
+              </p>
+            ) : (
+              <div className="space-y-1.5">
+                {filteredUsers.map(user => (
+                  <div key={user.id} className="flex items-center gap-3 p-2 rounded-lg border hover:bg-muted/50">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={user.avatar_url || ''} />
+                      <AvatarFallback className="text-xs">{getInitials(user.full_name, user.email)}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {user.full_name || user.email.split('@')[0]}
+                      </p>
+                    </div>
+                    {getRoleBadge(user.role)}
+                    <Button
+                      size="sm"
+                      onClick={() => addMember(user.id)}
+                      disabled={adding === user.id}
+                    >
+                      {adding === user.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <UserPlus className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </div>
+      )}
+    </DialogContent>
+  );
 
-          {teamMembers.length === 0 ? (
-            <p className="text-xs text-muted-foreground">Δεν έχουν ανατεθεί μέλη</p>
-          ) : (
-            <div className="flex items-center gap-2">
-              {/* Avatar stack */}
-              <div className="flex -space-x-2">
-                {visibleMembers.map(member => (
-                  <Tooltip key={member.id}>
-                    <TooltipTrigger asChild>
-                      <Avatar className="h-8 w-8 border-2 border-background cursor-pointer ring-1 ring-border">
+  // Helper to find member by user_id
+  const findMember = (userId: string | null | undefined) =>
+    userId ? teamMembers.find(m => m.user_id === userId) : null;
+
+  const leadMember = findMember(projectLeadId);
+  const accountMgrMember = findMember(accountManagerId);
+
+  // ─── COMPACT MODE with full names ─────────────────────────────────────
+  if (compact) {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-semibold">Ομάδα Έργου</span>
+            <Badge variant="secondary" className="text-xs">{teamMembers.length}</Badge>
+          </div>
+          <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+            <DialogTrigger asChild>
+              {canEdit && (
+                <Button variant="ghost" size="sm" className="h-7 text-xs">
+                  <Settings2 className="h-3.5 w-3.5 mr-1" />
+                  Διαχείριση
+                </Button>
+              )}
+            </DialogTrigger>
+            {manageDialogContent}
+          </Dialog>
+        </div>
+
+        {/* Project Lead selector */}
+        {showFullNames && onUpdateProjectRole && (
+          <div className="space-y-2">
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Crown className="h-3 w-3" />
+                <span>Project Lead</span>
+              </div>
+              {canEdit ? (
+                <Select
+                  value={projectLeadId || 'none'}
+                  onValueChange={(val) => onUpdateProjectRole('project_lead_id', val === 'none' ? null : val)}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Επιλέξτε Lead..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— Κανείς —</SelectItem>
+                    {teamMembers.map(m => (
+                      <SelectItem key={m.user_id} value={m.user_id}>
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-5 w-5">
+                            <AvatarImage src={m.profile.avatar_url || ''} />
+                            <AvatarFallback className="text-[10px]">{getInitials(m.profile.full_name, m.profile.email)}</AvatarFallback>
+                          </Avatar>
+                          {m.profile.full_name || m.profile.email.split('@')[0]}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="flex items-center gap-2 text-sm">
+                  {leadMember ? (
+                    <>
+                      <Avatar className="h-6 w-6">
+                        <AvatarImage src={leadMember.profile.avatar_url || ''} />
+                        <AvatarFallback className="text-[10px]">{getInitials(leadMember.profile.full_name, leadMember.profile.email)}</AvatarFallback>
+                      </Avatar>
+                      <span className="font-medium">{leadMember.profile.full_name || leadMember.profile.email.split('@')[0]}</span>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground italic text-xs">Δεν έχει οριστεί</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Briefcase className="h-3 w-3" />
+                <span>Account Manager</span>
+              </div>
+              {canEdit ? (
+                <Select
+                  value={accountManagerId || 'none'}
+                  onValueChange={(val) => onUpdateProjectRole('account_manager_id', val === 'none' ? null : val)}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Επιλέξτε Account Manager..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— Κανείς —</SelectItem>
+                    {teamMembers.map(m => (
+                      <SelectItem key={m.user_id} value={m.user_id}>
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-5 w-5">
+                            <AvatarImage src={m.profile.avatar_url || ''} />
+                            <AvatarFallback className="text-[10px]">{getInitials(m.profile.full_name, m.profile.email)}</AvatarFallback>
+                          </Avatar>
+                          {m.profile.full_name || m.profile.email.split('@')[0]}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="flex items-center gap-2 text-sm">
+                  {accountMgrMember ? (
+                    <>
+                      <Avatar className="h-6 w-6">
+                        <AvatarImage src={accountMgrMember.profile.avatar_url || ''} />
+                        <AvatarFallback className="text-[10px]">{getInitials(accountMgrMember.profile.full_name, accountMgrMember.profile.email)}</AvatarFallback>
+                      </Avatar>
+                      <span className="font-medium">{accountMgrMember.profile.full_name || accountMgrMember.profile.email.split('@')[0]}</span>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground italic text-xs">Δεν έχει οριστεί</span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Members list */}
+        {teamMembers.length === 0 ? (
+          <p className="text-xs text-muted-foreground">Δεν έχουν ανατεθεί μέλη</p>
+        ) : (
+          <div className="space-y-1">
+            {showFullNames ? (
+              // Full names list
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground mt-1">Μέλη</p>
+                {teamMembers.map(member => {
+                  const isLead = member.user_id === projectLeadId;
+                  const isAccMgr = member.user_id === accountManagerId;
+                  return (
+                    <div key={member.id} className="flex items-center gap-2 py-1">
+                      <Avatar className="h-6 w-6">
                         <AvatarImage src={member.profile.avatar_url || ''} />
-                        <AvatarFallback className="text-xs">
+                        <AvatarFallback className="text-[10px]">
                           {getInitials(member.profile.full_name, member.profile.email)}
                         </AvatarFallback>
                       </Avatar>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="font-medium">{member.profile.full_name || member.profile.email}</p>
-                      <p className="text-xs text-muted-foreground">{member.role?.role || 'member'}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                ))}
-                {extraCount > 0 && (
-                  <div className="h-8 w-8 rounded-full bg-muted border-2 border-background flex items-center justify-center text-xs font-medium text-muted-foreground ring-1 ring-border">
-                    +{extraCount}
-                  </div>
-                )}
-              </div>
-
-              {/* Manage button */}
-              <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 ml-1">
-                    <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-lg">
-                  <DialogHeader>
-                    <DialogTitle>Διαχείριση Ομάδας</DialogTitle>
-                    <DialogDescription>Προσθήκη ή αφαίρεση μελών από την ομάδα του έργου</DialogDescription>
-                  </DialogHeader>
-
-                  {/* Current members */}
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium text-muted-foreground">Τρέχοντα μέλη ({teamMembers.length})</p>
-                    <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                      {teamMembers.map(member => (
-                        <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg border bg-card">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={member.profile.avatar_url || ''} />
-                            <AvatarFallback className="text-xs">
-                              {getInitials(member.profile.full_name, member.profile.email)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">
-                              {member.profile.full_name || member.profile.email.split('@')[0]}
-                            </p>
-                          </div>
-                          {getRoleBadge(member.role?.role)}
-                          {canEdit && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-destructive"
-                              onClick={() => removeMember(member.id)}
-                              disabled={removing === member.id}
-                            >
-                              {removing === member.id ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                <UserMinus className="h-3.5 w-3.5" />
-                              )}
-                            </Button>
-                          )}
-                        </div>
-                      ))}
+                      <span className="text-sm truncate flex-1">
+                        {member.profile.full_name || member.profile.email.split('@')[0]}
+                      </span>
+                      {isLead && <Badge variant="default" className="text-[10px] px-1.5 py-0">Lead</Badge>}
+                      {isAccMgr && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">AM</Badge>}
                     </div>
-                  </div>
-
-                  {/* Add member search */}
-                  {canEdit && (
-                    <div className="space-y-2 border-t pt-3">
-                      <p className="text-sm font-medium text-muted-foreground">Προσθήκη μέλους</p>
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder="Αναζήτηση χρήστη..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="pl-9"
-                        />
-                        {searchTerm && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
-                            onClick={() => setSearchTerm('')}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                      <ScrollArea className="h-[200px] pr-2">
-                        {filteredUsers.length === 0 ? (
-                          <p className="text-center text-sm text-muted-foreground py-4">
-                            Δεν βρέθηκαν διαθέσιμοι χρήστες
-                          </p>
-                        ) : (
-                          <div className="space-y-1.5">
-                            {filteredUsers.map(user => (
-                              <div key={user.id} className="flex items-center gap-3 p-2 rounded-lg border hover:bg-muted/50">
-                                <Avatar className="h-8 w-8">
-                                  <AvatarImage src={user.avatar_url || ''} />
-                                  <AvatarFallback className="text-xs">{getInitials(user.full_name, user.email)}</AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium truncate">
-                                    {user.full_name || user.email.split('@')[0]}
-                                  </p>
-                                </div>
-                                {getRoleBadge(user.role)}
-                                <Button
-                                  size="sm"
-                                  onClick={() => addMember(user.id)}
-                                  disabled={adding === user.id}
-                                >
-                                  {adding === user.id ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : (
-                                    <UserPlus className="h-3.5 w-3.5" />
-                                  )}
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </ScrollArea>
+                  );
+                })}
+              </div>
+            ) : (
+              // Avatar stack (original compact mode)
+              <div className="flex items-center gap-2">
+                <div className="flex -space-x-2">
+                  {teamMembers.slice(0, 4).map(member => (
+                    <Avatar key={member.id} className="h-8 w-8 border-2 border-background ring-1 ring-border">
+                      <AvatarImage src={member.profile.avatar_url || ''} />
+                      <AvatarFallback className="text-xs">
+                        {getInitials(member.profile.full_name, member.profile.email)}
+                      </AvatarFallback>
+                    </Avatar>
+                  ))}
+                  {teamMembers.length > 4 && (
+                    <div className="h-8 w-8 rounded-full bg-muted border-2 border-background flex items-center justify-center text-xs font-medium text-muted-foreground ring-1 ring-border">
+                      +{teamMembers.length - 4}
                     </div>
                   )}
-                </DialogContent>
-              </Dialog>
-            </div>
-          )}
-        </div>
-      </TooltipProvider>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     );
   }
 

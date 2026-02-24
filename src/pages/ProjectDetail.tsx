@@ -3,22 +3,18 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { useDocumentParser } from '@/hooks/useDocumentParser';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ProjectDeliverablesTable } from '@/components/projects/ProjectDeliverablesTable';
 import TasksPage from '@/pages/Tasks';
 import { ProjectFinancialsHub } from '@/components/projects/ProjectFinancialsHub';
 import { ProjectCreatives } from '@/components/projects/ProjectCreatives';
 import { ProjectMediaPlan } from '@/components/projects/ProjectMediaPlan';
-import { ProjectAISuggestions } from '@/components/projects/ProjectAISuggestions';
 import { ProjectTeamManager } from '@/components/projects/ProjectTeamManager';
 import { FileExplorer } from '@/components/files/FileExplorer';
 import { ProjectCommentsAndHistory } from '@/components/projects/ProjectCommentsAndHistory';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -26,28 +22,23 @@ import {
   ArrowLeft,
   Calendar,
   DollarSign,
-  CheckCircle2,
   Clock,
   Loader2,
-  Sparkles,
-  Upload,
   Megaphone,
   Palette,
   FolderInput,
   Timer,
-  Plus,
-  ChevronDown,
   ListChecks,
   FileText,
   MessageSquare,
   Pencil,
   Save,
   X,
+  ClipboardList,
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { createProjectFilesObjectKey } from '@/utils/storageKeys';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -67,6 +58,8 @@ interface Project {
   agency_fee_percentage: number;
   start_date: string | null;
   end_date: string | null;
+  project_lead_id: string | null;
+  account_manager_id: string | null;
   client?: { name: string } | null;
 }
 
@@ -133,22 +126,6 @@ export default function ProjectDetailPage() {
     enabled: !!id,
   });
 
-  // AI Analysis state
-  const [aiFiles, setAiFiles] = useState<Array<{ fileName: string; content: string }>>([]);
-  const [aiRawFiles, setAiRawFiles] = useState<File[]>([]);
-  const [aiOpen, setAiOpen] = useState(false);
-
-  const { parsing: uploadingForAi, parseFiles } = useDocumentParser({
-    saveToStorage: true,
-    projectId: id,
-    onSuccess: (parsedFiles) => {
-      setAiFiles(prev => [...prev, ...parsedFiles.map(f => ({
-        fileName: f.fileName,
-        content: f.content
-      }))]);
-    }
-  });
-
   const canViewFinancials = isAdmin || isManager;
   const canEdit = isAdmin || isManager || hasPermission('projects.edit');
 
@@ -165,7 +142,7 @@ export default function ProjectDetailPage() {
         .eq('id', id)
         .single();
       if (projectError) throw projectError;
-      setProject(projectData);
+      setProject(projectData as any);
 
       const { data: tasksData } = await supabase
         .from('tasks')
@@ -187,37 +164,6 @@ export default function ProjectDetailPage() {
       setLoading(false);
     }
   };
-
-  const handleAiFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    setAiRawFiles(prev => [...prev, ...Array.from(files)]);
-    const parsed = await parseFiles(files);
-    if (parsed.length > 0) toast.success(`${parsed.length} αρχείο(α) αναλύθηκαν`);
-    e.target.value = '';
-  };
-
-  const saveAiFilesToStorage = async () => {
-    if (!id || !user || aiRawFiles.length === 0) return;
-    try {
-      for (const file of aiRawFiles) {
-        const fileName = createProjectFilesObjectKey({ userId: user.id, originalName: file.name, prefix: `projects/${id}` });
-        const { error: uploadError } = await supabase.storage.from('project-files').upload(fileName, file);
-        if (uploadError) { console.error('Error uploading file:', uploadError); continue; }
-        await supabase.from('file_attachments').insert({
-          file_name: file.name, file_path: fileName, file_size: file.size,
-          content_type: file.type, uploaded_by: user.id, project_id: id,
-        });
-      }
-    } catch (error) { console.error('Error saving files:', error); }
-  };
-
-  const handleSuggestionsApplied = useCallback(async () => {
-    await saveAiFilesToStorage();
-    setAiFiles([]);
-    setAiRawFiles([]);
-    fetchProjectData();
-  }, [id, user, aiRawFiles]);
 
   const updateProjectField = async (field: string, value: any) => {
     if (!project) return;
@@ -248,10 +194,7 @@ export default function ProjectDetailPage() {
 
   // Stats
   const completedTasks = tasks.filter(t => t.status === 'completed').length;
-  const taskProgress = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
   const completedDeliverables = deliverables.filter(d => d.completed).length;
-  const deliverableProgress = deliverables.length > 0 ? Math.round((completedDeliverables / deliverables.length) * 100) : 0;
-  const overallProgress = Math.round((taskProgress + deliverableProgress) / 2);
   const totalTrackedHours = Math.round((totalTrackedMinutes / 60) * 10) / 10;
 
   const getStatusConfig = (status: ProjectStatus) => {
@@ -386,176 +329,99 @@ export default function ProjectDetailPage() {
             </div>
           </div>
 
-          {/* Right side: progress + timer + actions */}
+          {/* Right side: timer badge only */}
           <div className="flex items-center gap-2 shrink-0">
-            {(tasks.length > 0 || deliverables.length > 0) && (
-              <div className="hidden sm:flex items-center gap-2 min-w-[120px]">
-                <Progress value={overallProgress} className="h-1.5 flex-1" />
-                <span className="text-xs text-muted-foreground">{overallProgress}%</span>
-              </div>
-            )}
             <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground">
               <Timer className="h-3 w-3" />{totalTrackedHours}h
             </span>
-            <Button size="sm" onClick={() => {
-              // Scroll to tasks and trigger dialog via embedded TasksPage
-              const tasksSection = document.getElementById('project-tasks-engine');
-              tasksSection?.scrollIntoView({ behavior: 'smooth' });
-            }}>
-              <Plus className="h-4 w-4 mr-1" /> Task
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => {
-              const delSection = document.getElementById('project-secondary-tabs');
-              delSection?.scrollIntoView({ behavior: 'smooth' });
-            }}>
-              <Plus className="h-4 w-4 mr-1" /> Παραδοτέο
-            </Button>
           </div>
         </div>
       </div>
 
       {/* ── 2-COLUMN LAYOUT ────────────────────────────────────────────────── */}
       <div className="flex gap-6 items-start">
-        {/* ── LEFT: Main Task Engine (75%) ──────────────────────────────────── */}
-        <div className="flex-1 min-w-0 space-y-4" id="project-tasks-engine">
-          {/* Task Engine */}
-          <TasksPage embedded projectId={project.id} />
+        {/* ── LEFT: Tabs (75%) ──────────────────────────────────── */}
+        <div className="flex-1 min-w-0 space-y-4">
+          <Tabs defaultValue="deliverables" className="space-y-3">
+            <TabsList className="h-auto gap-1 flex-wrap">
+              <TabsTrigger value="deliverables" className="text-xs gap-1">
+                <ListChecks className="h-3.5 w-3.5" /> Παραδοτέα
+              </TabsTrigger>
+              <TabsTrigger value="tasks" className="text-xs gap-1">
+                <ClipboardList className="h-3.5 w-3.5" /> Tasks
+              </TabsTrigger>
+              <TabsTrigger value="files" className="text-xs gap-1">
+                <FileText className="h-3.5 w-3.5" /> Αρχεία
+              </TabsTrigger>
+              <TabsTrigger value="media-plan" className="text-xs gap-1">
+                <Megaphone className="h-3.5 w-3.5" /> Media Plan
+              </TabsTrigger>
+              <TabsTrigger value="creatives" className="text-xs gap-1">
+                <Palette className="h-3.5 w-3.5" /> Δημιουργικά
+              </TabsTrigger>
+              {(canViewFinancials || isClient) && (
+                <TabsTrigger value="financials" className="text-xs gap-1">
+                  <DollarSign className="h-3.5 w-3.5" /> Οικονομικά
+                </TabsTrigger>
+              )}
+              <TabsTrigger value="comments" className="text-xs gap-1">
+                <MessageSquare className="h-3.5 w-3.5" /> Σχόλια
+              </TabsTrigger>
+            </TabsList>
 
-          {/* ── SECONDARY TABS ──────────────────────────────────────────────── */}
-          <div id="project-secondary-tabs">
-            <Tabs defaultValue="deliverables" className="space-y-3">
-              <TabsList className="h-auto gap-1 flex-wrap">
-                <TabsTrigger value="deliverables" className="text-xs gap-1">
-                  <ListChecks className="h-3.5 w-3.5" /> Παραδοτέα
-                </TabsTrigger>
-                <TabsTrigger value="files" className="text-xs gap-1">
-                  <FileText className="h-3.5 w-3.5" /> Αρχεία
-                </TabsTrigger>
-                <TabsTrigger value="media-plan" className="text-xs gap-1">
-                  <Megaphone className="h-3.5 w-3.5" /> Media Plan
-                </TabsTrigger>
-                <TabsTrigger value="creatives" className="text-xs gap-1">
-                  <Palette className="h-3.5 w-3.5" /> Δημιουργικά
-                </TabsTrigger>
-                {(canViewFinancials || isClient) && (
-                  <TabsTrigger value="financials" className="text-xs gap-1">
-                    <DollarSign className="h-3.5 w-3.5" /> Οικονομικά
-                  </TabsTrigger>
-                )}
-                <TabsTrigger value="comments" className="text-xs gap-1">
-                  <MessageSquare className="h-3.5 w-3.5" /> Σχόλια
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="deliverables">
-                <ProjectDeliverablesTable projectId={project.id} projectName={project.name} />
-              </TabsContent>
-              <TabsContent value="files">
-                <FileExplorer projectId={project.id} />
-              </TabsContent>
-              <TabsContent value="media-plan">
-                <ProjectMediaPlan
+            <TabsContent value="deliverables">
+              <ProjectDeliverablesTable projectId={project.id} projectName={project.name} />
+            </TabsContent>
+            <TabsContent value="tasks">
+              <TasksPage embedded projectId={project.id} />
+            </TabsContent>
+            <TabsContent value="files">
+              <FileExplorer projectId={project.id} />
+            </TabsContent>
+            <TabsContent value="media-plan">
+              <ProjectMediaPlan
+                projectId={project.id}
+                projectName={project.name}
+                projectBudget={project.budget}
+                agencyFeePercentage={project.agency_fee_percentage || 0}
+                deliverables={deliverables.map(d => ({ id: d.id, name: d.name }))}
+              />
+            </TabsContent>
+            <TabsContent value="creatives">
+              <ProjectCreatives
+                projectId={project.id}
+                projectName={project.name}
+                deliverables={deliverables.map(d => ({ id: d.id, name: d.name }))}
+                tasks={tasks.map(t => ({ id: t.id, title: t.title }))}
+                mediaPlanItems={[]}
+              />
+            </TabsContent>
+            {(canViewFinancials || isClient) && (
+              <TabsContent value="financials">
+                <ProjectFinancialsHub
                   projectId={project.id}
-                  projectName={project.name}
+                  clientId={project.client_id}
                   projectBudget={project.budget}
                   agencyFeePercentage={project.agency_fee_percentage || 0}
-                  deliverables={deliverables.map(d => ({ id: d.id, name: d.name }))}
                 />
               </TabsContent>
-              <TabsContent value="creatives">
-                <ProjectCreatives
-                  projectId={project.id}
-                  projectName={project.name}
-                  deliverables={deliverables.map(d => ({ id: d.id, name: d.name }))}
-                  tasks={tasks.map(t => ({ id: t.id, title: t.title }))}
-                  mediaPlanItems={[]}
-                />
-              </TabsContent>
-              {(canViewFinancials || isClient) && (
-                <TabsContent value="financials">
-                  <ProjectFinancialsHub
-                    projectId={project.id}
-                    clientId={project.client_id}
-                    projectBudget={project.budget}
-                    agencyFeePercentage={project.agency_fee_percentage || 0}
-                  />
-                </TabsContent>
-              )}
-              <TabsContent value="comments">
-                <Card>
-                  <CardContent className="pt-6">
-                    <ProjectCommentsAndHistory projectId={project.id} />
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          </div>
+            )}
+            <TabsContent value="comments">
+              <Card>
+                <CardContent className="pt-6">
+                  <ProjectCommentsAndHistory projectId={project.id} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
 
         {/* ── RIGHT: Project Meta Panel (25%) ──────────────────────────────── */}
         <div className="w-72 xl:w-80 shrink-0 space-y-4 hidden lg:block">
-          {/* Card 1: Summary */}
-          <Card>
-            <CardContent className="p-4 space-y-4">
-              <p className="text-sm font-semibold">Σύνοψη</p>
-
-              {/* Overall progress */}
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Συνολική Πρόοδος</span>
-                  <span className="font-medium text-foreground">{overallProgress}%</span>
-                </div>
-                <Progress value={overallProgress} className="h-2" />
-              </div>
-
-              {/* Tasks progress */}
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Tasks</span>
-                  <span className="font-medium text-foreground">{completedTasks}/{tasks.length}</span>
-                </div>
-                <Progress value={taskProgress} className="h-1.5" />
-              </div>
-
-              {/* Deliverables progress */}
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Παραδοτέα</span>
-                  <span className="font-medium text-foreground">{completedDeliverables}/{deliverables.length}</span>
-                </div>
-                <Progress value={deliverableProgress} className="h-1.5" />
-              </div>
-
-              {/* Days remaining */}
-              {dueDateInfo && (
-                <div className="flex items-center gap-2 text-xs">
-                  <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className={cn('font-medium', dueDateInfo.className)}>{dueDateInfo.label}</span>
-                </div>
-              )}
-
-              {/* Budget */}
-              <div className="flex items-center gap-2 text-xs">
-                <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="font-medium text-foreground">€{project.budget.toLocaleString()}</span>
-                {project.agency_fee_percentage > 0 && (
-                  <span className="text-muted-foreground">(Fee: {project.agency_fee_percentage}%)</span>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Card 2: Team */}
-          <Card>
-            <CardContent className="p-4">
-              <ProjectTeamManager projectId={project.id} canEdit={canEdit} compact />
-            </CardContent>
-          </Card>
-
-          {/* Card 3: Description & Details */}
+          {/* Card 1: Πληροφορίες Έργου (merged Summary + Details) */}
           <Card>
             <CardContent className="p-4 space-y-3">
-              <p className="text-sm font-semibold">Λεπτομέρειες</p>
+              <p className="text-sm font-semibold">Πληροφορίες Έργου</p>
 
               {/* Description - inline edit */}
               <div className="group">
@@ -604,6 +470,14 @@ export default function ProjectDetailPage() {
                   </p>
                 )}
               </div>
+
+              {/* Client */}
+              {project.client && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Πελάτης</span>
+                  <span className="text-sm font-medium">{project.client.name}</span>
+                </div>
+              )}
 
               {/* Budget - inline edit */}
               <div className="group flex items-center justify-between">
@@ -692,59 +566,52 @@ export default function ProjectDetailPage() {
                   className="text-xs bg-transparent border-none outline-none text-foreground cursor-pointer disabled:cursor-default"
                 />
               </div>
+
+              {/* Days remaining */}
+              {dueDateInfo && (
+                <div className="flex items-center gap-2 text-xs">
+                  <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className={cn('font-medium', dueDateInfo.className)}>{dueDateInfo.label}</span>
+                </div>
+              )}
+
+              {/* Tracked hours */}
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Καταγεγραμμένες Ώρες</span>
+                <span className="text-sm font-medium flex items-center gap-1">
+                  <Timer className="h-3.5 w-3.5 text-muted-foreground" />
+                  {totalTrackedHours}h
+                </span>
+              </div>
+
+              {/* Tasks count */}
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Tasks</span>
+                <span className="text-sm font-medium">{completedTasks}/{tasks.length} ολοκληρωμένα</span>
+              </div>
+
+              {/* Deliverables count */}
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Παραδοτέα</span>
+                <span className="text-sm font-medium">{completedDeliverables}/{deliverables.length} ολοκληρωμένα</span>
+              </div>
             </CardContent>
           </Card>
 
-          {/* Card 4: AI Analysis (collapsible) */}
-          <Collapsible open={aiOpen} onOpenChange={setAiOpen}>
-            <Card className="border-foreground/10">
-              <CollapsibleTrigger asChild>
-                <button className="w-full p-4 flex items-center justify-between text-left hover:bg-muted/30 rounded-2xl transition-colors">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-foreground" />
-                    <span className="text-sm font-semibold">AI Ανάλυση</span>
-                  </div>
-                  <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", aiOpen && "rotate-180")} />
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <CardContent className="pt-0 pb-4 px-4 space-y-3">
-                  <Input
-                    id="ai-file-upload"
-                    type="file"
-                    multiple
-                    accept=".txt,.pdf,.doc,.docx,.rtf"
-                    onChange={handleAiFileUpload}
-                    disabled={uploadingForAi}
-                    className="cursor-pointer text-xs h-8"
-                  />
-                  {uploadingForAi && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-
-                  {aiFiles.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {aiFiles.map((file, idx) => (
-                        <Badge key={idx} variant="secondary" className="text-xs flex items-center gap-1">
-                          <Upload className="h-2.5 w-2.5" />
-                          {file.fileName}
-                          <button onClick={() => setAiFiles(prev => prev.filter((_, i) => i !== idx))} className="ml-0.5 hover:text-destructive">×</button>
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-
-                  {aiFiles.length > 0 && (
-                    <ProjectAISuggestions
-                      projectId={project.id}
-                      projectName={project.name}
-                      projectBudget={project.budget}
-                      files={aiFiles}
-                      onSuggestionsApplied={handleSuggestionsApplied}
-                    />
-                  )}
-                </CardContent>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
+          {/* Card 2: Team */}
+          <Card>
+            <CardContent className="p-4">
+              <ProjectTeamManager
+                projectId={project.id}
+                canEdit={canEdit}
+                compact
+                showFullNames
+                projectLeadId={project.project_lead_id}
+                accountManagerId={project.account_manager_id}
+                onUpdateProjectRole={(field, value) => updateProjectField(field, value)}
+              />
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

@@ -2639,6 +2639,7 @@ export type Database = {
       }
       projects: {
         Row: {
+          account_manager_id: string | null
           agency_fee_percentage: number | null
           budget: number | null
           client_id: string | null
@@ -2653,6 +2654,7 @@ export type Database = {
           name: string
           probability: number | null
           progress: number | null
+          project_lead_id: string | null
           source: string | null
           start_date: string | null
           status: Database["public"]["Enums"]["project_status"]
@@ -2662,6 +2664,7 @@ export type Database = {
           won_date: string | null
         }
         Insert: {
+          account_manager_id?: string | null
           agency_fee_percentage?: number | null
           budget?: number | null
           client_id?: string | null
@@ -2676,6 +2679,7 @@ export type Database = {
           name: string
           probability?: number | null
           progress?: number | null
+          project_lead_id?: string | null
           source?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["project_status"]
@@ -2685,6 +2689,7 @@ export type Database = {
           won_date?: string | null
         }
         Update: {
+          account_manager_id?: string | null
           agency_fee_percentage?: number | null
           budget?: number | null
           client_id?: string | null
@@ -2699,6 +2704,7 @@ export type Database = {
           name?: string
           probability?: number | null
           progress?: number | null
+          project_lead_id?: string | null
           source?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["project_status"]
@@ -2708,6 +2714,13 @@ export type Database = {
           won_date?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "projects_account_manager_id_fkey"
+            columns: ["account_manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "projects_client_id_fkey"
             columns: ["client_id"]
@@ -2727,6 +2740,13 @@ export type Database = {
             columns: ["folder_id"]
             isOneToOne: false
             referencedRelation: "project_folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_project_lead_id_fkey"
+            columns: ["project_lead_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

@@ -1,174 +1,106 @@
 
 
-# Project Detail Page -- Task-Centric Restructuring
+# Project Detail Page -- Corrections
 
-## Summary
+## Changes Overview
 
-Transform the Project Detail page from a tab-heavy dashboard layout to a task-centric 2-column workspace. Tasks become the core of the page (always visible), while project metadata moves to a compact right panel. Tabs are reduced to secondary views only.
-
----
-
-## New Layout Structure
-
-```text
-+------------------------------------------------------------------+
-| [<] Project Name     [Status▼] [Folder▼]  [Progress] [Timer]     |
-|     Client · 1 Jan → 30 Jun · Σε 126 ημέρες                      |
-|     [Add Task] [Add Deliverable]                                  |
-+------------------------------------------------------------------+
-|                                        |                          |
-|  MAIN TASK ENGINE (75%)                |  PROJECT PANEL (25%)     |
-|                                        |                          |
-|  A. View Switcher                      |  1. Summary Card         |
-|  [List] [Kanban] [Timeline]            |     - Progress bars      |
-|                                        |     - Tasks X/Y          |
-|  B. Quick Filter Bar (sticky)          |     - Deliverables X/Y   |
-|  All | My Tasks | Overdue | This Week  |     - Days remaining     |
-|  | Completed | By Deliverable          |                          |
-|                                        |  2. Team Card            |
-|  C. Task List                          |     - Avatars + roles    |
-|  [x] Task title  @user  15 Feb  ●High  |     - Active tasks count |
-|  [ ] Task title  @user  20 Mar  ●Med   |                          |
-|  [ ] Task title  @user  -       ●Low   |  3. Description Card     |
-|  ...                                   |     - Inline editable    |
-|                                        |     - Budget, dates      |
-|  D. Secondary Tabs (below tasks)       |                          |
-|  Deliverables | Files | Media Plan     |  4. AI Analysis (mini)   |
-|  | Creatives | Financials              |     - Upload trigger     |
-|                                        |                          |
-+------------------------------------------------------------------+
-```
+1. **Remove progress bars** from both the sticky header and the deliverables tab area
+2. **Restore top-level tabs** including Tasks as a tab alongside Deliverables (like the original layout)
+3. **Team card: show full names** with visible Lead and Account Manager roles (assignable)
+4. **Merge "Σύνοψη" and "Λεπτομέρειες"** into a single card at the top of the right sidebar, including tracked hours
+5. **Remove AI Analysis card** entirely
+6. **Remove the two buttons** (+Task, +Παραδοτέο) from the sticky header top-right
 
 ---
 
 ## Detailed Changes
 
-### 1. Sticky Header (Simplified)
+### File: `src/pages/ProjectDetail.tsx`
 
-Keep the existing header structure but make it sticky:
-- Project Name, Status dropdown, Folder dropdown, Timer badge (already exist)
-- Add primary "Add Task" button and secondary "Add Deliverable" button
-- Keep client name, date range, due date countdown
-- Keep progress bar
-- Make the entire header `sticky top-0 z-10`
+**1. Sticky Header -- Remove buttons and progress bar**
+- Remove the `+ Task` and `+ Παραδοτέο` buttons from the header right side
+- Remove the progress bar and percentage display from the header
+- Keep: project name, status dropdown, folder dropdown, client, date range, days remaining, timer badge
 
-### 2. Remove Tab-First Architecture
+**2. Restore top-level Tabs**
+- Replace the current layout (TasksPage always visible + secondary tabs below) with a proper `Tabs` component
+- Tab items: **Παραδοτέα** | **Tasks** | **Αρχεία** | **Media Plan** | **Δημιουργικά** | **Οικονομικά** | **Σχόλια**
+- Tasks tab renders embedded `TasksPage`
+- Deliverables tab renders `ProjectDeliverablesTable` (without the progress summary row that currently shows "Πρόοδος: 0/3 παραδοτέα 0%")
+- Other tabs render existing components as before
 
-The current page uses Tabs as the primary navigation (Overview, Deliverables, Tasks, etc.). The new layout:
-- **Remove the top-level Tabs wrapper** that controls the entire page
-- Tasks are **always visible** as the main content area (no tab needed)
-- Secondary features (Deliverables, Files, Media Plan, Creatives, Financials) move to **secondary tabs below the task list**
-- Comments/History moves into the secondary tabs as well
+**3. Right sidebar -- Merge Summary + Details into one card**
+- Combine "Σύνοψη" and "Λεπτομέρειες" into a single card titled "Πληροφορίες Έργου"
+- Content order:
+  - Description (inline editable)
+  - Client (display)
+  - Budget (inline editable)
+  - Agency Fee (inline editable)
+  - Start date / End date (inline date pickers)
+  - Days remaining
+  - Tracked hours (moved here from header -- keep the timer badge in header too for quick glance)
+  - Tasks: X/Y completed (text only, no progress bar)
+  - Deliverables: X/Y completed (text only, no progress bar)
+- No progress bars anywhere in this card
 
-### 3. Left Column -- Main Task Engine (flex-1, ~75%)
+**4. Team card -- Full names + Lead/Account Manager**
+- Replace avatar-only compact display with a list showing full names
+- Each member row: Avatar + Full Name + Role badge
+- Add two special role designators at the top:
+  - **Project Lead** -- selectable from team members
+  - **Account Manager** -- selectable from team members
+- These are stored as metadata on the `project_user_access` table (or a new field on the project itself)
+- Display Lead and Account Manager prominently at the top of the team card with their names
 
-**A. View Switcher**
-- Reuse existing `UnifiedViewToggle` or simple toggle buttons: List | Kanban | Timeline
-- Default to List view
-- Store preference in localStorage
-
-**B. Quick Filter Bar (sticky below header)**
-- Horizontal pill buttons: All | My Tasks | Overdue | Due This Week | Completed | By Deliverable
-- "By Deliverable" groups tasks under their deliverable headers
-- Filters applied client-side on the task list
-
-**C. Task List (Enhanced inline)**
-- Embed `TasksPage` (already exists as `embedded` mode) with the project filter
-- Each task row shows: Checkbox, Title (inline edit), Assignee avatar, Due date, Priority dot, Status dropdown, Subtask progress
-- Hover reveals quick actions (comment, attach, log time)
-- This is essentially the existing Tasks page in embedded mode with filters on top
-
-**D. Secondary Tabs (Below the task area)**
-- Smaller tab bar for: Παραδοτέα | Αρχεία | Media Plan | Δημιουργικά | Οικονομικά | Σχόλια
-- These render the existing components: `ProjectDeliverablesTable`, `FileExplorer`, `ProjectMediaPlan`, `ProjectCreatives`, `ProjectFinancialsHub`, `ProjectCommentsAndHistory`
-
-### 4. Right Column -- Compact Project Panel (w-80, ~25%)
-
-**Card 1: Project Summary**
-- Overall progress (combined bar)
-- Tasks: X/Y completed with mini progress bar
-- Deliverables: X/Y completed with mini progress bar
-- Days remaining (with color coding)
-- Budget display
-
-**Card 2: Team**
-- Compact `ProjectTeamManager` (already has `compact` prop)
-- Show active tasks count per member (future enhancement)
-
-**Card 3: Description & Details**
-- Inline editable description
-- Budget, Agency Fee (inline edit)
-- Start/End dates (inline date pickers)
-- This replaces the large `ProjectInfoEditor` card
-
-**Card 4: AI Analysis (Mini)**
-- Collapsed by default, expandable
-- File upload trigger
-- Shows AI suggestions when files are uploaded
-
----
-
-## What Gets Removed/Simplified
-
-- **Remove**: Top-level Tabs as page architecture (replaced by always-visible tasks + secondary tabs)
-- **Remove**: "Overview" tab concept (its contents are distributed: KPIs to right panel, tasks to main area, comments to secondary tab)
-- **Remove**: Large "Πληροφορίες Έργου" card (replaced by compact description card in right panel)
-- **Remove**: "Πρόσφατα Tasks" card (redundant -- full task list is always visible)
-- **Remove**: KPI cards row (data moves to right panel summary card)
-- **Simplify**: AI Analysis block (moves to collapsible mini card in right panel)
+**5. Remove AI Analysis**
+- Remove the entire collapsible AI Analysis card from the right sidebar
+- Remove related state variables (`aiFiles`, `aiRawFiles`, `aiOpen`) and handler functions
+- Remove `useDocumentParser` import and usage
 
 ---
 
 ## Technical Details
 
+### Database Change
+
+Add two columns to the `projects` table for Lead and Account Manager:
+
+```sql
+ALTER TABLE projects ADD COLUMN project_lead_id uuid REFERENCES profiles(id);
+ALTER TABLE projects ADD COLUMN account_manager_id uuid REFERENCES profiles(id);
+```
+
+This approach stores the lead/account manager at the project level rather than on team access records, making it simpler to query and display.
+
+### Team Card Layout (New)
+
+```text
++----------------------------------+
+| Ομάδα Έργου          [Προσθήκη] |
+|                                  |
+| Project Lead:                    |
+| [Avatar] Πέτρος Νικολάου  [▼]   |
+|                                  |
+| Account Manager:                 |
+| [Avatar] Σοφία Μαυρίδου   [▼]   |
+|                                  |
+| Μέλη:                            |
+| [Avatar] Μαρία Παπαδοπούλου      |
+| [Avatar] Γιώργος Νικολάου        |
+| [Avatar] Δημήτρης Αλεξίου        |
++----------------------------------+
+```
+
 ### Modified Files
 
 | File | Changes |
 |------|---------|
-| `src/pages/ProjectDetail.tsx` | Complete restructure: remove top-level Tabs, implement 2-column layout with tasks as main content, add quick filter bar, move metadata to right panel, add secondary tabs below task area |
+| `src/pages/ProjectDetail.tsx` | Remove header buttons and progress; restore top-level tabs with Tasks tab; merge Summary+Details cards; remove AI block; update team card usage |
+| `src/components/projects/ProjectTeamManager.tsx` | Update compact mode to show full names instead of avatar-only; add Lead/Account Manager display and selection dropdowns |
 
-### Task Filter Implementation
-
-```text
-Filters (client-side on fetched tasks):
-- All: no filter
-- My Tasks: task.assigned_to === user.id
-- Overdue: task.due_date < today && status !== 'completed'
-- Due This Week: task.due_date within current week
-- Completed: task.status === 'completed'
-- By Deliverable: group tasks by deliverable_id
-```
-
-### Layout Structure (JSX)
-
-```text
-<div sticky header />
-<div className="flex gap-6">
-  <div className="flex-1">   <!-- 75% -->
-    <ViewSwitcher />
-    <FilterBar />
-    <TasksPage embedded projectId={id} />
-    <SecondaryTabs>
-      <Deliverables />
-      <Files />
-      <MediaPlan />
-      <Creatives />
-      <Financials />
-      <Comments />
-    </SecondaryTabs>
-  </div>
-  <div className="w-80 shrink-0">  <!-- 25% -->
-    <SummaryCard />
-    <TeamCard />
-    <DescriptionCard />
-    <AICard />
-  </div>
-</div>
-```
-
-### Add Task / Add Deliverable Buttons
-
-- "Add Task" opens the task creation flow (navigate to task creation or inline dialog)
-- "Add Deliverable" opens deliverable creation (existing flow in `ProjectDeliverablesTable`)
-- Both pre-fill `project_id`
-
+### Removed Code
+- AI Analysis collapsible card and all related state/handlers
+- `useDocumentParser` hook usage
+- `ProjectAISuggestions` import
+- Progress bars from summary card
+- `+ Task` and `+ Παραδοτέο` buttons from header

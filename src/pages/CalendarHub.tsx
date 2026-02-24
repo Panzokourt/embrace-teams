@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { CalendarZoomView } from '@/components/calendar/CalendarZoomView';
 import { CalendarFilterTabs, CalendarFilter } from '@/components/calendar/CalendarFilterTabs';
 import { CalendarEventDialog } from '@/components/calendar/CalendarEventDialog';
@@ -10,6 +10,7 @@ import { Plus, PanelRight } from 'lucide-react';
 import { startOfYear, endOfYear } from 'date-fns';
 
 export default function CalendarHub() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = (searchParams.get('tab') || 'all') as CalendarFilter;
   const [activeFilter, setActiveFilter] = useState<CalendarFilter>(tabParam);
@@ -66,9 +67,29 @@ export default function CalendarHub() {
   }, []);
 
   const handleEventClick = useCallback((event: CalendarEvent) => {
+    // Navigate to detail page for tasks/projects/deliverables
+    if (event._source === 'task') {
+      const realId = event.id.replace('task-', '');
+      navigate(`/tasks/${realId}`);
+      return;
+    }
+    if (event._source === 'project') {
+      const realId = event.id.replace('proj-', '');
+      navigate(`/projects/${realId}`);
+      return;
+    }
+    if (event._source === 'deliverable') {
+      const realId = event.id.replace('del-', '');
+      // Deliverables live under their project
+      if (event.project_id) {
+        navigate(`/projects/${event.project_id}`);
+      }
+      return;
+    }
+    // Calendar events open the edit dialog
     setEditEvent(event);
     setDialogOpen(true);
-  }, []);
+  }, [navigate]);
 
   const handleSave = useCallback(async (input: CreateEventInput) => {
     if (editEvent) {

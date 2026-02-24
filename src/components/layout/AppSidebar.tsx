@@ -75,7 +75,7 @@ interface NavItem {
 }
 
 // ─── Category definitions for the icon rail ───
-type CategoryId = 'home' | 'work' | 'comms' | 'files' | 'time' | 'people' | 'finance' | 'admin';
+type CategoryId = 'home' | 'work' | 'calendar' | 'comms' | 'files' | 'time' | 'people' | 'finance' | 'admin';
 
 interface Category {
   id: CategoryId;
@@ -87,6 +87,7 @@ interface Category {
 const categories: Category[] = [
   { id: 'home', icon: LayoutDashboard, label: 'Αρχική', routePrefixes: ['/my-work', '/'] },
   { id: 'work', icon: Briefcase, label: 'Εργασίες', routePrefixes: ['/work', '/projects', '/tasks'] },
+  { id: 'calendar', icon: CalendarDays, label: 'Ημερολόγιο', routePrefixes: ['/calendar'] },
   { id: 'comms', icon: MessageSquare, label: 'Επικοινωνία', routePrefixes: ['/inbox', '/chat'] },
   { id: 'files', icon: FileArchive, label: 'Αρχείο', routePrefixes: ['/files'] },
   { id: 'time', icon: Timer, label: 'Χρόνος', routePrefixes: ['/timesheets'] },
@@ -102,6 +103,9 @@ const categoryNavItems: Record<CategoryId, NavItem[]> = {
     { title: 'Dashboard', href: '/', icon: LayoutDashboard },
   ],
   work: [], // handled separately with SidebarNavGroup
+  calendar: [
+    { title: 'Όλα', href: '/calendar', icon: CalendarDays },
+  ],
   comms: [
     { title: 'Inbox', href: '/inbox', icon: Mail },
     { title: 'Chat', href: '/chat', icon: MessageSquare },
@@ -135,6 +139,7 @@ const briefIcons: Record<string, React.ComponentType<{ className?: string }>> = 
 function detectCategory(pathname: string): CategoryId {
   // Check more specific routes first (longer prefixes)
   if (pathname.startsWith('/work') || pathname.startsWith('/projects') || pathname.startsWith('/tasks')) return 'work';
+  if (pathname.startsWith('/calendar')) return 'calendar';
   if (pathname.startsWith('/inbox') || pathname.startsWith('/chat')) return 'comms';
   if (pathname.startsWith('/files')) return 'files';
   if (pathname.startsWith('/timesheets')) return 'time';
@@ -339,14 +344,7 @@ export default function AppSidebar({ collapsed, onToggleCollapse }: { collapsed:
                       active={location.pathname === '/work' && location.search.includes('tab=tasks')}
                       onClick={() => { navigate('/work?tab=tasks'); isMobile && setMobileOpen(false); }}
                     />
-                    <SidebarSubLink
-                      to="/work?tab=calendar"
-                      icon={<CalendarDays className="h-4 w-4" />}
-                      label="Ημερολόγιο"
-                      active={location.pathname === '/work' && location.search.includes('tab=calendar')}
-                      onClick={() => { navigate('/work?tab=calendar'); isMobile && setMobileOpen(false); }}
-                    />
-                  </SidebarNavGroup>
+                    </SidebarNavGroup>
                 </>
               ) : (
                 // Regular nav items for the active category

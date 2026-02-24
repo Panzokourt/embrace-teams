@@ -19,6 +19,7 @@ import Clients from "@/pages/Clients";
 import ClientDetail from "@/pages/ClientDetail";
 import Settings from "@/pages/Settings";
 import Calendar from "@/pages/Calendar";
+import CalendarHub from "@/pages/CalendarHub";
 import Files from "@/pages/Files";
 import Blueprints from "@/pages/Blueprints";
 import HR from "@/pages/HR";
@@ -78,7 +79,7 @@ const App = () => (
                   <Route path="/hr/employee/:id" element={<EmployeeProfile />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/settings/organization" element={<OrganizationSettings />} />
-                  <Route path="/calendar" element={<Navigate to="/work?tab=calendar" replace />} />
+                  <Route path="/calendar" element={<CalendarHub />} />
                   <Route path="/files" element={<Files />} />
                   <Route path="/blueprints" element={<Blueprints />} />
                   <Route path="/secretary" element={<Secretary />} />

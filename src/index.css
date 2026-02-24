@@ -350,6 +350,22 @@
   .stagger-3 { animation-delay: 0.15s; }
   .stagger-4 { animation-delay: 0.2s; }
   .stagger-5 { animation-delay: 0.25s; }
+
+  /* Calendar zoom animations */
+  .calendar-zoom-enter {
+    animation: calendar-zoom-in 300ms cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  }
+  .calendar-zoom-exit {
+    animation: calendar-zoom-out 150ms cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  }
+  @keyframes calendar-zoom-in {
+    from { transform: scale(0.88); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  @keyframes calendar-zoom-out {
+    from { transform: scale(1); opacity: 1; }
+    to { transform: scale(1.08); opacity: 0; }
+  }
 }
 
 /* Print styles */

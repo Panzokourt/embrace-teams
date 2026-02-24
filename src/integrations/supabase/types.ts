@@ -201,6 +201,137 @@ export type Database = {
           },
         ]
       }
+      calendar_event_attendees: {
+        Row: {
+          created_at: string | null
+          event_id: string
+          id: string
+          status: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          event_id: string
+          id?: string
+          status?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          event_id?: string
+          id?: string
+          status?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_event_attendees_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_event_attendees_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calendar_events: {
+        Row: {
+          all_day: boolean | null
+          client_id: string | null
+          color: string | null
+          company_id: string
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          end_time: string
+          event_type: string
+          google_event_id: string | null
+          id: string
+          location: string | null
+          project_id: string | null
+          recurrence_rule: string | null
+          start_time: string
+          title: string
+          updated_at: string | null
+          video_link: string | null
+        }
+        Insert: {
+          all_day?: boolean | null
+          client_id?: string | null
+          color?: string | null
+          company_id: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          end_time: string
+          event_type?: string
+          google_event_id?: string | null
+          id?: string
+          location?: string | null
+          project_id?: string | null
+          recurrence_rule?: string | null
+          start_time: string
+          title: string
+          updated_at?: string | null
+          video_link?: string | null
+        }
+        Update: {
+          all_day?: boolean | null
+          client_id?: string | null
+          color?: string | null
+          company_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          end_time?: string
+          event_type?: string
+          google_event_id?: string | null
+          id?: string
+          location?: string | null
+          project_id?: string | null
+          recurrence_rule?: string | null
+          start_time?: string
+          title?: string
+          updated_at?: string | null
+          video_link?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_events_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_events_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_channel_members: {
         Row: {
           channel_id: string

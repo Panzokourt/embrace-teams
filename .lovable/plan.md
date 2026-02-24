@@ -1,212 +1,157 @@
 
 
-# Ημερολόγιο -- Ολική Αναδιαμόρφωση (Φάση 1)
+# Ασφάλεια Multi-Tenant: Πλήρης Αποκατάσταση RLS Policies
 
-## Σύνοψη
+## Το Πρόβλημα
 
-Το Ημερολόγιο γίνεται αυτόνομη ενότητα στο sidebar (νέα κατηγορία) με δικές του υποσελίδες, zoom-based navigation (Ετος → Μήνας → Εβδομάδα → Ημέρα), δημιουργία meetings, backlog panel, και context menu / drag-and-drop. Η σύνδεση με Google Calendar θα γίνει σε Φάση 2.
+Εντοπίστηκε **κρίσιμο κενό ασφαλείας**: η συνάρτηση `is_admin_or_manager()` ελέγχει αν ο χρήστης είναι admin/manager **χωρίς να φιλτράρει ανά εταιρεία**. Αποτέλεσμα: ένας χρήστης που είναι admin σε εταιρεία Α μπορεί να δει **όλα τα δεδομένα** από εταιρεία Β.
 
----
+Συγκεκριμένα, ο χρήστης `info@advize.gr` (owner στην "Advize") μπορεί να δει projects, tasks, expenses, invoices κλπ. της "Default Company" γιατί:
+- Εχει `admin` role στον πίνακα `user_roles` (legacy)
+- Η `is_admin_or_manager()` ελέγχει μόνο αν υπάρχει ο ρόλος, χωρίς company scoping
+- Πάνω από 30 RLS policies χρησιμοποιούν `is_admin_or_manager(auth.uid())` χωρίς φίλτρο company_id
 
-## Δομή Navigation
+## Λύση
 
-Νέα κατηγορία "Ημερολόγιο" στο Icon Rail του sidebar, μεταξύ "Εργασίες" και "Επικοινωνία":
+### Βήμα 1: Νέα Security Definer Function
 
-```text
-Icon Rail:
-  Αρχική
-  Εργασίες      (αφαιρείται το Calendar sub-link)
-  Ημερολόγιο    ← ΝΕΟ (CalendarDays icon)
-  Επικοινωνία
-  ...
-```
-
-Υποσελίδες στο Category Panel:
-- **Όλα** (`/calendar`) -- Ενοποιημένο ημερολόγιο (tasks + deliverables + projects + meetings)
-- **Campaigns** (`/calendar/campaigns`) -- Digital campaigns timeline
-- **Tasks** (`/calendar/tasks`) -- Μόνο tasks
-- **Έργα** (`/calendar/projects`) -- Project deadlines και milestones
-- **PR & Events** (`/calendar/events`) -- Events, media, PR activities
-- **Backlog** (`/calendar/backlog`) -- Items χωρίς ημερομηνία
-
----
-
-## Zoom-Based Views με Smooth Animation
-
-4 επίπεδα zoom: **Year → Month → Week → Day**
-
-Η αλλαγή view γίνεται με:
-1. **Click σε κελί** -- zoom in (π.χ. click μήνα στο Year view → Month view εκείνου του μήνα)
-2. **Breadcrumb navigation** -- zoom out (π.χ. "2026 > Φεβρουάριος > Εβδ. 8" -- click "2026" → Year view)
-3. **Keyboard**: scroll wheel ή +/- για zoom in/out
-
-Κάθε transition χρησιμοποιεί CSS `transform: scale()` + `opacity` animation (~300ms) για smooth zoom effect.
-
-### Year View
-- 12 μήνες σε grid 4x3
-- Κάθε μήνας δείχνει mini calendar + event count dots
-- Click σε μήνα → zoom in σε Month view
-
-### Month View (υπάρχον, βελτιωμένο)
-- Κλασικό grid 7 στηλών
-- Events σαν colored bars
-- Click σε ημέρα → zoom in σε Day view
-- Double-click σε κενό → δημιουργία meeting
-
-### Week View
-- 7 στήλες, ώρες στον κατακόρυφο άξονα (08:00-22:00)
-- Time blocks για meetings
-- Drag to create meeting
-- Drag to reschedule
-
-### Day View
-- Λεπτομερές ωράριο (30min slots)
-- Timeline αριστερά με ώρες
-- Δεξί panel με λεπτομέρειες επιλεγμένου event
-
----
-
-## Database: Meetings Table
+Δημιουργία `is_company_admin_or_manager(_user_id uuid, _company_id uuid)` που ελέγχει ρόλο **εντός συγκεκριμένης εταιρείας**:
 
 ```sql
-CREATE TABLE public.calendar_events (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id uuid NOT NULL REFERENCES companies(id),
-  title text NOT NULL,
-  description text,
-  event_type text NOT NULL DEFAULT 'meeting',
-    -- 'meeting', 'call', 'event', 'reminder', 'pr', 'campaign'
-  start_time timestamptz NOT NULL,
-  end_time timestamptz NOT NULL,
-  all_day boolean DEFAULT false,
-  location text,
-  video_link text,
-  color text,
-  created_by uuid REFERENCES profiles(id),
-  project_id uuid REFERENCES projects(id),
-  client_id uuid REFERENCES clients(id),
-  recurrence_rule text,   -- RRULE string (φάση 2)
-  google_event_id text,   -- Google Calendar sync (φάση 2)
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now()
-);
-
-CREATE TABLE public.calendar_event_attendees (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  event_id uuid NOT NULL REFERENCES calendar_events(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL REFERENCES profiles(id),
-  status text DEFAULT 'pending', -- 'accepted', 'declined', 'pending', 'tentative'
-  created_at timestamptz DEFAULT now(),
-  UNIQUE(event_id, user_id)
-);
-
--- Enable realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE public.calendar_events;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.calendar_event_attendees;
+CREATE OR REPLACE FUNCTION public.is_company_admin_or_manager(_user_id uuid, _company_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_company_roles
+    WHERE user_id = _user_id 
+    AND company_id = _company_id 
+    AND role IN ('owner', 'admin', 'manager')
+    AND status = 'active'
+  )
+$$;
 ```
 
-RLS policies για company-scoped access + attendee visibility.
+### Βήμα 2: Ενημέρωση Πινάκων ΜΕ company_id
 
----
+Πίνακες που ήδη έχουν `company_id` αλλά χρησιμοποιούν `is_admin_or_manager()` χωρίς φίλτρο. Θα αλλαχτούν σε:
 
-## Interactions
-
-### Click
-- Click σε event → side panel με λεπτομέρειες
-- Click σε κενό slot → quick create meeting dialog
-- Click σε ημέρα (Month/Year view) → zoom in
-
-### Right Click (Context Menu)
-- Σε event: Edit, Delete, Duplicate, Αλλαγή χρώματος, Link to Project
-- Σε κενό: New Meeting, New Reminder, Paste Event
-
-### Drag & Drop
-- Drag event σε άλλη ημέρα/ώρα → reschedule (update start_time/end_time)
-- Drag from backlog → assign date
-- Drag edge of event → resize duration (Week/Day view)
-
----
-
-## Backlog Panel
-
-Slide-out panel (δεξιά) ή dedicated page (`/calendar/backlog`):
-- Tasks χωρίς due_date
-- Deliverables χωρίς due_date
-- Draft meetings χωρίς ημερομηνία
-- Drag from backlog → calendar = assign date
-- Filter by project, type
-
----
-
-## Meeting Creation Dialog
-
-Fields:
-- Τίτλος
-- Τύπος (Meeting, Call, Event, Reminder)
-- Ημερομηνία/Ώρα έναρξης - λήξης
-- Ολοήμερο toggle
-- Τοποθεσία / Video link
-- Attendees (multi-select from team, sends notification)
-- Linked Project (optional)
-- Linked Client (optional)
-- Χρώμα
-- Περιγραφή
-
----
-
-## Technical Details
-
-### Νέα αρχεία
-
-| File | Purpose |
-|------|---------|
-| `src/pages/CalendarHub.tsx` | Main calendar page with sub-routing |
-| `src/components/calendar/CalendarZoomView.tsx` | Core zoom engine (Year/Month/Week/Day) |
-| `src/components/calendar/CalendarYearView.tsx` | Year grid (12 months) |
-| `src/components/calendar/CalendarMonthView.tsx` | Enhanced month grid |
-| `src/components/calendar/CalendarWeekView.tsx` | Week view with time slots |
-| `src/components/calendar/CalendarDayView.tsx` | Day detail view |
-| `src/components/calendar/CalendarEventDialog.tsx` | Create/edit meeting dialog |
-| `src/components/calendar/CalendarBacklog.tsx` | Backlog panel |
-| `src/components/calendar/CalendarContextMenu.tsx` | Right-click context menu |
-| `src/components/calendar/CalendarEventCard.tsx` | Event display component |
-| `src/components/calendar/CalendarFilterTabs.tsx` | Sub-page filter tabs |
-| `src/hooks/useCalendarEvents.ts` | CRUD hook for calendar_events |
-
-### Τροποποιημένα αρχεία
-
-| File | Changes |
-|------|---------|
-| `src/App.tsx` | Add `/calendar/*` routes, remove `/calendar` redirect to work |
-| `src/components/layout/AppSidebar.tsx` | Add "calendar" category to icon rail, remove calendar from work sub-links |
-| `src/pages/Work.tsx` | Remove calendar tab |
-
-### Zoom Animation CSS
-
-```css
-.calendar-zoom-enter {
-  animation: zoom-in 300ms cubic-bezier(0.32, 0.72, 0, 1);
-}
-.calendar-zoom-exit {
-  animation: zoom-out 300ms cubic-bezier(0.32, 0.72, 0, 1);
-}
-@keyframes zoom-in {
-  from { transform: scale(0.85); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
-}
-@keyframes zoom-out {
-  from { transform: scale(1); opacity: 1; }
-  to { transform: scale(1.15); opacity: 0; }
-}
+```sql
+is_company_admin_or_manager(auth.uid(), company_id)
 ```
 
+Αφορά: `billing_notifications`, `services`, `work_day_logs`, `work_schedules`
+
+### Βήμα 3: Ενημέρωση Πινάκων ΧΩΡΙΣ company_id (μέσω project)
+
+Πίνακες που συνδέονται με projects (deliverables, tasks, comments, creatives κλπ.). Η λογική γίνεται:
+
+```sql
+EXISTS (
+  SELECT 1 FROM projects p
+  WHERE p.id = <table>.project_id
+  AND is_company_admin_or_manager(auth.uid(), p.company_id)
+)
+```
+
+Αφορά: `projects`, `tasks`, `deliverables`, `comments`, `contracts`, `expenses`, `invoices`, `time_entries`, `media_plans`, `media_plan_items`, `project_creatives`, `project_contact_access`, `project_team_access`, `project_user_access`, `file_attachments`, `file_folders`, `project_templates`, `project_template_tasks`, `project_template_deliverables`, `task_templates`
+
+### Βήμα 4: Ενημέρωση Πινάκων Tenders
+
+Tenders, tender_tasks, tender_deliverables, tender_evaluation_criteria, tender_suggestions, tender_team_access -- μέσω tender -> company_id.
+
+### Βήμα 5: Fix `has_project_access` Function
+
+Η τρέχουσα `has_project_access` δίνει πρόσβαση σε admin/manager χωρίς company check. Θα προστεθεί:
+
+```sql
+-- Αντικατάσταση:
+EXISTS (SELECT 1 FROM user_roles WHERE user_id = _user_id AND role IN ('admin','manager'))
+-- Με:
+EXISTS (
+  SELECT 1 FROM projects p
+  JOIN user_company_roles ucr ON ucr.company_id = p.company_id
+  WHERE p.id = _project_id AND ucr.user_id = _user_id
+  AND ucr.role IN ('owner','admin','manager') AND ucr.status = 'active'
+)
+```
+
+### Βήμα 6: Fix `is_admin_or_manager` Function
+
+Η legacy function θα ενημερωθεί ώστε να ελέγχει μόνο `user_company_roles` με company context (αφαιρεί τον έλεγχο στο legacy `user_roles` table):
+
+```sql
+CREATE OR REPLACE FUNCTION public.is_admin_or_manager(_user_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_company_roles
+    WHERE user_id = _user_id 
+    AND role IN ('owner', 'admin', 'manager')
+    AND status = 'active'
+  )
+$$;
+```
+
+Αυτό επηρεάζει αυτόματα όλες τις policies που ήδη χρησιμοποιούν `is_admin_or_manager` **μαζί** με company_id check (departments, leave_requests κλπ.).
+
 ---
 
-## Φάση 2 (Μελλοντική)
+## Πλήρης Λίστα Πινάκων προς Ενημέρωση (30+)
 
-- Google Calendar bi-directional sync
-- Recurring events (RRULE)
-- Calendar sharing / permissions
-- Email invitations σε εξωτερικούς
-- Agenda print view
+| Πίνακας | Τρόπος Scoping |
+|---------|---------------|
+| `activity_log` | Μέσω company_id (αν υπάρχει) ή user-level |
+| `billing_notifications` | company_id |
+| `briefs` | Μέσω project -> company_id |
+| `calendar_event_attendees` | Μέσω event -> company_id |
+| `comments` | Μέσω project -> company_id |
+| `contracts` | Μέσω project/client -> company_id |
+| `deliverables` | Μέσω project -> company_id |
+| `expenses` | Μέσω project -> company_id |
+| `file_attachments` | Μέσω project/tender -> company_id |
+| `file_folders` | Μέσω project/tender -> company_id |
+| `invoices` | Μέσω project/client -> company_id |
+| `media_plans` | Μέσω project -> company_id |
+| `media_plan_items` | Μέσω media_plan -> project -> company_id |
+| `project_contact_access` | Μέσω project -> company_id |
+| `project_creatives` | Μέσω project -> company_id |
+| `project_team_access` | Μέσω project -> company_id |
+| `project_templates` | company_id |
+| `project_template_tasks` | Μέσω template -> company_id |
+| `project_template_deliverables` | Μέσω template -> company_id |
+| `project_user_access` | Μέσω project -> company_id |
+| `projects` | company_id |
+| `services` | company_id |
+| `task_templates` | Μέσω project -> company_id |
+| `tasks` | Μέσω project -> company_id |
+| `team_members` | Μέσω team -> company_id |
+| `tender_*` (6 πίνακες) | Μέσω tender -> company_id |
+| `time_entries` | company_id |
+| `work_day_logs` | company_id |
+| `work_schedules` | company_id |
+
+---
+
+## Onboarding Flow -- Τρέχουσα Κατάσταση
+
+Η ροή σύνδεσης/εγγραφής είναι **σωστά σχεδιασμένη**:
+
+1. **Νέος χρήστης με εταιρικό email** → `auto_onboard_user()` βρίσκει εταιρεία με ίδιο domain → δημιουργεί join request → αναμονή έγκρισης
+2. **Νέος χρήστης χωρίς εταιρεία** → Onboarding screen: δημιουργία εταιρείας ή αποδοχή πρόσκλησης
+3. **Χρήστης με πολλές εταιρείες** → Workspace Selector
+
+Το πρόβλημα **δεν** είναι στο onboarding flow αλλά στα RLS policies που δεν φιλτράρουν σωστά ανά εταιρεία.
+
+---
+
+## Τεχνικά Βήματα Υλοποίησης
+
+1. Migration SQL με:
+   - `CREATE FUNCTION is_company_admin_or_manager()`
+   - `DROP + RECREATE` ολων των affected policies (30+)
+   - `ALTER FUNCTION is_admin_or_manager()` update
+   - `ALTER FUNCTION has_project_access()` update
+2. Κανένα frontend αλλαγή -- η ασφάλεια εφαρμόζεται στη βάση δεδομένων
+3. Test ότι ο χρήστης `info@advize.gr` δεν βλέπει δεδομένα "Default Company"
 

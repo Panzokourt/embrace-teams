@@ -271,6 +271,11 @@
 }
 
 @layer utilities {
+  /* Lime text is unreadable — force foreground color for all text-primary usages */
+  [class*="text-primary"]:not([class*="text-primary-foreground"]) {
+    color: hsl(var(--foreground)) !important;
+  }
+
   .text-balance {
     text-wrap: balance;
   }

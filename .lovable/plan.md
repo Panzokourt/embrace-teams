@@ -1,318 +1,227 @@
 
 
-# Digital Governance Module -- Πλήρης Σχεδιασμός
+# Knowledge Base Module -- Πλήρης Σχεδιασμός
 
 ## Σύνοψη
 
-Νέο module "Governance" στο sidebar (ανάμεσα σε "Οικονομικά" και "Διαχείριση") για παρακολούθηση ψηφιακών λογαριασμών, assets, δικαιωμάτων πρόσβασης, security controls και audit trail σε όλους τους πελάτες. ISO-27001 friendly.
+Νέο module "Knowledge Base" στο sidebar για κεντρική διαχείριση γνώσης: playbooks, SOPs, templates, per-client documentation, meeting notes. Κάθε άρθρο έχει ownership, lifecycle (draft/approved/deprecated), review cycles και full-text search.
 
 ---
 
 ## 1. Navigation
 
-Νέα κατηγορία `governance` στο Icon Rail (Shield icon):
+Νέα κατηγορία `knowledge` στο Icon Rail (BookOpen icon), ανάμεσα σε "Αρχείο" και "Χρόνος":
 
 ```text
 Icon Rail:
   ...
-  Οικονομικά
-  Governance    <-- ΝΕΟ (Shield icon)
-  Διαχείριση
+  Αρχείο
+  Knowledge Base  <-- ΝΕΟ (BookOpen icon)
+  Χρόνος
+  ...
 ```
 
 Sub-links στο Category Panel:
-- **Dashboard** (`/governance`) -- KPIs, risk overview
-- **Digital Assets** (`/governance/assets`) -- All assets across clients
-- **Access Control** (`/governance/access`) -- Access grants + review queue
-- **Credentials Vault** (`/governance/vault`) -- Vault references (no passwords)
-- **Compliance** (`/governance/compliance`) -- Audit log + review workflows
+- **Αρχική KB** (`/knowledge`) -- Quick links, search, browse
+- **Company Playbook** (`/knowledge/playbook`) -- Εταιρικά articles (Operations, Quality, Security, Tools)
+- **Templates & SOPs** (`/knowledge/templates`) -- Template library with "Use template" action
+- **Review Queue** (`/knowledge/reviews`) -- Articles pending review
 
 ---
 
-## 2. Database Schema (9 tables)
+## 2. Database Schema (5 tables)
 
-### A) `gov_platforms`
-Κατάλογος πλατφορμών (Meta, Google, LinkedIn, κλπ.)
-
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid PK | |
-| company_id | uuid FK companies | |
-| name | text | Meta, Google, κλπ. |
-| category | text | ads/analytics/social/crm/cms/infrastructure |
-| icon_name | text | Optional icon identifier |
-| created_at | timestamptz | |
-
-### B) `gov_assets`
-Κάθε ψηφιακό asset (Ad Account, Page, Pixel, Domain, κλπ.)
+### A) `kb_categories`
+3-level taxonomy (Company > Operations, Department > Performance, κλπ.)
 
 | Column | Type | Notes |
 |--------|------|-------|
 | id | uuid PK | |
 | company_id | uuid FK companies | |
-| client_id | uuid FK clients | Nullable |
-| platform_id | uuid FK gov_platforms | |
-| asset_type | text | BM, Ad Account, Page, Pixel, κλπ. |
-| asset_name | text | |
-| asset_external_id | text | Platform-specific ID |
-| url | text | |
-| status | text | active/inactive |
-| owner_entity | text | Agency entity name or "client" |
-| billing_owner | text | Who pays |
-| created_by_person | text | |
-| notes | text | |
-| created_at / updated_at | timestamptz | |
-
-### C) `gov_access_roles`
-Ρόλοι ανά πλατφόρμα (Admin, Editor, Advertiser, κλπ.)
-
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid PK | |
-| company_id | uuid FK | |
-| platform_id | uuid FK gov_platforms | |
-| role_name | text | Admin, Editor, κλπ. |
-| permissions_description | text | |
-
-### D) `gov_access_grants`
-Ποιος έχει πρόσβαση σε τι
-
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid PK | |
-| company_id | uuid FK | |
-| asset_id | uuid FK gov_assets | |
-| person_name | text | Name of person |
-| person_email | text | |
-| person_type | text | internal/external/client |
-| role_id | uuid FK gov_access_roles | Nullable |
-| role_name_override | text | If role not in catalog |
-| granted_on | date | |
-| granted_by | text | |
-| removal_date | date | Nullable |
-| status | text | active/revoked |
-| last_review_date | date | |
-| review_cycle_days | integer | Default 90 |
-| notes | text | |
-| created_at / updated_at | timestamptz | |
-
-### E) `gov_security_controls`
-Security status ανά asset
-
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid PK | |
-| company_id | uuid FK | |
-| asset_id | uuid FK gov_assets | UNIQUE |
-| mfa_enabled | boolean | Default false |
-| mfa_method | text | app/sms/email/none |
-| backup_admin_present | boolean | Default false |
-| personal_login_used | boolean | Default false |
-| recovery_email | text | |
-| recovery_phone | text | |
-| last_password_change_date | date | |
-| password_rotation_policy | text | 90/180/none |
-| risk_level | text | low/medium/high (auto-calculated) |
-| risk_score | integer | 1-5 (auto-calculated) |
-| created_at / updated_at | timestamptz | |
-
-### F) `gov_vault_references`
-Αναφορές σε password managers (χωρίς passwords)
-
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid PK | |
-| company_id | uuid FK | |
-| asset_id | uuid FK gov_assets | |
-| vault_provider | text | 1Password/Bitwarden/Other |
-| vault_location | text | Folder/path |
-| vault_entry_name | text | |
-| last_verified_date | date | |
+| name | text | |
+| slug | text | URL-friendly |
+| parent_id | uuid FK kb_categories | Nullable (for nesting) |
+| level | integer | 1, 2, or 3 |
+| sort_order | integer | Default 0 |
 | created_at | timestamptz | |
 
-### G) `gov_audit_events`
-Immutable audit log
+### B) `kb_articles`
+Articles, playbooks, meeting notes, client docs
 
 | Column | Type | Notes |
 |--------|------|-------|
 | id | uuid PK | |
-| company_id | uuid FK | |
-| client_id | uuid FK clients | Nullable |
-| asset_id | uuid FK gov_assets | Nullable |
-| actor_name | text | Who did it |
-| event_type | text | access_granted/revoked/role_changed/mfa_updated/owner_changed/asset_created/asset_archived |
-| before_state | jsonb | |
-| after_state | jsonb | |
-| notes | text | |
-| created_at | timestamptz | Immutable timestamp |
-
-### H) `gov_review_tasks`
-Review queue items
-
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid PK | |
-| company_id | uuid FK | |
-| asset_id | uuid FK gov_assets | |
-| due_date | date | |
-| status | text | pending/completed/skipped |
-| completed_by | uuid FK profiles | |
-| completed_at | timestamptz | |
-| notes | text | |
-| created_at | timestamptz | |
-
-### I) `gov_checklists`
-Templates: onboarding, offboarding, quarterly review
-
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid PK | |
-| company_id | uuid FK | |
-| template_type | text | client_onboarding/user_offboarding/quarterly_review |
+| company_id | uuid FK companies | |
 | title | text | |
-| items | jsonb | Array of checklist items |
-| created_at / updated_at | timestamptz | |
+| body | text | Markdown/rich text |
+| article_type | text | article/meeting_note/decision |
+| category_id | uuid FK kb_categories | Nullable |
+| tags | text[] | Array of tags |
+| owner_id | uuid FK profiles | Who owns this article |
+| status | text | draft/approved/deprecated |
+| visibility | text | internal/client-visible |
+| client_id | uuid FK clients | Nullable |
+| project_id | uuid FK projects | Nullable |
+| gov_asset_id | uuid FK gov_assets | Nullable |
+| source_links | text[] | Drive/Confluence/URLs |
+| version | integer | Default 1 |
+| next_review_date | date | Nullable |
+| attendees | text[] | For meeting notes |
+| decisions | jsonb | For meeting notes/decisions |
+| action_items | jsonb | Links to tasks |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
+
+### C) `kb_templates`
+Reusable templates (briefs, SOPs, checklists, reports)
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid PK | |
+| company_id | uuid FK companies | |
+| title | text | |
+| template_type | text | brief/media-plan/report/checklist/sop |
+| description | text | |
+| content | jsonb | Structured fields + text |
+| default_tasks | jsonb | Optional tasks to auto-generate |
+| owner_id | uuid FK profiles | |
+| status | text | draft/approved/deprecated |
+| usage_count | integer | Default 0 |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
+
+### D) `kb_article_versions`
+Version history (immutable)
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid PK | |
+| article_id | uuid FK kb_articles | |
+| version | integer | |
+| title | text | |
+| body | text | Snapshot |
+| changed_by | uuid FK profiles | |
+| change_notes | text | |
+| created_at | timestamptz | |
+
+### E) `kb_template_usage`
+Log when templates are used
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid PK | |
+| company_id | uuid FK companies | |
+| template_id | uuid FK kb_templates | |
+| used_by | uuid FK profiles | |
+| project_id | uuid FK projects | Nullable |
+| client_id | uuid FK clients | Nullable |
+| created_at | timestamptz | |
 
 ---
 
 ## 3. RLS Policies
 
-Ολα τα tables θα χρησιμοποιούν `is_company_admin_or_manager(auth.uid(), company_id)` για full access, και `EXISTS (SELECT 1 FROM user_company_roles WHERE user_id = auth.uid() AND company_id = <table>.company_id AND status = 'active')` για read-only access στα μέλη.
-
-Το `gov_audit_events` θα έχει INSERT-only policy (immutable) -- κανένα UPDATE/DELETE.
+- Ολα τα tables: `is_company_admin_or_manager(auth.uid(), company_id)` για full access
+- Read access: active company members μέσω `user_company_roles`
+- `kb_article_versions`: INSERT-only (immutable history)
+- Client-visible articles: future extension for client portal
 
 ---
 
 ## 4. UI Screens
 
-### A) Governance Dashboard (`/governance`)
-- KPI cards: Total Assets, Assets χωρίς MFA, χωρίς Backup Admin, High-Risk, Pending Reviews, Personal Logins
-- Filters: Client, Platform, Owner, Risk Level, Status
-- Quick tables: Top risks, upcoming reviews
+### A) KB Home (`/knowledge`)
+- Search bar (full-text across articles + templates)
+- Quick sections: Recently Updated, Review Due, Most Used Templates
+- Browse by Category tree (collapsible)
+- KPI cards: Total Articles, Drafts, Pending Review, Deprecated
 
-### B) Digital Assets (`/governance/assets`)
-- Table view με columns: Client, Platform, Type, Name, Owner, Status, Risk Score
-- Click row -> Asset Detail page
-- Create/Edit asset dialog
-- Bulk actions
+### B) Company Playbook (`/knowledge/playbook`)
+- Filtered view: articles with company-level categories
+- Tree navigation on left, article content on right
+- Category management for admins
 
-### C) Asset Detail (`/governance/assets/:id`)
-- Sections: Asset Info, Security Controls, Access List, Vault Reference, Audit Timeline
-- Inline edit για security controls
-- Add/remove access grants
+### C) Article Page (`/knowledge/articles/:id`)
+- Full markdown body with sidebar:
+  - Metadata: Owner, Status badge, Version, Last Updated
+  - Related items: Client, Project, Governance Asset
+  - Source links
+  - Tags
+- Action buttons: Edit, New Version, Deprecate, Request Review
+- Version history timeline
 
-### D) Access Control (`/governance/access`)
-- Tab 1: All Access Grants (filterable table)
-- Tab 2: Reviews Due (queue -- assets needing review)
-- Approve/Remove/Change role buttons -> auto-create audit events
+### D) Templates & SOPs (`/knowledge/templates`)
+- Grid/list view with filters by type (brief/sop/checklist/report)
+- Each card shows: title, type, description, usage count, owner
+- "Use Template" button -> creates linked entity in project
+- Usage log visible to admins
 
-### E) Credentials Vault (`/governance/vault`)
-- Table: Asset, Vault Provider, Location, Entry Name, Last Verified
-- No actual passwords -- just references
-
-### F) Compliance (`/governance/compliance`)
-- Full audit log (filterable timeline)
-- Checklist templates (onboarding, offboarding, quarterly)
-- Generate review tasks
+### E) Review Queue (`/knowledge/reviews`)
+- Table of articles where `next_review_date <= today` or status = 'draft' pending approval
+- Columns: Title, Owner, Category, Last Updated, Review Due
+- Actions: Approve, Request Changes, Deprecate
 
 ---
 
 ## 5. Automations (Frontend Logic)
 
-- **Risk auto-calculation** on security controls save:
-  - `mfa_enabled = false` -> risk_score >= 4
-  - `backup_admin_present = false` -> risk_score >= 3
-  - `personal_login_used = true` -> risk_score = 5, risk_level = "high"
-
-- **Review reminders**: Dashboard shows overdue reviews based on `last_review_date + review_cycle_days`
-
-- **Audit trail**: Every CRUD action on assets/access/security creates `gov_audit_events` entry automatically
+- **Version tracking**: On article edit + save, auto-create `kb_article_versions` entry, increment version
+- **Review reminders**: Dashboard shows articles with `next_review_date <= today`
+- **Deprecate instead of delete**: Status changes to "deprecated", article remains searchable
+- **Template usage logging**: When "Use Template" is clicked, create `kb_template_usage` entry
+- **Search**: Client-side filtering across title, body, tags -- articles and templates combined
 
 ---
 
-## 6. Default Checklist Templates
-
-Seeded on first visit or via "Create defaults" button:
-
-**Client Onboarding Governance:**
-1. Collect all platform credentials from client
-2. Document asset ownership (agency vs client)
-3. Add all assets to governance registry
-4. Verify MFA on all accounts
-5. Set backup admin on all platforms
-6. Store credentials in vault (1Password/Bitwarden)
-7. Document billing ownership per platform
-8. Initial access review -- grant minimum necessary access
-
-**User Offboarding:**
-1. List all active access grants for departing user
-2. Revoke access on each platform
-3. Update governance registry (status -> revoked)
-4. Rotate passwords on shared accounts
-5. Verify vault entries updated
-6. Create audit event for each revocation
-7. Final review sign-off
-
-**Quarterly Access Review:**
-1. Pull list of all active access grants
-2. Verify each person still needs access
-3. Check MFA status on all assets
-4. Verify backup admin presence
-5. Flag personal login usage
-6. Update risk scores
-7. Document review completion
-
----
-
-## 7. Αρχεία
+## 6. Αρχεία
 
 ### Νέα αρχεία
 
 | File | Purpose |
 |------|---------|
-| `src/pages/Governance.tsx` | Main dashboard page |
-| `src/pages/GovernanceAssets.tsx` | Assets list page |
-| `src/pages/GovernanceAssetDetail.tsx` | Asset detail page |
-| `src/pages/GovernanceAccess.tsx` | Access control + review queue |
-| `src/pages/GovernanceVault.tsx` | Vault references |
-| `src/pages/GovernanceCompliance.tsx` | Audit log + checklists |
-| `src/components/governance/GovernanceDashboardKPIs.tsx` | KPI cards |
-| `src/components/governance/AssetForm.tsx` | Create/edit asset dialog |
-| `src/components/governance/SecurityControlsEditor.tsx` | Security controls form |
-| `src/components/governance/AccessGrantForm.tsx` | Add/edit access grant |
-| `src/components/governance/AccessReviewQueue.tsx` | Review queue component |
-| `src/components/governance/VaultReferenceForm.tsx` | Vault reference form |
-| `src/components/governance/AuditTimeline.tsx` | Audit events timeline |
-| `src/components/governance/ChecklistManager.tsx` | Checklist templates |
-| `src/components/governance/RiskBadge.tsx` | Risk level/score badge |
-| `src/hooks/useGovernance.ts` | CRUD hook for all governance tables |
-| Migration SQL | 9 tables + RLS + seed platforms |
+| `src/pages/Knowledge.tsx` | KB Home page |
+| `src/pages/KnowledgePlaybook.tsx` | Company Playbook (filtered articles) |
+| `src/pages/KnowledgeArticle.tsx` | Article detail page |
+| `src/pages/KnowledgeTemplates.tsx` | Template library |
+| `src/pages/KnowledgeReviews.tsx` | Review queue |
+| `src/components/knowledge/KBSearchBar.tsx` | Search component |
+| `src/components/knowledge/KBCategoryTree.tsx` | Category tree navigation |
+| `src/components/knowledge/KBArticleEditor.tsx` | Article create/edit form |
+| `src/components/knowledge/KBArticleCard.tsx` | Article preview card |
+| `src/components/knowledge/KBTemplateCard.tsx` | Template card with "Use" button |
+| `src/components/knowledge/KBReviewQueue.tsx` | Review queue table |
+| `src/components/knowledge/KBVersionHistory.tsx` | Version timeline |
+| `src/components/knowledge/KBCategoryManager.tsx` | Category CRUD for admins |
+| `src/hooks/useKnowledgeBase.ts` | CRUD hook for all KB tables |
+| Migration SQL | 5 tables + RLS + seed categories |
 
 ### Τροποποιημένα αρχεία
 
 | File | Changes |
 |------|---------|
-| `src/components/layout/AppSidebar.tsx` | Add "governance" category to icon rail |
-| `src/App.tsx` | Add `/governance/*` routes |
+| `src/components/layout/AppSidebar.tsx` | Add "knowledge" category to icon rail + nav items |
+| `src/App.tsx` | Add `/knowledge/*` routes |
 
 ---
 
-## 8. Seed Data -- Default Platforms
+## 7. Seed Data -- Default Categories
 
-Θα δημιουργηθούν αυτόματα 12+ πλατφόρμες:
+Αυτόματη δημιουργία κατηγοριών κατά την πρώτη επίσκεψη:
 
-| Name | Category |
-|------|----------|
-| Meta (Facebook) | social/ads |
-| Google | ads/analytics |
-| LinkedIn | social/ads |
-| TikTok | social/ads |
-| X (Twitter) | social |
-| YouTube | social |
-| Mailchimp | crm |
-| WordPress | cms |
-| Shopify | cms |
-| Cloudflare | infrastructure |
-| GoDaddy | infrastructure |
-| Papaki | infrastructure |
+**Level 1:**
+| Name | Slug |
+|------|------|
+| Company | company |
+| Departments | departments |
+| Clients | clients |
+| Templates | templates |
+
+**Level 2 (under Company):**
+Operations, Quality, Security, Tools & Platforms
+
+**Level 2 (under Departments):**
+Performance, Creative, Social Media, Account Management, Tech/Dev
+
+**Level 2 (under Templates):**
+Briefs, Reports, Checklists, SOPs
 

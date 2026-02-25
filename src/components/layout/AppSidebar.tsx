@@ -77,7 +77,7 @@ interface NavItem {
 }
 
 // ─── Category definitions for the icon rail ───
-type CategoryId = 'overview' | 'work' | 'clients' | 'revenue' | 'operations' | 'intelligence' | 'governance' | 'settings';
+type CategoryId = 'overview' | 'work' | 'clients' | 'communication' | 'revenue' | 'operations' | 'intelligence' | 'governance' | 'settings';
 
 interface Category {
   id: CategoryId;
@@ -90,6 +90,7 @@ const categories: Category[] = [
   { id: 'overview', icon: LayoutDashboard, label: 'Overview', routePrefixes: ['/my-work', '/'] },
   { id: 'work', icon: Briefcase, label: 'Work', routePrefixes: ['/work', '/projects', '/tasks', '/calendar', '/files', '/blueprints', '/campaigns', '/backlog'] },
   { id: 'clients', icon: Building2, label: 'Clients', routePrefixes: ['/clients', '/contacts'] },
+  { id: 'communication', icon: MessageSquare, label: 'Communication', routePrefixes: ['/chat', '/inbox'] },
   { id: 'revenue', icon: DollarSign, label: 'Revenue', routePrefixes: ['/financials', '/pricing'] },
   { id: 'operations', icon: Users, label: 'Operations', routePrefixes: ['/hr', '/timesheets', '/knowledge', '/operations'] },
   { id: 'intelligence', icon: BarChart3, label: 'Intelligence', routePrefixes: ['/reports', '/leaderboard', '/secretary', '/intelligence'] },
@@ -106,6 +107,10 @@ const categoryNavItems: Record<CategoryId, NavItem[]> = {
   clients: [
     { title: 'All Clients', href: '/clients', icon: Building2, permission: 'clients.view' },
     { title: 'Contacts', href: '/contacts', icon: BookUser },
+  ],
+  communication: [
+    { title: 'Chat', href: '/chat', icon: MessageSquare },
+    { title: 'Inbox', href: '/inbox', icon: Mail },
   ],
   revenue: [
     { title: 'Dashboard', href: '/financials?tab=dashboard', icon: LayoutDashboard, permission: 'financials.view' },
@@ -162,6 +167,7 @@ const categoryNavItems: Record<CategoryId, NavItem[]> = {
 function detectCategory(pathname: string): CategoryId {
   if (pathname.startsWith('/work') || pathname.startsWith('/projects') || pathname.startsWith('/tasks') || pathname.startsWith('/calendar') || pathname.startsWith('/files') || pathname.startsWith('/blueprints') || pathname.startsWith('/campaigns') || pathname.startsWith('/backlog')) return 'work';
   if (pathname.startsWith('/clients') || pathname.startsWith('/contacts')) return 'clients';
+  if (pathname.startsWith('/chat') || pathname.startsWith('/inbox')) return 'communication';
   if (pathname.startsWith('/financials') || pathname.startsWith('/pricing')) return 'revenue';
   if (pathname.startsWith('/hr') || pathname.startsWith('/timesheets') || pathname.startsWith('/knowledge') || pathname.startsWith('/operations')) return 'operations';
   if (pathname.startsWith('/reports') || pathname.startsWith('/leaderboard') || pathname.startsWith('/secretary') || pathname.startsWith('/intelligence')) return 'intelligence';

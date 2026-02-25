@@ -118,6 +118,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        // On token refresh, silently update session without remounting the app
+        if (event === 'TOKEN_REFRESHED') {
+          setSession(session);
+          setUser(session?.user ?? null);
+          return;
+        }
         applySession(session);
         if (session?.user) {
           setTimeout(() => fetchUserData(session.user.id), 0);

@@ -697,21 +697,18 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
   return (
     <div className={embedded ? 'space-y-6' : 'page-shell'}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in">
-        {!embedded && (
-          <PageHeader
-            icon={FolderKanban}
-            title="Έργα"
-            subtitle="Διαχείριση και παρακολούθηση έργων"
-            breadcrumbs={[{ label: 'Εργασία', href: '/work' }, { label: 'Έργα' }]}
-          />
-        )}
-
-        <div className="flex items-center gap-3">
-          <UnifiedViewToggle 
-            viewMode={viewMode} 
-            onViewModeChange={setViewMode}
-          />
+      {!embedded && (
+        <PageHeader
+          icon={FolderKanban}
+          title="Έργα"
+          subtitle="Διαχείριση και παρακολούθηση έργων"
+          breadcrumbs={[{ label: 'Εργασία', href: '/work' }, { label: 'Έργα' }]}
+          actions={
+            <div className="flex items-center gap-3">
+              <UnifiedViewToggle 
+                viewMode={viewMode} 
+                onViewModeChange={setViewMode}
+              />
 
           {canManage && (
             <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
@@ -1017,8 +1014,10 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
               </DialogContent>
             </Dialog>
           )}
-        </div>
-      </div>
+            </div>
+          }
+        />
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 animate-fade-in" style={{ animationDelay: '50ms' }}>

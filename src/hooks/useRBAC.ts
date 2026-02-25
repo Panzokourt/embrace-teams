@@ -307,7 +307,7 @@ export function useRBAC() {
       await supabase.functions.invoke('send-invitation', {
         body: {
           invitation_id: data.id,
-          app_url: window.location.origin,
+          app_url: 'https://embrace-teams.lovable.app',
         },
       });
     } catch (emailError) {

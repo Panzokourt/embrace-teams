@@ -25,9 +25,10 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Verify JWT
+    // Verify JWT using getUser
     const authHeader = req.headers.get('Authorization')
     if (!authHeader?.startsWith('Bearer ')) {
+      console.error('Missing or invalid Authorization header')
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -40,14 +41,16 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     )
 
-    const token = authHeader.replace('Bearer ', '')
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token)
-    if (claimsError || !claimsData?.claims) {
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      console.error('Auth verification failed:', userError?.message || 'No user')
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
+
+    console.log(`Authenticated user: ${user.email} (${user.id})`)
 
     const { invitation_id, app_url } = await req.json()
 
@@ -57,6 +60,8 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
+
+    console.log(`Processing invitation: ${invitation_id}`)
 
     // Use service role to read invitation details
     const adminClient = createClient(
@@ -71,6 +76,7 @@ Deno.serve(async (req) => {
       .single()
 
     if (invError || !invitation) {
+      console.error('Invitation not found:', invError?.message)
       return new Response(JSON.stringify({ error: 'Invitation not found' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -89,6 +95,8 @@ Deno.serve(async (req) => {
     const roleName = ROLE_LABELS[invitation.role] || invitation.role
     const baseUrl = app_url || 'https://embrace-teams.lovable.app'
     const acceptUrl = `${baseUrl}/accept-invite/${invitation.token}`
+
+    console.log(`Sending invitation to ${invitation.email} for company "${companyName}" with link: ${acceptUrl}`)
 
     const expiresDate = new Date(invitation.expires_at)
     const expiresAt = expiresDate.toLocaleDateString('el-GR', {
@@ -111,6 +119,7 @@ Deno.serve(async (req) => {
     // Send via Resend
     const resendApiKey = Deno.env.get('RESEND_API_KEY')
     if (!resendApiKey) {
+      console.error('RESEND_API_KEY not configured')
       return new Response(JSON.stringify({ error: 'RESEND_API_KEY not configured' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -118,7 +127,7 @@ Deno.serve(async (req) => {
     }
 
     const resend = new Resend(resendApiKey)
-    const { error: sendError } = await resend.emails.send({
+    const { data: sendData, error: sendError } = await resend.emails.send({
       from: 'Olseny <noreply@olseny.com>',
       to: [invitation.email],
       subject: `Πρόσκληση στο ${companyName} — Olseny`,
@@ -126,21 +135,21 @@ Deno.serve(async (req) => {
     })
 
     if (sendError) {
-      console.error('Resend error:', sendError)
+      console.error('Resend error:', JSON.stringify(sendError))
       return new Response(JSON.stringify({ error: 'Failed to send email', details: sendError }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    console.log(`Invitation email sent to ${invitation.email}`)
+    console.log(`✅ Invitation email sent to ${invitation.email}, Resend ID: ${sendData?.id}`)
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error: any) {
-    console.error('Error in send-invitation:', error)
+    console.error('Error in send-invitation:', error.message, error.stack)
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

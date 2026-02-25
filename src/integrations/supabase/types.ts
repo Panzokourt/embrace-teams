@@ -1553,6 +1553,512 @@ export type Database = {
           },
         ]
       }
+      gov_access_grants: {
+        Row: {
+          asset_id: string
+          company_id: string
+          created_at: string
+          granted_by: string | null
+          granted_on: string | null
+          id: string
+          last_review_date: string | null
+          notes: string | null
+          person_email: string | null
+          person_name: string
+          person_type: string
+          removal_date: string | null
+          review_cycle_days: number
+          role_id: string | null
+          role_name_override: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          asset_id: string
+          company_id: string
+          created_at?: string
+          granted_by?: string | null
+          granted_on?: string | null
+          id?: string
+          last_review_date?: string | null
+          notes?: string | null
+          person_email?: string | null
+          person_name: string
+          person_type?: string
+          removal_date?: string | null
+          review_cycle_days?: number
+          role_id?: string | null
+          role_name_override?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          asset_id?: string
+          company_id?: string
+          created_at?: string
+          granted_by?: string | null
+          granted_on?: string | null
+          id?: string
+          last_review_date?: string | null
+          notes?: string | null
+          person_email?: string | null
+          person_name?: string
+          person_type?: string
+          removal_date?: string | null
+          review_cycle_days?: number
+          role_id?: string | null
+          role_name_override?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gov_access_grants_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "gov_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gov_access_grants_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gov_access_grants_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "gov_access_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gov_access_roles: {
+        Row: {
+          company_id: string
+          id: string
+          permissions_description: string | null
+          platform_id: string
+          role_name: string
+        }
+        Insert: {
+          company_id: string
+          id?: string
+          permissions_description?: string | null
+          platform_id: string
+          role_name: string
+        }
+        Update: {
+          company_id?: string
+          id?: string
+          permissions_description?: string | null
+          platform_id?: string
+          role_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gov_access_roles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gov_access_roles_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: false
+            referencedRelation: "gov_platforms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gov_assets: {
+        Row: {
+          asset_external_id: string | null
+          asset_name: string
+          asset_type: string
+          billing_owner: string | null
+          client_id: string | null
+          company_id: string
+          created_at: string
+          created_by_person: string | null
+          id: string
+          notes: string | null
+          owner_entity: string | null
+          platform_id: string
+          status: string
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          asset_external_id?: string | null
+          asset_name: string
+          asset_type: string
+          billing_owner?: string | null
+          client_id?: string | null
+          company_id: string
+          created_at?: string
+          created_by_person?: string | null
+          id?: string
+          notes?: string | null
+          owner_entity?: string | null
+          platform_id: string
+          status?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          asset_external_id?: string | null
+          asset_name?: string
+          asset_type?: string
+          billing_owner?: string | null
+          client_id?: string | null
+          company_id?: string
+          created_at?: string
+          created_by_person?: string | null
+          id?: string
+          notes?: string | null
+          owner_entity?: string | null
+          platform_id?: string
+          status?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gov_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gov_assets_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gov_assets_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: false
+            referencedRelation: "gov_platforms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gov_audit_events: {
+        Row: {
+          actor_name: string
+          after_state: Json | null
+          asset_id: string | null
+          before_state: Json | null
+          client_id: string | null
+          company_id: string
+          created_at: string
+          event_type: string
+          id: string
+          notes: string | null
+        }
+        Insert: {
+          actor_name: string
+          after_state?: Json | null
+          asset_id?: string | null
+          before_state?: Json | null
+          client_id?: string | null
+          company_id: string
+          created_at?: string
+          event_type: string
+          id?: string
+          notes?: string | null
+        }
+        Update: {
+          actor_name?: string
+          after_state?: Json | null
+          asset_id?: string | null
+          before_state?: Json | null
+          client_id?: string | null
+          company_id?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gov_audit_events_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "gov_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gov_audit_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gov_audit_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gov_checklists: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          items: Json
+          template_type: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          items?: Json
+          template_type: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          items?: Json
+          template_type?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gov_checklists_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gov_platforms: {
+        Row: {
+          category: string
+          company_id: string
+          created_at: string
+          icon_name: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          category?: string
+          company_id: string
+          created_at?: string
+          icon_name?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          category?: string
+          company_id?: string
+          created_at?: string
+          icon_name?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gov_platforms_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gov_review_tasks: {
+        Row: {
+          asset_id: string
+          company_id: string
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          due_date: string
+          id: string
+          notes: string | null
+          status: string
+        }
+        Insert: {
+          asset_id: string
+          company_id: string
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          due_date: string
+          id?: string
+          notes?: string | null
+          status?: string
+        }
+        Update: {
+          asset_id?: string
+          company_id?: string
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          due_date?: string
+          id?: string
+          notes?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gov_review_tasks_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "gov_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gov_review_tasks_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gov_review_tasks_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gov_security_controls: {
+        Row: {
+          asset_id: string
+          backup_admin_present: boolean
+          company_id: string
+          created_at: string
+          id: string
+          last_password_change_date: string | null
+          mfa_enabled: boolean
+          mfa_method: string
+          password_rotation_policy: string
+          personal_login_used: boolean
+          recovery_email: string | null
+          recovery_phone: string | null
+          risk_level: string
+          risk_score: number
+          updated_at: string
+        }
+        Insert: {
+          asset_id: string
+          backup_admin_present?: boolean
+          company_id: string
+          created_at?: string
+          id?: string
+          last_password_change_date?: string | null
+          mfa_enabled?: boolean
+          mfa_method?: string
+          password_rotation_policy?: string
+          personal_login_used?: boolean
+          recovery_email?: string | null
+          recovery_phone?: string | null
+          risk_level?: string
+          risk_score?: number
+          updated_at?: string
+        }
+        Update: {
+          asset_id?: string
+          backup_admin_present?: boolean
+          company_id?: string
+          created_at?: string
+          id?: string
+          last_password_change_date?: string | null
+          mfa_enabled?: boolean
+          mfa_method?: string
+          password_rotation_policy?: string
+          personal_login_used?: boolean
+          recovery_email?: string | null
+          recovery_phone?: string | null
+          risk_level?: string
+          risk_score?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gov_security_controls_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "gov_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gov_security_controls_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gov_vault_references: {
+        Row: {
+          asset_id: string
+          company_id: string
+          created_at: string
+          id: string
+          last_verified_date: string | null
+          vault_entry_name: string | null
+          vault_location: string | null
+          vault_provider: string
+        }
+        Insert: {
+          asset_id: string
+          company_id: string
+          created_at?: string
+          id?: string
+          last_verified_date?: string | null
+          vault_entry_name?: string | null
+          vault_location?: string | null
+          vault_provider?: string
+        }
+        Update: {
+          asset_id?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          last_verified_date?: string | null
+          vault_entry_name?: string | null
+          vault_location?: string | null
+          vault_provider?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gov_vault_references_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "gov_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gov_vault_references_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hr_documents: {
         Row: {
           company_id: string

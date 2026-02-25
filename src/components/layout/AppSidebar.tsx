@@ -56,6 +56,7 @@ import {
   Briefcase,
   Mail,
   Trophy,
+  ShieldCheck,
 } from 'lucide-react';
 import { briefDefinitions, getBriefDefinition } from '@/components/blueprints/briefDefinitions';
 import { BriefFormDialog } from '@/components/blueprints/BriefFormDialog';
@@ -75,7 +76,7 @@ interface NavItem {
 }
 
 // ─── Category definitions for the icon rail ───
-type CategoryId = 'home' | 'work' | 'calendar' | 'comms' | 'files' | 'time' | 'people' | 'finance' | 'admin';
+type CategoryId = 'home' | 'work' | 'calendar' | 'comms' | 'files' | 'time' | 'people' | 'finance' | 'governance' | 'admin';
 
 interface Category {
   id: CategoryId;
@@ -93,6 +94,7 @@ const categories: Category[] = [
   { id: 'time', icon: Timer, label: 'Χρόνος', routePrefixes: ['/timesheets'] },
   { id: 'people', icon: Users, label: 'Ομάδα', routePrefixes: ['/contacts', '/hr', '/leaderboard'] },
   { id: 'finance', icon: DollarSign, label: 'Οικονομικά', routePrefixes: ['/financials', '/reports'] },
+  { id: 'governance', icon: ShieldCheck, label: 'Governance', routePrefixes: ['/governance'] },
   { id: 'admin', icon: Settings, label: 'Διαχείριση', routePrefixes: ['/clients', '/blueprints', '/settings'] },
 ];
 
@@ -125,6 +127,13 @@ const categoryNavItems: Record<CategoryId, NavItem[]> = {
     { title: 'Λογιστήριο', href: '/financials', icon: DollarSign, permission: 'financials.view' },
     { title: 'Αναφορές', href: '/reports', icon: BarChart3, permission: 'financials.view' },
   ],
+  governance: [
+    { title: 'Dashboard', href: '/governance', icon: ShieldCheck },
+    { title: 'Digital Assets', href: '/governance/assets', icon: Globe },
+    { title: 'Access Control', href: '/governance/access', icon: UserCog },
+    { title: 'Vault', href: '/governance/vault', icon: FileArchive },
+    { title: 'Compliance', href: '/governance/compliance', icon: FileText },
+  ],
   admin: [
     { title: 'Πελάτες', href: '/clients', icon: Building2, permission: 'clients.view' },
     { title: 'Προσχέδια', href: '/blueprints', icon: FileStack, permission: 'settings.company' },
@@ -145,6 +154,7 @@ function detectCategory(pathname: string): CategoryId {
   if (pathname.startsWith('/timesheets')) return 'time';
   if (pathname.startsWith('/contacts') || pathname.startsWith('/hr') || pathname.startsWith('/leaderboard')) return 'people';
   if (pathname.startsWith('/financials') || pathname.startsWith('/reports')) return 'finance';
+  if (pathname.startsWith('/governance')) return 'governance';
   if (pathname.startsWith('/clients') || pathname.startsWith('/blueprints') || pathname.startsWith('/settings')) return 'admin';
   if (pathname === '/my-work' || pathname === '/') return 'home';
   return 'home';

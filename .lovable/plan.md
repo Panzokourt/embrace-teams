@@ -1,114 +1,56 @@
 
 
-# Ολοκληρωμένο Σύστημα Πρόσκλησης & Onboarding Χρηστών
+# Διόρθωση Ροής Πρόσκλησης Χρήστη
 
-## Πρόβλημα Σήμερα
+## Πρόβλημα
 
-1. Όταν ένας admin στέλνει πρόσκληση, αποθηκεύεται μόνο στη βάση -- **δεν αποστέλλεται email**.
-2. Ο προσκεκλημένος χρήστης πρέπει να γνωρίζει ένα UUID token και να το κάνει paste χειροκίνητα -- πρακτικά αδύνατο.
-3. Δεν υπάρχει welcome wizard για νέους χρήστες που μπαίνουν σε υπάρχοντα οργανισμό.
-4. Δεν υπάρχει ενοποιημένη ροή για τις διαφορετικές περιπτώσεις (πρόσκληση, join request, freelancer, κλπ).
+Το email στέλνεται κανονικά (όπως φαίνεται στο screenshot), αλλά όταν ο χρήστης κάνει κλικ στο "Αποδοχή Πρόσκλησης", βλέπει "Access denied" γιατί:
+
+1. Το link οδηγεί στο **preview URL** του Lovable (π.χ. `id-preview--xxx.lovable.app`) αντί στο **published URL** (`embrace-teams.lovable.app`)
+2. Η edge function χρησιμοποιεί `supabase.auth.getClaims()` που δεν είναι διαθέσιμο στο Supabase JS v2 και μπορεί να σπάει σιωπηλά
 
 ## Λύση
 
-### 1. Edge Function για αποστολή Invitation Email
+### 1. Διόρθωση URL στο useRBAC.ts
 
-**Νέο αρχείο: `supabase/functions/send-invitation/index.ts`**
+Αντί να στέλνουμε `window.location.origin` (που στο preview είναι λάθος), θα χρησιμοποιούμε πάντα το published URL:
 
-Θα δημιουργηθεί backend function που:
-- Καλείται αυτόματα μετά τη δημιουργία πρόσκλησης
-- Στέλνει email στον προσκεκλημένο με ένα magic link (π.χ. `https://app.olseny.com/accept-invite/{token}`)
-- Χρησιμοποιεί Resend για αποστολή email
-- Περιλαμβάνει branded React Email template με το λογότυπο Olseny
+```text
+app_url: 'https://embrace-teams.lovable.app'
+```
 
-**Απαίτηση**: Θα χρειαστεί RESEND_API_KEY (API κλειδί από το resend.com) και ένα verified domain.
+Εναλλακτικά, θα χρησιμοποιήσουμε environment variable `VITE_APP_URL` αν υπάρχει, αλλιώς fallback στο published URL.
 
-### 2. Αυτόματη αποστολή email μετά τη δημιουργία πρόσκλησης
+### 2. Διόρθωση auth verification στην Edge Function
 
-**Τροποποίηση: `src/hooks/useRBAC.ts`**
+Αντικατάσταση του `getClaims()` με `getUser()` που είναι η σωστή μέθοδος:
 
-Μετά το `createInvitation`, καλεί αυτόματα τη νέα edge function για αποστολή email με:
-- Όνομα εταιρείας
-- Ρόλο που θα αποκτήσει ο χρήστης
-- Magic link για αποδοχή
+```text
+// Αντί getClaims (δεν υπάρχει)
+const { data: { user }, error } = await supabase.auth.getUser()
+if (error || !user) return 401
+```
 
-### 3. Βελτίωση ροής AcceptInvite
+### 3. Βελτίωση error handling
 
-**Τροποποίηση: `src/pages/AcceptInvite.tsx`**
+Προσθήκη περισσότερων `console.log` στην edge function ώστε να μπορούμε να παρακολουθούμε τυχόν σφάλματα.
 
-Ο χρήστης κάνει κλικ στο link του email και:
-- **Αν έχει ήδη λογαριασμό**: Ζητά σύνδεση, μετά αποδέχεται αυτόματα
-- **Αν δεν έχει λογαριασμό**: Εμφανίζεται inline φόρμα εγγραφής (ονοματεπώνυμο + κωδικός), με το email προ-συμπληρωμένο από την πρόσκληση. Μετά την εγγραφή, αποδέχεται αυτόματα.
-- Αφαίρεση χειροκίνητης εισαγωγής UUID token
-
-### 4. Welcome Wizard για νέους χρήστες σε υπάρχοντα οργανισμό
-
-**Νέο αρχείο: `src/pages/WelcomeWizard.tsx`**
-
-Εμφανίζεται μόνο σε χρήστες που μπαίνουν σε οργανισμό για πρώτη φορά (μέσω πρόσκλησης ή join request). Βήματα:
-
-1. **Καλωσόρισμα** -- "Καλωσήρθατε στο [Εταιρεία]!" με λογότυπο εταιρείας
-2. **Προφίλ** -- Avatar upload, τηλέφωνο, τίτλος θέσης
-3. **Προτιμήσεις** -- Γλώσσα, θέμα (dark/light), ειδοποιήσεις
-4. **Ξεκινήστε** -- Σύνοψη + κουμπί "Μπείτε στον χώρο εργασίας"
-
-Η πρόοδος αποθηκεύεται στο profile (`onboarding_completed` flag).
-
-### 5. Αναδιοργάνωση Onboarding Page
-
-**Τροποποίηση: `src/pages/Onboarding.tsx`**
-
-Καθαρότερη ροή:
-- Αφαίρεση του βήματος "Αποδοχή πρόσκλησης" (γίνεται πλέον μέσω email link)
-- Αν ο χρήστης έχει personal email: εμφανίζονται 2 επιλογές (Δημιουργία εταιρείας ή Freelancer mode)
-- Αν έχει corporate email: auto-onboard (ήδη λειτουργεί)
-
-### 6. Routing Logic
-
-**Τροποποίηση: `src/contexts/AuthContext.tsx`**
-
-Μετά τη σύνδεση:
-- Νέος χρήστης χωρίς ρόλο → `/onboarding`
-- Νέος χρήστης μέσω πρόσκλησης (πρώτη φορά) → `/welcome` (wizard)
-- Υπάρχων χρήστης, 1 εταιρεία → `/`
-- Υπάρχων χρήστης, πολλές εταιρείες → `/select-workspace`
-
----
-
-## Τεχνικές Λεπτομέρειες
-
-### Database Changes
-
-Προσθήκη στον πίνακα `profiles`:
-- `onboarding_completed boolean DEFAULT false` -- flag για το αν ολοκλήρωσε το welcome wizard
-
-### Email Template
-
-Branded React Email template (`supabase/functions/send-invitation/_templates/invitation.tsx`) με:
-- Λογότυπο Olseny
-- Όνομα εταιρείας που προσκαλεί
-- Ρόλος χρήστη
-- CTA button "Αποδοχή Πρόσκλησης"
-- Ημερομηνία λήξης
-
-### Αρχεία
+## Αρχεία
 
 | Ενέργεια | Αρχείο |
 |----------|--------|
-| Δημιουργία | `supabase/functions/send-invitation/index.ts` |
-| Δημιουργία | `supabase/functions/send-invitation/_templates/invitation.tsx` |
-| Δημιουργία | `src/pages/WelcomeWizard.tsx` |
-| Τροποποίηση | `src/pages/AcceptInvite.tsx` |
-| Τροποποίηση | `src/pages/Onboarding.tsx` |
-| Τροποποίηση | `src/hooks/useRBAC.ts` |
-| Τροποποίηση | `src/contexts/AuthContext.tsx` |
-| Τροποποίηση | `src/App.tsx` (νέο route `/welcome`) |
-| Migration | Προσθήκη `onboarding_completed` στο profiles |
+| Τροποποίηση | `src/hooks/useRBAC.ts` -- Hardcode published URL |
+| Τροποποίηση | `supabase/functions/send-invitation/index.ts` -- Fix auth + logging |
 
-### Προαπαιτούμενα
+## Ροή μετά τη διόρθωση
 
-Για την αποστολή email θα χρειαστεί:
-1. Λογαριασμός στο **resend.com**
-2. Verified domain (ή χρήση του test domain `onboarding@resend.dev`)
-3. Δημιουργία API key και αποθήκευσή του ως `RESEND_API_KEY`
+```text
+1. Admin στέλνει πρόσκληση
+2. Edge function στέλνει email με link: embrace-teams.lovable.app/accept-invite/{token}
+3. Χρήστης κάνει κλικ → ανοίγει το published app
+4. Αν δεν είναι συνδεδεμένος → φόρμα login/register
+5. Αν είναι ήδη συνδεδεμένος → αυτόματη αποδοχή
+6. Μετά την αποδοχή → Welcome Wizard (/welcome)
+7. Ολοκλήρωση wizard → Dashboard
+```
 

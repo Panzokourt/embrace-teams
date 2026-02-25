@@ -14,7 +14,7 @@ export default function WorkPage() {
   const activeTab = TAB_MAP[tabParam] || 'projects';
 
   return (
-    <div className="space-y-0">
+    <div className="page-shell">
       {activeTab === 'projects' && <Projects embedded />}
       {activeTab === 'tasks' && <Tasks embedded />}
     </div>

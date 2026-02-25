@@ -3124,6 +3124,7 @@ export type Database = {
           hire_date: string | null
           id: string
           job_title: string | null
+          onboarding_completed: boolean
           phone: string | null
           reports_to: string | null
           status: Database["public"]["Enums"]["user_status"]
@@ -3140,6 +3141,7 @@ export type Database = {
           hire_date?: string | null
           id: string
           job_title?: string | null
+          onboarding_completed?: boolean
           phone?: string | null
           reports_to?: string | null
           status?: Database["public"]["Enums"]["user_status"]
@@ -3156,6 +3158,7 @@ export type Database = {
           hire_date?: string | null
           id?: string
           job_title?: string | null
+          onboarding_completed?: boolean
           phone?: string | null
           reports_to?: string | null
           status?: Database["public"]["Enums"]["user_status"]

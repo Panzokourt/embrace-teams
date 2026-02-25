@@ -234,7 +234,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .limit(1);
 
         if (pendingRequests && pendingRequests.length > 0) {
-          // User has a pending join request - show pending screen via onboarding
           setPostLoginRoute('/onboarding');
         } else {
           setPostLoginRoute('/onboarding');
@@ -242,17 +241,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setCompanyRole(null);
         setCompany(null);
       } else if (activeRoles.length === 1) {
-        setPostLoginRoute('/');
+        // Check if onboarding_completed
+        const needsWelcome = profileData && !profileData.onboarding_completed;
+        setPostLoginRoute(needsWelcome ? '/welcome' : '/');
         selectCompany(activeRoles[0], companies);
       } else {
         // Check if we have a saved preference
         const savedCompanyId = localStorage.getItem('activeCompanyId');
         const savedRole = savedCompanyId ? activeRoles.find(r => r.company_id === savedCompanyId) : null;
+        const needsWelcome = profileData && !profileData.onboarding_completed;
         if (savedRole) {
-          setPostLoginRoute('/');
+          setPostLoginRoute(needsWelcome ? '/welcome' : '/');
           selectCompany(savedRole, companies);
         } else {
-          setPostLoginRoute('/select-workspace');
+          setPostLoginRoute(needsWelcome ? '/welcome' : '/select-workspace');
           // Default to first
           selectCompany(activeRoles[0], companies);
         }

@@ -7,10 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Loader2, Building2, Mail, Link2, ArrowLeft, CheckCircle, Clock } from 'lucide-react';
+import { Loader2, Building2, Link2, ArrowLeft, Clock } from 'lucide-react';
 import olsenyLogo from '@/assets/olseny-logo.png';
 
-type Step = 'loading' | 'choose' | 'create-org' | 'accept-invite' | 'domain-join' | 'pending';
+type Step = 'loading' | 'choose' | 'create-org' | 'domain-join' | 'pending';
 
 export default function Onboarding() {
   const navigate = useNavigate();
@@ -29,9 +29,6 @@ export default function Onboarding() {
   // Create org state
   const [companyName, setCompanyName] = useState('');
   const [companyDomain, setCompanyDomain] = useState('');
-
-  // Invite state
-  const [inviteToken, setInviteToken] = useState('');
 
   // Domain join state
   const [domainCompanies, setDomainCompanies] = useState<any[]>([]);
@@ -100,29 +97,6 @@ export default function Onboarding() {
       navigate('/', { replace: true });
     } catch (error: any) {
       toast.error(error.message || 'Σφάλμα δημιουργίας');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAcceptInvite = async () => {
-    if (!inviteToken.trim()) return;
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.rpc('accept_invitation', {
-        _token: inviteToken.trim()
-      });
-      if (error) throw error;
-      const result = data as any;
-      if (!result.success) {
-        toast.error(result.error || 'Μη έγκυρη πρόσκληση');
-        return;
-      }
-      toast.success('Η πρόσκληση έγινε αποδεκτή!');
-      await refreshUserData();
-      navigate('/', { replace: true });
-    } catch (error: any) {
-      toast.error(error.message || 'Σφάλμα αποδοχής');
     } finally {
       setLoading(false);
     }
@@ -200,16 +174,6 @@ export default function Onboarding() {
               </CardContent>
             </Card>
 
-            <Card className="cursor-pointer hover:border-primary/40 transition-colors border-border/40" onClick={() => setStep('accept-invite')}>
-              <CardContent className="flex items-center gap-4 p-6">
-                <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center text-foreground"><Mail className="h-6 w-6" /></div>
-                <div>
-                  <h3 className="font-semibold text-foreground">Αποδοχή πρόσκλησης</h3>
-                  <p className="text-sm text-muted-foreground">Εισάγετε κωδικό πρόσκλησης</p>
-                </div>
-              </CardContent>
-            </Card>
-
             {!isPersonalEmail && (
               <Card className="cursor-pointer hover:border-primary/40 transition-colors border-border/40" onClick={() => { setStep('domain-join'); handleCheckDomain(); }}>
                 <CardContent className="flex items-center gap-4 p-6">
@@ -252,28 +216,6 @@ export default function Onboarding() {
               <Button className="w-full" onClick={handleCreateOrg} disabled={loading || !companyName.trim()}>
                 {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                 Δημιουργία
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {step === 'accept-invite' && (
-          <Card className="border-border/40">
-            <CardHeader>
-              <Button variant="ghost" size="sm" className="w-fit -ml-2 mb-2" onClick={() => setStep('choose')}>
-                <ArrowLeft className="h-4 w-4 mr-1" />Πίσω
-              </Button>
-              <CardTitle>Αποδοχή πρόσκλησης</CardTitle>
-              <CardDescription>Εισάγετε τον κωδικό πρόσκλησης</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Κωδικός πρόσκλησης</Label>
-                <Input placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" value={inviteToken} onChange={(e) => setInviteToken(e.target.value)} />
-              </div>
-              <Button className="w-full" onClick={handleAcceptInvite} disabled={loading || !inviteToken.trim()}>
-                {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Αποδοχή
               </Button>
             </CardContent>
           </Card>

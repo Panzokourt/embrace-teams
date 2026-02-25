@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.gmail-auth-callback]
 verify_jwt = false
+
+[functions.send-invitation]
+verify_jwt = false

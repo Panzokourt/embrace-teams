@@ -301,6 +301,20 @@ export function useRBAC() {
       .single();
 
     if (error) throw error;
+
+    // Send invitation email via edge function
+    try {
+      await supabase.functions.invoke('send-invitation', {
+        body: {
+          invitation_id: data.id,
+          app_url: window.location.origin,
+        },
+      });
+    } catch (emailError) {
+      console.error('Failed to send invitation email:', emailError);
+      // Don't throw - invitation was created successfully, email is best-effort
+    }
+
     await fetchInvitations();
     return data;
   };

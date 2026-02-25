@@ -623,6 +623,8 @@ export type Database = {
       }
       clients: {
         Row: {
+          ad_accounts: Json | null
+          additional_websites: Json | null
           address: string | null
           company_id: string | null
           contact_email: string | null
@@ -634,12 +636,17 @@ export type Database = {
           notes: string | null
           secondary_phone: string | null
           sector: string | null
+          social_accounts: Json | null
+          status: string | null
+          strategy: Json | null
           tags: string[] | null
           tax_id: string | null
           updated_at: string
           website: string | null
         }
         Insert: {
+          ad_accounts?: Json | null
+          additional_websites?: Json | null
           address?: string | null
           company_id?: string | null
           contact_email?: string | null
@@ -651,12 +658,17 @@ export type Database = {
           notes?: string | null
           secondary_phone?: string | null
           sector?: string | null
+          social_accounts?: Json | null
+          status?: string | null
+          strategy?: Json | null
           tags?: string[] | null
           tax_id?: string | null
           updated_at?: string
           website?: string | null
         }
         Update: {
+          ad_accounts?: Json | null
+          additional_websites?: Json | null
           address?: string | null
           company_id?: string | null
           contact_email?: string | null
@@ -668,6 +680,9 @@ export type Database = {
           notes?: string | null
           secondary_phone?: string | null
           sector?: string | null
+          social_accounts?: Json | null
+          status?: string | null
+          strategy?: Json | null
           tags?: string[] | null
           tax_id?: string | null
           updated_at?: string

@@ -179,10 +179,11 @@ export default function ClientDetailPage() {
           <ClientWebsitesCard
             primaryWebsite={client.website}
             additionalWebsites={additionalWebsites}
+            onEdit={() => setEditOpen(true)}
           />
-          <ClientSocialCard accounts={socialAccounts} />
-          <ClientAdAccountsCard accounts={adAccounts} />
-          <ClientStrategyCard strategy={strategy} />
+          <ClientSocialCard accounts={socialAccounts} onEdit={() => setEditOpen(true)} />
+          <ClientAdAccountsCard accounts={adAccounts} onEdit={() => setEditOpen(true)} />
+          <ClientStrategyCard strategy={strategy} onEdit={() => setEditOpen(true)} />
         </div>
 
         {/* Right Column — Execution & People */}
@@ -190,8 +191,8 @@ export default function ClientDetailPage() {
           <ClientProjectsCard projects={projects} clientId={client.id} />
           <ClientTasksSnapshot overdue={overdueTasks} dueThisWeek={dueThisWeek} open={openTasks} />
           <ClientBriefsCard briefs={briefs} clientId={client.id} />
-          <ClientTeamCard members={teamMembers} />
-          <ClientContactsCard contacts={contacts} />
+          <ClientTeamCard members={teamMembers} onEdit={() => setEditOpen(true)} />
+          <ClientContactsCard contacts={contacts} onEdit={() => setEditOpen(true)} />
         </div>
       </div>
 

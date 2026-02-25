@@ -15,43 +15,56 @@ import { cn } from '@/lib/utils';
 const PANEL_OPEN_KEY = 'secretary-panel-open';
 const PANEL_TAB_KEY = 'secretary-panel-tab';
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed';
+const SIDEBAR_WIDTH_KEY = 'sidebar-width';
+const RIGHT_PANEL_WIDTH_KEY = 'right-panel-width';
 
-// Fixed pixel widths for sidebar
-const SIDEBAR_EXPANDED_W = 240; // px - rail (48) + panel (~192)
-const SIDEBAR_COLLAPSED_W = 48;  // px - rail only
-const RIGHT_PANEL_W = 380;       // px
-const MIN_MAIN_CONTENT_W = 600;  // px - safe minimum
+// Fixed pixel widths
+const SIDEBAR_EXPANDED_DEFAULT = 240;
+const SIDEBAR_MIN_W = 200;
+const SIDEBAR_MAX_W = 320;
+const SIDEBAR_COLLAPSED_W = 48;
+const SIDEBAR_COLLAPSE_THRESHOLD = 180;
+const SIDEBAR_EXPAND_THRESHOLD = 120;
+
+const RIGHT_PANEL_DEFAULT = 380;
+const RIGHT_PANEL_MIN = 300;
+const RIGHT_PANEL_MAX = 500;
 
 function AppLayoutInner() {
   const { user, loading, companyRole, postLoginRoute } = useAuth();
   const { layoutState, sidebarMode, rightPanelMode, density } = useLayout();
 
-  // User preference for sidebar collapse (only applies in wide/standard)
+  // Sidebar collapsed preference
   const [sidebarUserPref, setSidebarUserPref] = useState(() => {
     try { return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true'; } catch { return false; }
   });
 
-  // Effective sidebar collapsed state
   const sidebarCollapsed = sidebarMode === 'collapsed' || (sidebarMode === 'expanded' && sidebarUserPref);
 
+  // Sidebar width (when expanded)
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    try { return Number(localStorage.getItem(SIDEBAR_WIDTH_KEY)) || SIDEBAR_EXPANDED_DEFAULT; } catch { return SIDEBAR_EXPANDED_DEFAULT; }
+  });
+
+  // Right panel
   const [rightPanelOpen, setRightPanelOpen] = useState(() => {
     try { return localStorage.getItem(PANEL_OPEN_KEY) === 'true'; } catch { return false; }
   });
   const [activeTab, setActiveTab] = useState<RightPanelTab>(() => {
     try { return (localStorage.getItem(PANEL_TAB_KEY) as RightPanelTab) || 'secretary'; } catch { return 'secretary'; }
   });
+  const [rightPanelWidth, setRightPanelWidth] = useState(() => {
+    try { return Number(localStorage.getItem(RIGHT_PANEL_WIDTH_KEY)) || RIGHT_PANEL_DEFAULT; } catch { return RIGHT_PANEL_DEFAULT; }
+  });
 
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
-  useEffect(() => {
-    try { localStorage.setItem(PANEL_OPEN_KEY, String(rightPanelOpen)); } catch {}
-  }, [rightPanelOpen]);
-  useEffect(() => {
-    try { localStorage.setItem(PANEL_TAB_KEY, activeTab); } catch {}
-  }, [activeTab]);
-  useEffect(() => {
-    try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(sidebarUserPref)); } catch {}
-  }, [sidebarUserPref]);
+  // Persist to localStorage
+  useEffect(() => { try { localStorage.setItem(PANEL_OPEN_KEY, String(rightPanelOpen)); } catch {} }, [rightPanelOpen]);
+  useEffect(() => { try { localStorage.setItem(PANEL_TAB_KEY, activeTab); } catch {} }, [activeTab]);
+  useEffect(() => { try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(sidebarUserPref)); } catch {} }, [sidebarUserPref]);
+  useEffect(() => { try { localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth)); } catch {} }, [sidebarWidth]);
+  useEffect(() => { try { localStorage.setItem(RIGHT_PANEL_WIDTH_KEY, String(rightPanelWidth)); } catch {} }, [rightPanelWidth]);
 
   const toggleCollapsed = useCallback(() => {
     setSidebarUserPref(prev => !prev);
@@ -87,6 +100,85 @@ function AppLayoutInner() {
     if (sidebarMode !== 'hidden') setMobileSidebarOpen(false);
   }, [sidebarMode]);
 
+  // ─── Sidebar resize ───
+  const sidebarResizing = useRef(false);
+  const sidebarStartX = useRef(0);
+  const sidebarStartW = useRef(0);
+
+  const onSidebarResizeStart = useCallback((e: React.MouseEvent) => {
+    if (sidebarMode === 'hidden') return;
+    e.preventDefault();
+    sidebarResizing.current = true;
+    sidebarStartX.current = e.clientX;
+    sidebarStartW.current = sidebarCollapsed ? SIDEBAR_COLLAPSED_W : sidebarWidth;
+
+    const onMove = (ev: MouseEvent) => {
+      if (!sidebarResizing.current) return;
+      const delta = ev.clientX - sidebarStartX.current;
+      const newW = sidebarStartW.current + delta;
+
+      if (sidebarCollapsed) {
+        // Expanding from rail
+        if (newW > SIDEBAR_EXPAND_THRESHOLD) {
+          setSidebarUserPref(false);
+          setSidebarWidth(Math.max(SIDEBAR_MIN_W, Math.min(SIDEBAR_MAX_W, newW)));
+        }
+      } else {
+        // Collapsing or resizing
+        if (newW < SIDEBAR_COLLAPSE_THRESHOLD) {
+          setSidebarUserPref(true);
+        } else {
+          setSidebarWidth(Math.max(SIDEBAR_MIN_W, Math.min(SIDEBAR_MAX_W, newW)));
+        }
+      }
+    };
+
+    const onUp = () => {
+      sidebarResizing.current = false;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [sidebarMode, sidebarCollapsed, sidebarWidth]);
+
+  // ─── Right panel resize ───
+  const rpResizing = useRef(false);
+  const rpStartX = useRef(0);
+  const rpStartW = useRef(0);
+
+  const onRightPanelResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    rpResizing.current = true;
+    rpStartX.current = e.clientX;
+    rpStartW.current = rightPanelWidth;
+
+    const onMove = (ev: MouseEvent) => {
+      if (!rpResizing.current) return;
+      const delta = rpStartX.current - ev.clientX; // dragging left = bigger
+      const newW = rpStartW.current + delta;
+      setRightPanelWidth(Math.max(RIGHT_PANEL_MIN, Math.min(RIGHT_PANEL_MAX, newW)));
+    };
+
+    const onUp = () => {
+      rpResizing.current = false;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [rightPanelWidth]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -109,18 +201,18 @@ function AppLayoutInner() {
 
   if (postLoginRoute === '/select-workspace') return <Navigate to="/select-workspace" replace />;
 
-  const showDockedRightPanel = rightPanelOpen && rightPanelMode === 'docked';
-  const showOverlayRightPanel = rightPanelOpen && (rightPanelMode === 'overlay');
-  const showDrawerRightPanel = rightPanelOpen && rightPanelMode === 'drawer';
+  const isMobile = layoutState === 'mobile';
+  const showDockedRightPanel = rightPanelOpen && !isMobile;
+  const showDrawerRightPanel = rightPanelOpen && isMobile;
 
-  const sidebarWidth = sidebarMode === 'hidden' ? 0 : sidebarCollapsed ? SIDEBAR_COLLAPSED_W : SIDEBAR_EXPANDED_W;
+  const effectiveSidebarWidth = sidebarMode === 'hidden' ? 0 : sidebarCollapsed ? SIDEBAR_COLLAPSED_W : sidebarWidth;
 
   return (
     <div className={cn(
       "flex h-screen bg-background relative overflow-hidden",
       density === 'compact' ? 'density-compact' : 'density-comfortable'
     )}>
-      {/* STATE D: Mobile sidebar as Sheet */}
+      {/* Mobile sidebar as Sheet */}
       {sidebarMode === 'hidden' && (
         <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
           <SheetContent side="left" className="p-0 w-80 bg-card border-border/50">
@@ -129,16 +221,21 @@ function AppLayoutInner() {
         </Sheet>
       )}
 
-      {/* Sidebar — fixed width, not resizable */}
+      {/* Sidebar */}
       {sidebarMode !== 'hidden' && (
         <div
-          className="h-full shrink-0 transition-[width] duration-200 ease-apple overflow-hidden"
-          style={{ width: sidebarWidth }}
+          className="h-full shrink-0 transition-[width] duration-200 ease-apple overflow-visible relative"
+          style={{ width: effectiveSidebarWidth }}
         >
           <AppSidebar
             collapsed={sidebarCollapsed}
             onToggleCollapse={toggleCollapsed}
             forceCollapsed={sidebarMode === 'collapsed'}
+          />
+          {/* Sidebar resize handle */}
+          <div
+            className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/20 active:bg-primary/30 transition-colors z-10"
+            onMouseDown={onSidebarResizeStart}
           />
         </div>
       )}
@@ -156,27 +253,22 @@ function AppLayoutInner() {
         </main>
       </div>
 
-      {/* STATE A: Docked right panel */}
+      {/* Docked right panel (non-mobile) */}
       {showDockedRightPanel && (
         <div
-          className="h-full shrink-0 border-l border-border/40 overflow-hidden"
-          style={{ width: RIGHT_PANEL_W }}
+          className="h-full shrink-0 overflow-hidden relative"
+          style={{ width: rightPanelWidth }}
         >
+          {/* Resize handle on left edge */}
+          <div
+            className="absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-primary/20 active:bg-primary/30 transition-colors z-10"
+            onMouseDown={onRightPanelResizeStart}
+          />
           <SecretaryPanel activeTab={activeTab} onTabChange={setActiveTab} onClose={closePanel} />
         </div>
       )}
 
-      {/* STATE B/C: Overlay right panel */}
-      {showOverlayRightPanel && (
-        <>
-          <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm" onClick={closePanel} />
-          <div className="fixed top-0 right-0 z-50 h-full w-[400px] max-w-[85vw] animate-slide-in-right shadow-2xl">
-            <SecretaryPanel activeTab={activeTab} onTabChange={setActiveTab} onClose={closePanel} />
-          </div>
-        </>
-      )}
-
-      {/* STATE D: Drawer right panel */}
+      {/* Mobile: Drawer right panel */}
       {showDrawerRightPanel && (
         <Sheet open={true} onOpenChange={(open) => !open && closePanel()}>
           <SheetContent side="right" className="p-0 w-[90vw] max-w-[400px]">

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Bot, Activity, Bell, MessageSquare, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import SecretaryChat from "./SecretaryChat";
 import { ActivityFeedContent } from "@/components/activity/ActivityFeedContent";
@@ -23,7 +24,6 @@ const tabs = [
 ];
 
 export default function SecretaryPanel({ activeTab, onTabChange, onClose }: SecretaryPanelProps) {
-  // Keyboard shortcut: Cmd+J toggles
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "j") {
@@ -37,22 +37,27 @@ export default function SecretaryPanel({ activeTab, onTabChange, onClose }: Secr
 
   return (
     <div className="h-full flex flex-col bg-background border-l border-border/40">
-      {/* Tab header */}
+      {/* Tab header — icon-only with tooltips */}
       <div className="flex items-center gap-1 px-2 py-2 border-b border-border/40 shrink-0">
         {tabs.map((tab) => (
-          <Button
-            key={tab.id}
-            variant="ghost"
-            size="sm"
-            className={cn(
-              "flex-1 gap-1.5 text-xs font-medium",
-              activeTab === tab.id && "bg-secondary text-foreground"
-            )}
-            onClick={() => onTabChange(tab.id)}
-          >
-            <tab.icon className="h-3.5 w-3.5 shrink-0" />
-            <span className="hidden standard:inline truncate">{tab.label}</span>
-          </Button>
+          <Tooltip key={tab.id} delayDuration={300}>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "flex-1 gap-1.5 text-xs font-medium h-8",
+                  activeTab === tab.id && "bg-secondary text-foreground"
+                )}
+                onClick={() => onTabChange(tab.id)}
+              >
+                <tab.icon className="h-4 w-4 shrink-0" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={6}>
+              {tab.label}
+            </TooltipContent>
+          </Tooltip>
         ))}
         <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={onClose}>
           <X className="h-3.5 w-3.5" />

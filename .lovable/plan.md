@@ -1,5 +1,6 @@
 
 
+
 # Sidebar & Right Panel UI Overhaul
 
 ## 1. Right Panel -- Docked with Resizable Width (No Blur)
@@ -71,4 +72,3 @@ Redesign the `IconRail` component:
 | `src/components/layout/AppLayout.tsx` | Docked right panel always (no blur/overlay except mobile). Add resize handles for sidebar and right panel. |
 | `src/components/layout/AppSidebar.tsx` | Dark floated rail design. Move Secretary + Quick Actions + Avatar to rail. Remove them from panel. Bigger logo. |
 | `src/components/secretary/SecretaryPanel.tsx` | Icon-only tabs with tooltip labels. |
-

@@ -697,49 +697,49 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
   return (
     <div className={embedded ? 'space-y-6' : 'page-shell'}>
       {/* Header */}
-      {!embedded ? (
-        <PageHeader
-          icon={FolderKanban}
-          title="Έργα"
-          subtitle="Διαχείριση και παρακολούθηση έργων"
-          breadcrumbs={[{ label: 'Εργασία', href: '/work' }, { label: 'Έργα' }]}
-          actions={
-            <div className="flex items-center gap-3">
-              <UnifiedViewToggle 
-                viewMode={viewMode} 
-                onViewModeChange={setViewMode}
-              />
+      <PageHeader
+        icon={FolderKanban}
+        title="Έργα"
+        subtitle="Διαχείριση και παρακολούθηση έργων"
+        breadcrumbs={[{ label: 'Εργασία', href: '/work' }, { label: 'Έργα' }]}
+        actions={
+          <div className="flex items-center gap-3">
+            <UnifiedViewToggle viewMode={viewMode} onViewModeChange={setViewMode} />
+            {canManage && (
+              <Button className="shadow-soft" onClick={() => setDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Νέο Έργο
+              </Button>
+            )}
+          </div>
+        }
+      />
 
-          {canManage && (
-            <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
-              <DialogTrigger asChild>
-                <Button className="shadow-soft">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Νέο Έργο
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle className="text-lg">{editingProject ? 'Επεξεργασία Έργου' : 'Δημιουργία Νέου Έργου'}</DialogTitle>
-                  <DialogDescription className="text-sm">
-                    {editingProject ? 'Ενημερώστε τα στοιχεία του έργου' : 'Συμπληρώστε τα στοιχεία και ανεβάστε αρχεία για AI ανάλυση'}
-                  </DialogDescription>
-                </DialogHeader>
+      {/* Project Create/Edit Dialog */}
+      {canManage && (
+        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-lg">{editingProject ? 'Επεξεργασία Έργου' : 'Δημιουργία Νέου Έργου'}</DialogTitle>
+              <DialogDescription className="text-sm">
+                {editingProject ? 'Ενημερώστε τα στοιχεία του έργου' : 'Συμπληρώστε τα στοιχεία και ανεβάστε αρχεία για AI ανάλυση'}
+              </DialogDescription>
+            </DialogHeader>
 
-                <Tabs value={dialogTab} onValueChange={setDialogTab}>
-                  <TabsList className="w-full bg-secondary/50">
-                    <TabsTrigger value="details" className="flex-1">Στοιχεία</TabsTrigger>
-                    <TabsTrigger value="files" className="flex-1">
-                      <Paperclip className="h-4 w-4 mr-1" /> Αρχεία
-                    </TabsTrigger>
-                    {(uploadedFiles.length > 0 || tempProjectId) && (
-                      <TabsTrigger value="ai" className="flex-1">
-                        <Sparkles className="h-4 w-4 mr-1" /> AI
-                      </TabsTrigger>
-                    )}
-                  </TabsList>
+            <Tabs value={dialogTab} onValueChange={setDialogTab}>
+              <TabsList className="w-full bg-secondary/50">
+                <TabsTrigger value="details" className="flex-1">Στοιχεία</TabsTrigger>
+                <TabsTrigger value="files" className="flex-1">
+                  <Paperclip className="h-4 w-4 mr-1" /> Αρχεία
+                </TabsTrigger>
+                {(uploadedFiles.length > 0 || tempProjectId) && (
+                  <TabsTrigger value="ai" className="flex-1">
+                    <Sparkles className="h-4 w-4 mr-1" /> AI
+                  </TabsTrigger>
+                )}
+              </TabsList>
 
-                  <TabsContent value="details" className="mt-4">
+              <TabsContent value="details" className="mt-4">
                     <form onSubmit={handleSubmit} className="space-y-4">
                       {/* Template Selector - only for new projects */}
                       {!editingProject && templates.length > 0 && (
@@ -750,29 +750,35 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
                             onValueChange={async (value) => {
                               setSelectedTemplateId(value);
                               if (value !== 'none') {
-                                const tpl = templates.find(t => t.id === value);
-                                if (tpl) {
+                                const tmpl = templates.find(t => t.id === value);
+                                if (tmpl) {
                                   setFormData(prev => ({
                                     ...prev,
-                                    budget: tpl.default_budget ? tpl.default_budget.toString() : prev.budget,
-                                    agency_fee_percentage: tpl.default_agency_fee_percentage ? tpl.default_agency_fee_percentage.toString() : prev.agency_fee_percentage,
+                                    budget: tmpl.default_budget?.toString() || prev.budget,
+                                    agency_fee_percentage: tmpl.default_agency_fee_percentage?.toString() || prev.agency_fee_percentage,
                                   }));
-                                  // Fetch template content
-                                  const [{ data: dels }, { data: tsks }] = await Promise.all([
-                                    supabase.from('project_template_deliverables').select('*').eq('template_id', value).order('sort_order'),
-                                    supabase.from('project_template_tasks').select('*').eq('template_id', value).order('sort_order'),
-                                  ]);
-                                  setTemplateDeliverables(dels || []);
-                                  setTemplateTasks(tsks || []);
-                                  setSelectedDeliverableIds(new Set((dels || []).map((d: any) => d.id)));
-                                  setSelectedTaskIds(new Set((tsks || []).map((t: any) => t.id)));
                                 }
+                                // Fetch template deliverables and tasks
+                                const { data: delData } = await supabase
+                                  .from('project_template_deliverables')
+                                  .select('*')
+                                  .eq('template_id', value)
+                                  .order('sort_order');
+                                setTemplateDeliverables(delData || []);
+                                setSelectedDeliverableIds(new Set((delData || []).map((d: any) => d.id)));
+
+                                const { data: taskData } = await supabase
+                                  .from('project_template_tasks')
+                                  .select('*')
+                                  .eq('template_id', value)
+                                  .order('sort_order');
+                                setTemplateTasks(taskData || []);
+                                setSelectedTaskIds(new Set((taskData || []).map((t: any) => t.id)));
                               } else {
                                 setTemplateDeliverables([]);
                                 setTemplateTasks([]);
                                 setSelectedDeliverableIds(new Set());
                                 setSelectedTaskIds(new Set());
-                                setProjectMetadata({});
                               }
                             }}
                           >
@@ -781,14 +787,13 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="none">Χωρίς template</SelectItem>
-                              {templates.map(tpl => (
-                                <SelectItem key={tpl.id} value={tpl.id}>{tpl.name}</SelectItem>
+                              {templates.map(t => (
+                                <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
 
-                          {/* Template Preview */}
-                          {selectedTemplateId !== 'none' && (templateDeliverables.length > 0 || templateTasks.length > 0) && (
+                          {selectedTemplateId !== 'none' && (
                             <TemplatePreview
                               deliverables={templateDeliverables}
                               tasks={templateTasks}
@@ -797,74 +802,59 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
                               onToggleDeliverable={(id) => {
                                 setSelectedDeliverableIds(prev => {
                                   const next = new Set(prev);
-                                  next.has(id) ? next.delete(id) : next.add(id);
+                                  if (next.has(id)) next.delete(id); else next.add(id);
                                   return next;
                                 });
                               }}
                               onToggleTask={(id) => {
                                 setSelectedTaskIds(prev => {
                                   const next = new Set(prev);
-                                  next.has(id) ? next.delete(id) : next.add(id);
+                                  if (next.has(id)) next.delete(id); else next.add(id);
                                   return next;
                                 });
                               }}
                             />
                           )}
-
-                          {/* Dynamic Fields */}
-                          {selectedTemplateId !== 'none' && (() => {
-                            const tpl = templates.find(t => t.id === selectedTemplateId);
-                            return tpl ? (
-                              <DynamicProjectFields
-                                projectType={tpl.project_type}
-                                metadata={projectMetadata}
-                                onChange={setProjectMetadata}
-                              />
-                            ) : null;
-                          })()}
                         </div>
                       )}
-                      <div className="space-y-2">
-                        <Label htmlFor="name">Όνομα Έργου *</Label>
-                        <Input
-                          id="name"
-                          value={formData.name}
-                          onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                          placeholder="π.χ. Digital Campaign 2026"
-                          required
-                        />
-                      </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="description">Περιγραφή</Label>
-                        <Textarea
-                          id="description"
-                          value={formData.description}
-                          onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                          placeholder="Σύντομη περιγραφή του έργου..."
-                          rows={3}
-                        />
-                      </div>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2 md:col-span-2">
+                          <Label htmlFor="name">Όνομα Έργου *</Label>
+                          <Input
+                            id="name"
+                            value={formData.name}
+                            onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                            placeholder="π.χ. Website Redesign"
+                            required
+                          />
+                        </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="client">Πελάτης</Label>
-                          <ClientSelector
-                            value={formData.client_id}
-                            onValueChange={(value) => setFormData(prev => ({ ...prev, client_id: value }))}
-                            clients={clients}
-                            onClientCreated={(newClient) => {
-                              setClients(prev => [...prev, newClient].sort((a, b) => a.name.localeCompare(b.name)));
-                            }}
-                            placeholder="Επιλέξτε πελάτη"
+                        <div className="space-y-2 md:col-span-2">
+                          <Label htmlFor="description">Περιγραφή</Label>
+                          <Textarea
+                            id="description"
+                            value={formData.description}
+                            onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                            placeholder="Σύντομη περιγραφή του έργου..."
+                            rows={3}
                           />
                         </div>
 
                         <div className="space-y-2">
-                          <Label htmlFor="status">Κατάσταση</Label>
+                          <Label>Πελάτης</Label>
+                          <ClientSelector
+                            clients={clients}
+                            value={formData.client_id}
+                            onValueChange={(val) => setFormData(prev => ({ ...prev, client_id: val }))}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Κατάσταση</Label>
                           <Select
                             value={formData.status}
-                            onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as ProjectStatus }))}
+                            onValueChange={(val) => setFormData(prev => ({ ...prev, status: val as ProjectStatus }))}
                           >
                             <SelectTrigger>
                               <SelectValue />
@@ -874,14 +864,12 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
                               <SelectItem value="proposal">Πρόταση</SelectItem>
                               <SelectItem value="negotiation">Διαπραγμάτευση</SelectItem>
                               <SelectItem value="active">Ενεργό</SelectItem>
-                              <SelectItem value="completed">Ολοκληρώθηκε</SelectItem>
-                              <SelectItem value="cancelled">Ακυρώθηκε</SelectItem>
+                              <SelectItem value="completed">Ολοκληρωμένο</SelectItem>
+                              <SelectItem value="cancelled">Ακυρωμένο</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
-                      </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="budget">Budget (€)</Label>
                           <Input
@@ -894,20 +882,18 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
                         </div>
 
                         <div className="space-y-2">
-                          <Label htmlFor="fee">Agency Fee (%)</Label>
+                          <Label htmlFor="agency_fee">Agency Fee (%)</Label>
                           <Input
-                            id="fee"
+                            id="agency_fee"
                             type="number"
                             value={formData.agency_fee_percentage}
                             onChange={(e) => setFormData(prev => ({ ...prev, agency_fee_percentage: e.target.value }))}
                             placeholder="30"
                           />
                         </div>
-                      </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="start_date">Ημ/νία Έναρξης</Label>
+                          <Label htmlFor="start_date">Ημ. Έναρξης</Label>
                           <Input
                             id="start_date"
                             type="date"
@@ -917,7 +903,7 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
                         </div>
 
                         <div className="space-y-2">
-                          <Label htmlFor="end_date">Ημ/νία Λήξης</Label>
+                          <Label htmlFor="end_date">Ημ. Λήξης</Label>
                           <Input
                             id="end_date"
                             type="date"
@@ -927,63 +913,73 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
                         </div>
                       </div>
 
+                      <DynamicProjectFields
+                        projectType={formData.status}
+                        metadata={projectMetadata}
+                        onChange={setProjectMetadata}
+                      />
+
                       <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
-                          Ακύρωση
-                        </Button>
-                        <Button type="submit" disabled={saving}>
-                          {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                          {editingProject ? 'Αποθήκευση' : 'Δημιουργία'}
+                        <Button type="submit" disabled={saving || !formData.name}>
+                          {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                          {editingProject ? 'Ενημέρωση' : 'Δημιουργία'}
                         </Button>
                       </DialogFooter>
                     </form>
                   </TabsContent>
 
-                  <TabsContent value="files" className="mt-4 space-y-4">
-                    <div className="border-2 border-dashed rounded-lg p-6 text-center">
+                  <TabsContent value="files" className="mt-4">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Ανεβάστε αρχεία για AI ανάλυση</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Ανεβάστε RFP, brief, ή οποιοδήποτε αρχείο σχετικό με το έργο
+                        </p>
+                      </div>
                       <input
                         ref={fileInputRef}
                         type="file"
                         multiple
-                        onChange={handleFileUpload}
                         className="hidden"
-                        accept=".txt,.md,.csv,.pdf,.doc,.docx"
+                        onChange={handleFileUpload}
+                        accept=".txt,.md,.csv,.pdf,.doc,.docx,.xls,.xlsx"
                       />
-                      <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-                      <h3 className="font-medium mb-1">Ανέβασμα αρχείων για AI ανάλυση</h3>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        Υποστηρίζονται: TXT, MD, CSV, PDF
-                      </p>
-                      <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-                        <Paperclip className="h-4 w-4 mr-2" />
-                        Επιλογή αρχείων
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full border-dashed"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Επιλογή Αρχείων
                       </Button>
+                      {uploadedFiles.length > 0 && (
+                        <div className="space-y-2">
+                          {uploadedFiles.map((file, index) => (
+                            <div key={index} className="flex items-center gap-2 p-2 rounded-lg bg-secondary/50 text-sm">
+                              <Paperclip className="h-4 w-4 text-muted-foreground" />
+                              <span className="truncate flex-1">{file.fileName}</span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => setUploadedFiles(prev => prev.filter((_, i) => i !== index))}
+                              >
+                                ×
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* If the project has been saved, show file attachments */}
+                      {(tempProjectId || editingProject?.id) && (
+                        <FileAttachments
+                          projectId={tempProjectId || editingProject?.id || ''}
+                        />
+                      )}
                     </div>
-
-                    {uploadedFiles.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">Αρχεία για ανάλυση ({uploadedFiles.length})</p>
-                        {uploadedFiles.map((file, idx) => (
-                          <div key={idx} className="flex items-center justify-between p-2 bg-muted rounded-lg">
-                            <span className="text-sm truncate">{file.fileName}</span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setUploadedFiles(prev => prev.filter((_, i) => i !== idx))}
-                            >
-                              ✕
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {editingProject && (
-                      <div className="pt-4 border-t">
-                        <h3 className="font-medium mb-3">Αρχεία Έργου</h3>
-                        <FileAttachments projectId={editingProject.id} />
-                      </div>
-                    )}
                   </TabsContent>
 
                   {(uploadedFiles.length > 0 || tempProjectId) && (
@@ -1014,28 +1010,7 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
               </DialogContent>
             </Dialog>
           )}
-            </div>
-          }
-        />
-      ) : (
-        <PageHeader
-          icon={FolderKanban}
-          title="Έργα"
-          subtitle="Διαχείριση και παρακολούθηση έργων"
-          breadcrumbs={[{ label: 'Εργασία', href: '/work' }, { label: 'Έργα' }]}
-          actions={
-            <div className="flex items-center gap-3">
-              <UnifiedViewToggle viewMode={viewMode} onViewModeChange={setViewMode} />
-              {canManage && (
-                <Button className="shadow-soft" onClick={() => setDialogOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Νέο Έργο
-                </Button>
-              )}
-            </div>
-          }
-        />
-      )}
+
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 animate-fade-in" style={{ animationDelay: '50ms' }}>
         <div className="relative flex-1 max-w-md">

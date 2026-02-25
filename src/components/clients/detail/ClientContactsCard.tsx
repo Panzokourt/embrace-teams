@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { BookUser, Mail, Phone } from 'lucide-react';
+import { BookUser, Mail, Phone, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface Contact {
@@ -14,9 +14,10 @@ interface Contact {
 
 interface Props {
   contacts: Contact[];
+  onEdit?: () => void;
 }
 
-export function ClientContactsCard({ contacts }: Props) {
+export function ClientContactsCard({ contacts, onEdit }: Props) {
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -26,7 +27,13 @@ export function ClientContactsCard({ contacts }: Props) {
       </CardHeader>
       <CardContent className="space-y-2">
         {contacts.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">Δεν υπάρχουν επαφές</p>
+          <button
+            onClick={onEdit}
+            className="w-full border-2 border-dashed border-border rounded-xl py-6 flex flex-col items-center gap-2 text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors cursor-pointer"
+          >
+            <Plus className="h-5 w-5" />
+            <span className="text-sm">Προσθήκη επαφής</span>
+          </button>
         ) : (
           contacts.slice(0, 5).map(c => (
             <Link

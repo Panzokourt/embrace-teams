@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Globe, ExternalLink, Copy } from 'lucide-react';
+import { Globe, ExternalLink, Copy, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
@@ -11,6 +11,7 @@ interface WebsiteItem {
 interface Props {
   primaryWebsite: string | null;
   additionalWebsites: WebsiteItem[];
+  onEdit?: () => void;
 }
 
 function WebsiteRow({ url, label }: { url: string; label?: string }) {
@@ -39,8 +40,8 @@ function WebsiteRow({ url, label }: { url: string; label?: string }) {
   );
 }
 
-export function ClientWebsitesCard({ primaryWebsite, additionalWebsites }: Props) {
-  if (!primaryWebsite && additionalWebsites.length === 0) return null;
+export function ClientWebsitesCard({ primaryWebsite, additionalWebsites, onEdit }: Props) {
+  const isEmpty = !primaryWebsite && additionalWebsites.length === 0;
 
   return (
     <Card>
@@ -50,10 +51,22 @@ export function ClientWebsitesCard({ primaryWebsite, additionalWebsites }: Props
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
-        {primaryWebsite && <WebsiteRow url={primaryWebsite} label="Primary Website" />}
-        {additionalWebsites.map((w, i) => (
-          <WebsiteRow key={i} url={w.url} label={w.label} />
-        ))}
+        {isEmpty ? (
+          <button
+            onClick={onEdit}
+            className="w-full border-2 border-dashed border-border rounded-xl py-6 flex flex-col items-center gap-2 text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors cursor-pointer"
+          >
+            <Plus className="h-5 w-5" />
+            <span className="text-sm">Προσθήκη website</span>
+          </button>
+        ) : (
+          <>
+            {primaryWebsite && <WebsiteRow url={primaryWebsite} label="Primary Website" />}
+            {additionalWebsites.map((w, i) => (
+              <WebsiteRow key={i} url={w.url} label={w.label} />
+            ))}
+          </>
+        )}
       </CardContent>
     </Card>
   );

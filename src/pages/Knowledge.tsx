@@ -75,7 +75,7 @@ export default function Knowledge() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 wide:grid-cols-4 gap-4">
         <Card><CardContent className="p-4 text-center">
           <FileText className="h-5 w-5 mx-auto text-primary mb-1" />
           <p className="text-2xl font-bold">{stats.total}</p>
@@ -101,7 +101,7 @@ export default function Knowledge() {
       {/* Search */}
       <KBSearchBar value={search} onChange={setSearch} />
 
-      <div className="grid md:grid-cols-[240px_1fr] gap-6">
+      <div className="grid narrow:grid-cols-[240px_1fr] gap-6">
         {/* Category Tree */}
         <div className="space-y-2">
           <h3 className="text-xs font-semibold text-muted-foreground uppercase">Κατηγορίες</h3>

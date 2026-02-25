@@ -50,8 +50,8 @@ export default function SecretaryPanel({ activeTab, onTabChange, onClose }: Secr
             )}
             onClick={() => onTabChange(tab.id)}
           >
-            <tab.icon className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{tab.label}</span>
+            <tab.icon className="h-3.5 w-3.5 shrink-0" />
+            <span className="hidden standard:inline truncate">{tab.label}</span>
           </Button>
         ))}
         <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={onClose}>

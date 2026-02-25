@@ -13,6 +13,11 @@ export default {
   		}
   	},
   	extend: {
+  		screens: {
+  			'narrow': '992px',
+  			'standard': '1200px',
+  			'wide': '1440px',
+  		},
   		fontFamily: {
   			sans: [
   				'Inter',

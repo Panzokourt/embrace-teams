@@ -368,6 +368,18 @@
   }
 }
 
+/* Density system */
+.density-comfortable {
+  --density-padding: 1.5rem;
+  --density-gap: 1.5rem;
+  --density-card-p: 1.5rem;
+}
+.density-compact {
+  --density-padding: 1rem;
+  --density-gap: 1rem;
+  --density-card-p: 1rem;
+}
+
 /* Print styles */
 @media print {
   body { background: white !important; }

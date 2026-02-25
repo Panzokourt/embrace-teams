@@ -1,184 +1,117 @@
-# Navigation Refactor -- Domain-Driven SaaS Architecture
+
+# Redesign Client Detail -- Modular Card-Based Dashboard
 
 ## Σύνοψη
 
-Πλήρης αναδιάρθρωση του sidebar από 11 κατηγορίες σε 8 business domains, με δημιουργία νέων placeholder σελίδων για τα items που δεν υπάρχουν ακόμα.
+Πλήρης αναδιάρθρωση της σελίδας `/clients/:id` σε ένα καθαρό, card-based "Client Overview" dashboard. Αντικατάσταση του tab-based layout με visual cards σε 12-column grid.
 
 ---
 
-## Νέο Icon Rail (8 domains)
+## Database Migration
 
+Προσθήκη 3 JSONB columns στον πίνακα `clients` για τα νέα δεδομένα:
 
-| #   | Domain       | Icon            | Label        |
-| --- | ------------ | --------------- | ------------ |
-| 1   | overview     | LayoutDashboard | Overview     |
-| 2   | work         | Briefcase       | Work         |
-| 3   | clients      | Building2       | Clients      |
-| 4   | revenue      | DollarSign      | Revenue      |
-| 5   | operations   | Users           | Operations   |
-| 6   | intelligence | BarChart3       | Intelligence |
-| 7   | governance   | ShieldCheck     | Governance   |
-| 8   | settings     | Settings        | Settings     |
+```sql
+ALTER TABLE clients
+  ADD COLUMN IF NOT EXISTS social_accounts jsonb DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS ad_accounts jsonb DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS strategy jsonb DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS status text DEFAULT 'active',
+  ADD COLUMN IF NOT EXISTS additional_websites jsonb DEFAULT '[]'::jsonb;
+```
 
-
----
-
-## Sub-links ανά Domain
-
-### 1. Overview
-
-- Company Dashboard `/` (LayoutDashboard)
-- My Work `/my-work` (LayoutList)
-
-### 2. Work
-
-- My Work `/my-work` (LayoutList)
-- Projects `/work?tab=projects` (FolderKanban) + ProjectTree
-- Tasks `/work?tab=tasks` (CheckSquare)
-- Calendar `/calendar` (CalendarDays)
-- Files `/files` (FileArchive)
-- Blueprints `/blueprints` (FileStack)
-
-### 3. Clients
-
-- All Clients `/clients` (Building2)
-- Contacts `/contacts` (BookUser)
-
-### 4. Revenue
-
-- Dashboard `/financials?tab=dashboard` (LayoutDashboard)
-- Services `/financials?tab=services` (FileText)
-- Contracts `/financials?tab=contracts` (FileText)
-- Invoices `/financials?tab=invoices` (FileText)
-- Expenses `/financials?tab=expenses` (DollarSign)
-- Profitability `/financials?tab=reports` (BarChart3)
-
-### 5. Operations
-
-- Team & HR `/hr` (UserCog)
-- Timesheets `/timesheets` (Timer)
-- Knowledge Base `/knowledge` (BookOpen)
-- Playbook `/knowledge/playbook` (FileText)
-- Templates & SOPs `/knowledge/templates` (FileStack)
-- Review Queue `/knowledge/reviews` (CheckSquare)
-
-### 6. Intelligence
-
-- Reports Hub `/reports` (BarChart3)
-- Leaderboard `/leaderboard` (Trophy)
-- Secretary AI `/secretary` (Zap)
-
-### 7. Governance
-
-- Dashboard `/governance` (ShieldCheck)
-- Digital Assets `/governance/assets` (Globe)
-- Access Control `/governance/access` (UserCog)
-- Vault `/governance/vault` (FileArchive)
-- Compliance `/governance/compliance` (FileText)
-
-### 8. Settings
-
-- General `/settings` (Settings)
-- Organization `/settings/organization` (Building2)
+JSONB structure:
+- `social_accounts`: `[{platform, account_name, url}]`
+- `ad_accounts`: `[{platform, account_name, url, ownership, has_risk}]`
+- `strategy`: `{goals: [], pillars: [], positioning: ""}`
+- `additional_websites`: `[{url, label}]`
+- `status`: `"active" | "proposal" | "risk"`
 
 ---
 
-## Route Detection Logic
+## Layout Structure
 
 ```text
-/work, /projects, /tasks, /calendar, /files, /blueprints  -> work
-/clients, /contacts                                         -> clients
-/financials                                                 -> revenue
-/hr, /timesheets, /knowledge                                -> operations
-/reports, /leaderboard, /secretary                          -> intelligence
-/governance                                                 -> governance
-/settings                                                   -> settings
-/my-work, /                                                 -> overview
-/inbox, /chat                                               -> overview (fallback)
++------------------------------------------------------------------+
+| SMART HEADER (full width)                                        |
+| [Logo] Client Name  [Sector] [Status]   Revenue | Margin | Edit |
++------------------------------------------------------------------+
+|                                                                  |
+| LEFT COLUMN (col-span-7)        | RIGHT COLUMN (col-span-5)     |
+|                                  |                                |
+| [Websites Card]                  | [Projects Card - top 3]       |
+| [Social & Channels Card]        | [Tasks Snapshot Card]         |
+| [Ad & Tracking Accounts Card]   | [Briefs Card]                |
+| [Strategy Card]                  | [Internal Team Card]          |
+|                                  | [Client Contacts Card]        |
++------------------------------------------------------------------+
+| FILES & DOCUMENTS (full width, internal tabs)                    |
++------------------------------------------------------------------+
 ```
 
 ---
 
-## Τι αλλάζει vs τώρα
+## Νέα Αρχεία
 
+### Sub-components (modular cards)
 
-| Αλλαγή                      | Λεπτομέρειες                                            |
-| --------------------------- | ------------------------------------------------------- |
-| Calendar μετακινείται       | Από ξεχωριστή κατηγορία -> sub-link στο **Work**        |
-| Files μετακινείται          | Από ξεχωριστή κατηγορία -> sub-link στο **Work**        |
-| Blueprints μετακινείται     | Από "Διαχείριση" -> sub-link στο **Work**               |
-| Inbox/Chat αφαιρούνται      | Δεν εμφανίζονται στο sidebar (TopBar/Secretary access)  |
-| Knowledge Base μετακινείται | Από ξεχωριστή κατηγορία -> sub-links στο **Operations** |
-| Timesheets μετακινείται     | Από "Χρόνος" -> sub-link στο **Operations**             |
-| HR μετακινείται             | Από "Ομάδα" -> sub-link στο **Operations**              |
-| Contacts μετακινείται       | Από "Ομάδα" -> sub-link στο **Clients**                 |
-| Reports μετακινείται        | Από "Οικονομικά" -> **Intelligence** domain             |
-| Leaderboard μετακινείται    | Από "Ομάδα" -> **Intelligence** domain                  |
-| Secretary μετακινείται      | Παραμένει bottom button + Intelligence sub-link         |
-| Revenue sub-links           | Κάθε tab του Financials γίνεται ξεχωριστό sub-link      |
-| Clients γίνεται domain      | Ανεξάρτητο domain αντί sub-item στο "Διαχείριση"        |
+Δημιουργία φακέλου `src/components/clients/detail/` με:
 
+| Component | Περιγραφή |
+|-----------|-----------|
+| `ClientSmartHeader.tsx` | Logo, name, sector/status badges, revenue KPIs, edit button, Quick Add dropdown |
+| `ClientWebsitesCard.tsx` | Primary + additional websites, external link + copy actions |
+| `ClientSocialCard.tsx` | Social platforms with icons, account names, external links |
+| `ClientAdAccountsCard.tsx` | Ad/tracking accounts with platform icons, ownership badge, risk dot |
+| `ClientStrategyCard.tsx` | Goals (bullets), pillars (chips), positioning summary |
+| `ClientProjectsCard.tsx` | Top 3 active projects with progress bars, "View all" button |
+| `ClientTasksSnapshot.tsx` | Overdue/this week/open task counts with icons |
+| `ClientBriefsCard.tsx` | Latest 3 briefs with status badges, "New Brief" button |
+| `ClientTeamCard.tsx` | Internal team members (avatar, name, role) in 2-col grid |
+| `ClientContactsCard.tsx` | Client contacts with name, role, email, phone, decision maker badge |
+| `ClientFilesCard.tsx` | Full-width files card with internal tabs (Contracts/Proposals/Presentations/Reports/Creative) |
 
----
+### Updated Files
 
-## Αρχεία που τροποποιούνται
-
-### `src/components/layout/AppSidebar.tsx`
-
-- Νέο `CategoryId` type: 8 domains
-- Νέο `categories` array: 8 entries με σωστά icons/labels/routePrefixes
-- Νέο `categoryNavItems` mapping: πλήρες ανά domain
-- Νέο `detectCategory()`: ενημερωμένη route detection
-- Work category: SidebarNavGroup με Projects + ProjectTree + Tasks, ακολουθούμενο από Calendar, Files, Blueprints links
-- Revenue links: `/financials?tab=X` format
-- Operations: HR + Timesheets + Knowledge sub-links
-- Inbox/Chat: αφαιρούνται από sidebar categories
-
-### `src/App.tsx`
-
-Δεν αλλάζουν routes -- μόνο η οργάνωση στο sidebar. Τα υπάρχοντα routes (`/inbox`, `/chat`, κλπ) παραμένουν λειτουργικά.
+| File | Changes |
+|------|---------|
+| `src/pages/ClientDetail.tsx` | Complete rewrite: fetch all data, compose card layout |
+| `src/components/clients/ClientForm.tsx` | Add fields for status, social_accounts, ad_accounts, strategy, additional_websites |
 
 ---
 
-**Σύμφωνα με το αίτημα "Πρόσθεσε και τις σελίδες που δεν έχουμε τώρα"**, θα δημιουργηθούν placeholder pages για:
+## Data Fetching Strategy
 
+Ολα τα data θα γίνονται fetch στο `ClientDetail.tsx` και θα περνάνε ως props στα cards:
 
-| Νέα Σελίδα             | Route                           | Domain                  |
-| ---------------------- | ------------------------------- | ----------------------- |
-| Campaigns              | `/campaigns`                    | Work                    |
-| Backlog                | `/backlog`                      | Work                    |
-| ClientStrategy         | `/clients/:id/strategy`         | Clients (client-scoped) |
-| Pricing                | `/financials?tab=pricing`       | Revenue (νέο tab)       |
-| Capacity               | `/operations/capacity`          | Operations              |
-| ResourcePlanning       | `/operations/resource-planning` | Operations              |
-| Performance            | `/intelligence/performance`     | Intelligence            |
-| CrossClientInsights    | `/intelligence/insights`        | Intelligence            |
-| Benchmarks             | `/intelligence/benchmarks`      | Intelligence            |
-| Forecasting            | `/intelligence/forecasting`     | Intelligence            |
-| MediaPlanning          | `/intelligence/media-planning`  | Intelligence            |
-| AIInsights             | `/intelligence/ai-insights`     | Intelligence            |
-| GovernanceIntegrations | `/governance/integrations`      | Governance              |
-| GovernanceAuditLog     | `/governance/audit-log`         | Governance              |
-| GovernanceOwnershipMap | `/governance/ownership-map`     | Governance              |
-| RolesPermissions       | `/settings/roles`               | Settings                |
-| BillingSettings        | `/settings/billing`             | Settings                |
-| APIKeys                | `/settings/api-keys`            | Settings                |
-| Webhooks               | `/settings/webhooks`            | Settings                |
-| BrandingSettings       | `/settings/branding`            | Settings                |
-| FeatureFlags           | `/settings/feature-flags`       | Settings                |
-
-
-Κάθε placeholder θα έχει τίτλο, description και "Coming Soon" badge.
+- `clients` table: client info + new JSONB fields
+- `projects` table: filtered by `client_id` (top 3 active)
+- `tasks` table: via project_ids, count overdue/due this week/open
+- `invoices` table: for revenue KPIs
+- `contacts` table: filtered by `client_id`
+- `profiles` table: team members linked through projects
+- `contracts` table: via project_ids
 
 ---
 
-## Συνολική λίστα αρχείων
+## Design Tokens
 
-### Τροποποιούμενα (2)
+Ακολουθεί το υπάρχον design system:
+- Card: `rounded-2xl border border-border/50 bg-card shadow-soft`
+- Badges: existing `Badge` component variants
+- Status colors: Active = green, Proposal = blue, Risk = destructive
+- Ownership badges: Agency = `bg-blue-100 text-blue-700`, Client = `bg-gray-100 text-gray-600`
+- Risk dot: `w-2 h-2 rounded-full bg-red-500`
+- Max 3 items visible per card + "View All" link
+- Platform icons: Lucide icons where available (Globe, Facebook via custom SVG or text labels)
 
-1. `src/components/layout/AppSidebar.tsx` -- Πλήρης refactor navigation
-2. `src/App.tsx` -- Νέα routes για placeholder pages
+---
 
-### Νέα placeholder pages (~21)
+## Τεχνικά Highlights
 
-Όλα τα παραπάνω νέα pages ως minimal components με consistent layout.
+1. **No heavy tabs** -- all cards visible on single scroll
+2. **12-column grid** using Tailwind: `grid-cols-12`, left `col-span-7`, right `col-span-5`
+3. **Quick Add dropdown** using existing `DropdownMenu` component
+4. **Progress bars** using existing `Progress` component
+5. **Internal tabs** in Files card using existing `Tabs` component (lightweight, inside card)
+6. **Collapsible** sections for long lists using existing `Collapsible` component

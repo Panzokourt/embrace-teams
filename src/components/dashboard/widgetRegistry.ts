@@ -1,37 +1,69 @@
 import { 
   DollarSign, Percent, TrendingUp, FileWarning, Trophy,
   FolderKanban, AlertTriangle, Activity, Timer, LucideIcon,
-  BarChart3, ListChecks
+  BarChart3, ListChecks, Users, Target, Repeat, CreditCard,
+  PieChart, Layers, Clock, ShieldAlert, Zap, UserCheck,
+  ArrowUpRight, Handshake, PhoneCall
 } from 'lucide-react';
-import type { WidgetSize, WidgetViewType } from '@/hooks/useDashboardConfig';
+import type { WidgetSize } from '@/hooks/useDashboardConfig';
 
 export interface WidgetDefinition {
   id: string;
   label: string;
   defaultSize: WidgetSize;
-  defaultVisible: boolean;
   icon: LucideIcon;
-  category: 'financial' | 'project' | 'composite';
-  supportedViews?: WidgetViewType[];
+  category: 'kpi' | 'chart' | 'list' | 'alert';
 }
 
 export const WIDGET_REGISTRY: WidgetDefinition[] = [
-  { id: 'total_revenue', label: 'Συνολικά Έσοδα', defaultSize: 'small', defaultVisible: true, icon: DollarSign, category: 'financial' },
-  { id: 'agency_fee', label: 'Προμήθεια Agency', defaultSize: 'small', defaultVisible: true, icon: Percent, category: 'financial' },
-  { id: 'net_profit', label: 'Καθαρό Κέρδος', defaultSize: 'small', defaultVisible: true, icon: TrendingUp, category: 'financial' },
-  { id: 'pending_invoices', label: 'Εκκρεμή Τιμολόγια', defaultSize: 'small', defaultVisible: true, icon: FileWarning, category: 'financial' },
-  { id: 'active_tenders', label: 'Διαγωνισμοί', defaultSize: 'small', defaultVisible: true, icon: FileWarning, category: 'project' },
-  { id: 'active_projects', label: 'Ενεργά Έργα', defaultSize: 'small', defaultVisible: true, icon: FolderKanban, category: 'project' },
-  { id: 'win_rate', label: 'Win Rate', defaultSize: 'small', defaultVisible: true, icon: Trophy, category: 'project' },
-  { id: 'overdue', label: 'Overdue Tasks', defaultSize: 'small', defaultVisible: true, icon: AlertTriangle, category: 'project' },
-  { id: 'today_hours', label: 'Ώρες Σήμερα', defaultSize: 'small', defaultVisible: true, icon: Timer, category: 'project' },
-  { id: 'utilization', label: 'Utilization', defaultSize: 'small', defaultVisible: true, icon: Activity, category: 'project' },
-  { id: 'pipeline', label: 'Pipeline', defaultSize: 'large', defaultVisible: true, icon: Activity, category: 'composite', supportedViews: ['card', 'table'] },
-  { id: 'alerts', label: 'Alerts', defaultSize: 'medium', defaultVisible: true, icon: AlertTriangle, category: 'composite', supportedViews: ['card', 'list'] },
-  { id: 'deadlines', label: 'Deadlines', defaultSize: 'medium', defaultVisible: true, icon: Timer, category: 'composite', supportedViews: ['card', 'table'] },
-  { id: 'recent_activity', label: 'Πρόσφατη Δραστηριότητα', defaultSize: 'medium', defaultVisible: true, icon: Activity, category: 'composite', supportedViews: ['card', 'list'] },
-  { id: 'revenue_chart', label: 'Γράφημα Εσόδων', defaultSize: 'large', defaultVisible: false, icon: BarChart3, category: 'composite' },
-  { id: 'project_progress', label: 'Πρόοδος Έργων', defaultSize: 'medium', defaultVisible: false, icon: ListChecks, category: 'composite', supportedViews: ['card', 'table'] },
+  // ── KPI widgets (Zone A) ──
+  { id: 'total_revenue', label: 'Συνολικά Έσοδα', defaultSize: 'small', icon: DollarSign, category: 'kpi' },
+  { id: 'net_profit', label: 'Καθαρό Κέρδος', defaultSize: 'small', icon: TrendingUp, category: 'kpi' },
+  { id: 'active_projects', label: 'Ενεργά Έργα', defaultSize: 'small', icon: FolderKanban, category: 'kpi' },
+  { id: 'alerts_count', label: 'Alerts', defaultSize: 'small', icon: AlertTriangle, category: 'kpi' },
+  { id: 'agency_fee', label: 'Προμήθεια Agency', defaultSize: 'small', icon: Percent, category: 'kpi' },
+  { id: 'pending_invoices', label: 'Εκκρεμή Τιμολόγια', defaultSize: 'small', icon: FileWarning, category: 'kpi' },
+  { id: 'active_tenders', label: 'Διαγωνισμοί', defaultSize: 'small', icon: FileWarning, category: 'kpi' },
+  { id: 'win_rate', label: 'Win Rate', defaultSize: 'small', icon: Trophy, category: 'kpi' },
+  { id: 'overdue', label: 'Overdue Tasks', defaultSize: 'small', icon: AlertTriangle, category: 'kpi' },
+  { id: 'today_hours', label: 'Ώρες Σήμερα', defaultSize: 'small', icon: Timer, category: 'kpi' },
+  { id: 'utilization', label: 'Utilization', defaultSize: 'small', icon: Activity, category: 'kpi' },
+  { id: 'recurring_revenue', label: 'Recurring Revenue', defaultSize: 'small', icon: Repeat, category: 'kpi' },
+  { id: 'outstanding_invoices', label: 'Ανεξόφλητα', defaultSize: 'small', icon: CreditCard, category: 'kpi' },
+  { id: 'capacity_pct', label: 'Capacity %', defaultSize: 'small', icon: Users, category: 'kpi' },
+  { id: 'pipeline_value', label: 'Pipeline Value', defaultSize: 'small', icon: Layers, category: 'kpi' },
+  { id: 'active_proposals', label: 'Active Proposals', defaultSize: 'small', icon: FileWarning, category: 'kpi' },
+  { id: 'closed_won', label: 'Closed Won', defaultSize: 'small', icon: Trophy, category: 'kpi' },
+  { id: 'overdue_invoices', label: 'Overdue Invoices', defaultSize: 'small', icon: FileWarning, category: 'kpi' },
+
+  // ── Chart widgets (Zone B) ──
+  { id: 'revenue_chart', label: 'Γράφημα Εσόδων', defaultSize: 'large', icon: BarChart3, category: 'chart' },
+  { id: 'project_progress', label: 'Πρόοδος Έργων', defaultSize: 'large', icon: ListChecks, category: 'chart' },
+  { id: 'cost_breakdown_chart', label: 'Ανάλυση Κόστους', defaultSize: 'large', icon: PieChart, category: 'chart' },
+  { id: 'hours_trend_chart', label: 'Hours Trend', defaultSize: 'large', icon: Clock, category: 'chart' },
+  { id: 'pipeline_stages_chart', label: 'Pipeline Stages', defaultSize: 'large', icon: Activity, category: 'chart' },
+  { id: 'win_rate_trend', label: 'Win Rate Trend', defaultSize: 'large', icon: TrendingUp, category: 'chart' },
+
+  // ── List/medium widgets (Zone C) ──
+  { id: 'top_clients_revenue', label: 'Top Πελάτες', defaultSize: 'medium', icon: Users, category: 'list' },
+  { id: 'active_projects_breakdown', label: 'Κατανομή Έργων', defaultSize: 'medium', icon: FolderKanban, category: 'list' },
+  { id: 'tasks_by_status', label: 'Tasks ανά Status', defaultSize: 'medium', icon: ListChecks, category: 'list' },
+  { id: 'resource_allocation', label: 'Resource Allocation', defaultSize: 'medium', icon: Users, category: 'list' },
+  { id: 'deadlines', label: 'Deadlines', defaultSize: 'medium', icon: Timer, category: 'list' },
+  { id: 'margin_by_client', label: 'Margin by Client', defaultSize: 'medium', icon: DollarSign, category: 'list' },
+  { id: 'revenue_by_service', label: 'Revenue by Service', defaultSize: 'medium', icon: BarChart3, category: 'list' },
+  { id: 'monthly_comparison', label: 'Monthly Comparison', defaultSize: 'medium', icon: BarChart3, category: 'list' },
+  { id: 'proposals_by_stage', label: 'Proposals by Stage', defaultSize: 'medium', icon: Layers, category: 'list' },
+  { id: 'top_opportunities', label: 'Top Opportunities', defaultSize: 'medium', icon: Target, category: 'list' },
+  { id: 'client_acquisition_trend', label: 'Client Acquisition', defaultSize: 'medium', icon: ArrowUpRight, category: 'list' },
+  { id: 'recent_activity', label: 'Πρόσφατη Δραστηριότητα', defaultSize: 'medium', icon: Activity, category: 'list' },
+
+  // ── Alert widgets (Zone D) ──
+  { id: 'sla_breaches', label: 'SLA Breaches', defaultSize: 'medium', icon: ShieldAlert, category: 'alert' },
+  { id: 'high_workload_warning', label: 'High Workload', defaultSize: 'medium', icon: Zap, category: 'alert' },
+  { id: 'cost_variance_alert', label: 'Cost Variance', defaultSize: 'medium', icon: AlertTriangle, category: 'alert' },
+  { id: 'stalled_deals', label: 'Stalled Deals', defaultSize: 'medium', icon: AlertTriangle, category: 'alert' },
+  { id: 'followup_required', label: 'Follow-up Required', defaultSize: 'medium', icon: PhoneCall, category: 'alert' },
 ];
 
 export function getWidgetDef(id: string): WidgetDefinition | undefined {

@@ -56,7 +56,7 @@ interface Category {
 }
 
 const categories: Category[] = [
-  { id: 'overview', icon: LayoutDashboard, label: 'Overview', routePrefixes: ['/my-work', '/'] },
+  { id: 'overview', icon: LayoutDashboard, label: 'Overview', routePrefixes: ['/my-work', '/', '/dashboard'] },
   { id: 'work', icon: Briefcase, label: 'Work', routePrefixes: ['/work', '/projects', '/tasks', '/calendar', '/files', '/blueprints', '/campaigns', '/backlog'] },
   { id: 'clients', icon: Building2, label: 'Clients', routePrefixes: ['/clients', '/contacts'] },
   { id: 'communication', icon: MessageSquare, label: 'Communication', routePrefixes: ['/chat', '/inbox'] },
@@ -69,7 +69,10 @@ const categories: Category[] = [
 
 const categoryNavItems: Record<CategoryId, NavItem[]> = {
   overview: [
-    { title: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { title: 'Executive', href: '/', icon: LayoutDashboard },
+    { title: 'Finance', href: '/dashboard/finance', icon: DollarSign },
+    { title: 'Operations', href: '/dashboard/operations', icon: Users },
+    { title: 'Sales & Pipeline', href: '/dashboard/sales', icon: BarChart3 },
   ],
   work: [],
   clients: [
@@ -140,7 +143,7 @@ function detectCategory(pathname: string): CategoryId {
   if (pathname.startsWith('/reports') || pathname.startsWith('/leaderboard') || pathname.startsWith('/secretary') || pathname.startsWith('/intelligence')) return 'intelligence';
   if (pathname.startsWith('/governance')) return 'governance';
   if (pathname.startsWith('/settings')) return 'settings';
-  if (pathname === '/my-work' || pathname === '/') return 'overview';
+  if (pathname === '/my-work' || pathname === '/' || pathname.startsWith('/dashboard')) return 'overview';
   return 'overview';
 }
 

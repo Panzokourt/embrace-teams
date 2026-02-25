@@ -5,7 +5,6 @@ import { Settings2, GripVertical, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { getWidgetDef } from './widgetRegistry';
 import type { WidgetSize, WidgetViewType } from '@/hooks/useDashboardConfig';
 
 const SIZE_OPTIONS: { value: WidgetSize; label: string }[] = [
@@ -35,8 +34,7 @@ export default function WidgetWrapper({
   id, size, viewType, onResize, onHide, onViewTypeChange, className, children,
 }: WidgetWrapperProps) {
   const [popoverOpen, setPopoverOpen] = useState(false);
-  const def = getWidgetDef(id);
-  const supportedViews = def?.supportedViews;
+  const supportedViews: WidgetViewType[] | undefined = undefined;
 
   const {
     attributes,

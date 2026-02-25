@@ -1,33 +1,35 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useDashboardRealtime } from '@/hooks/useRealtimeSubscription';
 import { useDashboardConfig, getFilterDateRange } from '@/hooks/useDashboardConfig';
-import { getColSpanClass } from '@/components/dashboard/widgetRegistry';
+import { getTemplate, ZONE_ORDER, type DashboardTemplateId, type ZoneId } from '@/components/dashboard/dashboardTemplates';
+import DashboardZone from '@/components/dashboard/DashboardZone';
 import StatCard from '@/components/dashboard/StatCard';
-import PipelineCard, { getDefaultPipelineStages } from '@/components/dashboard/PipelineCard';
 import TaskList from '@/components/dashboard/TaskList';
 import DashboardFilters from '@/components/dashboard/DashboardFilters';
 import DashboardCustomizer from '@/components/dashboard/DashboardCustomizer';
 import DashboardExport from '@/components/dashboard/DashboardExport';
-import DashboardLayoutSelector from '@/components/dashboard/DashboardLayoutSelector';
-import WidgetWrapper from '@/components/dashboard/WidgetWrapper';
 import RecentActivity from '@/components/dashboard/widgets/RecentActivity';
 import RevenueChart from '@/components/dashboard/widgets/RevenueChart';
 import ProjectProgress from '@/components/dashboard/widgets/ProjectProgress';
+import CostBreakdownChart from '@/components/dashboard/widgets/CostBreakdownChart';
+import HoursLoggedChart from '@/components/dashboard/widgets/HoursLoggedChart';
+import PipelineStagesChart from '@/components/dashboard/widgets/PipelineStagesChart';
+import WinRateTrendChart from '@/components/dashboard/widgets/WinRateTrendChart';
+import TopClientsRevenue from '@/components/dashboard/widgets/TopClientsRevenue';
+import TasksByStatus from '@/components/dashboard/widgets/TasksByStatus';
+import AlertWidget from '@/components/dashboard/widgets/AlertWidget';
+import PlaceholderWidget from '@/components/dashboard/widgets/PlaceholderWidget';
 import { PageHeader } from '@/components/shared/PageHeader';
 import {
-  DndContext, closestCenter, PointerSensor, useSensor, useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core';
-import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
-import { 
   DollarSign, Percent, TrendingUp, FileWarning,
   Trophy, FolderKanban, AlertTriangle, Activity,
-  Loader2, Timer, Settings2, LayoutDashboard
+  Loader2, Timer, Settings2, Repeat, CreditCard,
+  Users, Layers, Target,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 
 interface DashboardStats {
   totalRevenue: number;
@@ -40,6 +42,8 @@ interface DashboardStats {
   overdueCount: number;
   utilization: number;
   todayHours: number;
+  pipelineValue: number;
+  closedWon: number;
 }
 
 interface Task {
@@ -51,42 +55,38 @@ interface Task {
 }
 
 export default function Dashboard() {
+  const { templateId: routeTemplateId } = useParams<{ templateId?: string }>();
   const { profile, isAdmin, isManager, isClient } = useAuth();
   const [loading, setLoading] = useState(true);
   const [customizerOpen, setCustomizerOpen] = useState(false);
+
+  // Determine active template
+  const activeTemplateId: DashboardTemplateId = (
+    ['executive', 'finance', 'operations', 'sales'].includes(routeTemplateId || '')
+      ? routeTemplateId as DashboardTemplateId
+      : 'executive'
+  );
+  const template = getTemplate(activeTemplateId);
+
   const {
-    config, visibleWidgets, toggleWidget, setWidgetSize, setWidgetViewType,
-    setFilters, getWidget, reorderWidgets,
-    savedLayouts, saveLayout, loadLayout, deleteLayout,
+    config, toggleWidget, setWidgetSize,
+    setFilters, savedLayouts, saveLayout, loadLayout, deleteLayout,
   } = useDashboardConfig();
 
   const [stats, setStats] = useState<DashboardStats>({
     totalRevenue: 0, agencyFee: 0, netProfit: 0, pendingInvoices: 0,
     activeTenders: 0, activeProjects: 0, winRate: 0, overdueCount: 0,
-    utilization: 0, todayHours: 0,
+    utilization: 0, todayHours: 0, pipelineValue: 0, closedWon: 0,
   });
 
-  const [pipelineStages, setPipelineStages] = useState(getDefaultPipelineStages());
   const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([]);
-
-  // DnD sensors
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
-  );
-
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      reorderWidgets(String(active.id), String(over.id));
-    }
-  }, [reorderWidgets]);
 
   const fetchDashboardData = useCallback(async () => {
     try {
       const periodStart = getFilterDateRange(config.filters.period).toISOString();
       const { clientId, projectId } = config.filters;
 
-      let invoicesQ = supabase.from('invoices').select('amount, paid, issued_date');
+      let invoicesQ = supabase.from('invoices').select('amount, paid, issued_date, client_id');
       invoicesQ = invoicesQ.gte('issued_date', periodStart);
       if (clientId) invoicesQ = invoicesQ.eq('client_id', clientId);
       if (projectId) invoicesQ = invoicesQ.eq('project_id', projectId);
@@ -98,13 +98,12 @@ export default function Dashboard() {
       let projectsQ = supabase.from('projects').select('budget, agency_fee_percentage, status, client_id');
       if (clientId) projectsQ = projectsQ.eq('client_id', clientId);
 
-      let tendersQ = supabase.from('tenders').select('id, name, budget, stage, client:clients(name)');
-
+      const tendersQ = supabase.from('tenders').select('id, name, budget, stage');
       let tasksQ = supabase.from('tasks').select('id, title, due_date, status, project:projects(name)');
       if (projectId) tasksQ = tasksQ.eq('project_id', projectId);
 
       const timeEntriesQ = supabase.from('time_entries').select('duration_minutes, start_time, is_running')
-        .gte('start_time', new Date(new Date().setHours(0,0,0,0)).toISOString())
+        .gte('start_time', new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
         .eq('is_running', false);
 
       const [invoicesRes, expensesRes, projectsRes, tendersRes, tasksRes, timeEntriesRes] =
@@ -141,29 +140,20 @@ export default function Dashboard() {
 
       const todayMinutes = (timeEntriesRes.data || []).reduce((s, e) => s + (e.duration_minutes || 0), 0);
 
+      const pipelineValue = tenders
+        .filter(t => !['won', 'lost'].includes(t.stage))
+        .reduce((s, t) => s + (Number(t.budget) || 0), 0);
+
       setStats({
         totalRevenue, agencyFee, netProfit, pendingInvoices,
         activeTenders, activeProjects: activeProjects.length, winRate,
         overdueCount: overdueTasks.length,
         utilization: Math.min(utilization, 100),
         todayHours: Math.round((todayMinutes / 60) * 10) / 10,
+        pipelineValue,
+        closedWon: wonTenders,
       });
 
-      // Pipeline
-      const stages = getDefaultPipelineStages();
-      tenders.forEach(tender => {
-        const idx = stages.findIndex(s => s.id === tender.stage);
-        if (idx !== -1) {
-          stages[idx].items.push({
-            id: tender.id, name: tender.name,
-            client: tender.client?.name || 'Άγνωστος',
-            budget: Number(tender.budget) || 0,
-          });
-        }
-      });
-      setPipelineStages(stages);
-
-      // Upcoming tasks
       const upcoming = tasks
         .filter(t => t.due_date && t.status !== 'completed')
         .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime())
@@ -185,7 +175,6 @@ export default function Dashboard() {
   useDashboardRealtime(fetchDashboardData);
   useEffect(() => { fetchDashboardData(); }, [fetchDashboardData]);
 
-  // Stats snapshot for export
   const statsSnapshot = useMemo<Record<string, string | number>>(() => ({
     total_revenue: `€${stats.totalRevenue.toLocaleString()}`,
     agency_fee: `€${stats.agencyFee.toLocaleString()}`,
@@ -210,12 +199,12 @@ export default function Dashboard() {
     );
   }
 
-  // Client Dashboard
+  // Client Dashboard (simple)
   if (isClient && !isAdmin && !isManager) {
     return (
       <div className="page-shell">
         <PageHeader
-          icon={LayoutDashboard}
+          icon={template.icon}
           title={`Καλωσήρθατε, ${profile?.full_name?.split(' ')[0] || 'Client'}`}
           subtitle="Παρακολουθήστε την πρόοδο των έργων σας"
           breadcrumbs={[{ label: 'Dashboard' }]}
@@ -230,75 +219,79 @@ export default function Dashboard() {
     );
   }
 
-  const sizeClass = (id: string) => getColSpanClass(getWidget(id)?.size ?? 'small');
+  // ── Widget renderer ──
+  const renderWidget = (widgetId: string): React.ReactNode => {
+    switch (widgetId) {
+      // KPIs
+      case 'total_revenue': return <StatCard title="Συνολικά Έσοδα" value={`€${stats.totalRevenue.toLocaleString()}`} icon={DollarSign} variant="primary" />;
+      case 'net_profit': return <StatCard title="Καθαρό Κέρδος" value={`€${stats.netProfit.toLocaleString()}`} icon={TrendingUp} variant={stats.netProfit >= 0 ? 'success' : 'destructive'} />;
+      case 'active_projects': return <StatCard title="Ενεργά Έργα" value={stats.activeProjects} icon={FolderKanban} />;
+      case 'alerts_count': return <StatCard title="Alerts" value={stats.overdueCount} icon={AlertTriangle} variant={stats.overdueCount > 0 ? 'destructive' : 'default'} />;
+      case 'agency_fee': return <StatCard title="Προμήθεια Agency" value={`€${stats.agencyFee.toLocaleString()}`} subtitle="από ενεργά έργα" icon={Percent} />;
+      case 'pending_invoices': return <StatCard title="Εκκρεμή Τιμολόγια" value={`€${stats.pendingInvoices.toLocaleString()}`} icon={FileWarning} variant={stats.pendingInvoices > 0 ? 'warning' : 'default'} />;
+      case 'active_tenders': return <StatCard title="Διαγωνισμοί" value={stats.activeTenders} icon={FileWarning} />;
+      case 'win_rate': return <StatCard title="Win Rate" value={`${stats.winRate}%`} icon={Trophy} variant={stats.winRate >= 50 ? 'success' : 'default'} />;
+      case 'overdue': return <StatCard title="Overdue Tasks" value={stats.overdueCount} icon={AlertTriangle} variant={stats.overdueCount > 0 ? 'destructive' : 'default'} />;
+      case 'today_hours': return <StatCard title="Ώρες Σήμερα" value={`${stats.todayHours}h`} icon={Timer} variant="primary" />;
+      case 'utilization': return <StatCard title="Utilization" value={`${stats.utilization}%`} icon={Activity} />;
+      case 'recurring_revenue': return <StatCard title="Recurring Revenue" value="—" icon={Repeat} subtitle="Σύντομα" />;
+      case 'outstanding_invoices': return <StatCard title="Ανεξόφλητα" value={`€${stats.pendingInvoices.toLocaleString()}`} icon={CreditCard} variant="warning" />;
+      case 'capacity_pct': return <StatCard title="Capacity" value={`${100 - stats.utilization}%`} icon={Users} />;
+      case 'pipeline_value': return <StatCard title="Pipeline Value" value={`€${stats.pipelineValue.toLocaleString()}`} icon={Layers} variant="primary" />;
+      case 'active_proposals': return <StatCard title="Active Proposals" value={stats.activeTenders} icon={FileWarning} />;
+      case 'closed_won': return <StatCard title="Closed Won" value={stats.closedWon} icon={Trophy} variant="success" />;
+      case 'overdue_invoices': return (
+        <AlertWidget
+          title="Overdue Invoices"
+          icon={FileWarning}
+          items={[{ label: 'Εκκρεμή τιμολόγια', count: stats.pendingInvoices > 0 ? 1 : 0, variant: 'warning' }]}
+          emptyMessage="Κανένα εκκρεμές τιμολόγιο"
+        />
+      );
 
-  // Stat widgets mapping
-  const statWidgets: Record<string, React.ReactNode> = {
-    total_revenue: <StatCard title="Συνολικά Έσοδα" value={`€${stats.totalRevenue.toLocaleString()}`} icon={DollarSign} variant="primary" />,
-    agency_fee: <StatCard title="Προμήθεια Agency" value={`€${stats.agencyFee.toLocaleString()}`} subtitle="από ενεργά έργα" icon={Percent} />,
-    net_profit: <StatCard title="Καθαρό Κέρδος" value={`€${stats.netProfit.toLocaleString()}`} icon={TrendingUp} variant={stats.netProfit >= 0 ? 'success' : 'destructive'} />,
-    pending_invoices: <StatCard title="Εκκρεμή Τιμολόγια" value={`€${stats.pendingInvoices.toLocaleString()}`} icon={FileWarning} variant={stats.pendingInvoices > 0 ? 'warning' : 'default'} />,
-    active_tenders: <StatCard title="Διαγωνισμοί" value={stats.activeTenders} icon={FileWarning} />,
-    active_projects: <StatCard title="Ενεργά Έργα" value={stats.activeProjects} icon={FolderKanban} />,
-    win_rate: <StatCard title="Win Rate" value={`${stats.winRate}%`} icon={Trophy} variant={stats.winRate >= 50 ? 'success' : 'default'} />,
-    overdue: <StatCard title="Overdue" value={stats.overdueCount} icon={AlertTriangle} variant={stats.overdueCount > 0 ? 'destructive' : 'default'} />,
-    today_hours: <StatCard title="Ώρες Σήμερα" value={`${stats.todayHours}h`} icon={Timer} variant="primary" />,
-    utilization: <StatCard title="Utilization" value={`${stats.utilization}%`} icon={Activity} />,
+      // Charts
+      case 'revenue_chart': return <RevenueChart />;
+      case 'project_progress': return <ProjectProgress />;
+      case 'cost_breakdown_chart': return <CostBreakdownChart />;
+      case 'hours_trend_chart': return <HoursLoggedChart />;
+      case 'pipeline_stages_chart': return <PipelineStagesChart />;
+      case 'win_rate_trend': return <WinRateTrendChart />;
+
+      // Lists
+      case 'top_clients_revenue': return <TopClientsRevenue />;
+      case 'tasks_by_status': return <TasksByStatus />;
+      case 'deadlines': return <TaskList tasks={upcomingTasks} title="Deadlines" />;
+      case 'recent_activity': return <RecentActivity />;
+      case 'active_projects_breakdown': return <PlaceholderWidget title="Κατανομή Έργων" icon={FolderKanban} />;
+      case 'resource_allocation': return <PlaceholderWidget title="Resource Allocation" icon={Users} />;
+      case 'margin_by_client': return <PlaceholderWidget title="Margin by Client" icon={DollarSign} />;
+      case 'revenue_by_service': return <PlaceholderWidget title="Revenue by Service" />;
+      case 'monthly_comparison': return <PlaceholderWidget title="Monthly Comparison" />;
+      case 'proposals_by_stage': return <PlaceholderWidget title="Proposals by Stage" icon={Layers} />;
+      case 'top_opportunities': return <PlaceholderWidget title="Top Opportunities" icon={Target} />;
+      case 'client_acquisition_trend': return <PlaceholderWidget title="Client Acquisition" />;
+
+      // Alerts
+      case 'sla_breaches': return <AlertWidget title="SLA Breaches" items={[]} emptyMessage="Κανένα SLA breach" />;
+      case 'high_workload_warning': return <AlertWidget title="High Workload" items={[]} emptyMessage="Κανονικό workload" />;
+      case 'cost_variance_alert': return <AlertWidget title="Cost Variance" items={[]} emptyMessage="Κανένα variance" />;
+      case 'stalled_deals': return <AlertWidget title="Stalled Deals" items={[]} emptyMessage="Κανένα stalled deal" />;
+      case 'followup_required': return <AlertWidget title="Follow-up Required" items={[]} emptyMessage="Δεν απαιτείται follow-up" />;
+
+      default: return <PlaceholderWidget title={widgetId} />;
+    }
   };
-
-  // Composite widgets
-  const compositeWidgets: Record<string, React.ReactNode> = {
-    pipeline: (isAdmin || isManager) ? <PipelineCard stages={pipelineStages} /> : null,
-    alerts: (
-      <div className="rounded-2xl border border-destructive/10 bg-destructive/[0.02] p-6 animate-fade-in shadow-soft h-full">
-        <h3 className="text-base font-semibold flex items-center gap-2 mb-4 text-foreground">
-          <span className="h-8 w-8 rounded-lg bg-destructive/10 flex items-center justify-center">
-            <AlertTriangle className="h-4 w-4 text-destructive" />
-          </span>
-          Alerts
-        </h3>
-        <div className="space-y-2">
-          {stats.overdueCount > 0 ? (
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-background/60 border border-destructive/10">
-              <AlertTriangle className="h-4 w-4 text-destructive" />
-              <span className="text-sm text-foreground/80">
-                {stats.overdueCount} task{stats.overdueCount > 1 ? 's' : ''} overdue
-              </span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-success/[0.03] border border-success/10">
-              <Activity className="h-4 w-4 text-success" />
-              <span className="text-sm text-success">Όλα τα tasks είναι εντός προθεσμίας</span>
-            </div>
-          )}
-        </div>
-      </div>
-    ),
-    deadlines: <TaskList tasks={upcomingTasks} title="Deadlines" />,
-    recent_activity: <RecentActivity />,
-    revenue_chart: <RevenueChart />,
-    project_progress: <ProjectProgress />,
-  };
-
-  const allWidgets = { ...statWidgets, ...compositeWidgets };
 
   return (
     <div className="page-shell">
-      {/* Header */}
       <PageHeader
-        icon={LayoutDashboard}
-        title="Dashboard"
-        subtitle="Συνολική εικόνα εταιρίας"
-        breadcrumbs={[{ label: 'Dashboard' }]}
+        icon={template.icon}
+        title={template.label + ' Dashboard'}
+        subtitle={template.description}
+        breadcrumbs={[{ label: 'Overview', href: '/' }, { label: template.label }]}
         actions={
           <div className="flex items-center gap-2">
             <DashboardFilters filters={config.filters} onFiltersChange={setFilters} />
-            <DashboardLayoutSelector
-              savedLayouts={savedLayouts}
-              onSave={saveLayout}
-              onLoad={loadLayout}
-              onDelete={deleteLayout}
-            />
             <DashboardExport widgets={config.widgets} statsSnapshot={statsSnapshot} />
             <Button
               variant="outline"
@@ -312,39 +305,28 @@ export default function Dashboard() {
         }
       />
 
-      {/* Widget grid with DnD */}
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={visibleWidgets.map(w => w.id)} strategy={rectSortingStrategy}>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {visibleWidgets.map(w => {
-              const content = allWidgets[w.id];
-              if (!content) return null;
-              return (
-                <WidgetWrapper
-                  key={w.id}
-                  id={w.id}
-                  size={w.size}
-                  viewType={w.viewType}
-                  onResize={(size) => setWidgetSize(w.id, size)}
-                  onHide={() => toggleWidget(w.id)}
-                  onViewTypeChange={(vt) => setWidgetViewType(w.id, vt)}
-                  className={sizeClass(w.id)}
-                >
-                  {content}
-                </WidgetWrapper>
-              );
-            })}
-          </div>
-        </SortableContext>
-      </DndContext>
+      {/* Zone-based layout */}
+      <div className="space-y-8">
+        {ZONE_ORDER.map(zoneId => {
+          const zoneWidgets = template.zones[zoneId].widgets;
+          if (zoneWidgets.length === 0) return null;
+          return (
+            <DashboardZone key={zoneId} zoneId={zoneId}>
+              {zoneWidgets.map(wId => (
+                <div key={wId}>{renderWidget(wId)}</div>
+              ))}
+            </DashboardZone>
+          );
+        })}
+      </div>
 
-      {/* Customizer Sheet */}
       <DashboardCustomizer
         open={customizerOpen}
         onOpenChange={setCustomizerOpen}
         widgets={config.widgets}
         onToggle={toggleWidget}
         onResize={setWidgetSize}
+        templateId={activeTemplateId}
       />
     </div>
   );

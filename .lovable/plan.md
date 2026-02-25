@@ -1,170 +1,210 @@
 
+Σωστό feedback — από το codebase και τα screenshots φαίνεται ότι το responsive σύστημα εφαρμόστηκε μερικώς, αλλά λείπουν κρίσιμα interaction states και “safe constraints”, οπότε προκύπτουν wrap/clipping και αστάθεια στο sidebar.
 
-# Responsive Layout System -- State-Based Behavior
+## Τι εντόπισα ως βασικά προβλήματα
 
-## Overview
+1. **Sidebar behavior δεν είναι ClickUp-like**
+   - Στο `AppSidebar.tsx`, όταν είναι collapsed και πατάς category icon, κάνει **μόνιμο expand** (`onToggleCollapse`) αντί για προσωρινό flyout.
+   - Δεν υπάρχει “peek/flyout που κλείνει με mouse leave”.
 
-Implement a 4-state responsive layout system that adapts the 3-panel structure (Sidebar, Main Content, Right Panel) based on viewport width, using a combination of JS-based layout states and CSS.
+2. **Resize χωρίς πρακτικά όρια περιεχομένου**
+   - Το `AppLayout.tsx` δουλεύει με `%` panel sizes (`ResizablePanel`) χωρίς έλεγχο ασφαλούς πλάτους main content σε px.
+   - Έτσι μπορεί να στενέψει υπερβολικά το κύριο content όταν panels είναι ανοιχτά.
 
----
+3. **Top bar δεν έχει πλήρη state machine**
+   - `TopBar.tsx` και `WorkDayClock.tsx` κρατάνε πολλά στοιχεία ακόμα και σε narrow/mobile.
+   - Η αναζήτηση και actions δεν περνάνε σωστά σε icon-only/compact modes, άρα έχουμε overflow/wrap.
 
-## Layout States
+4. **Density mode υπάρχει αλλά σχεδόν δεν χρησιμοποιείται**
+   - `density-comfortable/compact` ορίζονται στο `index.css`, αλλά οι περισσότερες σελίδες συνεχίζουν με fixed `p-6 lg:p-8`.
+   - Άρα η “compact” λογική δεν εφαρμόζεται ουσιαστικά.
 
-```text
-STATE A (>= 1440px) -- Wide Desktop
-+----------+---------------------------+-----------+
-| Sidebar  |      Main Content         |  Right    |
-| expanded |                           |  Panel    |
-| (icons + |                           |  docked   |
-|  labels) |                           |           |
-+----------+---------------------------+-----------+
+5. **Κάρτες/τίτλοι/toolbar controls χωρίς καθολικούς κανόνες truncation**
+   - Σε shared components (π.χ. `StatCard`, dashboard controls) λείπουν systematic `line-clamp/truncate/min-w-0`.
+   - Προκαλείται διπλό wrapping σε τίτλους/κουμπιά.
 
-STATE B (1200-1439px) -- Standard Desktop
-+----------+----------------------------------+
-| Sidebar  |         Main Content             |
-| expanded |                                  |
-| (icons + |    Right Panel = slide-over      |
-|  labels) |    overlay from right            |
-+----------+----------------------------------+
-
-STATE C (992-1199px) -- Narrow Desktop
-+------+--------------------------------------+
-| Rail |          Main Content                |
-| only |     (compact density)               |
-| icons|    Right Panel = drawer overlay      |
-+------+--------------------------------------+
-
-STATE D (< 992px) -- Mobile/Tablet
-+--------------------------------------------+
-|          Main Content                      |
-|     (single column, compact)               |
-|  Sidebar = hamburger overlay               |
-|  Right Panel = modal/drawer                |
-+--------------------------------------------+
-```
+6. **Knowledge page δεν ολοκληρώνει το spec σε <992px**
+   - Ακόμα δείχνει tree panel inline· δεν έχει πλήρη dropdown-mode category selector σε narrow/mobile.
 
 ---
 
-## New Hook: `useLayoutState`
+## Υλοποίηση που προτείνω (σταθερή, state-based, όχι μόνο breakpoints)
 
-Create `src/hooks/useLayoutState.ts` -- a single hook that provides the current layout state and derived booleans.
+### Phase 1 — Σωστό layout state engine + safe width guards
+**Files:**  
+- `src/hooks/useLayoutState.ts`  
+- `src/contexts/LayoutContext.tsx`  
+- `src/components/layout/AppLayout.tsx`
 
-```typescript
-type LayoutState = 'wide' | 'standard' | 'narrow' | 'mobile';
-
-Returns:
-- layoutState: LayoutState
-- sidebarMode: 'expanded' | 'collapsed' | 'hidden'
-- rightPanelMode: 'docked' | 'overlay' | 'drawer'
-- density: 'comfortable' | 'compact'
-```
-
-Uses `window.matchMedia` listeners (not resize polling) for the 4 breakpoints: 1440, 1200, 992.
-
----
-
-## New Context: `useLayoutDensity`
-
-Create `src/contexts/LayoutContext.tsx` to provide density mode globally so cards/pages can adapt padding and spacing.
+**Αλλαγές:**
+- Επέκταση του layout state ώστε να δίνει και “interaction capabilities”:
+  - `canDockRightPanel`
+  - `isCompact`
+  - `isNarrowOrMobile`
+- Προσθήκη **safe main content guard** σε px (π.χ. `MIN_MAIN_CONTENT_PX = 860`):
+  - Αν docked right panel + sidebar οδηγούν main κάτω από ασφαλές πλάτος, το right panel γυρίζει αυτόματα σε overlay (χωρίς να εξαρτάται μόνο από breakpoint).
+- Clamp για sidebar/right panel με πρακτικά όρια px (μέσα από resize callbacks + container width), ώστε να μη “φεύγουν” σε ακραίο resize.
 
 ---
 
-## Files to Modify
+### Phase 2 — ClickUp-like sidebar rail + ephemeral flyout
+**Files:**  
+- `src/components/layout/AppSidebar.tsx`  
+- `src/components/layout/AppLayout.tsx`  
+- (πιθανό μικρό touch στο `src/components/layout/SidebarNavGroup.tsx`)
 
-### 1. `tailwind.config.ts`
-- Add custom screens: `narrow: '992px'`, `standard: '1200px'`, `wide: '1440px'`
-- Add utility classes for line-clamp (already available via tailwindcss built-in)
-
-### 2. `src/hooks/useLayoutState.ts` (NEW)
-- Core layout state logic with matchMedia listeners
-- Returns layoutState, sidebarMode, rightPanelMode, density
-- Respects user preference for sidebar collapse (localStorage)
-
-### 3. `src/contexts/LayoutContext.tsx` (NEW)
-- Provides `density` ('comfortable' | 'compact') to all children
-- Auto-switches based on layout state (compact for narrow + mobile)
-
-### 4. `src/components/layout/AppLayout.tsx` (MAJOR REWRITE)
-Current: Uses ResizablePanelGroup for all states with `hidden md:block` on sidebar.
-
-New behavior:
-- **State A (wide)**: Keep ResizablePanelGroup with all 3 panels docked. Right panel auto-opens.
-- **State B (standard)**: ResizablePanelGroup with sidebar + main only. Right panel renders as a fixed overlay (absolutely positioned over the right edge, not inside the panel group), with slide-in animation.
-- **State C (narrow)**: Sidebar auto-collapses to icon-only rail. Right panel renders as Sheet/Drawer overlay.
-- **State D (mobile)**: Sidebar hidden entirely (hamburger Sheet exists already). Right panel renders as bottom Sheet/Drawer.
-- Remove the `hidden md:block` on sidebar panel; replace with state-based rendering.
-
-### 5. `src/components/layout/AppSidebar.tsx`
-- In State C: force `collapsed=true` regardless of user pref (auto-collapse)
-- In State D: don't render desktop sidebar at all (only Sheet mobile menu)
-- Add `truncate` / `line-clamp-1` to nav labels
-- Add `min-w-0` on text containers to prevent overflow
-
-### 6. `src/components/layout/TopBar.tsx`
-- In State D: show hamburger trigger button (currently exists but at fixed position)
-- Move the hamburger button from AppSidebar's fixed div into TopBar for mobile
-- Buttons switch to icon-only in narrow/mobile (hide text labels)
-- Search bar: shorter placeholder text on narrow
-
-### 7. `src/components/secretary/SecretaryPanel.tsx`
-- Tab labels: always show icons, hide text below 1200px (use layout state)
-- Already has `hidden sm:inline` on labels -- adjust to use layout-aware classes
-
-### 8. `src/pages/Knowledge.tsx` (page-specific)
-- KPI grid: `grid-cols-1 sm:grid-cols-2 wide:grid-cols-4` (use new breakpoints)
-- Category tree: on narrow/mobile, render as a Select dropdown instead of sidebar tree
-- Article grid: adjust columns based on available space
+**Αλλαγές:**
+- Εισαγωγή νέου sidebar interaction mode για narrow/collapsed:
+  - `persistent-expanded`
+  - `collapsed-rail`
+  - `collapsed-rail-flyout` (ephemeral)
+- Σε narrow state:
+  - Μένει μόνο το rail.
+  - Hover ή click σε category icon ανοίγει **προσωρινό flyout panel**.
+  - Flyout κλείνει σε `onMouseLeave`, `Escape`, ή όταν χαθεί focus.
+  - Δεν αλλάζει μόνιμα το collapsed preference.
+- Σε mobile:
+  - Sidebar μόνο ως sheet μέσω hamburger (όχι rail + panel μαζί).
+- Διόρθωση current logic που κάνει permanent expand με click πάνω σε rail icon.
+- Προσθήκη hover-safe “bridge area” ώστε να μη κλείνει flyout όταν μετακινείται ο δείκτης από rail προς panel.
 
 ---
 
-## Density System
+### Phase 3 — Top bar με καθαρά responsive states
+**Files:**  
+- `src/components/layout/TopBar.tsx`  
+- `src/components/topbar/WorkDayClock.tsx`
 
-Add a CSS custom property approach via a class on the root layout:
-
-```css
-.density-comfortable { --density-padding: 1.5rem; --density-gap: 1.5rem; --density-card-p: 1.5rem; }
-.density-compact { --density-padding: 1rem; --density-gap: 1rem; --density-card-p: 1rem; }
-```
-
-Pages that use `p-6 space-y-6` will be updated to use `p-[var(--density-padding)] space-y-[var(--density-gap)]` or a utility class.
-
----
-
-## Text Overflow Prevention
-
-Apply across all card components and nav:
-- Card titles: `line-clamp-1`
-- Card subtitles: `line-clamp-1`  
-- Card descriptions: `line-clamp-2`
-- Nav labels: `truncate` (already some, ensure all)
-- Buttons in TopBar: icon-only mode below 992px
+**Αλλαγές ανά state:**
+- **Wide:** πλήρες topbar (clock, search, labels, actions).
+- **Standard:** compact labels, μικρότερα controls, περιορισμός μεγάλων placeholders.
+- **Narrow:** icon-first toolbar:
+  - Search trigger icon + popover/dialog αντί για full-width input.
+  - Work mode και δευτερεύοντα actions σε icon-only.
+  - XP/δευτερεύοντα στοιχεία με προτεραιοποίηση ή κρυψίματα.
+- **Mobile:** μία καθαρή γραμμή:
+  - Hamburger, search icon, secretary toggle.
+  - Τα υπόλοιπα actions σε overflow menu.
+- Στο `WorkDayClock`, explicit compact mode (κρύβει date/time/status labels σε narrow/mobile, κρατά μόνο essential indicators).
 
 ---
 
-## Right Panel Overlay Behavior (States B/C/D)
+### Phase 4 — Global typography & control constraints (anti-wrap layer)
+**Files:**  
+- `src/index.css`  
+- `src/components/ui/button.tsx`
 
-For States B and C, the right panel renders as:
-- An absolutely positioned panel sliding in from the right edge
-- With a semi-transparent backdrop that closes it on click
-- Uses existing `animate-slide-in-right` / `animate-slide-out-right` keyframes
-- Does NOT resize the main content (pure overlay)
-
-For State D:
-- Uses the existing `Sheet` component with `side="right"`
+**Αλλαγές:**
+- Προσθήκη reusable utility classes:
+  - `.ui-title-1line`, `.ui-subtitle-1line`, `.ui-desc-2line`
+  - `.ui-toolbar`, `.ui-toolbar-item`, `.ui-page-shell`
+- Buttons:
+  - min-width rules για να μη “σπάνε”.
+  - icon-only fallback class σε narrow/mobile.
+- Εξαναγκασμός `min-w-0` και `truncate` σε nav labels και toolbar text containers.
+- Density utilities που πραγματικά χρησιμοποιούνται από pages/components (όχι μόνο root class).
 
 ---
 
-## Files Summary
+### Phase 5 — Dashboard & card grids (πρώτη προτεραιότητα από τα screenshots)
+**Files:**  
+- `src/pages/Dashboard.tsx`  
+- `src/components/dashboard/DashboardFilters.tsx`  
+- `src/components/dashboard/StatCard.tsx`  
+- `src/components/dashboard/PipelineCard.tsx`  
+- `src/components/dashboard/DashboardLayoutSelector.tsx`  
+- `src/components/dashboard/DashboardExport.tsx`  
+- `src/components/dashboard/WidgetWrapper.tsx`
 
-| File | Action |
-|------|--------|
-| `tailwind.config.ts` | Add `narrow`, `standard`, `wide` screen breakpoints |
-| `src/hooks/useLayoutState.ts` | NEW -- layout state hook |
-| `src/contexts/LayoutContext.tsx` | NEW -- density context provider |
-| `src/components/layout/AppLayout.tsx` | Rewrite panel rendering per layout state |
-| `src/components/layout/AppSidebar.tsx` | Auto-collapse logic, text truncation |
-| `src/components/layout/TopBar.tsx` | Mobile hamburger integration, icon-only buttons |
-| `src/components/secretary/SecretaryPanel.tsx` | Responsive tab labels |
-| `src/pages/Knowledge.tsx` | Responsive KPI grid, category dropdown on mobile |
-| `src/index.css` | Add density CSS custom properties |
+**Αλλαγές:**
+- Header/filters γίνονται 2-level responsive toolbar:
+  - no-wrap row με horizontal scroll όπου χρειάζεται.
+  - φίλτρα σε compact widths (μικρότερα select, collapsing labels).
+- Stat cards:
+  - τίτλος 1-line clamp,
+  - subtitle 2-line clamp,
+  - σταθερό min-height για αποφυγή layout shift.
+- Pipeline:
+  - stage labels clamp-1,
+  - responsive στήλες (όχι υπερβολικά πολλά columns σε μικρό πλάτος),
+  - πιο σταθερό spacing σε compact density.
 
+---
+
+### Phase 6 — Knowledge page ειδικό behavior + template για υπόλοιπες σελίδες
+**Files:**  
+- `src/pages/Knowledge.tsx`  
+- `src/components/knowledge/KBCategoryTree.tsx` (μόνο αν χρειαστεί μικρή υποστήριξη)
+
+**Αλλαγές:**
+- <992px: category tree αντικαθίσταται από dropdown selector.
+- KPI cards: 4 → 2 → 1 columns με consistent spacing.
+- Search bar full width χωρίς overflow.
+- Εφαρμογή των νέων utility classes για τίτλους/περιγραφές.
+
+---
+
+### Phase 7 — Επέκταση των responsive primitives στις κύριες listing pages
+**Files (αρχικό κύμα):**  
+- `src/pages/Projects.tsx`  
+- `src/pages/Tenders.tsx`  
+- (και τα αντίστοιχα shared card/table headers αν απαιτηθεί)
+
+**Αλλαγές:**
+- card title/subtitle/description clamp policy
+- toolbar actions icon-only σε narrow/mobile
+- grid structure που μεταβαίνει ομαλά σε 1-column σε mobile/tablet narrow
+- αποφυγή hidden actions ή clipped buttons
+
+---
+
+## Τεχνικές αρχές που θα τηρηθούν
+
+1. **State-first responsive architecture**  
+   Όχι μόνο media queries· οι αποφάσεις panel/toolbar γίνονται από layout state + πραγματικό διαθέσιμο πλάτος.
+
+2. **No persistent side effects από transient interactions**  
+   Το hover/click flyout του rail δεν θα αλλάζει μόνιμα user preference.
+
+3. **Safe minimum content width**  
+   Κανένα panel δεν επιτρέπεται να στραγγαλίζει το main κάτω από ασφαλές όριο.
+
+4. **Design consistency**  
+   Θα κρατηθεί το υπάρχον visual system (rounded geometry, subtle shadows, clean spacing).
+
+---
+
+## Validation plan (για να κλείσει οριστικά το θέμα)
+
+Θα γίνει έλεγχος σε 5 πλάτη: **1536, 1366, 1199, 1024, 390** με checklist:
+
+- Sidebar:
+  - wide/standard persistent behavior σωστό
+  - narrow rail-only + ephemeral flyout (κλείσιμο με leave/ESC)
+  - mobile hamburger sheet
+- Top bar:
+  - κανένα overlap/wrap που κρύβει controls
+  - icon-only όπου πρέπει
+- Right panel:
+  - docked μόνο όταν χωράει ασφαλώς
+  - overlay/drawer στα μικρά
+- Cards & lists:
+  - no clipped text/buttons
+  - clamp rules εφαρμόζονται
+  - mobile single-column όπου απαιτείται
+- Knowledge:
+  - category dropdown κάτω από 992
+  - KPI transitions σωστές
+
+---
+
+## Παραδοτέο
+
+Θα παραδώσω ένα συνεκτικό responsive refactor με:
+- σταθερό rail/flyout sidebar τύπου ClickUp,
+- καθαρά topbar states ανά εύρος,
+- bounded panel resizing,
+- λειτουργικό compact density,
+- και anti-wrap κανόνες που εφαρμόζονται σε dashboard + βασικές σελίδες.
+
+Έτσι θα σταματήσει το “σπάσιμο” UI σε μικρές διαστάσεις και η εφαρμογή θα συμπεριφέρεται προβλέψιμα σε desktop/tablet/mobile.

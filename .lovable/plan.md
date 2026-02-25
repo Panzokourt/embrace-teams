@@ -1,176 +1,187 @@
 
+# Executive Dashboard Layer -- Structured Overview Refactor
 
-# Unified Page Header Structure & Breadcrumbs
+## Summary
 
-## Problem Summary
+Replace the current flat "widget board" Dashboard with a structured **Executive Layer** containing 4 predefined dashboard templates (Executive, Finance, Operations, Sales & Pipeline) plus user-created Custom Dashboards. Each dashboard follows a strict 4-zone layout system (Health, Trends, Workload, Attention) with controlled widget placement.
 
-Every page uses a different header layout:
-- **Dashboard**: `text-2xl font-semibold`, no icon box, no breadcrumbs
-- **Projects/Tasks**: `text-2xl font-semibold` with 40px icon box, subtitle at `ml-[52px]`
-- **Clients**: `text-2xl font-semibold` with 40px icon box, different subtitle alignment
-- **Financials/HR**: `text-3xl font-bold` with icon (no box), different subtitle style
-- **Reports**: `text-2xl font-semibold` with inline icon, no box
-- **Calendar**: `text-lg font-bold`, inline with filter tabs
-- **Contacts**: `text-2xl font-bold` with muted box, no subtitle padding
-- **Knowledge**: `text-2xl font-bold` with inline icon
-- **ComingSoonPage**: `text-3xl font-bold`
+## Architecture
 
-No page has breadcrumbs. Tab placement, button positioning, and search/filter alignment vary everywhere.
-
-## Solution
-
-### 1. Create a Shared `PageHeader` Component
-
-**New file: `src/components/shared/PageHeader.tsx`**
-
-A reusable component that enforces consistent structure across all pages:
-
-```
-[Breadcrumbs - small text, muted]
-[Icon] Title                    [View Toggle] [Action Button]
-        Subtitle
-[Tab Menu - if applicable]
-[Search & Filters toolbar - if applicable]
+```text
+Overview (sidebar category)
+  |-- Executive Dashboard (default)
+  |-- Finance Dashboard
+  |-- Operations Dashboard
+  |-- Sales & Pipeline Dashboard
+  |-- Custom Dashboards (user-created copies)
 ```
 
-Props:
-- `icon`: LucideIcon
-- `title`: string
-- `subtitle?`: string
-- `breadcrumbs`: array of `{ label, href? }` -- auto-generated from route or passed manually
-- `actions?`: ReactNode (for buttons like "New Project", view toggles)
-- `tabs?`: ReactNode (for TabsList)
-- `toolbar?`: ReactNode (for search, filters, etc.)
-- `children?`: ReactNode (any extra content below header)
+The sidebar "overview" category will show sub-links for each dashboard type. Selecting one loads the corresponding template with its zone layout.
 
-Design rules:
-- Title: always `text-xl font-semibold` (not 2xl or 3xl -- slightly smaller for consistency)
-- Icon: 36px box with `rounded-xl bg-muted` container
-- Subtitle: `text-sm text-muted-foreground`, no left margin trick
-- Breadcrumbs: `text-xs text-muted-foreground/60` above the title, using the existing Breadcrumb UI components
-- Consistent padding: `px-6 pt-4 pb-0` (the page body below uses its own spacing)
+---
 
-### 2. Create Breadcrumb Config
+## Technical Plan
 
-**New file: `src/utils/breadcrumbConfig.ts`**
+### 1. New: Dashboard Template Registry
 
-A route-to-breadcrumb mapping so that each page auto-generates breadcrumbs from the current path:
+**File: `src/components/dashboard/dashboardTemplates.ts`**
 
-- `/` -> `Dashboard`
-- `/work` -> `Work > Projects` or `Work > Tasks`
-- `/financials` -> `Financials > [active tab]`
-- `/clients` -> `Clients`
-- `/clients/:id` -> `Clients > [client name]`
-- `/projects/:id` -> `Work > Projects > [project name]`
-- `/calendar` -> `Calendar`
-- `/hr` -> `HR > [active tab]`
-- `/reports` -> `Reports > [active tab]`
-- `/knowledge` -> `Knowledge Base`
-- `/settings/*` -> `Settings > [sub-page]`
-- `/governance/*` -> `Governance > [sub-page]`
+Define the 4 templates, each with 4 zones (A/B/C/D) and the widget IDs assigned to each zone, including allowed sizes.
 
-### 3. Apply `PageHeader` to All Pages
+```typescript
+type ZoneId = 'health' | 'trends' | 'workload' | 'attention';
+type DashboardTemplateId = 'executive' | 'finance' | 'operations' | 'sales';
 
-Each page will replace its custom header with `<PageHeader>`. Pages affected:
+interface ZoneDefinition {
+  id: ZoneId;
+  label: string;
+  maxWidgets: number;
+  allowedSizes: WidgetSize[];
+  gridClass: string; // e.g., "grid-cols-4" for health
+}
 
-| Page | Current Title Style | Changes |
-|------|-------------------|---------|
-| `Dashboard.tsx` | 2xl semibold | Add breadcrumbs, use PageHeader |
-| `Projects.tsx` (via Work) | 2xl semibold + icon box | Use PageHeader, move view toggle + create button to `actions` |
-| `Tasks.tsx` (via Work) | 2xl semibold + icon box | Same as Projects |
-| `Clients.tsx` | 2xl semibold + icon box | Use PageHeader |
-| `Contacts.tsx` | 2xl bold + muted box | Use PageHeader |
-| `Financials.tsx` | 3xl bold + inline icon | Use PageHeader, tabs go to `tabs` prop |
-| `HR.tsx` | 3xl bold + icon box | Use PageHeader |
-| `Reports.tsx` | 2xl semibold + inline icon | Use PageHeader |
-| `Timesheets.tsx` | 2xl semibold + icon box | Use PageHeader |
-| `CalendarHub.tsx` | lg bold, inline | Use PageHeader |
-| `Knowledge.tsx` | 2xl bold + inline icon | Use PageHeader |
-| `ComingSoonPage.tsx` | 3xl bold | Use PageHeader |
-| `Governance.tsx` | Check and unify | Use PageHeader |
-| `Settings.tsx` | Check and unify | Use PageHeader |
-
-### 4. Consistent Page Shell
-
-Each page currently has different padding (`p-6 lg:p-8`, `p-4 md:p-6`, `p-6`, etc.). We'll standardize:
-
-- All pages: `<div className="page-shell">` where `.page-shell` applies `p-6 space-y-5`
-- The `PageHeader` sits inside this shell at the top
-- Content follows with consistent gap
-
-### 5. Tab Menu Consistency
-
-Tabs currently appear at different levels -- some inline with title, some below. Standard:
-
-- Tabs always render **below** the title row, as a separate horizontal band
-- Same `TabsList` styling everywhere (already mostly consistent via the UI component)
-- On pages with many tabs (Financials has 6, HR has 5), tabs wrap with `flex-wrap`
-
-### 6. Action Button Consistency
-
-- Primary action button (e.g., "New Project", "New Client") always on the **right side** of the title row
-- View toggle (Cards/Table/Kanban) also on the right, before the primary button
-- Style: primary button with `Plus` icon for create actions
-
-## Technical Details
-
-### PageHeader Component Structure
-
-```tsx
-function PageHeader({ icon: Icon, title, subtitle, breadcrumbs, actions, tabs, toolbar }) {
-  return (
-    <div className="space-y-3">
-      {/* Breadcrumbs */}
-      <Breadcrumb>
-        <BreadcrumbList className="text-xs">
-          <BreadcrumbItem><BreadcrumbLink href="/">Dashboard</BreadcrumbLink></BreadcrumbItem>
-          {breadcrumbs.map(...)}
-        </BreadcrumbList>
-      </Breadcrumb>
-      
-      {/* Title row */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="h-9 w-9 rounded-xl bg-muted flex items-center justify-center shrink-0">
-            <Icon className="h-4.5 w-4.5" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-xl font-semibold tracking-tight truncate">{title}</h1>
-            {subtitle && <p className="text-sm text-muted-foreground truncate">{subtitle}</p>}
-          </div>
-        </div>
-        {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
-      </div>
-      
-      {/* Tabs */}
-      {tabs}
-      
-      {/* Toolbar (search, filters) */}
-      {toolbar}
-    </div>
-  );
+interface TemplateDefinition {
+  id: DashboardTemplateId;
+  label: string;
+  icon: LucideIcon;
+  description: string;
+  zones: Record<ZoneId, { widgets: string[] }>;
 }
 ```
 
-### Files to Create
-- `src/components/shared/PageHeader.tsx`
-- `src/utils/breadcrumbConfig.ts`
+Template contents matching the spec:
+- **Executive**: Revenue, Net Profit, Active Projects, Alerts Count / Revenue Trend + Project Progress / Utilization + Top Clients + Active Projects Breakdown / Overdue Tasks + Overdue Invoices
+- **Finance**: Revenue, Recurring Revenue, Net Profit, Outstanding Invoices / Revenue Trend + Cost Breakdown / Margin by Client + Revenue by Service + Monthly Comparison / Overdue Invoices + Cost Variance
+- **Operations**: Active Projects, Utilization, Overdue Tasks, Capacity / Project Progress + Hours Trend / Tasks by Status + Resource Allocation + Deadlines / SLA Breaches + High Workload
+- **Sales**: Pipeline Value, Win Rate, Active Proposals, Closed Won / Pipeline Stages + Win Rate Trend / Proposals by Stage + Top Opportunities + Client Acquisition / Stalled Deals + Follow-up Required
 
-### Files to Modify (header replacement)
-- `src/pages/Dashboard.tsx`
-- `src/pages/Projects.tsx`
-- `src/pages/Tasks.tsx`
-- `src/pages/Clients.tsx`
-- `src/pages/Contacts.tsx`
-- `src/pages/Financials.tsx`
-- `src/pages/HR.tsx`
-- `src/pages/Reports.tsx`
-- `src/pages/Timesheets.tsx`
-- `src/pages/CalendarHub.tsx`
-- `src/pages/Knowledge.tsx`
-- `src/pages/placeholder/ComingSoonPage.tsx`
-- `src/pages/Work.tsx` (minor -- ensure padding consistency)
+### 2. New: Expanded Widget Registry
 
-### CSS Addition
-- Add `.page-shell` utility class in `src/index.css`: `@apply p-6 space-y-5`
+**File: `src/components/dashboard/widgetRegistry.ts`**
 
+Add new widget definitions for the additional widgets needed by the templates. Many already exist; new ones include:
+- `recurring_revenue`, `outstanding_invoices`, `capacity_pct`, `closed_won`
+- `cost_breakdown_chart`, `margin_by_client`, `revenue_by_service`, `monthly_comparison`
+- `tasks_by_status`, `resource_allocation`, `hours_trend_chart`
+- `pipeline_stages_chart`, `win_rate_trend`, `top_opportunities`
+- `sla_breaches`, `high_workload_warning`, `stalled_deals`, `followup_required`
+- `top_clients_revenue`, `active_projects_breakdown`, `client_acquisition_trend`, `proposals_by_stage`, `cost_variance_alert`
+
+Each widget will specify which zone(s) it belongs to and allowed sizes.
+
+### 3. New: Zone Layout Component
+
+**File: `src/components/dashboard/DashboardZone.tsx`**
+
+A component that renders a single zone with:
+- Zone title (small, muted uppercase label)
+- Grid layout appropriate to zone type:
+  - Zone A (Health): `grid-cols-2 lg:grid-cols-4`, max 4 items
+  - Zone B (Trends): `grid-cols-1 lg:grid-cols-2`, max 2 items
+  - Zone C (Workload): `grid-cols-1 md:grid-cols-3`, max 3 items
+  - Zone D (Attention): `grid-cols-1 md:grid-cols-2`, max 2 items
+- Visual separator (subtle border-bottom or spacing) between zones
+- Drag-and-drop reordering WITHIN the zone only (using separate SortableContext per zone)
+- Widget toggle on/off, resize within allowed sizes
+
+### 4. New: Dashboard Selector Sub-Nav in Sidebar
+
+**File: `src/components/layout/AppSidebar.tsx`**
+
+Update the `categoryNavItems.overview` to include sub-links:
+- Executive (default, `/dashboard/executive` or just `/`)
+- Finance (`/dashboard/finance`)
+- Operations (`/dashboard/operations`)
+- Sales & Pipeline (`/dashboard/sales`)
+- Custom (expandable, lists user-created dashboards)
+
+### 5. Refactored: Dashboard Page
+
+**File: `src/pages/Dashboard.tsx`**
+
+Major refactor:
+- Accept a `templateId` parameter (from route or sidebar selection)
+- Load the template definition from the registry
+- Render 4 `DashboardZone` components in sequence
+- Each zone gets its own `DndContext` / `SortableContext` for within-zone reordering
+- User preferences (toggle on/off, resize, reorder within zone) stored per template in localStorage
+- Keep existing data fetching logic but extend with new data queries
+- Time filter (Today/Week/Month/Year) and Client filter apply globally to all widgets
+- Role-based default: map user role to default template
+
+### 6. New: Widget Components for New Widgets
+
+**File: `src/components/dashboard/widgets/` (multiple new files)**
+
+Create placeholder/functional widgets for the new entries. Many will share patterns:
+- **KPI widgets** (Zone A): Reuse `StatCard` with different data
+- **Chart widgets** (Zone B): New Recharts-based components (e.g., `CostBreakdownChart`, `PipelineStagesChart`, `HoursLoggedChart`, `WinRateTrendChart`)
+- **List/table widgets** (Zone C/D): Card-based lists showing top items, breakdowns, or alerts
+
+Initially, widgets without real data will show placeholder/mock data with a clear empty state, as some data sources (recurring revenue, SLA breaches, etc.) may not exist yet in the database.
+
+### 7. Updated: Custom Dashboard Management
+
+**File: `src/components/dashboard/DashboardCustomizer.tsx`**
+
+Refactor the customizer sheet to:
+- Show widgets grouped by zone (not by category)
+- Only show widgets belonging to the current template's zones
+- Allow toggle and resize within zone constraints
+- Add a "Duplicate as Custom" button to create a personal copy
+- Custom dashboards saved in localStorage with unique names
+
+### 8. New: Custom Dashboard CRUD
+
+**File: `src/hooks/useDashboardConfig.ts`**
+
+Extend the hook to:
+- Support multiple template configs (keyed by template ID)
+- Store per-template user preferences
+- Support custom dashboard creation (duplicate from template)
+- Support renaming, deleting custom dashboards
+- Role-based default template selection
+
+### 9. Routing Updates
+
+**File: `src/App.tsx`**
+
+Add routes:
+- `/` or `/dashboard/executive` -- Executive Dashboard
+- `/dashboard/finance` -- Finance Dashboard  
+- `/dashboard/operations` -- Operations Dashboard
+- `/dashboard/sales` -- Sales & Pipeline Dashboard
+- `/dashboard/custom/:id` -- Custom Dashboard
+
+---
+
+## Design Rules Enforcement
+
+- Zone A: Always top, max 4 KPIs, large stat cards only
+- Zone B: Below health, max 2 wide charts, `col-span-2` each
+- Zone C: Below trends, max 3 medium widgets
+- Zone D: Bottom, max 2 medium widgets (alerts/risk themed)
+- Consistent card heights within each zone (min-height per zone)
+- Clear zone labels as subtle section dividers
+- No cross-zone dragging -- each zone is an independent sortable context
+
+## Files Summary
+
+| Action | File |
+|--------|------|
+| Create | `src/components/dashboard/dashboardTemplates.ts` |
+| Create | `src/components/dashboard/DashboardZone.tsx` |
+| Create | `src/components/dashboard/widgets/CostBreakdownChart.tsx` |
+| Create | `src/components/dashboard/widgets/HoursLoggedChart.tsx` |
+| Create | `src/components/dashboard/widgets/PipelineStagesChart.tsx` |
+| Create | `src/components/dashboard/widgets/WinRateTrendChart.tsx` |
+| Create | `src/components/dashboard/widgets/TopClientsRevenue.tsx` |
+| Create | `src/components/dashboard/widgets/TasksByStatus.tsx` |
+| Create | `src/components/dashboard/widgets/AlertWidget.tsx` |
+| Edit | `src/components/dashboard/widgetRegistry.ts` |
+| Edit | `src/components/dashboard/DashboardCustomizer.tsx` |
+| Edit | `src/components/dashboard/WidgetWrapper.tsx` |
+| Edit | `src/hooks/useDashboardConfig.ts` |
+| Edit | `src/pages/Dashboard.tsx` |
+| Edit | `src/components/layout/AppSidebar.tsx` |
+| Edit | `src/App.tsx` |

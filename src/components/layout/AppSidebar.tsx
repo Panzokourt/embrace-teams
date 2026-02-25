@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/popover';
 import {
   LayoutDashboard, LayoutList, FileText, FolderKanban, CheckSquare, Users,
-  DollarSign, Settings, LogOut, Zap, ChevronLeft, UserCog, Building2,
+  DollarSign, Settings, LogOut, Zap, ChevronLeft, ChevronRight, UserCog, Building2,
   Moon, Sun, CalendarDays, FileArchive, Timer, FileStack, BarChart3,
   Plus, Palette, Monitor, Globe, Calendar, MessageSquare, BookUser,
   Briefcase, Mail, Trophy, ShieldCheck, BookOpen,
@@ -236,6 +236,16 @@ export default function AppSidebar({
     setFlyoutCategory(null);
   }, []);
 
+  // Close flyout on outside click (Escape key handled via onKeyDown on container)
+  useEffect(() => {
+    if (!flyoutCategory) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setFlyoutCategory(null);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [flyoutCategory]);
+
   // ─── Icon Rail ───
   const IconRail = ({ isMobile = false }: { isMobile?: boolean }) => (
     <div
@@ -243,8 +253,22 @@ export default function AppSidebar({
       onMouseEnter={handleFlyoutEnter}
       onMouseLeave={handleFlyoutLeave}
     >
-      <div className="mb-3">
+      {/* Logo + expand button */}
+      <div className="mb-2 flex flex-col items-center gap-1">
         <img src={olsenyLogo} alt="Olseny" className="h-7 w-7 rounded-md" />
+        {isEffectivelyCollapsed && !isMobile && (
+          <Tooltip delayDuration={300}>
+            <TooltipTrigger asChild>
+              <button
+                onClick={onToggleCollapse}
+                className="flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all duration-200"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={8}>Expand sidebar</TooltipContent>
+          </Tooltip>
+        )}
       </div>
 
       <div className="flex-1 flex flex-col items-center gap-0.5">
@@ -449,7 +473,7 @@ export default function AppSidebar({
     <>
       <div
         ref={containerRef}
-        className="h-screen bg-card border-r border-border/40 flex overflow-hidden relative"
+        className="h-screen bg-card border-r border-border/40 flex overflow-hidden"
         onKeyDown={handleKeyDown}
         tabIndex={-1}
       >
@@ -458,18 +482,19 @@ export default function AppSidebar({
 
         {/* Expanded panel (persistent) — only when sidebar is expanded */}
         {!isEffectivelyCollapsed && <CategoryPanelContent />}
-
-        {/* Ephemeral flyout panel (ClickUp-like) — only when collapsed + category clicked/hovered */}
-        {isEffectivelyCollapsed && flyoutCategory && (
-          <div
-            className="absolute left-12 top-0 bottom-0 w-56 bg-card border-r border-border/40 shadow-xl z-50 animate-slide-in-left"
-            onMouseEnter={handleFlyoutEnter}
-            onMouseLeave={handleFlyoutLeave}
-          >
-            <CategoryPanelContent onItemClick={handleNavClick} />
-          </div>
-        )}
       </div>
+
+      {/* Ephemeral flyout panel — rendered OUTSIDE the overflow-hidden container via portal-like fixed positioning */}
+      {isEffectivelyCollapsed && flyoutCategory && (
+        <div
+          className="fixed top-0 bottom-0 w-56 bg-card border-r border-border/40 shadow-2xl z-[60] animate-slide-in-left"
+          style={{ left: 48 }}
+          onMouseEnter={handleFlyoutEnter}
+          onMouseLeave={handleFlyoutLeave}
+        >
+          <CategoryPanelContent onItemClick={handleNavClick} />
+        </div>
+      )}
 
       {selectedDef && (
         <BriefFormDialog open={true} onOpenChange={() => setSelectedBriefType(null)} definition={selectedDef} />

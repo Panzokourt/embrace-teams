@@ -38,7 +38,19 @@ export default function Onboarding() {
   const [pendingCompanyName, setPendingCompanyName] = useState('');
 
   const emailDomain = user?.email?.split('@')[1] || '';
-  const isPersonalEmail = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'live.com', 'icloud.com', 'yahoo.gr', 'hotmail.gr', 'googlemail.com', 'protonmail.com', 'aol.com', 'mail.com', 'zoho.com'].includes(emailDomain);
+  const isPersonalEmail = [
+    'gmail.com','gmail.gr','googlemail.com',
+    'yahoo.com','yahoo.gr','yahoo.co.uk',
+    'hotmail.com','hotmail.gr','hotmail.co.uk',
+    'outlook.com','outlook.gr',
+    'live.com','live.gr','windowslive.com',
+    'icloud.com','me.com',
+    'protonmail.com','proton.me',
+    'aol.com','mail.com','zoho.com',
+    'yandex.com','yandex.ru',
+    'msn.com','inbox.com',
+    'gmx.com','gmx.de','gmx.net'
+  ].includes(emailDomain);
 
   // Auto-onboard on mount
   useEffect(() => {
@@ -52,6 +64,11 @@ export default function Onboarding() {
 
         const result = data as any;
         switch (result.action) {
+          case 'invitation_accepted':
+            toast.success(`Η πρόσκλησή σας για "${result.company_name}" έγινε αποδεκτή αυτόματα!`);
+            await refreshUserData();
+            navigate('/welcome', { replace: true });
+            return;
           case 'created_company':
             toast.success(`Η εταιρεία "${result.company_name}" δημιουργήθηκε αυτόματα!`);
             await refreshUserData();

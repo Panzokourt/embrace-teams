@@ -225,21 +225,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Determine post-login route
       const activeRoles = roles.filter(r => r.status === 'active');
       if (activeRoles.length === 0) {
-        // Check if there's a pending join request
-        const { data: pendingRequests } = await supabase
-          .from('join_requests')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('status', 'pending')
-          .limit(1);
+        // Check if there's a pending invitation for this user's email
+        const userEmail = profileData?.email;
+        if (userEmail) {
+          const { data: pendingInvitations } = await supabase
+            .from('invitations')
+            .select('id, token')
+            .eq('email', userEmail)
+            .eq('status', 'pending')
+            .limit(1);
 
-        if (pendingRequests && pendingRequests.length > 0) {
-          setPostLoginRoute('/onboarding');
+          if (pendingInvitations && pendingInvitations.length > 0) {
+            // Route to accept-invite with the token
+            setPostLoginRoute(`/accept-invite/${pendingInvitations[0].token}`);
+            setCompanyRole(null);
+            setCompany(null);
+          } else {
+            setPostLoginRoute('/onboarding');
+            setCompanyRole(null);
+            setCompany(null);
+          }
         } else {
           setPostLoginRoute('/onboarding');
+          setCompanyRole(null);
+          setCompany(null);
         }
-        setCompanyRole(null);
-        setCompany(null);
       } else if (activeRoles.length === 1) {
         // Check if onboarding_completed
         const needsWelcome = profileData && !profileData.onboarding_completed;

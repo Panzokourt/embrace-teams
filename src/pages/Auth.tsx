@@ -90,7 +90,7 @@ export default function Auth() {
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
     const { error } = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin + '/onboarding',
+      redirect_uri: 'https://embrace-teams.lovable.app/onboarding',
     });
     if (error) {
       toast.error('Σφάλμα σύνδεσης με Google');

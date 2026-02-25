@@ -49,6 +49,27 @@ import KnowledgeArticle from "@/pages/KnowledgeArticle";
 import KnowledgeTemplates from "@/pages/KnowledgeTemplates";
 import KnowledgeReviews from "@/pages/KnowledgeReviews";
 import { ChatProvider } from "@/contexts/ChatContext";
+// New placeholder pages
+import Campaigns from "@/pages/Campaigns";
+import Backlog from "@/pages/Backlog";
+import Pricing from "@/pages/Pricing";
+import Capacity from "@/pages/Capacity";
+import ResourcePlanning from "@/pages/ResourcePlanning";
+import Performance from "@/pages/Performance";
+import CrossClientInsights from "@/pages/CrossClientInsights";
+import Benchmarks from "@/pages/Benchmarks";
+import Forecasting from "@/pages/Forecasting";
+import MediaPlanningPage from "@/pages/MediaPlanningPage";
+import AIInsights from "@/pages/AIInsights";
+import GovernanceIntegrations from "@/pages/GovernanceIntegrations";
+import GovernanceAuditLog from "@/pages/GovernanceAuditLog";
+import GovernanceOwnershipMap from "@/pages/GovernanceOwnershipMap";
+import RolesPermissions from "@/pages/RolesPermissions";
+import BillingSettings from "@/pages/BillingSettings";
+import APIKeys from "@/pages/APIKeys";
+import WebhooksSettings from "@/pages/WebhooksSettings";
+import BrandingSettings from "@/pages/BrandingSettings";
+import FeatureFlags from "@/pages/FeatureFlags";
 
 function RedirectUserToEmployee() {
   const { id } = useParams();
@@ -105,11 +126,32 @@ const App = () => (
                   <Route path="/governance/access" element={<GovernanceAccess />} />
                   <Route path="/governance/vault" element={<GovernanceVault />} />
                   <Route path="/governance/compliance" element={<GovernanceCompliance />} />
+                  <Route path="/governance/integrations" element={<GovernanceIntegrations />} />
+                  <Route path="/governance/audit-log" element={<GovernanceAuditLog />} />
+                  <Route path="/governance/ownership-map" element={<GovernanceOwnershipMap />} />
                   <Route path="/knowledge" element={<Knowledge />} />
                   <Route path="/knowledge/playbook" element={<KnowledgePlaybook />} />
                   <Route path="/knowledge/articles/:id" element={<KnowledgeArticle />} />
                   <Route path="/knowledge/templates" element={<KnowledgeTemplates />} />
                   <Route path="/knowledge/reviews" element={<KnowledgeReviews />} />
+                  {/* New placeholder pages */}
+                  <Route path="/campaigns" element={<Campaigns />} />
+                  <Route path="/backlog" element={<Backlog />} />
+                  <Route path="/pricing" element={<Pricing />} />
+                  <Route path="/operations/capacity" element={<Capacity />} />
+                  <Route path="/operations/resource-planning" element={<ResourcePlanning />} />
+                  <Route path="/intelligence/performance" element={<Performance />} />
+                  <Route path="/intelligence/insights" element={<CrossClientInsights />} />
+                  <Route path="/intelligence/benchmarks" element={<Benchmarks />} />
+                  <Route path="/intelligence/forecasting" element={<Forecasting />} />
+                  <Route path="/intelligence/media-planning" element={<MediaPlanningPage />} />
+                  <Route path="/intelligence/ai-insights" element={<AIInsights />} />
+                  <Route path="/settings/roles" element={<RolesPermissions />} />
+                  <Route path="/settings/billing" element={<BillingSettings />} />
+                  <Route path="/settings/api-keys" element={<APIKeys />} />
+                  <Route path="/settings/webhooks" element={<WebhooksSettings />} />
+                  <Route path="/settings/branding" element={<BrandingSettings />} />
+                  <Route path="/settings/feature-flags" element={<FeatureFlags />} />
                   {/* Redirects from old routes */}
                   <Route path="/users" element={<Navigate to="/hr?tab=staff" replace />} />
                   <Route path="/users/:id" element={<RedirectUserToEmployee />} />

@@ -77,7 +77,7 @@ interface NavItem {
 }
 
 // ─── Category definitions for the icon rail ───
-type CategoryId = 'home' | 'work' | 'calendar' | 'comms' | 'files' | 'knowledge' | 'time' | 'people' | 'finance' | 'governance' | 'admin';
+type CategoryId = 'overview' | 'work' | 'clients' | 'revenue' | 'operations' | 'intelligence' | 'governance' | 'settings';
 
 interface Category {
   id: CategoryId;
@@ -87,53 +87,56 @@ interface Category {
 }
 
 const categories: Category[] = [
-  { id: 'home', icon: LayoutDashboard, label: 'Αρχική', routePrefixes: ['/my-work', '/'] },
-  { id: 'work', icon: Briefcase, label: 'Εργασίες', routePrefixes: ['/work', '/projects', '/tasks'] },
-  { id: 'calendar', icon: CalendarDays, label: 'Ημερολόγιο', routePrefixes: ['/calendar'] },
-  { id: 'comms', icon: MessageSquare, label: 'Επικοινωνία', routePrefixes: ['/inbox', '/chat'] },
-  { id: 'files', icon: FileArchive, label: 'Αρχείο', routePrefixes: ['/files'] },
-  { id: 'knowledge', icon: BookOpen, label: 'Knowledge Base', routePrefixes: ['/knowledge'] },
-  { id: 'time', icon: Timer, label: 'Χρόνος', routePrefixes: ['/timesheets'] },
-  { id: 'people', icon: Users, label: 'Ομάδα', routePrefixes: ['/contacts', '/hr', '/leaderboard'] },
-  { id: 'finance', icon: DollarSign, label: 'Οικονομικά', routePrefixes: ['/financials', '/reports'] },
+  { id: 'overview', icon: LayoutDashboard, label: 'Overview', routePrefixes: ['/my-work', '/'] },
+  { id: 'work', icon: Briefcase, label: 'Work', routePrefixes: ['/work', '/projects', '/tasks', '/calendar', '/files', '/blueprints', '/campaigns', '/backlog'] },
+  { id: 'clients', icon: Building2, label: 'Clients', routePrefixes: ['/clients', '/contacts'] },
+  { id: 'revenue', icon: DollarSign, label: 'Revenue', routePrefixes: ['/financials', '/pricing'] },
+  { id: 'operations', icon: Users, label: 'Operations', routePrefixes: ['/hr', '/timesheets', '/knowledge', '/operations'] },
+  { id: 'intelligence', icon: BarChart3, label: 'Intelligence', routePrefixes: ['/reports', '/leaderboard', '/secretary', '/intelligence'] },
   { id: 'governance', icon: ShieldCheck, label: 'Governance', routePrefixes: ['/governance'] },
-  { id: 'admin', icon: Settings, label: 'Διαχείριση', routePrefixes: ['/clients', '/blueprints', '/settings'] },
+  { id: 'settings', icon: Settings, label: 'Settings', routePrefixes: ['/settings'] },
 ];
 
 // Map each nav item to its category
 const categoryNavItems: Record<CategoryId, NavItem[]> = {
-  home: [
-    { title: 'My Work', href: '/my-work', icon: LayoutList },
+  overview: [
     { title: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { title: 'My Work', href: '/my-work', icon: LayoutList },
   ],
   work: [], // handled separately with SidebarNavGroup
-  calendar: [
-    { title: 'Όλα', href: '/calendar', icon: CalendarDays },
+  clients: [
+    { title: 'All Clients', href: '/clients', icon: Building2, permission: 'clients.view' },
+    { title: 'Contacts', href: '/contacts', icon: BookUser },
   ],
-  comms: [
-    { title: 'Inbox', href: '/inbox', icon: Mail },
-    { title: 'Chat', href: '/chat', icon: MessageSquare },
+  revenue: [
+    { title: 'Dashboard', href: '/financials?tab=dashboard', icon: LayoutDashboard, permission: 'financials.view' },
+    { title: 'Services', href: '/financials?tab=services', icon: FileText, permission: 'financials.view' },
+    { title: 'Contracts', href: '/financials?tab=contracts', icon: FileText, permission: 'financials.view' },
+    { title: 'Pricing', href: '/pricing', icon: DollarSign },
+    { title: 'Invoices', href: '/financials?tab=invoices', icon: FileText, permission: 'financials.view' },
+    { title: 'Expenses', href: '/financials?tab=expenses', icon: DollarSign, permission: 'financials.view' },
+    { title: 'Profitability', href: '/financials?tab=reports', icon: BarChart3, permission: 'financials.view' },
   ],
-  files: [
-    { title: 'Αρχείο', href: '/files', icon: FileArchive, permission: 'files.view' },
-  ],
-  knowledge: [
-    { title: 'Αρχική KB', href: '/knowledge', icon: BookOpen },
-    { title: 'Company Playbook', href: '/knowledge/playbook', icon: FileText },
+  operations: [
+    { title: 'Team & HR', href: '/hr', icon: UserCog },
+    { title: 'Timesheets', href: '/timesheets', icon: Timer },
+    { title: 'Capacity', href: '/operations/capacity', icon: Users },
+    { title: 'Resource Planning', href: '/operations/resource-planning', icon: CalendarDays },
+    { title: 'Knowledge Base', href: '/knowledge', icon: BookOpen },
+    { title: 'Playbook', href: '/knowledge/playbook', icon: FileText },
     { title: 'Templates & SOPs', href: '/knowledge/templates', icon: FileStack },
     { title: 'Review Queue', href: '/knowledge/reviews', icon: CheckSquare },
   ],
-  time: [
-    { title: 'Timesheets', href: '/timesheets', icon: Timer },
-  ],
-  people: [
-    { title: 'Ευρετήριο', href: '/contacts', icon: BookUser },
-    { title: 'HR', href: '/hr', icon: UserCog },
+  intelligence: [
+    { title: 'Reports Hub', href: '/reports', icon: BarChart3, permission: 'financials.view' },
+    { title: 'Performance', href: '/intelligence/performance', icon: BarChart3 },
+    { title: 'Cross-client Insights', href: '/intelligence/insights', icon: BarChart3 },
+    { title: 'Benchmarks', href: '/intelligence/benchmarks', icon: BarChart3 },
+    { title: 'Forecasting', href: '/intelligence/forecasting', icon: BarChart3 },
+    { title: 'Media Planning', href: '/intelligence/media-planning', icon: BarChart3 },
+    { title: 'AI Insights', href: '/intelligence/ai-insights', icon: Zap },
     { title: 'Leaderboard', href: '/leaderboard', icon: Trophy },
-  ],
-  finance: [
-    { title: 'Λογιστήριο', href: '/financials', icon: DollarSign, permission: 'financials.view' },
-    { title: 'Αναφορές', href: '/reports', icon: BarChart3, permission: 'financials.view' },
+    { title: 'Secretary AI', href: '/secretary', icon: Zap },
   ],
   governance: [
     { title: 'Dashboard', href: '/governance', icon: ShieldCheck },
@@ -141,33 +144,37 @@ const categoryNavItems: Record<CategoryId, NavItem[]> = {
     { title: 'Access Control', href: '/governance/access', icon: UserCog },
     { title: 'Vault', href: '/governance/vault', icon: FileArchive },
     { title: 'Compliance', href: '/governance/compliance', icon: FileText },
+    { title: 'Integrations', href: '/governance/integrations', icon: Globe },
+    { title: 'Audit Log', href: '/governance/audit-log', icon: FileText },
+    { title: 'Ownership Map', href: '/governance/ownership-map', icon: Globe },
   ],
-  admin: [
-    { title: 'Πελάτες', href: '/clients', icon: Building2, permission: 'clients.view' },
-    { title: 'Προσχέδια', href: '/blueprints', icon: FileStack, permission: 'settings.company' },
-    { title: 'Ρυθμίσεις', href: '/settings', icon: Settings, permission: 'settings.company' },
+  settings: [
+    { title: 'General', href: '/settings', icon: Settings, permission: 'settings.company' },
+    { title: 'Organization', href: '/settings/organization', icon: Building2, permission: 'settings.company' },
+    { title: 'Roles & Permissions', href: '/settings/roles', icon: UserCog, permission: 'settings.company' },
+    { title: 'Billing', href: '/settings/billing', icon: DollarSign, permission: 'settings.company' },
+    { title: 'API Keys', href: '/settings/api-keys', icon: Settings, permission: 'settings.company' },
+    { title: 'Webhooks', href: '/settings/webhooks', icon: Settings, permission: 'settings.company' },
+    { title: 'Branding', href: '/settings/branding', icon: Settings, permission: 'settings.company' },
+    { title: 'Feature Flags', href: '/settings/feature-flags', icon: Settings, permission: 'settings.company' },
   ],
 };
+
+function detectCategory(pathname: string): CategoryId {
+  if (pathname.startsWith('/work') || pathname.startsWith('/projects') || pathname.startsWith('/tasks') || pathname.startsWith('/calendar') || pathname.startsWith('/files') || pathname.startsWith('/blueprints') || pathname.startsWith('/campaigns') || pathname.startsWith('/backlog')) return 'work';
+  if (pathname.startsWith('/clients') || pathname.startsWith('/contacts')) return 'clients';
+  if (pathname.startsWith('/financials') || pathname.startsWith('/pricing')) return 'revenue';
+  if (pathname.startsWith('/hr') || pathname.startsWith('/timesheets') || pathname.startsWith('/knowledge') || pathname.startsWith('/operations')) return 'operations';
+  if (pathname.startsWith('/reports') || pathname.startsWith('/leaderboard') || pathname.startsWith('/secretary') || pathname.startsWith('/intelligence')) return 'intelligence';
+  if (pathname.startsWith('/governance')) return 'governance';
+  if (pathname.startsWith('/settings')) return 'settings';
+  if (pathname === '/my-work' || pathname === '/') return 'overview';
+  return 'overview';
+}
 
 const briefIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   Palette, Monitor, FileText, Globe, Calendar, MessageSquare,
 };
-
-function detectCategory(pathname: string): CategoryId {
-  // Check more specific routes first (longer prefixes)
-  if (pathname.startsWith('/work') || pathname.startsWith('/projects') || pathname.startsWith('/tasks')) return 'work';
-  if (pathname.startsWith('/calendar')) return 'calendar';
-  if (pathname.startsWith('/inbox') || pathname.startsWith('/chat')) return 'comms';
-  if (pathname.startsWith('/files')) return 'files';
-  if (pathname.startsWith('/knowledge')) return 'knowledge';
-  if (pathname.startsWith('/timesheets')) return 'time';
-  if (pathname.startsWith('/contacts') || pathname.startsWith('/hr') || pathname.startsWith('/leaderboard')) return 'people';
-  if (pathname.startsWith('/financials') || pathname.startsWith('/reports')) return 'finance';
-  if (pathname.startsWith('/governance')) return 'governance';
-  if (pathname.startsWith('/clients') || pathname.startsWith('/blueprints') || pathname.startsWith('/settings')) return 'admin';
-  if (pathname === '/my-work' || pathname === '/') return 'home';
-  return 'home';
-}
 
 export default function AppSidebar({ collapsed, onToggleCollapse }: { collapsed: boolean; onToggleCollapse: () => void }) {
   const location = useLocation();
@@ -340,10 +347,18 @@ export default function AppSidebar({ collapsed, onToggleCollapse }: { collapsed:
               {/* Work category has special expandable group */}
               {activeCategory === 'work' ? (
                 <>
+                  <SidebarLink
+                    to="/my-work"
+                    icon={<LayoutList className="h-[18px] w-[18px]" />}
+                    label="My Work"
+                    active={location.pathname === '/my-work'}
+                    collapsed={false}
+                    onClick={() => isMobile && setMobileOpen(false)}
+                  />
                   <SidebarNavGroup
                     id="work"
                     icon={<Briefcase className="h-[18px] w-[18px]" />}
-                    label="Εργασίες"
+                    label="Projects"
                     collapsed={false}
                     isActive={location.pathname === '/work' || location.pathname.startsWith('/projects/') || location.pathname.startsWith('/tasks/')}
                     defaultOpen
@@ -351,7 +366,7 @@ export default function AppSidebar({ collapsed, onToggleCollapse }: { collapsed:
                     <SidebarSubLink
                       to="/work?tab=projects"
                       icon={<FolderKanban className="h-4 w-4" />}
-                      label="Έργα"
+                      label="Projects"
                       active={location.pathname === '/work' && (!location.search || location.search.includes('tab=projects'))}
                       onClick={() => { navigate('/work?tab=projects'); isMobile && setMobileOpen(false); }}
                     />
@@ -363,21 +378,66 @@ export default function AppSidebar({ collapsed, onToggleCollapse }: { collapsed:
                       active={location.pathname === '/work' && location.search.includes('tab=tasks')}
                       onClick={() => { navigate('/work?tab=tasks'); isMobile && setMobileOpen(false); }}
                     />
-                    </SidebarNavGroup>
-                </>
-              ) : (
-                // Regular nav items for the active category
-                categoryNavItems[activeCategory]?.filter(canAccess).map((item) => (
+                  </SidebarNavGroup>
                   <SidebarLink
-                    key={item.href}
-                    to={item.href}
-                    icon={<item.icon className="h-[18px] w-[18px]" />}
-                    label={item.title}
-                    active={location.pathname === item.href}
+                    to="/campaigns"
+                    icon={<FileText className="h-[18px] w-[18px]" />}
+                    label="Campaigns"
+                    active={location.pathname === '/campaigns'}
                     collapsed={false}
                     onClick={() => isMobile && setMobileOpen(false)}
                   />
-                ))
+                  <SidebarLink
+                    to="/calendar"
+                    icon={<CalendarDays className="h-[18px] w-[18px]" />}
+                    label="Calendar"
+                    active={location.pathname === '/calendar'}
+                    collapsed={false}
+                    onClick={() => isMobile && setMobileOpen(false)}
+                  />
+                  <SidebarLink
+                    to="/backlog"
+                    icon={<FileStack className="h-[18px] w-[18px]" />}
+                    label="Backlog"
+                    active={location.pathname === '/backlog'}
+                    collapsed={false}
+                    onClick={() => isMobile && setMobileOpen(false)}
+                  />
+                  <SidebarLink
+                    to="/blueprints"
+                    icon={<FileStack className="h-[18px] w-[18px]" />}
+                    label="Templates"
+                    active={location.pathname === '/blueprints'}
+                    collapsed={false}
+                    onClick={() => isMobile && setMobileOpen(false)}
+                  />
+                  <SidebarLink
+                    to="/files"
+                    icon={<FileArchive className="h-[18px] w-[18px]" />}
+                    label="Files"
+                    active={location.pathname === '/files'}
+                    collapsed={false}
+                    onClick={() => isMobile && setMobileOpen(false)}
+                  />
+                </>
+              ) : (
+                // Regular nav items for the active category
+                categoryNavItems[activeCategory]?.filter(canAccess).map((item) => {
+                  const isActiveItem = item.href.includes('?')
+                    ? location.pathname + location.search === item.href
+                    : location.pathname === item.href;
+                  return (
+                    <SidebarLink
+                      key={item.href}
+                      to={item.href}
+                      icon={<item.icon className="h-[18px] w-[18px]" />}
+                      label={item.title}
+                      active={isActiveItem}
+                      collapsed={false}
+                      onClick={() => isMobile && setMobileOpen(false)}
+                    />
+                  );
+                })
               )}
             </>
           )}

@@ -4,11 +4,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import AppSidebar from './AppSidebar';
 import TopBar from './TopBar';
 import SecretaryPanel, { type RightPanelTab } from '@/components/secretary/SecretaryPanel';
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Loader2 } from 'lucide-react';
 import ChatFloatingBubbles from '@/components/chat/ChatFloatingBubbles';
-import type { ImperativePanelHandle } from 'react-resizable-panels';
 import { FocusModeProvider } from '@/contexts/FocusContext';
 import FocusOverlay from '@/components/focus/FocusOverlay';
 import { LayoutProvider, useLayout } from '@/contexts/LayoutContext';
@@ -17,17 +15,16 @@ import { cn } from '@/lib/utils';
 const PANEL_OPEN_KEY = 'secretary-panel-open';
 const PANEL_TAB_KEY = 'secretary-panel-tab';
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed';
-const SIDEBAR_SIZE_KEY = 'sidebar-panel-size';
 
-const COLLAPSED_SIZE = 4;
-const DEFAULT_SIZE = 15;
-const MIN_EXPANDED_SIZE = 12;
-const MAX_SIZE = 25;
+// Fixed pixel widths for sidebar
+const SIDEBAR_EXPANDED_W = 240; // px - rail (48) + panel (~192)
+const SIDEBAR_COLLAPSED_W = 48;  // px - rail only
+const RIGHT_PANEL_W = 380;       // px
+const MIN_MAIN_CONTENT_W = 600;  // px - safe minimum
 
 function AppLayoutInner() {
   const { user, loading, companyRole, postLoginRoute } = useAuth();
   const { layoutState, sidebarMode, rightPanelMode, density } = useLayout();
-  const sidebarRef = useRef<ImperativePanelHandle>(null);
 
   // User preference for sidebar collapse (only applies in wide/standard)
   const [sidebarUserPref, setSidebarUserPref] = useState(() => {
@@ -44,44 +41,17 @@ function AppLayoutInner() {
     try { return (localStorage.getItem(PANEL_TAB_KEY) as RightPanelTab) || 'secretary'; } catch { return 'secretary'; }
   });
 
-  // Mobile sidebar state
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     try { localStorage.setItem(PANEL_OPEN_KEY, String(rightPanelOpen)); } catch {}
   }, [rightPanelOpen]);
-
   useEffect(() => {
     try { localStorage.setItem(PANEL_TAB_KEY, activeTab); } catch {}
   }, [activeTab]);
-
   useEffect(() => {
     try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(sidebarUserPref)); } catch {}
   }, [sidebarUserPref]);
-
-  // When collapsed state changes, resize the panel (only for docked sidebar)
-  useEffect(() => {
-    if (sidebarRef.current && sidebarMode !== 'hidden') {
-      if (sidebarCollapsed) {
-        sidebarRef.current.resize(COLLAPSED_SIZE);
-      } else {
-        const savedSize = localStorage.getItem(SIDEBAR_SIZE_KEY);
-        const size = savedSize ? Math.max(Number(savedSize), MIN_EXPANDED_SIZE) : DEFAULT_SIZE;
-        sidebarRef.current.resize(size);
-      }
-    }
-  }, [sidebarCollapsed, sidebarMode]);
-
-  const handleSidebarResize = useCallback((size: number) => {
-    if (!sidebarCollapsed && size <= COLLAPSED_SIZE + 1) {
-      setSidebarUserPref(true);
-    } else if (sidebarCollapsed && size > COLLAPSED_SIZE + 2) {
-      setSidebarUserPref(false);
-    }
-    if (!sidebarCollapsed && size >= MIN_EXPANDED_SIZE) {
-      try { localStorage.setItem(SIDEBAR_SIZE_KEY, String(size)); } catch {}
-    }
-  }, [sidebarCollapsed]);
 
   const toggleCollapsed = useCallback(() => {
     setSidebarUserPref(prev => !prev);
@@ -140,12 +110,14 @@ function AppLayoutInner() {
   if (postLoginRoute === '/select-workspace') return <Navigate to="/select-workspace" replace />;
 
   const showDockedRightPanel = rightPanelOpen && rightPanelMode === 'docked';
-  const showOverlayRightPanel = rightPanelOpen && rightPanelMode === 'overlay';
+  const showOverlayRightPanel = rightPanelOpen && (rightPanelMode === 'overlay');
   const showDrawerRightPanel = rightPanelOpen && rightPanelMode === 'drawer';
+
+  const sidebarWidth = sidebarMode === 'hidden' ? 0 : sidebarCollapsed ? SIDEBAR_COLLAPSED_W : SIDEBAR_EXPANDED_W;
 
   return (
     <div className={cn(
-      "flex h-screen bg-background relative",
+      "flex h-screen bg-background relative overflow-hidden",
       density === 'compact' ? 'density-compact' : 'density-comfortable'
     )}>
       {/* STATE D: Mobile sidebar as Sheet */}
@@ -157,72 +129,49 @@ function AppLayoutInner() {
         </Sheet>
       )}
 
-      <ResizablePanelGroup direction="horizontal" className="flex-1">
-        {/* Sidebar panel — hidden on mobile */}
-        {sidebarMode !== 'hidden' && (
-          <>
-            <ResizablePanel
-              ref={sidebarRef}
-              defaultSize={sidebarCollapsed ? COLLAPSED_SIZE : DEFAULT_SIZE}
-              minSize={COLLAPSED_SIZE}
-              maxSize={MAX_SIZE}
-              collapsible
-              collapsedSize={COLLAPSED_SIZE}
-              onResize={handleSidebarResize}
-            >
-              <AppSidebar
-                collapsed={sidebarCollapsed}
-                onToggleCollapse={toggleCollapsed}
-                forceCollapsed={sidebarMode === 'collapsed'}
-              />
-            </ResizablePanel>
-            <ResizableHandle />
-          </>
-        )}
+      {/* Sidebar — fixed width, not resizable */}
+      {sidebarMode !== 'hidden' && (
+        <div
+          className="h-full shrink-0 transition-[width] duration-200 ease-apple overflow-hidden"
+          style={{ width: sidebarWidth }}
+        >
+          <AppSidebar
+            collapsed={sidebarCollapsed}
+            onToggleCollapse={toggleCollapsed}
+            forceCollapsed={sidebarMode === 'collapsed'}
+          />
+        </div>
+      )}
 
-        {/* Main content */}
-        <ResizablePanel defaultSize={showDockedRightPanel ? 55 : 85} minSize={30}>
-          <main className="h-full overflow-auto flex flex-col">
-            <TopBar
-              onPanelToggle={togglePanelSimple}
-              rightPanelOpen={rightPanelOpen}
-              onMobileMenuToggle={() => setMobileSidebarOpen(true)}
-              showHamburger={sidebarMode === 'hidden'}
-            />
-            <div className="flex-1">
-              <Outlet />
-            </div>
-          </main>
-        </ResizablePanel>
+      {/* Main content area */}
+      <div className="flex-1 min-w-0 flex flex-col h-full">
+        <TopBar
+          onPanelToggle={togglePanelSimple}
+          rightPanelOpen={rightPanelOpen}
+          onMobileMenuToggle={() => setMobileSidebarOpen(true)}
+          showHamburger={sidebarMode === 'hidden'}
+        />
+        <main className="flex-1 overflow-auto">
+          <Outlet />
+        </main>
+      </div>
 
-        {/* STATE A: Docked right panel */}
-        {showDockedRightPanel && (
-          <>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={30} minSize={20} maxSize={45}>
-              <SecretaryPanel
-                activeTab={activeTab}
-                onTabChange={setActiveTab}
-                onClose={closePanel}
-              />
-            </ResizablePanel>
-          </>
-        )}
-      </ResizablePanelGroup>
+      {/* STATE A: Docked right panel */}
+      {showDockedRightPanel && (
+        <div
+          className="h-full shrink-0 border-l border-border/40 overflow-hidden"
+          style={{ width: RIGHT_PANEL_W }}
+        >
+          <SecretaryPanel activeTab={activeTab} onTabChange={setActiveTab} onClose={closePanel} />
+        </div>
+      )}
 
       {/* STATE B/C: Overlay right panel */}
       {showOverlayRightPanel && (
         <>
-          <div
-            className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
-            onClick={closePanel}
-          />
+          <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm" onClick={closePanel} />
           <div className="fixed top-0 right-0 z-50 h-full w-[400px] max-w-[85vw] animate-slide-in-right shadow-2xl">
-            <SecretaryPanel
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-              onClose={closePanel}
-            />
+            <SecretaryPanel activeTab={activeTab} onTabChange={setActiveTab} onClose={closePanel} />
           </div>
         </>
       )}
@@ -231,11 +180,7 @@ function AppLayoutInner() {
       {showDrawerRightPanel && (
         <Sheet open={true} onOpenChange={(open) => !open && closePanel()}>
           <SheetContent side="right" className="p-0 w-[90vw] max-w-[400px]">
-            <SecretaryPanel
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-              onClose={closePanel}
-            />
+            <SecretaryPanel activeTab={activeTab} onTabChange={setActiveTab} onClose={closePanel} />
           </SheetContent>
         </Sheet>
       )}

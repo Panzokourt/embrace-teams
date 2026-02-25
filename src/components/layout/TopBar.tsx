@@ -11,6 +11,7 @@ import { useFocusMode } from '@/contexts/FocusContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { XPBadge } from '@/components/gamification/XPBadge';
 import { useLayout } from '@/contexts/LayoutContext';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 interface SearchResult {
   id: string;
@@ -43,6 +44,9 @@ export default function TopBar({ onPanelToggle, rightPanelOpen, onMobileMenuTogg
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const isNarrow = layoutState === 'narrow' || layoutState === 'mobile';
+  const isMobile = layoutState === 'mobile';
 
   // Cmd+K shortcut
   useEffect(() => {
@@ -105,36 +109,39 @@ export default function TopBar({ onPanelToggle, rightPanelOpen, onMobileMenuTogg
   }, {});
 
   return (
-    <div className="sticky top-0 z-20 h-14 gap-2 border-b border-border/40 bg-card/80 backdrop-blur-lg md:px-6 mx-0 flex items-center justify-center my-0 px-2 py-[10px]">
+    <div className="sticky top-0 z-20 h-12 border-b border-border/40 bg-card/80 backdrop-blur-lg px-2 md:px-4 flex items-center gap-1.5 shrink-0">
       {/* Hamburger for mobile */}
       {showHamburger && (
-        <Button variant="ghost" size="icon" className="shrink-0" onClick={onMobileMenuToggle}>
-          <Menu className="h-5 w-5" />
+        <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={onMobileMenuToggle}>
+          <Menu className="h-4 w-4" />
         </Button>
       )}
 
-      {/* Work Day Clock */}
-      <WorkDayClock />
+      {/* Work Day Clock — hidden on mobile */}
+      {!isMobile && <WorkDayClock compact={isNarrow} />}
 
-      <div className="hidden md:block w-px h-5 bg-border" />
+      {!isMobile && <div className="w-px h-5 bg-border shrink-0" />}
 
       {/* Search */}
-      <div className="flex-1 max-w-xl">
+      <div className="flex-1 min-w-0 max-w-xl">
         <Popover open={searchOpen} onOpenChange={setSearchOpen}>
           <PopoverTrigger asChild>
             <button
-              className="flex h-9 w-full items-center gap-2 rounded-xl border border-border/60 px-3 text-sm transition-colors focus:outline-none bg-muted text-muted-foreground hover:bg-muted/80"
+              className="flex h-8 w-full items-center gap-2 rounded-lg border border-border/60 px-2.5 text-sm transition-colors focus:outline-none bg-muted text-muted-foreground hover:bg-muted/80 min-w-0"
               onClick={() => setSearchOpen(true)}
             >
-              <Search className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">Αναζήτηση projects, tasks...</span>
-              <span className="sm:hidden">Αναζήτηση...</span>
-              <kbd className="ml-auto hidden rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground md:inline">
-                ⌘K
-              </kbd>
+              <Search className="h-3.5 w-3.5 shrink-0" />
+              {!isMobile && (
+                <span className="truncate text-xs">{isNarrow ? 'Αναζήτηση...' : 'Αναζήτηση projects, tasks...'}</span>
+              )}
+              {!isNarrow && (
+                <kbd className="ml-auto hidden rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground md:inline shrink-0">
+                  ⌘K
+                </kbd>
+              )}
             </button>
           </PopoverTrigger>
-          <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start" sideOffset={8}>
+          <PopoverContent className="w-[var(--radix-popover-trigger-width)] min-w-[300px] p-0" align="start" sideOffset={8}>
             <Command shouldFilter={false}>
               <CommandInput placeholder="Αναζήτηση σε projects, tasks, tenders, clients..." value={query} onValueChange={onQueryChange} />
               <CommandList>
@@ -160,30 +167,44 @@ export default function TopBar({ onPanelToggle, rightPanelOpen, onMobileMenuTogg
         </Popover>
       </div>
 
-      {/* XP Badge + Focus + Panel toggle */}
-      <div className="px-1 flex items-center gap-1.5">
-        <XPBadge userId={user?.id} size="sm" showXP />
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => enterFocus()}
-          title="Work Mode"
-          className="gap-1.5 bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 hover:from-violet-600/30 hover:to-fuchsia-600/30 text-violet-400 hover:text-violet-300 border border-violet-500/20"
-        >
-          <Zap className="h-4 w-4" />
-          {(layoutState === 'wide' || layoutState === 'standard') && (
-            <span className="text-xs font-semibold">Work Mode</span>
-          )}
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onPanelToggle}
-          title="Panel (⌘J)"
-          className={cn(rightPanelOpen && "bg-secondary")}
-        >
-          {rightPanelOpen ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
-        </Button>
+      {/* Right actions */}
+      <div className="flex items-center gap-1 shrink-0">
+        {/* XP Badge — hide on mobile */}
+        {!isMobile && <XPBadge userId={user?.id} size="sm" showXP={!isNarrow} />}
+
+        {/* Work Mode */}
+        <Tooltip delayDuration={300}>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => enterFocus()}
+              className={cn(
+                "gap-1.5 bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 hover:from-violet-600/30 hover:to-fuchsia-600/30 text-violet-400 hover:text-violet-300 border border-violet-500/20 h-8 px-2",
+                isNarrow && "px-1.5"
+              )}
+            >
+              <Zap className="h-3.5 w-3.5 shrink-0" />
+              {!isNarrow && <span className="text-xs font-semibold">Work Mode</span>}
+            </Button>
+          </TooltipTrigger>
+          {isNarrow && <TooltipContent>Work Mode</TooltipContent>}
+        </Tooltip>
+
+        {/* Panel toggle */}
+        <Tooltip delayDuration={300}>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onPanelToggle}
+              className={cn("h-8 w-8 shrink-0", rightPanelOpen && "bg-secondary")}
+            >
+              {rightPanelOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Panel (⌘J)</TooltipContent>
+        </Tooltip>
       </div>
     </div>
   );

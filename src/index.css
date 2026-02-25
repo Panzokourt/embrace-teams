@@ -375,9 +375,18 @@
   --density-card-p: 1.5rem;
 }
 .density-compact {
-  --density-padding: 1rem;
-  --density-gap: 1rem;
-  --density-card-p: 1rem;
+  --density-padding: 0.75rem;
+  --density-gap: 0.75rem;
+  --density-card-p: 0.75rem;
+}
+
+/* Flyout slide-in animation */
+@keyframes slide-in-left {
+  from { transform: translateX(-100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.animate-slide-in-left {
+  animation: slide-in-left 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Print styles */

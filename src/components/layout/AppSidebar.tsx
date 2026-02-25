@@ -181,7 +181,7 @@ const briefIcons: Record<string, React.ComponentType<{ className?: string }>> = 
   Palette, Monitor, FileText, Globe, Calendar, MessageSquare,
 };
 
-export default function AppSidebar({ collapsed, onToggleCollapse }: { collapsed: boolean; onToggleCollapse: () => void }) {
+export default function AppSidebar({ collapsed, onToggleCollapse, forceCollapsed, isMobileSheet }: { collapsed: boolean; onToggleCollapse: () => void; forceCollapsed?: boolean; isMobileSheet?: boolean }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { profile, roles, signOut, isAdmin, isManager, isClient, hasPermission, isSuperAdmin, isCompanyAdmin } = useAuth();
@@ -527,31 +527,33 @@ export default function AppSidebar({ collapsed, onToggleCollapse }: { collapsed:
     );
   };
 
+  // If rendering inside mobile sheet from AppLayout, just show sidebar content
+  if (isMobileSheet) {
+    return (
+      <>
+        <div className="h-full flex flex-row">
+          <IconRail isMobile />
+          <CategoryPanel isMobile />
+        </div>
+        {selectedDef && (
+          <BriefFormDialog
+            open={true}
+            onOpenChange={() => setSelectedBriefType(null)}
+            definition={selectedDef}
+          />
+        )}
+      </>
+    );
+  }
+
   return (
     <>
-      {/* Mobile Menu Button */}
-      <div className="fixed top-4 left-4 z-50 md:hidden">
-        <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="icon" className="bg-card border-border/50 shadow-soft h-10 w-10">
-              <Menu className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-80 bg-card border-border/50">
-            <div className="h-full flex flex-row">
-              <IconRail isMobile />
-              <CategoryPanel isMobile />
-            </div>
-          </SheetContent>
-        </Sheet>
-      </div>
-
       {/* Desktop Sidebar */}
-      <div className="h-screen bg-card border-r border-border/40 hidden md:flex overflow-hidden">
+      <div className="h-screen bg-card border-r border-border/40 flex overflow-hidden">
         {/* Always show icon rail */}
         <IconRail />
         {/* Show category panel only when not collapsed */}
-        {!collapsed && <CategoryPanel />}
+        {!collapsed && !forceCollapsed && <CategoryPanel />}
       </div>
 
       {selectedDef && (
@@ -607,7 +609,7 @@ function SidebarLink({
       </span>
       {!collapsed && (
         <span className={cn(
-          "text-sm font-medium transition-colors",
+          "text-sm font-medium transition-colors truncate min-w-0",
           active && "font-semibold"
         )}>
           {label}

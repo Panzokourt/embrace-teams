@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, FolderKanban, CheckSquare, FileText, Users, PanelRightOpen, PanelRightClose, BookUser, Zap } from 'lucide-react';
+import { Search, FolderKanban, CheckSquare, FileText, Users, PanelRightOpen, PanelRightClose, BookUser, Zap, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
@@ -10,6 +10,7 @@ import WorkDayClock from '@/components/topbar/WorkDayClock';
 import { useFocusMode } from '@/contexts/FocusContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { XPBadge } from '@/components/gamification/XPBadge';
+import { useLayout } from '@/contexts/LayoutContext';
 
 interface SearchResult {
   id: string;
@@ -28,12 +29,15 @@ const entityConfig = {
 interface TopBarProps {
   onPanelToggle: () => void;
   rightPanelOpen?: boolean;
+  onMobileMenuToggle?: () => void;
+  showHamburger?: boolean;
 }
 
-export default function TopBar({ onPanelToggle, rightPanelOpen }: TopBarProps) {
+export default function TopBar({ onPanelToggle, rightPanelOpen, onMobileMenuToggle, showHamburger }: TopBarProps) {
   const navigate = useNavigate();
   const { enterFocus } = useFocusMode();
   const { user } = useAuth();
+  const { layoutState } = useLayout();
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -102,6 +106,13 @@ export default function TopBar({ onPanelToggle, rightPanelOpen }: TopBarProps) {
 
   return (
     <div className="sticky top-0 z-20 h-14 gap-2 border-b border-border/40 bg-card/80 backdrop-blur-lg md:px-6 mx-0 flex items-center justify-center my-0 px-2 py-[10px]">
+      {/* Hamburger for mobile */}
+      {showHamburger && (
+        <Button variant="ghost" size="icon" className="shrink-0" onClick={onMobileMenuToggle}>
+          <Menu className="h-5 w-5" />
+        </Button>
+      )}
+
       {/* Work Day Clock */}
       <WorkDayClock />
 
@@ -160,7 +171,9 @@ export default function TopBar({ onPanelToggle, rightPanelOpen }: TopBarProps) {
           className="gap-1.5 bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 hover:from-violet-600/30 hover:to-fuchsia-600/30 text-violet-400 hover:text-violet-300 border border-violet-500/20"
         >
           <Zap className="h-4 w-4" />
-          <span className="hidden sm:inline text-xs font-semibold">Work Mode</span>
+          {(layoutState === 'wide' || layoutState === 'standard') && (
+            <span className="text-xs font-semibold">Work Mode</span>
+          )}
         </Button>
         <Button
           variant="ghost"

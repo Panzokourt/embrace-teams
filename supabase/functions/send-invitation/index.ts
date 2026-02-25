@@ -119,7 +119,7 @@ Deno.serve(async (req) => {
 
     const resend = new Resend(resendApiKey)
     const { error: sendError } = await resend.emails.send({
-      from: 'Olseny <onboarding@resend.dev>',
+      from: 'Olseny <noreply@olseny.com>',
       to: [invitation.email],
       subject: `Πρόσκληση στο ${companyName} — Olseny`,
       html,

@@ -108,7 +108,6 @@ const categoryNavItems: Record<CategoryId, NavItem[]> = {
     { title: 'Media Planning', href: '/intelligence/media-planning', icon: BarChart3 },
     { title: 'AI Insights', href: '/intelligence/ai-insights', icon: Zap },
     { title: 'Leaderboard', href: '/leaderboard', icon: Trophy },
-    { title: 'Secretary AI', href: '/secretary', icon: Zap },
   ],
   governance: [
     { title: 'Dashboard', href: '/governance', icon: ShieldCheck },
@@ -164,7 +163,6 @@ export default function AppSidebar({
   const navigate = useNavigate();
   const { profile, roles, signOut, isAdmin, isManager, isClient, hasPermission, isSuperAdmin, isCompanyAdmin } = useAuth();
   const { resolvedTheme, setTheme } = useTheme();
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
   const [selectedBriefType, setSelectedBriefType] = useState<string | null>(null);
 
@@ -199,10 +197,8 @@ export default function AppSidebar({
     setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
   };
 
-  // ClickUp-like: In collapsed mode, clicking opens ephemeral flyout (not permanent expand)
   const handleCategoryClick = useCallback((catId: CategoryId) => {
     if (isEffectivelyCollapsed && !isMobileSheet) {
-      // Open flyout without changing collapsed state
       setFlyoutCategory(prev => prev === catId ? null : catId);
       setActiveCategory(catId);
     } else {
@@ -210,7 +206,6 @@ export default function AppSidebar({
     }
   }, [isEffectivelyCollapsed, isMobileSheet]);
 
-  // Flyout mouse management
   const handleFlyoutEnter = useCallback(() => {
     if (flyoutTimeoutRef.current) {
       clearTimeout(flyoutTimeoutRef.current);
@@ -224,19 +219,10 @@ export default function AppSidebar({
     }, 200);
   }, []);
 
-  // Close flyout on Escape
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape' && flyoutCategory) {
-      setFlyoutCategory(null);
-    }
-  }, [flyoutCategory]);
-
-  // Close flyout on navigation
   const handleNavClick = useCallback(() => {
     setFlyoutCategory(null);
   }, []);
 
-  // Close flyout on outside click (Escape key handled via onKeyDown on container)
   useEffect(() => {
     if (!flyoutCategory) return;
     const handler = (e: KeyboardEvent) => {
@@ -246,22 +232,28 @@ export default function AppSidebar({
     return () => window.removeEventListener('keydown', handler);
   }, [flyoutCategory]);
 
-  // ─── Icon Rail ───
+  // ─── Dark Floated Icon Rail ───
   const IconRail = ({ isMobile = false }: { isMobile?: boolean }) => (
     <div
-      className="flex flex-col items-center py-3 gap-1 border-r border-border/30 bg-card/80 shrink-0 w-12"
+      className={cn(
+        "flex flex-col items-center py-3 gap-1 shrink-0 w-12",
+        isMobile
+          ? "bg-card border-r border-border/30"
+          : "my-2 ml-2 rounded-2xl bg-[#1A1A1A] shadow-lg"
+      )}
+      style={!isMobile ? { height: 'calc(100% - 16px)' } : undefined}
       onMouseEnter={handleFlyoutEnter}
       onMouseLeave={handleFlyoutLeave}
     >
-      {/* Logo + expand button */}
+      {/* Logo */}
       <div className="mb-2 flex flex-col items-center gap-1">
-        <img src={olsenyLogo} alt="Olseny" className="h-7 w-7 rounded-md" />
+        <img src={olsenyLogo} alt="Olseny" className="h-9 w-9 rounded-md" />
         {isEffectivelyCollapsed && !isMobile && (
           <Tooltip delayDuration={300}>
             <TooltipTrigger asChild>
               <button
                 onClick={onToggleCollapse}
-                className="flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all duration-200"
+                className="flex items-center justify-center w-7 h-7 rounded-md text-white/50 hover:text-white hover:bg-white/10 transition-all duration-200"
               >
                 <ChevronRight className="h-3.5 w-3.5" />
               </button>
@@ -271,6 +263,7 @@ export default function AppSidebar({
         )}
       </div>
 
+      {/* Category icons */}
       <div className="flex-1 flex flex-col items-center gap-0.5">
         {categories.map((cat) => {
           const isActive = (isEffectivelyCollapsed ? flyoutCategory === cat.id : activeCategory === cat.id) ||
@@ -282,18 +275,20 @@ export default function AppSidebar({
                   onClick={() => handleCategoryClick(cat.id)}
                   className={cn(
                     "relative flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200",
-                    isActive
-                      ? "bg-accent text-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                    isMobile
+                      ? (isActive ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/60")
+                      : (isActive ? "bg-white/15 text-white" : "text-white/50 hover:text-white hover:bg-white/10")
                   )}
                 >
-                  {isActive && (
+                  {isActive && !isMobile && (
+                    <span className="absolute left-0.5 top-1/2 -translate-y-1/2 w-[3px] h-3 rounded-full bg-primary" />
+                  )}
+                  {isActive && isMobile && (
                     <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-full bg-primary" />
                   )}
                   <cat.icon className="h-[18px] w-[18px]" />
                 </button>
               </TooltipTrigger>
-              {/* Only show tooltip when NOT showing flyout */}
               {!flyoutCategory && isEffectivelyCollapsed && (
                 <TooltipContent side="right" sideOffset={8}>
                   {cat.label}
@@ -304,12 +299,80 @@ export default function AppSidebar({
         })}
       </div>
 
+      {/* Bottom actions: Secretary, Quick Actions, Theme, Avatar */}
       <div className="flex flex-col items-center gap-1 mt-auto">
+        {/* Secretary AI */}
+        <Tooltip delayDuration={300}>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => { navigate('/secretary'); handleNavClick(); }}
+              className={cn(
+                "flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200",
+                isMobile
+                  ? "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                  : "text-white/50 hover:text-white hover:bg-white/10"
+              )}
+            >
+              <Zap className="h-[18px] w-[18px]" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right" sideOffset={8}>AI Secretary</TooltipContent>
+        </Tooltip>
+
+        {/* Quick Actions */}
+        <Popover open={quickOpen} onOpenChange={setQuickOpen}>
+          <Tooltip delayDuration={300}>
+            <TooltipTrigger asChild>
+              <PopoverTrigger asChild>
+                <button
+                  className={cn(
+                    "flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200",
+                    isMobile
+                      ? "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                      : "text-white/50 hover:text-white hover:bg-white/10",
+                    quickOpen && "[&>svg]:rotate-45"
+                  )}
+                >
+                  <Plus className="h-[18px] w-[18px] transition-transform duration-200" />
+                </button>
+              </PopoverTrigger>
+            </TooltipTrigger>
+            {!quickOpen && (
+              <TooltipContent side="right" sideOffset={8}>Quick Actions</TooltipContent>
+            )}
+          </Tooltip>
+          <PopoverContent side="right" align="end" className="w-56 p-2" sideOffset={8}>
+            <div className="space-y-1">
+              <button onClick={() => { navigate('/projects?new=true'); setQuickOpen(false); handleNavClick(); }} className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted transition-colors text-left">
+                <FolderKanban className="h-4 w-4 text-muted-foreground shrink-0" /> Νέο Έργο
+              </button>
+              <button onClick={() => { navigate('/tasks?new=true'); setQuickOpen(false); handleNavClick(); }} className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted transition-colors text-left">
+                <CheckSquare className="h-4 w-4 text-muted-foreground shrink-0" /> Νέο Task
+              </button>
+              <div className="h-px bg-border my-1" />
+              {briefDefinitions.map(def => {
+                const Icon = briefIcons[def.icon] || FileText;
+                return (
+                  <button key={def.type} onClick={() => { setSelectedBriefType(def.type); setQuickOpen(false); handleNavClick(); }} className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted transition-colors text-left">
+                    <Icon className="h-4 w-4 text-muted-foreground shrink-0" /> {def.label}
+                  </button>
+                );
+              })}
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        {/* Theme toggle */}
         <Tooltip delayDuration={300}>
           <TooltipTrigger asChild>
             <button
               onClick={toggleTheme}
-              className="flex items-center justify-center w-9 h-9 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all duration-200"
+              className={cn(
+                "flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200",
+                isMobile
+                  ? "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                  : "text-white/50 hover:text-white hover:bg-white/10"
+              )}
             >
               {resolvedTheme === 'dark' ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
             </button>
@@ -319,26 +382,46 @@ export default function AppSidebar({
           </TooltipContent>
         </Tooltip>
 
-        <Tooltip delayDuration={300}>
-          <TooltipTrigger asChild>
-            <button className="flex items-center justify-center rounded-lg p-1">
-              <Avatar className="h-7 w-7 ring-2 ring-border/50">
-                <AvatarImage src={profile?.avatar_url || undefined} />
-                <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-medium">
-                  {getInitials(profile?.full_name)}
-                </AvatarFallback>
-              </Avatar>
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={8}>
-            {profile?.full_name || 'User'}
-          </TooltipContent>
-        </Tooltip>
+        {/* User Avatar with dropdown */}
+        <DropdownMenu>
+          <Tooltip delayDuration={300}>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center justify-center rounded-lg p-1">
+                  <Avatar className={cn("h-7 w-7", isMobile ? "ring-2 ring-border/50" : "ring-2 ring-white/20")}>
+                    <AvatarImage src={profile?.avatar_url || undefined} />
+                    <AvatarFallback className={cn(
+                      "text-[10px] font-medium",
+                      isMobile ? "bg-primary/10 text-primary" : "bg-white/15 text-white"
+                    )}>
+                      {getInitials(profile?.full_name)}
+                    </AvatarFallback>
+                  </Avatar>
+                </button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={8}>
+              {profile?.full_name || 'User'}
+            </TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent align="end" side="right" className="w-56 rounded-xl border-border/50 shadow-soft-lg">
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col space-y-1">
+                <span className="text-sm font-medium truncate">{profile?.full_name || 'User'}</span>
+                <span className="text-xs text-muted-foreground truncate">{profile?.email}</span>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator className="bg-border/50" />
+            <DropdownMenuItem onClick={() => signOut()} className="text-destructive focus:text-destructive focus:bg-destructive/10 rounded-lg mx-1 cursor-pointer">
+              <LogOut className="mr-2 h-4 w-4" /> Αποσύνδεση
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
 
-  // ─── Category Nav Panel Content ───
+  // ─── Category Nav Panel Content (no Secretary, no Quick Actions, no UserMenu) ───
   const CategoryPanelContent = ({ isMobile = false, onItemClick }: { isMobile?: boolean; onItemClick?: () => void }) => (
     <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
       {/* Header */}
@@ -364,24 +447,24 @@ export default function AppSidebar({
       <nav className="flex-1 px-2 py-1 space-y-0.5 overflow-y-auto scrollbar-thin">
         {isClient && !isAdmin && !isManager ? (
           <>
-            <SidebarLink to="/" icon={<LayoutDashboard className="h-[18px] w-[18px]" />} label="Τα Έργα μου" active={location.pathname === '/'} collapsed={false} onClick={() => { isMobile && setMobileOpen(false); onItemClick?.(); }} />
-            <SidebarLink to="/tasks" icon={<CheckSquare className="h-[18px] w-[18px]" />} label="Παραδοτέα" active={location.pathname === '/tasks'} collapsed={false} onClick={() => { isMobile && setMobileOpen(false); onItemClick?.(); }} />
+            <SidebarLink to="/" icon={<LayoutDashboard className="h-[18px] w-[18px]" />} label="Τα Έργα μου" active={location.pathname === '/'} collapsed={false} onClick={() => { onItemClick?.(); }} />
+            <SidebarLink to="/tasks" icon={<CheckSquare className="h-[18px] w-[18px]" />} label="Παραδοτέα" active={location.pathname === '/tasks'} collapsed={false} onClick={() => { onItemClick?.(); }} />
           </>
         ) : (
           <>
             {(flyoutCategory || activeCategory) === 'work' ? (
               <>
-                <SidebarLink to="/my-work" icon={<LayoutList className="h-[18px] w-[18px]" />} label="My Work" active={location.pathname === '/my-work'} collapsed={false} onClick={() => { isMobile && setMobileOpen(false); onItemClick?.(); }} />
+                <SidebarLink to="/my-work" icon={<LayoutList className="h-[18px] w-[18px]" />} label="My Work" active={location.pathname === '/my-work'} collapsed={false} onClick={() => { onItemClick?.(); }} />
                 <SidebarNavGroup id="work" icon={<Briefcase className="h-[18px] w-[18px]" />} label="Projects" collapsed={false} isActive={location.pathname === '/work' || location.pathname.startsWith('/projects/') || location.pathname.startsWith('/tasks/')} defaultOpen>
-                  <SidebarSubLink to="/work?tab=projects" icon={<FolderKanban className="h-4 w-4" />} label="Projects" active={location.pathname === '/work' && (!location.search || location.search.includes('tab=projects'))} onClick={() => { navigate('/work?tab=projects'); isMobile && setMobileOpen(false); onItemClick?.(); }} />
+                  <SidebarSubLink to="/work?tab=projects" icon={<FolderKanban className="h-4 w-4" />} label="Projects" active={location.pathname === '/work' && (!location.search || location.search.includes('tab=projects'))} onClick={() => { navigate('/work?tab=projects'); onItemClick?.(); }} />
                   <SidebarProjectTree collapsed={false} />
-                  <SidebarSubLink to="/work?tab=tasks" icon={<CheckSquare className="h-4 w-4" />} label="Tasks" active={location.pathname === '/work' && location.search.includes('tab=tasks')} onClick={() => { navigate('/work?tab=tasks'); isMobile && setMobileOpen(false); onItemClick?.(); }} />
+                  <SidebarSubLink to="/work?tab=tasks" icon={<CheckSquare className="h-4 w-4" />} label="Tasks" active={location.pathname === '/work' && location.search.includes('tab=tasks')} onClick={() => { navigate('/work?tab=tasks'); onItemClick?.(); }} />
                 </SidebarNavGroup>
-                <SidebarLink to="/campaigns" icon={<FileText className="h-[18px] w-[18px]" />} label="Campaigns" active={location.pathname === '/campaigns'} collapsed={false} onClick={() => { isMobile && setMobileOpen(false); onItemClick?.(); }} />
-                <SidebarLink to="/calendar" icon={<CalendarDays className="h-[18px] w-[18px]" />} label="Calendar" active={location.pathname === '/calendar'} collapsed={false} onClick={() => { isMobile && setMobileOpen(false); onItemClick?.(); }} />
-                <SidebarLink to="/backlog" icon={<FileStack className="h-[18px] w-[18px]" />} label="Backlog" active={location.pathname === '/backlog'} collapsed={false} onClick={() => { isMobile && setMobileOpen(false); onItemClick?.(); }} />
-                <SidebarLink to="/blueprints" icon={<FileStack className="h-[18px] w-[18px]" />} label="Templates" active={location.pathname === '/blueprints'} collapsed={false} onClick={() => { isMobile && setMobileOpen(false); onItemClick?.(); }} />
-                <SidebarLink to="/files" icon={<FileArchive className="h-[18px] w-[18px]" />} label="Files" active={location.pathname === '/files'} collapsed={false} onClick={() => { isMobile && setMobileOpen(false); onItemClick?.(); }} />
+                <SidebarLink to="/campaigns" icon={<FileText className="h-[18px] w-[18px]" />} label="Campaigns" active={location.pathname === '/campaigns'} collapsed={false} onClick={() => { onItemClick?.(); }} />
+                <SidebarLink to="/calendar" icon={<CalendarDays className="h-[18px] w-[18px]" />} label="Calendar" active={location.pathname === '/calendar'} collapsed={false} onClick={() => { onItemClick?.(); }} />
+                <SidebarLink to="/backlog" icon={<FileStack className="h-[18px] w-[18px]" />} label="Backlog" active={location.pathname === '/backlog'} collapsed={false} onClick={() => { onItemClick?.(); }} />
+                <SidebarLink to="/blueprints" icon={<FileStack className="h-[18px] w-[18px]" />} label="Templates" active={location.pathname === '/blueprints'} collapsed={false} onClick={() => { onItemClick?.(); }} />
+                <SidebarLink to="/files" icon={<FileArchive className="h-[18px] w-[18px]" />} label="Files" active={location.pathname === '/files'} collapsed={false} onClick={() => { onItemClick?.(); }} />
               </>
             ) : (
               categoryNavItems[flyoutCategory || activeCategory]?.filter(canAccess).map((item) => {
@@ -389,68 +472,13 @@ export default function AppSidebar({
                   ? location.pathname + location.search === item.href
                   : location.pathname === item.href;
                 return (
-                  <SidebarLink key={item.href} to={item.href} icon={<item.icon className="h-[18px] w-[18px]" />} label={item.title} active={isActiveItem} collapsed={false} onClick={() => { isMobile && setMobileOpen(false); onItemClick?.(); }} />
+                  <SidebarLink key={item.href} to={item.href} icon={<item.icon className="h-[18px] w-[18px]" />} label={item.title} active={isActiveItem} collapsed={false} onClick={() => { onItemClick?.(); }} />
                 );
               })
             )}
           </>
         )}
       </nav>
-
-      {/* Secretary AI */}
-      <div className="px-2 py-1 shrink-0">
-        <NavLink
-          to="/secretary"
-          onClick={() => { isMobile && setMobileOpen(false); onItemClick?.(); }}
-          className={cn(
-            "flex items-center gap-3 rounded-2xl px-3 py-2.5 transition-all duration-200 ease-apple",
-            "bg-primary text-primary-foreground hover:brightness-95 shadow-soft w-full"
-          )}
-        >
-          <Zap className="h-[18px] w-[18px]" />
-          <span className="text-sm font-semibold truncate">AI Secretary</span>
-        </NavLink>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="px-2 py-1 shrink-0">
-        <Popover open={quickOpen} onOpenChange={setQuickOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="default"
-              className={cn(
-                "h-10 transition-all duration-200 bg-primary text-primary-foreground hover:bg-primary/90 w-full justify-start gap-3 px-3",
-                quickOpen && "[&>svg:first-child]:rotate-45"
-              )}
-            >
-              <Plus className="h-[18px] w-[18px] transition-transform duration-200 shrink-0" />
-              <span className="text-sm font-medium truncate">Νέο...</span>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent side="right" align="end" className="w-56 p-2" sideOffset={8}>
-            <div className="space-y-1">
-              <button onClick={() => { navigate('/projects?new=true'); setQuickOpen(false); onItemClick?.(); }} className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted transition-colors text-left">
-                <FolderKanban className="h-4 w-4 text-muted-foreground shrink-0" /> Νέο Έργο
-              </button>
-              <button onClick={() => { navigate('/tasks?new=true'); setQuickOpen(false); onItemClick?.(); }} className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted transition-colors text-left">
-                <CheckSquare className="h-4 w-4 text-muted-foreground shrink-0" /> Νέο Task
-              </button>
-              <div className="h-px bg-border my-1" />
-              {briefDefinitions.map(def => {
-                const Icon = briefIcons[def.icon] || FileText;
-                return (
-                  <button key={def.type} onClick={() => { setSelectedBriefType(def.type); setQuickOpen(false); onItemClick?.(); }} className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted transition-colors text-left">
-                    <Icon className="h-4 w-4 text-muted-foreground shrink-0" /> {def.label}
-                  </button>
-                );
-              })}
-            </div>
-          </PopoverContent>
-        </Popover>
-      </div>
-
-      {/* User Menu */}
-      <UserMenu profile={profile} collapsed={false} signOut={() => { signOut(); isMobile && setMobileOpen(false); onItemClick?.(); }} getInitials={getInitials} />
     </div>
   );
 
@@ -473,18 +501,17 @@ export default function AppSidebar({
     <>
       <div
         ref={containerRef}
-        className="h-screen bg-card border-r border-border/40 flex overflow-hidden"
-        onKeyDown={handleKeyDown}
+        className="h-screen bg-card border-r border-border/40 flex overflow-visible"
         tabIndex={-1}
       >
-        {/* Icon rail always visible */}
+        {/* Dark floated icon rail */}
         <IconRail />
 
-        {/* Expanded panel (persistent) — only when sidebar is expanded */}
+        {/* Expanded panel — only when sidebar is expanded */}
         {!isEffectivelyCollapsed && <CategoryPanelContent />}
       </div>
 
-      {/* Ephemeral flyout panel — rendered OUTSIDE the overflow-hidden container via portal-like fixed positioning */}
+      {/* Ephemeral flyout panel — fixed positioning outside overflow */}
       {isEffectivelyCollapsed && flyoutCategory && (
         <div
           className="fixed top-0 bottom-0 w-56 bg-card border-r border-border/40 shadow-2xl z-[60] animate-slide-in-left"
@@ -532,52 +559,5 @@ function SidebarLink({
         </span>
       )}
     </NavLink>
-  );
-}
-
-function UserMenu({
-  profile, collapsed, signOut, getInitials,
-}: {
-  profile: any; collapsed: boolean; signOut: () => void; getInitials: (name: string | null) => string;
-}) {
-  return (
-    <div className="p-2 border-t border-border/40 shrink-0">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            className={cn(
-              "w-full justify-start gap-3 h-12 text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all duration-200 min-w-0",
-              collapsed && "justify-center px-2"
-            )}
-          >
-            <Avatar className="h-8 w-8 ring-2 ring-border/50 shrink-0">
-              <AvatarImage src={profile?.avatar_url || undefined} />
-              <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
-                {getInitials(profile?.full_name)}
-              </AvatarFallback>
-            </Avatar>
-            {!collapsed && (
-              <div className="flex-1 text-left min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">{profile?.full_name || 'User'}</p>
-                <p className="text-xs text-muted-foreground/70 truncate">{profile?.email}</p>
-              </div>
-            )}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56 rounded-xl border-border/50 shadow-soft-lg">
-          <DropdownMenuLabel className="font-normal">
-            <div className="flex flex-col space-y-1">
-              <span className="text-sm font-medium truncate">{profile?.full_name || 'User'}</span>
-              <span className="text-xs text-muted-foreground truncate">{profile?.email}</span>
-            </div>
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator className="bg-border/50" />
-          <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive focus:bg-destructive/10 rounded-lg mx-1 cursor-pointer">
-            <LogOut className="mr-2 h-4 w-4" /> Αποσύνδεση
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
   );
 }

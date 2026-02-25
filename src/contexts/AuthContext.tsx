@@ -103,23 +103,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [legacyRoles, setLegacyRoles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const fetchingRef = useRef(false);
+  const userRef = useRef<User | null>(null);
+  const profileRef = useRef<Profile | null>(null);
   const [postLoginRoute, setPostLoginRoute] = useState<string | null>(null);
 
   const applySession = (nextSession: Session | null) => {
     setSession(nextSession);
     setUser(nextSession?.user ?? null);
-    // If a new user session arrives, keep loading=true until fetchUserData completes
-    // This prevents AppLayout from seeing user!=null + companyRole==null and redirecting to onboarding
+    userRef.current = nextSession?.user ?? null;
     if (nextSession?.user) {
       setLoading(true);
     }
   };
 
+  // Keep refs in sync
+  useEffect(() => { profileRef.current = profile; }, [profile]);
+
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        // On token refresh, silently update session without remounting the app
-        if (event === 'TOKEN_REFRESHED') {
+        // On token refresh or re-authentication of the same user, silently update session
+        // without remounting the app -- this prevents tab-switch reloads
+        if (event === 'TOKEN_REFRESHED' || (event === 'SIGNED_IN' && session?.user?.id === userRef.current?.id && profileRef.current !== null)) {
           setSession(session);
           setUser(session?.user ?? null);
           return;

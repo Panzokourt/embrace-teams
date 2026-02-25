@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback, Fragment } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
@@ -248,9 +248,20 @@ export default function ProjectDetailPage() {
   const statusConfig = getStatusConfig(project.status);
 
   return (
-    <div className="p-4 lg:p-6 space-y-4">
+    <div className="page-shell">
+      {/* ── BREADCRUMBS ──────────────────────────────────────────────────── */}
+      <nav className="text-xs text-muted-foreground/60 flex items-center gap-1.5 mb-1">
+        <Link to="/" className="hover:text-foreground transition-colors">Dashboard</Link>
+        <span className="text-muted-foreground/40">›</span>
+        <Link to="/work?tab=projects" className="hover:text-foreground transition-colors">Εργασία</Link>
+        <span className="text-muted-foreground/40">›</span>
+        <Link to="/work?tab=projects" className="hover:text-foreground transition-colors">Έργα</Link>
+        <span className="text-muted-foreground/40">›</span>
+        <span className="text-muted-foreground/70">{project.name}</span>
+      </nav>
+
       {/* ── STICKY HEADER ──────────────────────────────────────────────────── */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 -mx-4 lg:-mx-6 px-4 lg:px-6 py-3 border-b border-border/50">
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 -mx-6 px-6 py-3 border-b border-border/50">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" className="shrink-0" onClick={() => navigate('/projects')}>
             <ArrowLeft className="h-5 w-5" />

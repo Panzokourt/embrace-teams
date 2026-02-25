@@ -57,6 +57,7 @@ import {
   Mail,
   Trophy,
   ShieldCheck,
+  BookOpen,
 } from 'lucide-react';
 import { briefDefinitions, getBriefDefinition } from '@/components/blueprints/briefDefinitions';
 import { BriefFormDialog } from '@/components/blueprints/BriefFormDialog';
@@ -76,7 +77,7 @@ interface NavItem {
 }
 
 // ─── Category definitions for the icon rail ───
-type CategoryId = 'home' | 'work' | 'calendar' | 'comms' | 'files' | 'time' | 'people' | 'finance' | 'governance' | 'admin';
+type CategoryId = 'home' | 'work' | 'calendar' | 'comms' | 'files' | 'knowledge' | 'time' | 'people' | 'finance' | 'governance' | 'admin';
 
 interface Category {
   id: CategoryId;
@@ -91,6 +92,7 @@ const categories: Category[] = [
   { id: 'calendar', icon: CalendarDays, label: 'Ημερολόγιο', routePrefixes: ['/calendar'] },
   { id: 'comms', icon: MessageSquare, label: 'Επικοινωνία', routePrefixes: ['/inbox', '/chat'] },
   { id: 'files', icon: FileArchive, label: 'Αρχείο', routePrefixes: ['/files'] },
+  { id: 'knowledge', icon: BookOpen, label: 'Knowledge Base', routePrefixes: ['/knowledge'] },
   { id: 'time', icon: Timer, label: 'Χρόνος', routePrefixes: ['/timesheets'] },
   { id: 'people', icon: Users, label: 'Ομάδα', routePrefixes: ['/contacts', '/hr', '/leaderboard'] },
   { id: 'finance', icon: DollarSign, label: 'Οικονομικά', routePrefixes: ['/financials', '/reports'] },
@@ -114,6 +116,12 @@ const categoryNavItems: Record<CategoryId, NavItem[]> = {
   ],
   files: [
     { title: 'Αρχείο', href: '/files', icon: FileArchive, permission: 'files.view' },
+  ],
+  knowledge: [
+    { title: 'Αρχική KB', href: '/knowledge', icon: BookOpen },
+    { title: 'Company Playbook', href: '/knowledge/playbook', icon: FileText },
+    { title: 'Templates & SOPs', href: '/knowledge/templates', icon: FileStack },
+    { title: 'Review Queue', href: '/knowledge/reviews', icon: CheckSquare },
   ],
   time: [
     { title: 'Timesheets', href: '/timesheets', icon: Timer },
@@ -151,6 +159,7 @@ function detectCategory(pathname: string): CategoryId {
   if (pathname.startsWith('/calendar')) return 'calendar';
   if (pathname.startsWith('/inbox') || pathname.startsWith('/chat')) return 'comms';
   if (pathname.startsWith('/files')) return 'files';
+  if (pathname.startsWith('/knowledge')) return 'knowledge';
   if (pathname.startsWith('/timesheets')) return 'time';
   if (pathname.startsWith('/contacts') || pathname.startsWith('/hr') || pathname.startsWith('/leaderboard')) return 'people';
   if (pathname.startsWith('/financials') || pathname.startsWith('/reports')) return 'finance';

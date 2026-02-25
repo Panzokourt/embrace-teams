@@ -94,7 +94,8 @@ const App = () => (
                 <Route path="/accept-invite/:token" element={<AcceptInvite />} />
                 <Route path="/accept-invite" element={<AcceptInvite />} />
                 <Route element={<AppLayout />}>
-                  <Route path="/" element={<Dashboard />} />
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/dashboard/:templateId" element={<Dashboard />} />
                   <Route path="/my-work" element={<MyWork />} />
                   <Route path="/work" element={<Work />} />
                   <Route path="/projects" element={<Navigate to="/work?tab=projects" replace />} />

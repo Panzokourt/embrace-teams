@@ -101,7 +101,6 @@ const categories: Category[] = [
 const categoryNavItems: Record<CategoryId, NavItem[]> = {
   overview: [
     { title: 'Dashboard', href: '/', icon: LayoutDashboard },
-    { title: 'My Work', href: '/my-work', icon: LayoutList },
   ],
   work: [], // handled separately with SidebarNavGroup
   clients: [

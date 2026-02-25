@@ -30,6 +30,7 @@ import NotFound from "./pages/NotFound";
 import Onboarding from "@/pages/Onboarding";
 import WorkspaceSelector from "@/pages/WorkspaceSelector";
 import AcceptInvite from "@/pages/AcceptInvite";
+import WelcomeWizard from "@/pages/WelcomeWizard";
 import OrganizationSettings from "@/pages/OrganizationSettings";
 import Secretary from "@/pages/Secretary";
 import Chat from "@/pages/Chat";
@@ -93,6 +94,7 @@ const App = () => (
                 <Route path="/select-workspace" element={<WorkspaceSelector />} />
                 <Route path="/accept-invite/:token" element={<AcceptInvite />} />
                 <Route path="/accept-invite" element={<AcceptInvite />} />
+                <Route path="/welcome" element={<WelcomeWizard />} />
                 <Route element={<AppLayout />}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/dashboard/:templateId" element={<Dashboard />} />

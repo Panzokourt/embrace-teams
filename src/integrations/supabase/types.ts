@@ -2311,6 +2311,343 @@ export type Database = {
           },
         ]
       }
+      kb_article_versions: {
+        Row: {
+          article_id: string
+          body: string
+          change_notes: string | null
+          changed_by: string | null
+          created_at: string
+          id: string
+          title: string
+          version: number
+        }
+        Insert: {
+          article_id: string
+          body?: string
+          change_notes?: string | null
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          title: string
+          version: number
+        }
+        Update: {
+          article_id?: string
+          body?: string
+          change_notes?: string | null
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          title?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kb_article_versions_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "kb_articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kb_article_versions_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kb_articles: {
+        Row: {
+          action_items: Json | null
+          article_type: string
+          attendees: string[] | null
+          body: string
+          category_id: string | null
+          client_id: string | null
+          company_id: string
+          created_at: string
+          decisions: Json | null
+          gov_asset_id: string | null
+          id: string
+          next_review_date: string | null
+          owner_id: string | null
+          project_id: string | null
+          source_links: string[] | null
+          status: string
+          tags: string[] | null
+          title: string
+          updated_at: string
+          version: number
+          visibility: string
+        }
+        Insert: {
+          action_items?: Json | null
+          article_type?: string
+          attendees?: string[] | null
+          body?: string
+          category_id?: string | null
+          client_id?: string | null
+          company_id: string
+          created_at?: string
+          decisions?: Json | null
+          gov_asset_id?: string | null
+          id?: string
+          next_review_date?: string | null
+          owner_id?: string | null
+          project_id?: string | null
+          source_links?: string[] | null
+          status?: string
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+          version?: number
+          visibility?: string
+        }
+        Update: {
+          action_items?: Json | null
+          article_type?: string
+          attendees?: string[] | null
+          body?: string
+          category_id?: string | null
+          client_id?: string | null
+          company_id?: string
+          created_at?: string
+          decisions?: Json | null
+          gov_asset_id?: string | null
+          id?: string
+          next_review_date?: string | null
+          owner_id?: string | null
+          project_id?: string | null
+          source_links?: string[] | null
+          status?: string
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+          version?: number
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kb_articles_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "kb_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kb_articles_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kb_articles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kb_articles_gov_asset_id_fkey"
+            columns: ["gov_asset_id"]
+            isOneToOne: false
+            referencedRelation: "gov_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kb_articles_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kb_articles_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kb_categories: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          level: number
+          name: string
+          parent_id: string | null
+          slug: string
+          sort_order: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          level?: number
+          name: string
+          parent_id?: string | null
+          slug: string
+          sort_order?: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          level?: number
+          name?: string
+          parent_id?: string | null
+          slug?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kb_categories_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kb_categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "kb_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kb_template_usage: {
+        Row: {
+          client_id: string | null
+          company_id: string
+          created_at: string
+          id: string
+          project_id: string | null
+          template_id: string
+          used_by: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          project_id?: string | null
+          template_id: string
+          used_by?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          project_id?: string | null
+          template_id?: string
+          used_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kb_template_usage_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kb_template_usage_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kb_template_usage_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kb_template_usage_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "kb_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kb_template_usage_used_by_fkey"
+            columns: ["used_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kb_templates: {
+        Row: {
+          company_id: string
+          content: Json | null
+          created_at: string
+          default_tasks: Json | null
+          description: string | null
+          id: string
+          owner_id: string | null
+          status: string
+          template_type: string
+          title: string
+          updated_at: string
+          usage_count: number
+        }
+        Insert: {
+          company_id: string
+          content?: Json | null
+          created_at?: string
+          default_tasks?: Json | null
+          description?: string | null
+          id?: string
+          owner_id?: string | null
+          status?: string
+          template_type?: string
+          title: string
+          updated_at?: string
+          usage_count?: number
+        }
+        Update: {
+          company_id?: string
+          content?: Json | null
+          created_at?: string
+          default_tasks?: Json | null
+          description?: string | null
+          id?: string
+          owner_id?: string | null
+          status?: string
+          template_type?: string
+          title?: string
+          updated_at?: string
+          usage_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kb_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kb_templates_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leave_balances: {
         Row: {
           carried_over: number

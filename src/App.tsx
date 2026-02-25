@@ -43,6 +43,11 @@ import GovernanceAssetDetail from "@/pages/GovernanceAssetDetail";
 import GovernanceAccess from "@/pages/GovernanceAccess";
 import GovernanceVault from "@/pages/GovernanceVault";
 import GovernanceCompliance from "@/pages/GovernanceCompliance";
+import Knowledge from "@/pages/Knowledge";
+import KnowledgePlaybook from "@/pages/KnowledgePlaybook";
+import KnowledgeArticle from "@/pages/KnowledgeArticle";
+import KnowledgeTemplates from "@/pages/KnowledgeTemplates";
+import KnowledgeReviews from "@/pages/KnowledgeReviews";
 import { ChatProvider } from "@/contexts/ChatContext";
 
 function RedirectUserToEmployee() {
@@ -100,6 +105,11 @@ const App = () => (
                   <Route path="/governance/access" element={<GovernanceAccess />} />
                   <Route path="/governance/vault" element={<GovernanceVault />} />
                   <Route path="/governance/compliance" element={<GovernanceCompliance />} />
+                  <Route path="/knowledge" element={<Knowledge />} />
+                  <Route path="/knowledge/playbook" element={<KnowledgePlaybook />} />
+                  <Route path="/knowledge/articles/:id" element={<KnowledgeArticle />} />
+                  <Route path="/knowledge/templates" element={<KnowledgeTemplates />} />
+                  <Route path="/knowledge/reviews" element={<KnowledgeReviews />} />
                   {/* Redirects from old routes */}
                   <Route path="/users" element={<Navigate to="/hr?tab=staff" replace />} />
                   <Route path="/users/:id" element={<RedirectUserToEmployee />} />

@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Plus, BookOpen, FileText, AlertTriangle, Archive } from 'lucide-react';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { useNavigate } from 'react-router-dom';
 
 export default function Knowledge() {
@@ -58,21 +59,21 @@ export default function Knowledge() {
     [articles]);
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <BookOpen className="h-6 w-6" /> Knowledge Base
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">Κεντρική βάση γνώσης της εταιρείας</p>
-        </div>
-        <div className="flex gap-2">
-          <KBCategoryManager categories={categories} onCreate={(d) => createCategory.mutate(d)} onDelete={() => {}} />
-          <Button onClick={() => setEditorOpen(true)} className="gap-1">
-            <Plus className="h-4 w-4" /> Νέο Άρθρο
-          </Button>
-        </div>
-      </div>
+    <div className="page-shell">
+      <PageHeader
+        icon={BookOpen}
+        title="Knowledge Base"
+        subtitle="Κεντρική βάση γνώσης της εταιρείας"
+        breadcrumbs={[{ label: 'Knowledge Base' }]}
+        actions={
+          <div className="flex gap-2">
+            <KBCategoryManager categories={categories} onCreate={(d) => createCategory.mutate(d)} onDelete={() => {}} />
+            <Button onClick={() => setEditorOpen(true)} className="gap-1">
+              <Plus className="h-4 w-4" /> Νέο Άρθρο
+            </Button>
+          </div>
+        }
+      />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 wide:grid-cols-4 gap-4">

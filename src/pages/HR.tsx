@@ -4,8 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Users, Building2, Network, Calendar, UsersRound, UserPlus } from 'lucide-react';
+import { PageHeader } from '@/components/shared/PageHeader';
 
-// Lazy load existing page content
 import UsersAccessPage from '@/pages/UsersAccess';
 import DepartmentsPage from '@/pages/Departments';
 import OrgChartPage from '@/pages/OrgChart';
@@ -15,13 +15,6 @@ import { LeaveRequestsList } from '@/components/hr/LeaveRequestsList';
 import { LeaveApprovalCard } from '@/components/hr/LeaveApprovalCard';
 import { useLeaveManagement } from '@/hooks/useLeaveManagement';
 import { JoinRequestsManager, useJoinRequestsCount } from '@/components/hr/JoinRequestsManager';
-
-const TAB_MAP: Record<string, string> = {
-  'users': 'staff',
-  'departments': 'departments',
-  'org-chart': 'orgchart',
-  'timesheets': 'timesheets',
-};
 
 export default function HRPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -36,50 +29,45 @@ export default function HRPage() {
   };
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-           <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center">
-            <UsersRound className="h-5 w-5 text-foreground" />
-          </div>
-          HR - Ανθρώπινο Δυναμικό
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Κεντρική διαχείριση προσωπικού, ομάδων, αδειών & timesheets
-        </p>
-      </div>
-
+    <div className="page-shell">
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-        <TabsList className="flex-wrap h-auto gap-1 p-1">
-          <TabsTrigger value="staff" className="gap-2">
-            <Users className="h-4 w-4" />
-            Προσωπικό
-          </TabsTrigger>
-          <TabsTrigger value="departments" className="gap-2">
-            <Building2 className="h-4 w-4" />
-            Τμήματα
-          </TabsTrigger>
-          <TabsTrigger value="orgchart" className="gap-2">
-            <Network className="h-4 w-4" />
-            Οργανόγραμμα
-          </TabsTrigger>
-          <TabsTrigger value="leaves" className="gap-2">
-            <Calendar className="h-4 w-4" />
-            Άδειες
-          </TabsTrigger>
-          {(isOwner || isCompanyAdmin) && (
-            <TabsTrigger value="join-requests" className="gap-2">
-              <UserPlus className="h-4 w-4" />
-              Αιτήματα
-              {pendingJoinRequests > 0 && (
-                <Badge variant="destructive" className="ml-1 h-5 min-w-5 text-xs px-1">
-                  {pendingJoinRequests}
-                </Badge>
+        <PageHeader
+          icon={UsersRound}
+          title="HR - Ανθρώπινο Δυναμικό"
+          subtitle="Κεντρική διαχείριση προσωπικού, ομάδων, αδειών & timesheets"
+          breadcrumbs={[{ label: 'HR' }]}
+          tabs={
+            <TabsList className="flex-wrap h-auto gap-1 p-1">
+              <TabsTrigger value="staff" className="gap-2">
+                <Users className="h-4 w-4" />
+                Προσωπικό
+              </TabsTrigger>
+              <TabsTrigger value="departments" className="gap-2">
+                <Building2 className="h-4 w-4" />
+                Τμήματα
+              </TabsTrigger>
+              <TabsTrigger value="orgchart" className="gap-2">
+                <Network className="h-4 w-4" />
+                Οργανόγραμμα
+              </TabsTrigger>
+              <TabsTrigger value="leaves" className="gap-2">
+                <Calendar className="h-4 w-4" />
+                Άδειες
+              </TabsTrigger>
+              {(isOwner || isCompanyAdmin) && (
+                <TabsTrigger value="join-requests" className="gap-2">
+                  <UserPlus className="h-4 w-4" />
+                  Αιτήματα
+                  {pendingJoinRequests > 0 && (
+                    <Badge variant="destructive" className="ml-1 h-5 min-w-5 text-xs px-1">
+                      {pendingJoinRequests}
+                    </Badge>
+                  )}
+                </TabsTrigger>
               )}
-            </TabsTrigger>
-          )}
-        </TabsList>
+            </TabsList>
+          }
+        />
 
         <TabsContent value="staff">
           <UsersAccessContent />

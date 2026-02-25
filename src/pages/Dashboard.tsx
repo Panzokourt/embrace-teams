@@ -15,6 +15,7 @@ import WidgetWrapper from '@/components/dashboard/WidgetWrapper';
 import RecentActivity from '@/components/dashboard/widgets/RecentActivity';
 import RevenueChart from '@/components/dashboard/widgets/RevenueChart';
 import ProjectProgress from '@/components/dashboard/widgets/ProjectProgress';
+import { PageHeader } from '@/components/shared/PageHeader';
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors,
   type DragEndEvent,
@@ -23,7 +24,7 @@ import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 import { 
   DollarSign, Percent, TrendingUp, FileWarning,
   Trophy, FolderKanban, AlertTriangle, Activity,
-  Loader2, Timer, Settings2
+  Loader2, Timer, Settings2, LayoutDashboard
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -212,13 +213,13 @@ export default function Dashboard() {
   // Client Dashboard
   if (isClient && !isAdmin && !isManager) {
     return (
-      <div className="p-6 lg:p-8 space-y-8">
-        <div className="animate-fade-in">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Καλωσήρθατε, {profile?.full_name?.split(' ')[0] || 'Client'}
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">Παρακολουθήστε την πρόοδο των έργων σας</p>
-        </div>
+      <div className="page-shell">
+        <PageHeader
+          icon={LayoutDashboard}
+          title={`Καλωσήρθατε, ${profile?.full_name?.split(' ')[0] || 'Client'}`}
+          subtitle="Παρακολουθήστε την πρόοδο των έργων σας"
+          breadcrumbs={[{ label: 'Dashboard' }]}
+        />
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <StatCard title="Ενεργά Έργα" value={stats.activeProjects} icon={FolderKanban} variant="primary" />
           <StatCard title="Παραδοτέα σε Εξέλιξη" value={upcomingTasks.length} icon={Activity} variant="success" />
@@ -282,32 +283,34 @@ export default function Dashboard() {
   const allWidgets = { ...statWidgets, ...compositeWidgets };
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
+    <div className="page-shell">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between animate-fade-in">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground mt-1 text-sm">Συνολική εικόνα εταιρίας</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <DashboardFilters filters={config.filters} onFiltersChange={setFilters} />
-          <DashboardLayoutSelector
-            savedLayouts={savedLayouts}
-            onSave={saveLayout}
-            onLoad={loadLayout}
-            onDelete={deleteLayout}
-          />
-          <DashboardExport widgets={config.widgets} statsSnapshot={statsSnapshot} />
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8 shrink-0"
-            onClick={() => setCustomizerOpen(true)}
-          >
-            <Settings2 className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        icon={LayoutDashboard}
+        title="Dashboard"
+        subtitle="Συνολική εικόνα εταιρίας"
+        breadcrumbs={[{ label: 'Dashboard' }]}
+        actions={
+          <div className="flex items-center gap-2">
+            <DashboardFilters filters={config.filters} onFiltersChange={setFilters} />
+            <DashboardLayoutSelector
+              savedLayouts={savedLayouts}
+              onSave={saveLayout}
+              onLoad={loadLayout}
+              onDelete={deleteLayout}
+            />
+            <DashboardExport widgets={config.widgets} statsSnapshot={statsSnapshot} />
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              onClick={() => setCustomizerOpen(true)}
+            >
+              <Settings2 className="h-4 w-4" />
+            </Button>
+          </div>
+        }
+      />
 
       {/* Widget grid with DnD */}
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>

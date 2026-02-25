@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Construction } from 'lucide-react';
+import { PageHeader } from '@/components/shared/PageHeader';
 
 interface ComingSoonPageProps {
   title: string;
@@ -9,17 +10,16 @@ interface ComingSoonPageProps {
 
 export default function ComingSoonPage({ title, description, icon: Icon = Construction }: ComingSoonPageProps) {
   return (
-    <div className="p-6 lg:p-8 space-y-6">
-      <div className="flex items-center gap-3">
-        <Icon className="h-8 w-8 text-muted-foreground" />
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
-            <Badge variant="secondary" className="text-xs">Coming Soon</Badge>
-          </div>
-          <p className="text-muted-foreground mt-1">{description}</p>
-        </div>
-      </div>
+    <div className="page-shell">
+      <PageHeader
+        icon={Icon as any}
+        title={title}
+        subtitle={description}
+        breadcrumbs={[{ label: title }]}
+        actions={
+          <Badge variant="secondary" className="text-xs">Coming Soon</Badge>
+        }
+      />
       <div className="flex items-center justify-center min-h-[400px] rounded-xl border border-dashed border-border/60 bg-muted/20">
         <div className="text-center space-y-2">
           <Construction className="h-12 w-12 text-muted-foreground/40 mx-auto" />

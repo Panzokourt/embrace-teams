@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { useActivityLogger } from '@/hooks/useActivityLogger';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -253,22 +254,13 @@ export default function ClientsPage() {
   const canManage = isAdmin || isManager;
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-3">
-            <span className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Building2 className="h-5 w-5 text-primary" />
-            </span>
-            Πελάτες
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm ml-[52px]">
-            Διαχείριση πελατών και οργανισμών • {clients.length} συνολικά
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
+    <div className="page-shell">
+      <PageHeader
+        icon={Building2}
+        title="Πελάτες"
+        subtitle={`Διαχείριση πελατών και οργανισμών • ${clients.length} συνολικά`}
+        breadcrumbs={[{ label: 'Πελάτες' }]}
+        toolbar={
           <div className="relative w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
             <Input
@@ -278,8 +270,9 @@ export default function ClientsPage() {
               className="pl-10 bg-card border-border/50"
             />
           </div>
-          
-          {canManage && (
+        }
+        actions={
+          canManage ? (
             <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
               <DialogTrigger asChild>
                 <Button className="shadow-soft">
@@ -423,9 +416,9 @@ export default function ClientsPage() {
                 </form>
               </DialogContent>
             </Dialog>
-          )}
-        </div>
-      </div>
+          ) : undefined
+        }
+      />
 
       {/* Clients Table */}
       {loading ? (

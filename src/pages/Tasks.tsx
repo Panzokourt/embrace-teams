@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/select';
 import { UnifiedViewToggle, usePersistedViewMode, type UnifiedViewMode } from '@/components/ui/unified-view-toggle';
 import { TasksTableView } from '@/components/tasks/TasksTableView';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { toast } from 'sonner';
 import { 
   CheckSquare, 
@@ -748,20 +749,15 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
   );
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
+    <div className="page-shell">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-3">
-            <span className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <CheckSquare className="h-5 w-5 text-primary" />
-            </span>
-            Tasks
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm ml-[52px]">
-            Διαχείριση εργασιών και παραδοτέων
-          </p>
-        </div>
+        <PageHeader
+          icon={CheckSquare}
+          title="Tasks"
+          subtitle="Διαχείριση εργασιών και παραδοτέων"
+          breadcrumbs={[{ label: 'Εργασία', href: '/work' }, { label: 'Tasks' }]}
+        />
 
         <div className="flex items-center gap-3">
           <UnifiedViewToggle 

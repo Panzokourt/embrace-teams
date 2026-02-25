@@ -7,6 +7,7 @@ import ContractsList from '@/components/finance/ContractsList';
 import InvoicesManager from '@/components/finance/InvoicesManager';
 import ExpensesManager from '@/components/finance/ExpensesManager';
 import ProfitabilityReports from '@/components/finance/ProfitabilityReports';
+import { PageHeader } from '@/components/shared/PageHeader';
 
 const TABS = [
   { value: 'dashboard', label: 'Dashboard' },
@@ -26,23 +27,21 @@ export default function FinancialsPage() {
   };
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-          <DollarSign className="h-8 w-8" />
-          Λογιστήριο
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Υπηρεσίες, συμβάσεις, τιμολόγια, έξοδα και κερδοφορία
-        </p>
-      </div>
-
+    <div className="page-shell">
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList className="flex flex-wrap h-auto gap-1">
-          {TABS.map(t => (
-            <TabsTrigger key={t.value} value={t.value}>{t.label}</TabsTrigger>
-          ))}
-        </TabsList>
+        <PageHeader
+          icon={DollarSign}
+          title="Λογιστήριο"
+          subtitle="Υπηρεσίες, συμβάσεις, τιμολόγια, έξοδα και κερδοφορία"
+          breadcrumbs={[{ label: 'Λογιστήριο' }]}
+          tabs={
+            <TabsList className="flex flex-wrap h-auto gap-1">
+              {TABS.map(t => (
+                <TabsTrigger key={t.value} value={t.value}>{t.label}</TabsTrigger>
+              ))}
+            </TabsList>
+          }
+        />
 
         <TabsContent value="dashboard"><FinanceDashboard /></TabsContent>
         <TabsContent value="services"><ServicesCatalog /></TabsContent>

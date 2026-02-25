@@ -1,150 +1,146 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
-import { el } from 'date-fns/locale';
-import { 
-  ArrowLeft, Building2, Mail, Phone, MapPin, Calendar, 
-  FolderKanban, Wallet, FileText, Loader2, TrendingUp, 
-  CheckCircle2, Clock, StickyNote, Globe, Hash, BookUser, Pencil
-} from 'lucide-react';
+import { Building2, Loader2 } from 'lucide-react';
+import { startOfYear, startOfWeek, endOfWeek, isBefore } from 'date-fns';
+
 import { ClientForm } from '@/components/clients/ClientForm';
-
-const sectorLabels: Record<string, string> = {
-  public: 'Δημόσιος Τομέας',
-  private: 'Ιδιωτικός Τομέας',
-  non_profit: 'Μη Κερδοσκοπικός',
-  government: 'Κυβερνητικός',
-  mixed: 'Μικτός',
-};
-
-interface ClientData {
-  id: string;
-  name: string;
-  contact_email: string | null;
-  contact_phone: string | null;
-  address: string | null;
-  notes: string | null;
-  created_at: string;
-  sector: string | null;
-  website: string | null;
-  tax_id: string | null;
-  secondary_phone: string | null;
-  tags: string[] | null;
-  logo_url: string | null;
-}
-
-interface Project {
-  id: string;
-  name: string;
-  status: string;
-  progress: number;
-  budget: number;
-  start_date: string | null;
-  end_date: string | null;
-}
-
-interface Invoice {
-  id: string;
-  invoice_number: string;
-  amount: number;
-  issued_date: string;
-  due_date: string | null;
-  paid: boolean;
-  paid_date: string | null;
-}
-
-interface Contract {
-  id: string;
-  contract_number: string | null;
-  total_amount: number;
-  status: string;
-  start_date: string | null;
-  end_date: string | null;
-}
+import { ClientSmartHeader } from '@/components/clients/detail/ClientSmartHeader';
+import { ClientWebsitesCard } from '@/components/clients/detail/ClientWebsitesCard';
+import { ClientSocialCard } from '@/components/clients/detail/ClientSocialCard';
+import { ClientAdAccountsCard } from '@/components/clients/detail/ClientAdAccountsCard';
+import { ClientStrategyCard } from '@/components/clients/detail/ClientStrategyCard';
+import { ClientProjectsCard } from '@/components/clients/detail/ClientProjectsCard';
+import { ClientTasksSnapshot } from '@/components/clients/detail/ClientTasksSnapshot';
+import { ClientBriefsCard } from '@/components/clients/detail/ClientBriefsCard';
+import { ClientTeamCard } from '@/components/clients/detail/ClientTeamCard';
+import { ClientContactsCard } from '@/components/clients/detail/ClientContactsCard';
+import { ClientFilesCard } from '@/components/clients/detail/ClientFilesCard';
 
 export default function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isAdmin, isManager } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [client, setClient] = useState<ClientData | null>(null);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [contracts, setContracts] = useState<Contract[]>([]);
-  const [contactId, setContactId] = useState<string | null>(null);
+  const [client, setClient] = useState<any>(null);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [contacts, setContacts] = useState<any[]>([]);
+  const [briefs, setBriefs] = useState<any[]>([]);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [editOpen, setEditOpen] = useState(false);
 
   useEffect(() => {
-    if (id) fetchClientData();
+    if (id) fetchAll();
   }, [id]);
 
-  const fetchClientData = async () => {
+  const fetchAll = async () => {
     if (!id) return;
     setLoading(true);
-    
     try {
-      const { data: clientData, error: clientError } = await supabase
+      // Fetch client
+      const { data: clientData, error } = await supabase
         .from('clients')
         .select('*')
         .eq('id', id)
         .single();
-      
-      if (clientError) throw clientError;
+      if (error) throw error;
       setClient(clientData);
 
-      // Fetch linked contact
-      const { data: contactData } = await supabase
-        .from('contacts')
-        .select('id')
-        .eq('client_id', id)
-        .maybeSingle();
-      setContactId(contactData?.id || null);
+      // Parallel fetches
+      const [projectsRes, contactsRes, briefsRes, invoicesRes] = await Promise.all([
+        supabase.from('projects').select('id, name, status, progress, budget, start_date, end_date')
+          .eq('client_id', id).order('created_at', { ascending: false }),
+        supabase.from('contacts').select('id, name, email, phone, category, tags')
+          .eq('client_id', id),
+        supabase.from('briefs').select('id, title, status, brief_type, created_at')
+          .eq('client_id', id).order('created_at', { ascending: false }).limit(5),
+        supabase.from('invoices').select('id, amount, paid, issued_date')
+          .eq('client_id', id),
+      ]);
 
-      const { data: projectsData } = await supabase
-        .from('projects')
-        .select('id, name, status, progress, budget, start_date, end_date')
-        .eq('client_id', id)
-        .order('created_at', { ascending: false });
-      
-      setProjects(projectsData || []);
+      const prjs = projectsRes.data || [];
+      setProjects(prjs);
+      setContacts(contactsRes.data || []);
+      setBriefs(briefsRes.data || []);
+      setInvoices(invoicesRes.data || []);
 
-      const { data: invoicesData } = await supabase
-        .from('invoices')
-        .select('id, invoice_number, amount, issued_date, due_date, paid, paid_date')
-        .eq('client_id', id)
-        .order('issued_date', { ascending: false });
-      
-      setInvoices(invoicesData || []);
+      // Fetch tasks for these projects
+      if (prjs.length > 0) {
+        const projectIds = prjs.map(p => p.id);
+        const { data: tasksData } = await supabase
+          .from('tasks')
+          .select('id, status, due_date')
+          .in('project_id', projectIds);
+        setTasks(tasksData || []);
 
-      if (projectsData && projectsData.length > 0) {
-        const { data: contractsData } = await supabase
-          .from('contracts')
-          .select('id, contract_number, total_amount, status, start_date, end_date')
-          .in('project_id', projectsData.map(p => p.id));
-        
-        setContracts(contractsData || []);
+        // Fetch team members via project_user_access
+        const { data: accessData } = await supabase
+          .from('project_user_access')
+          .select('user_id')
+          .in('project_id', projectIds);
+
+        if (accessData && accessData.length > 0) {
+          const uniqueUserIds = [...new Set(accessData.map(a => a.user_id))];
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url, job_title')
+            .in('id', uniqueUserIds);
+
+          setTeamMembers((profiles || []).map(p => ({
+            ...p,
+            role: p.job_title || null,
+          })));
+        }
       }
-
-    } catch (error) {
-      console.error('Error fetching client:', error);
-      toast.error('Σφάλμα κατά τη φόρτωση πελάτη');
+    } catch (err) {
+      console.error(err);
+      toast.error('Σφάλμα φόρτωσης πελάτη');
     } finally {
       setLoading(false);
     }
   };
 
-  const totalRevenue = invoices.filter(i => i.paid).reduce((sum, i) => sum + Number(i.amount), 0);
-  const pendingInvoices = invoices.filter(i => !i.paid);
-  const pendingAmount = pendingInvoices.reduce((sum, i) => sum + Number(i.amount), 0);
-  const activeProjects = projects.filter(p => p.status === 'active');
+  // KPI calculations
+  const now = new Date();
+  const yearStart = startOfYear(now);
+  const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+
+  const revenueThisYear = useMemo(() =>
+    invoices.filter(i => i.paid && new Date(i.issued_date) >= yearStart)
+      .reduce((s, i) => s + Number(i.amount), 0),
+    [invoices]
+  );
+
+  const monthlyRevenue = useMemo(() => {
+    const months = Math.max(1, (now.getMonth() + 1));
+    return Math.round(revenueThisYear / months);
+  }, [revenueThisYear]);
+
+  const totalBudget = useMemo(() => projects.reduce((s, p) => s + (p.budget || 0), 0), [projects]);
+  const totalCost = useMemo(() => invoices.reduce((s, i) => s + Number(i.amount), 0), [invoices]);
+  const marginPercent = totalBudget > 0 ? Math.round(((totalBudget - totalCost) / totalBudget) * 100) : 0;
+
+  // Task snapshots
+  const overdueTasks = tasks.filter(t => t.status !== 'done' && t.due_date && isBefore(new Date(t.due_date), now)).length;
+  const dueThisWeek = tasks.filter(t => {
+    if (t.status === 'done' || !t.due_date) return false;
+    const d = new Date(t.due_date);
+    return d >= weekStart && d <= weekEnd;
+  }).length;
+  const openTasks = tasks.filter(t => t.status !== 'done').length;
+
+  // Parse JSONB fields safely
+  const socialAccounts = Array.isArray(client?.social_accounts) ? client.social_accounts : [];
+  const adAccounts = Array.isArray(client?.ad_accounts) ? client.ad_accounts : [];
+  const additionalWebsites = Array.isArray(client?.additional_websites) ? client.additional_websites : [];
+  const strategy = (client?.strategy && typeof client.strategy === 'object' && !Array.isArray(client.strategy))
+    ? client.strategy : {};
 
   if (loading) {
     return (
@@ -159,309 +155,50 @@ export default function ClientDetailPage() {
       <div className="p-8 text-center">
         <Building2 className="h-16 w-16 mx-auto text-muted-foreground/30 mb-4" />
         <h2 className="text-xl font-semibold">Ο πελάτης δεν βρέθηκε</h2>
-        <Button variant="outline" onClick={() => navigate('/clients')} className="mt-4">
-          <ArrowLeft className="h-4 w-4 mr-2" /> Επιστροφή
-        </Button>
+        <Button variant="outline" onClick={() => navigate('/clients')} className="mt-4">Επιστροφή</Button>
       </div>
     );
   }
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/clients')}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="flex items-center gap-4 flex-1">
-          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-            <Building2 className="h-8 w-8 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold">{client.name}</h1>
-            <div className="flex items-center gap-3 mt-1 flex-wrap">
-              {client.sector && <Badge variant="secondary">{sectorLabels[client.sector] || client.sector}</Badge>}
-              {client.contact_email && (
-                <span className="text-muted-foreground text-sm">{client.contact_email}</span>
-              )}
-              <Badge variant="outline">{projects.length} έργα</Badge>
-            </div>
-            {(client.tags || []).length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {client.tags!.map(t => <Badge key={t} variant="outline" className="text-xs">{t}</Badge>)}
-              </div>
-            )}
-          </div>
-        </div>
-        {contactId && (
-          <Button variant="outline" size="sm" asChild>
-            <Link to={`/contacts/${contactId}`}><BookUser className="h-4 w-4 mr-1" />Ευρετήριο</Link>
-          </Button>
-        )}
-        {(isAdmin || isManager) && (
-          <Button size="sm" onClick={() => setEditOpen(true)}>
-            <Pencil className="h-4 w-4 mr-1" />Επεξεργασία
-          </Button>
-        )}
-      </div>
+    <div className="p-6 lg:p-8 space-y-6 max-w-[1400px] mx-auto">
+      {/* SECTION 1 — Smart Header */}
+      <ClientSmartHeader
+        client={client}
+        revenueThisYear={revenueThisYear}
+        monthlyRevenue={monthlyRevenue}
+        marginPercent={marginPercent}
+        canEdit={isAdmin || isManager}
+        onEdit={() => setEditOpen(true)}
+      />
 
-      <Separator />
-
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                <FolderKanban className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{activeProjects.length}</p>
-                <p className="text-sm text-muted-foreground">Ενεργά έργα</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-lg bg-success/10 flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-success" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">€{totalRevenue.toLocaleString()}</p>
-                <p className="text-sm text-muted-foreground">Συνολικά έσοδα</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-lg bg-warning/10 flex items-center justify-center">
-                <Clock className="h-6 w-6 text-warning" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">€{pendingAmount.toLocaleString()}</p>
-                <p className="text-sm text-muted-foreground">Εκκρεμεί</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center">
-                <FileText className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{invoices.length}</p>
-                <p className="text-sm text-muted-foreground">Τιμολόγια</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Main Content */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Left Column - Info */}
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                Πληροφορίες
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {client.sector && (
-                <div className="flex items-center gap-3">
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                  <span>{sectorLabels[client.sector] || client.sector}</span>
-                </div>
-              )}
-              {client.tax_id && (
-                <div className="flex items-center gap-3">
-                  <Hash className="h-4 w-4 text-muted-foreground" />
-                  <div><p className="text-xs text-muted-foreground">ΑΦΜ</p><p className="text-sm">{client.tax_id}</p></div>
-                </div>
-              )}
-              {client.contact_email && (
-                <div className="flex items-center gap-3">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <span>{client.contact_email}</span>
-                </div>
-              )}
-              {client.contact_phone && (
-                <div className="flex items-center gap-3">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span>{client.contact_phone}</span>
-                </div>
-              )}
-              {client.secondary_phone && (
-                <div className="flex items-center gap-3">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  <div><p className="text-xs text-muted-foreground">Δεύτερο Τηλ.</p><p className="text-sm">{client.secondary_phone}</p></div>
-                </div>
-              )}
-              {client.website && (
-                <div className="flex items-center gap-3">
-                  <Globe className="h-4 w-4 text-muted-foreground" />
-                  <a href={client.website} target="_blank" rel="noreferrer" className="text-primary hover:underline text-sm">{client.website}</a>
-                </div>
-              )}
-              {client.address && (
-                <div className="flex items-center gap-3">
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
-                  <span>{client.address}</span>
-                </div>
-              )}
-              <div className="flex items-center gap-3">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span>Πελάτης από: {format(new Date(client.created_at), 'd MMM yyyy', { locale: el })}</span>
-              </div>
-              {client.notes && (
-                <div className="pt-2 border-t">
-                  <div className="flex items-start gap-3">
-                    <StickyNote className="h-4 w-4 text-muted-foreground mt-0.5" />
-                    <p className="text-sm text-muted-foreground">{client.notes}</p>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+      {/* SECTION 2 — Main Grid */}
+      <div className="grid grid-cols-12 gap-6">
+        {/* Left Column — Business & Strategy */}
+        <div className="col-span-12 lg:col-span-7 space-y-6">
+          <ClientWebsitesCard
+            primaryWebsite={client.website}
+            additionalWebsites={additionalWebsites}
+          />
+          <ClientSocialCard accounts={socialAccounts} />
+          <ClientAdAccountsCard accounts={adAccounts} />
+          <ClientStrategyCard strategy={strategy} />
         </div>
 
-        {/* Right Column - Projects, Invoices, Contracts */}
-        <div className="lg:col-span-2">
-          <Tabs defaultValue="projects">
-            <TabsList>
-              <TabsTrigger value="projects">
-                <FolderKanban className="h-4 w-4 mr-2" />
-                Έργα ({projects.length})
-              </TabsTrigger>
-              <TabsTrigger value="invoices">
-                <FileText className="h-4 w-4 mr-2" />
-                Τιμολόγια ({invoices.length})
-              </TabsTrigger>
-              <TabsTrigger value="contracts">
-                <Wallet className="h-4 w-4 mr-2" />
-                Συμβόλαια ({contracts.length})
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="projects" className="mt-4">
-              <Card>
-                <CardContent className="pt-4">
-                  {projects.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-8">Δεν υπάρχουν έργα</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {projects.map(project => (
-                        <Link 
-                          key={project.id} 
-                          to={`/projects/${project.id}`}
-                          className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors"
-                        >
-                          <div>
-                            <span className="font-medium">{project.name}</span>
-                            {project.budget > 0 && (
-                              <span className="text-sm text-muted-foreground ml-2">
-                                • €{project.budget.toLocaleString()}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <Badge variant={project.status === 'active' ? 'default' : 'outline'}>
-                              {project.status}
-                            </Badge>
-                            <span className="text-sm text-muted-foreground">{project.progress}%</span>
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="invoices" className="mt-4">
-              <Card>
-                <CardContent className="pt-4">
-                  {invoices.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-8">Δεν υπάρχουν τιμολόγια</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {invoices.map(invoice => (
-                        <div 
-                          key={invoice.id}
-                          className="flex items-center justify-between p-3 rounded-lg bg-secondary/50"
-                        >
-                          <div>
-                            <span className="font-medium">{invoice.invoice_number}</span>
-                            <span className="text-sm text-muted-foreground ml-2">
-                              • {format(new Date(invoice.issued_date), 'd MMM yyyy', { locale: el })}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="font-semibold">€{Number(invoice.amount).toLocaleString()}</span>
-                            {invoice.paid ? (
-                              <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                                <CheckCircle2 className="h-3 w-3 mr-1" />
-                                Πληρώθηκε
-                              </Badge>
-                            ) : (
-                              <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
-                                <Clock className="h-3 w-3 mr-1" />
-                                Εκκρεμεί
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="contracts" className="mt-4">
-              <Card>
-                <CardContent className="pt-4">
-                  {contracts.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-8">Δεν υπάρχουν συμβόλαια</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {contracts.map(contract => (
-                        <div 
-                          key={contract.id}
-                          className="flex items-center justify-between p-3 rounded-lg bg-secondary/50"
-                        >
-                          <div>
-                            <span className="font-medium">{contract.contract_number || 'Χωρίς αριθμό'}</span>
-                            {contract.start_date && (
-                              <span className="text-sm text-muted-foreground ml-2">
-                                • {format(new Date(contract.start_date), 'd MMM yyyy', { locale: el })}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="font-semibold">€{Number(contract.total_amount).toLocaleString()}</span>
-                            <Badge variant="outline">{contract.status}</Badge>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+        {/* Right Column — Execution & People */}
+        <div className="col-span-12 lg:col-span-5 space-y-6">
+          <ClientProjectsCard projects={projects} clientId={client.id} />
+          <ClientTasksSnapshot overdue={overdueTasks} dueThisWeek={dueThisWeek} open={openTasks} />
+          <ClientBriefsCard briefs={briefs} clientId={client.id} />
+          <ClientTeamCard members={teamMembers} />
+          <ClientContactsCard contacts={contacts} />
         </div>
       </div>
 
-      <ClientForm open={editOpen} onOpenChange={setEditOpen} client={client} onSaved={fetchClientData} />
+      {/* SECTION 3 — Files (full width) */}
+      <ClientFilesCard files={[]} />
+
+      <ClientForm open={editOpen} onOpenChange={setEditOpen} client={client} onSaved={fetchAll} />
     </div>
   );
 }

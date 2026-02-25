@@ -6,7 +6,8 @@ import { CalendarEventDialog } from '@/components/calendar/CalendarEventDialog';
 import { CalendarBacklog } from '@/components/calendar/CalendarBacklog';
 import { useCalendarEvents, CalendarEvent, CreateEventInput } from '@/hooks/useCalendarEvents';
 import { Button } from '@/components/ui/button';
-import { Plus, PanelRight } from 'lucide-react';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { Plus, PanelRight, CalendarDays } from 'lucide-react';
 import { startOfYear, endOfYear } from 'date-fns';
 
 export default function CalendarHub() {
@@ -123,30 +124,34 @@ export default function CalendarHub() {
   return (
     <div className="flex flex-col h-[calc(100vh-56px)]">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-bold tracking-tight">Ημερολόγιο</h1>
-          <CalendarFilterTabs active={activeFilter} onChange={handleFilterChange} />
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8"
-            onClick={() => setBacklogOpen(!backlogOpen)}
-          >
-            <PanelRight className="h-4 w-4 mr-1.5" />
-            Backlog
-          </Button>
-          <Button
-            size="sm"
-            className="h-8"
-            onClick={() => handleCreateEvent(new Date())}
-          >
-            <Plus className="h-4 w-4 mr-1.5" />
-            Νέο Event
-          </Button>
-        </div>
+      <div className="px-6 pt-4 pb-3 border-b border-border/40">
+        <PageHeader
+          icon={CalendarDays}
+          title="Ημερολόγιο"
+          breadcrumbs={[{ label: 'Ημερολόγιο' }]}
+          actions={
+            <div className="flex items-center gap-2">
+              <CalendarFilterTabs active={activeFilter} onChange={handleFilterChange} />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8"
+                onClick={() => setBacklogOpen(!backlogOpen)}
+              >
+                <PanelRight className="h-4 w-4 mr-1.5" />
+                Backlog
+              </Button>
+              <Button
+                size="sm"
+                className="h-8"
+                onClick={() => handleCreateEvent(new Date())}
+              >
+                <Plus className="h-4 w-4 mr-1.5" />
+                Νέο Event
+              </Button>
+            </div>
+          }
+        />
       </div>
 
       {/* Calendar body */}

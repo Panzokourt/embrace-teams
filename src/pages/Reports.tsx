@@ -10,6 +10,7 @@ import { ReportsTasks } from '@/components/reports/ReportsTasks';
 import { ReportsClients } from '@/components/reports/ReportsClients';
 import { ReportsTeam } from '@/components/reports/ReportsTeam';
 import { exportToCSV, exportToExcel, formatters } from '@/utils/exportUtils';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { Loader2, BarChart3 } from 'lucide-react';
 
 const TABS = [
@@ -120,35 +121,37 @@ export default function Reports() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-[1400px] mx-auto" id="reports-content">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <BarChart3 className="h-6 w-6 text-foreground" />
-          <h1 className="text-2xl font-semibold tracking-tight">Αναφορές</h1>
-        </div>
-        <div className="flex flex-wrap items-center gap-3 print:hidden">
-          <ReportFilters
-            filters={filters}
-            onChange={setFilters}
-            clients={data.clients}
-            projects={data.projects}
-            departments={data.departments}
-            profiles={data.profiles}
-          />
-          <ReportExportMenu
-            onExportCSV={handleExportCSV}
-            onExportExcel={handleExportExcel}
-            onExportPDF={handleExportPDF}
-          />
-        </div>
-      </div>
-
+    <div className="page-shell max-w-[1400px] mx-auto" id="reports-content">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="print:hidden">
-          {TABS.map(t => (
-            <TabsTrigger key={t.value} value={t.value}>{t.label}</TabsTrigger>
-          ))}
-        </TabsList>
+        <PageHeader
+          icon={BarChart3}
+          title="Αναφορές"
+          breadcrumbs={[{ label: 'Αναφορές' }]}
+          actions={
+            <div className="flex flex-wrap items-center gap-3 print:hidden">
+              <ReportFilters
+                filters={filters}
+                onChange={setFilters}
+                clients={data.clients}
+                projects={data.projects}
+                departments={data.departments}
+                profiles={data.profiles}
+              />
+              <ReportExportMenu
+                onExportCSV={handleExportCSV}
+                onExportExcel={handleExportExcel}
+                onExportPDF={handleExportPDF}
+              />
+            </div>
+          }
+          tabs={
+            <TabsList className="print:hidden">
+              {TABS.map(t => (
+                <TabsTrigger key={t.value} value={t.value}>{t.label}</TabsTrigger>
+              ))}
+            </TabsList>
+          }
+        />
 
         <TabsContent value="overview"><ReportsOverview data={data} /></TabsContent>
         <TabsContent value="financial"><ReportsFinancial data={data} /></TabsContent>

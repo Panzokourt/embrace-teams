@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { RiskBadge } from '@/components/governance/RiskBadge';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Database } from 'lucide-react';
+import { Loader2, Database, Shield } from 'lucide-react';
 
 export default function Governance() {
   const { assets, assetsLoading, reviewTasks, platforms, seedPlatforms, platformsLoading } = useGovernance();
@@ -18,19 +19,21 @@ export default function Governance() {
   const needsSeed = platforms.length === 0;
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Digital Governance</h1>
-          <p className="text-muted-foreground">Παρακολούθηση ψηφιακών assets, πρόσβασης και ασφάλειας</p>
-        </div>
-        {needsSeed && (
-          <Button onClick={() => seedPlatforms.mutate()} disabled={seedPlatforms.isPending}>
-            <Database className="h-4 w-4 mr-2" />
-            Δημιουργία Default Platforms
-          </Button>
-        )}
-      </div>
+    <div className="page-shell">
+      <PageHeader
+        icon={Shield}
+        title="Digital Governance"
+        subtitle="Παρακολούθηση ψηφιακών assets, πρόσβασης και ασφάλειας"
+        breadcrumbs={[{ label: 'Governance' }]}
+        actions={
+          needsSeed ? (
+            <Button onClick={() => seedPlatforms.mutate()} disabled={seedPlatforms.isPending}>
+              <Database className="h-4 w-4 mr-2" />
+              Δημιουργία Default Platforms
+            </Button>
+          ) : undefined
+        }
+      />
 
       <GovernanceDashboardKPIs assets={assets} reviewTasks={reviewTasks} />
 

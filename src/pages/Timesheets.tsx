@@ -10,6 +10,7 @@ import { AttendanceLog } from '@/components/time-tracking/AttendanceLog';
 import { exportToCSV, exportToExcel } from '@/utils/exportUtils';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { Loader2, Download, Timer, LayoutGrid, List, CalendarDays } from 'lucide-react';
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfDay, endOfDay, parseISO, isWithinInterval, subWeeks, subMonths, format } from 'date-fns';
 import { toast } from 'sonner';
@@ -166,31 +167,26 @@ export default function Timesheets() {
   }
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2">
-            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Timer className="h-5 w-5 text-primary" />
-            </div>
-            Timesheets
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">Καταγραφή & διαχείριση χρόνου εργασίας</p>
-        </div>
-      </div>
-
+    <div className="page-shell">
       <Tabs defaultValue="timesheets" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="timesheets" className="gap-1.5">
-            <Timer className="h-3.5 w-3.5" />
-            Timesheets
-          </TabsTrigger>
-          <TabsTrigger value="attendance" className="gap-1.5">
-            <CalendarDays className="h-3.5 w-3.5" />
-            Παρουσίες
-          </TabsTrigger>
-        </TabsList>
+        <PageHeader
+          icon={Timer}
+          title="Timesheets"
+          subtitle="Καταγραφή & διαχείριση χρόνου εργασίας"
+          breadcrumbs={[{ label: 'Timesheets' }]}
+          tabs={
+            <TabsList>
+              <TabsTrigger value="timesheets" className="gap-1.5">
+                <Timer className="h-3.5 w-3.5" />
+                Timesheets
+              </TabsTrigger>
+              <TabsTrigger value="attendance" className="gap-1.5">
+                <CalendarDays className="h-3.5 w-3.5" />
+                Παρουσίες
+              </TabsTrigger>
+            </TabsList>
+          }
+        />
 
         <TabsContent value="timesheets" className="space-y-6">
           {/* Controls */}

@@ -3,6 +3,7 @@ import { Plus, Download, BookUser } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ContactsTableView } from '@/components/contacts/ContactsTableView';
 import { ContactForm } from '@/components/contacts/ContactForm';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function Contacts() {
@@ -33,20 +34,19 @@ export default function Contacts() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-muted"><BookUser className="h-6 w-6 text-foreground" /></div>
-          <div>
-            <h1 className="text-2xl font-bold">Ευρετήριο Επαφών</h1>
-            <p className="text-sm text-muted-foreground">{contacts.length} επαφές</p>
+    <div className="page-shell">
+      <PageHeader
+        icon={BookUser}
+        title="Ευρετήριο Επαφών"
+        subtitle={`${contacts.length} επαφές`}
+        breadcrumbs={[{ label: 'Επαφές' }]}
+        actions={
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={exportCSV}><Download className="h-4 w-4 mr-1" />Export</Button>
+            <Button size="sm" onClick={handleNew}><Plus className="h-4 w-4 mr-1" />Νέα Επαφή</Button>
           </div>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={exportCSV}><Download className="h-4 w-4 mr-1" />Export</Button>
-          <Button size="sm" onClick={handleNew}><Plus className="h-4 w-4 mr-1" />Νέα Επαφή</Button>
-        </div>
-      </div>
+        }
+      />
 
       <ContactsTableView contacts={contacts} loading={loading} onEdit={handleEdit} onRefresh={fetchContacts} />
 

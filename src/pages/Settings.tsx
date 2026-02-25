@@ -39,6 +39,7 @@ import {
   LayoutGrid
 } from 'lucide-react';
 import { ProjectCategoriesManager } from '@/components/settings/ProjectCategoriesManager';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { EmailAccountSetup } from '@/components/settings/EmailAccountSetup';
 
 const DAY_LABELS = ['Δευτέρα', 'Τρίτη', 'Τετάρτη', 'Πέμπτη', 'Παρασκευή', 'Σάββατο', 'Κυριακή'];
@@ -272,17 +273,13 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-          <SettingsIcon className="h-8 w-8" />
-          Ρυθμίσεις
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Διαχείριση λογαριασμού και προτιμήσεων
-        </p>
-      </div>
+    <div className="page-shell">
+      <PageHeader
+        icon={SettingsIcon}
+        title="Ρυθμίσεις"
+        subtitle="Διαχείριση λογαριασμού και προτιμήσεων"
+        breadcrumbs={[{ label: 'Ρυθμίσεις' }]}
+      />
 
       {/* Profile Settings */}
       <Card>

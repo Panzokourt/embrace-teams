@@ -1,95 +1,52 @@
-# Fix Empty Cards + Add Inline Editing on Client Detail
 
-## Problem
 
-When cards have no data (Websites, Social, Ad Accounts, Strategy, Team, Contacts), they return `null` and disappear, leaving large empty gaps -- especially visible in the left column (screenshots show blank space).
+# Fix Navigation for Chat/Inbox + Fix Tab-Switch Reload Issue
 
-## Solution
+## Issue 1: Chat & Inbox Missing from Navigation
 
-All cards will always render, showing an empty state with an inline "Add" button when no data exists. This ensures the layout stays consistent and users can add data directly without going to the edit form.
+Chat (`/chat`) and Inbox (`/inbox`) routes exist but are not listed in any sidebar navigation category. They need a new "Communication" domain in the sidebar.
 
----
+### Changes
 
-## Changes Per Component
-
-### 1. `ClientWebsitesCard.tsx`
-
-- Remove `if (!primaryWebsite && ...) return null`
-- Show empty state: "No websites added" + inline "Add Website" button (opens a small inline form or triggers the edit dialog)
-
-### 2. `ClientSocialCard.tsx`
-
-- Remove `if (accounts.length === 0) return null`
-- Show empty state with placeholder rows for common platforms (Facebook, Instagram, LinkedIn, TikTok, YouTube) as grayed-out items with "Add" action
-
-### 3. `ClientAdAccountsCard.tsx`
-
-- Remove `if (accounts.length === 0) return null`
-- Show empty state with placeholder for common platforms (Business Manager, Meta Ads, Google Ads, GA4, GTM) grayed out with "Add" action
-
-### 4. `ClientStrategyCard.tsx`
-
-- Remove the `if (!hasContent) return null` check
-- Show empty state sections for Goals, Pillars, Positioning with "Add" prompts
-
-### 5. `ClientTeamCard.tsx`
-
-- Remove `if (members.length === 0) return null`
-- Show empty state: "No team members assigned" with helpful text
-
-### 6. `ClientContactsCard.tsx`
-
-- Already shows empty state (good) -- no change needed
-
-### 7. `ClientBriefsCard.tsx`
-
-- Already shows empty state (good) -- no change needed
-
-### 8. `ClientProjectsCard.tsx`
-
-- Already shows empty state (good) -- no change needed
+**`src/components/layout/AppSidebar.tsx`**:
+- Add a new category `communication` to the `categories` array with a `MessageSquare` icon and label "Communication"
+- Add `communication` to the `CategoryId` type
+- Add nav items to `categoryNavItems.communication`:
+  - Chat (`/chat`, MessageSquare icon)
+  - Inbox (`/inbox`, Mail icon)
+- Update `detectCategory()` to handle `/chat` and `/inbox` route prefixes
 
 ---
 
-## Empty State Design Pattern
+## Issue 2: Page Reloads When Switching Browser Tabs
 
-Each empty card will follow this consistent pattern:
+**Root Cause**: When the user switches away from the tab and comes back, the Supabase auth client fires a `TOKEN_REFRESHED` event via `onAuthStateChange`. The current `AuthContext` handler calls `applySession()` which sets `loading=true` every time a session is received. This causes `AppLayout` to render the loading spinner, unmounting all children (including open dialogs/forms). When `fetchUserData` completes, `loading` becomes `false` again and everything re-mounts from scratch.
 
-- Card header with icon + title (same as when populated)
-- Light dashed border placeholder area inside
-- Muted text describing what can be added
-- A subtle "Add" button (ghost variant, small size)
-- Clicking "Add" triggers `onEdit()` callback passed from ClientDetail, opening the ClientForm dialog
+### Fix
+
+**`src/contexts/AuthContext.tsx`**:
+- In the `onAuthStateChange` callback, check whether we already have loaded user data (profile, companyRole). If we do, do NOT set `loading=true` -- just silently update the session/user references and skip re-fetching.
+- Only set `loading=true` and re-fetch on actual sign-in/sign-out events, not on token refreshes.
+- Specifically: check the `event` parameter -- if it's `TOKEN_REFRESHED` or `SIGNED_IN` when user is already loaded, just update session without triggering loading state.
+
+```
+// Pseudocode change in onAuthStateChange:
+if (event === 'TOKEN_REFRESHED') {
+  // Just update session reference, don't reload everything
+  setSession(session);
+  setUser(session?.user ?? null);
+  return; // skip fetchUserData + loading=true
+}
+```
+
+This ensures forms, dialogs, and page state survive tab switches completely.
 
 ---
 
-## Props Changes
+## Files Modified (2)
 
-Cards that currently don't accept an `onEdit` callback will receive one:
+| File | Change |
+|------|--------|
+| `src/components/layout/AppSidebar.tsx` | Add "Communication" category with Chat + Inbox nav items |
+| `src/contexts/AuthContext.tsx` | Skip loading state on TOKEN_REFRESHED events to prevent page remount |
 
-- `ClientWebsitesCard`: add `onEdit?: () => void`
-- `ClientSocialCard`: add `onEdit?: () => void`
-- `ClientAdAccountsCard`: add `onEdit?: () => void`
-- `ClientStrategyCard`: add `onEdit?: () => void`
-- `ClientTeamCard`: add `onEdit?: () => void`
-
-The `ClientDetail.tsx` page will pass `onEdit={() => setEditOpen(true)}` to each card.
-
----
-
-## Files Modified (7)
-
-
-| File                                                     | Change                                                                |
-| -------------------------------------------------------- | --------------------------------------------------------------------- |
-| `src/components/clients/detail/ClientWebsitesCard.tsx`   | Always render, add empty state + onEdit prop                          |
-| `src/components/clients/detail/ClientSocialCard.tsx`     | Always render, add empty state with platform placeholders + onEdit    |
-| `src/components/clients/detail/ClientAdAccountsCard.tsx` | Always render, add empty state with platform placeholders + onEdit    |
-| `src/components/clients/detail/ClientStrategyCard.tsx`   | Always render, add empty state for goals/pillars/positioning + onEdit |
-| `src/components/clients/detail/ClientTeamCard.tsx`       | Always render, add empty state + onEdit                               |
-| `src/components/clients/detail/ClientContactsCard.tsx`   | Add onEdit prop for "Add Contact" action in empty state               |
-| `src/pages/ClientDetail.tsx`                             | Pass `onEdit` prop to all cards                                       |
-
-
-No new files needed. No database changes needed.  
-Make clickabel assets that are possible to be clicked (people, tasks, links, etc)

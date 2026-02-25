@@ -697,7 +697,7 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
   return (
     <div className={embedded ? 'space-y-6' : 'page-shell'}>
       {/* Header */}
-      {!embedded && (
+      {!embedded ? (
         <PageHeader
           icon={FolderKanban}
           title="Έργα"
@@ -1017,8 +1017,25 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
             </div>
           }
         />
+      ) : (
+        <PageHeader
+          icon={FolderKanban}
+          title="Έργα"
+          subtitle="Διαχείριση και παρακολούθηση έργων"
+          breadcrumbs={[{ label: 'Εργασία', href: '/work' }, { label: 'Έργα' }]}
+          actions={
+            <div className="flex items-center gap-3">
+              <UnifiedViewToggle viewMode={viewMode} onViewModeChange={setViewMode} />
+              {canManage && (
+                <Button className="shadow-soft" onClick={() => setDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Νέο Έργο
+                </Button>
+              )}
+            </div>
+          }
+        />
       )}
-
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 animate-fade-in" style={{ animationDelay: '50ms' }}>
         <div className="relative flex-1 max-w-md">

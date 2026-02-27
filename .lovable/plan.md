@@ -1,167 +1,90 @@
 
-# Brain - AI Intelligence Hub με NLP & Neuromarketing
 
-## Concept
+# Brain: Deep Dive + Auto-Create + Fix Market/Neuro Insights
 
-Το Brain αναλύει τα δεδομένα της εταιρείας (projects, clients, tasks, financials, team) και παράγει τεκμηριωμένα insights χρησιμοποιώντας:
+## Προβλημα με Market & Neuro Insights
 
-- **NLP μεθόδους**: Sentiment analysis σε σχόλια/notes πελατών, keyword extraction από briefs/deliverables, topic clustering για αναγνώριση patterns, intent detection σε επικοινωνίες
-- **Neuromarketing τακτικές**: Framing effects (παρουσίαση δεδομένων με loss aversion), anchoring (σύγκριση με benchmarks), social proof (τι κάνουν παρόμοιοι πελάτες), scarcity/urgency triggers (deadlines, budget windows), reciprocity (upsell βασισμένο σε αξία που ήδη δόθηκε)
-- **Perplexity** (ήδη συνδεδεμένο): Market intelligence, industry trends, competitor analysis
-- **Firecrawl**: Scraping client websites/social για context enrichment
+Η ανάλυση βγάζει σωστά insights αλλά ο AI δεν δημιουργεί insights με κατηγορίες `market` και `neuro`. Αν και τα neuro tactics εφαρμόζονται σωστά σε κάθε insight (loss aversion, anchoring κλπ), λείπουν αυτόνομα insights τύπου "Market News" (ειδήσεις αγοράς) και "Neuro" (ψυχολογικές τακτικές πώλησης).
 
-## Database
+**Fix**: Ενισχύω το prompt στο `brain-analyze` ώστε να απαιτεί ρητά τουλάχιστον 1 `market` και 1 `neuro` insight, με σαφείς οδηγίες τι σημαίνει κάθε κατηγορία.
 
-### Νέος πίνακας: `brain_insights`
+---
 
-| Column | Type | Description |
-|--------|------|-------------|
-| id | uuid PK | |
-| company_id | uuid FK | Εταιρεία |
-| category | text | strategic / sales / productivity / market / alert / neuro |
-| subcategory | text | upsell / cross_sell / retention / framing / anchoring / sentiment |
-| priority | text | high / medium / low |
-| title | text | Τίτλος insight |
-| body | text | Πλήρες κείμενο (markdown) |
-| evidence | jsonb | Array links: [{type, id, name, url}] |
-| nlp_metadata | jsonb | Sentiment scores, keywords, topics |
-| neuro_tactic | text | Ποια neuromarketing τακτική εφαρμόζεται |
-| neuro_rationale | text | Γιατί αυτή η τακτική λειτουργεί εδώ |
-| market_context | text | External data (Perplexity/Firecrawl) |
-| citations | jsonb | URLs πηγών |
-| is_dismissed | boolean | Ο χρήστης το απέρριψε |
-| is_actioned | boolean | Ο χρήστης ενήργησε |
-| created_at | timestamptz | |
+## Νέες Δυνατότητες
 
-RLS: Μόνο active users της ίδιας εταιρείας βλέπουν τα insights.
+### 1. Deep Dive Analysis (Αναλυσε Περισσότερο)
 
-## Edge Function: `brain-analyze`
+Κάθε insight card αποκτά κουμπί **"Ανάλυση"** που:
+- Καλεί νέο edge function `brain-deep-analyze`
+- Στέλνει το insight + evidence entities
+- Το AI κάνει εστιασμένη βαθιά ανάλυση
+- Επιστρέφει extended report + action plan + suggested project/task data
+- Εμφανίζεται σε Dialog με markdown report
 
-Η κεντρική λογική ανάλυσης:
+### 2. Auto-Create Project / Task
 
-### Βήμα 1: Data Aggregation
-Fetch από τη βάση (με service role):
-- Projects: status, budget, progress, overdue tasks, margins
-- Clients: services, revenue, activity frequency, last contact
-- Tasks: overdue count, workload per user, completion rates
-- Financials: revenue trends, expense ratios, profitability per client
-- Comments/Notes: raw text για NLP analysis
+Κάθε insight card αποκτά dropdown **"Δημιούργησε..."** με:
+- **Νέο Έργο**: Pre-filled form (name, description, client, budget) βάσει AI suggestion
+- **Νέο Task**: Pre-filled form (title, description, priority) βάσει AI suggestion
+- Insert στη βάση + navigate στο νέο entity
 
-### Βήμα 2: NLP Processing (μέσω Gemini tool calling)
-Το AI θα εκτελεί NLP ανάλυση μέσω structured tool calls:
-- **Sentiment Analysis**: Αξιολόγηση sentiment σε client communications/notes
-- **Keyword Extraction**: Αναγνώριση key topics από project descriptions/briefs
-- **Pattern Recognition**: Εντοπισμός μοτίβων (π.χ. πελάτης που μειώνει engagement)
-- **Intent Detection**: Τι "θέλει" πραγματικά ο πελάτης βάσει ιστορικού
+---
 
-### Βήμα 3: Market Intelligence
-- **Perplexity**: Industry trends, competitor moves, market opportunities σχετικά με τους κλάδους των πελατών
-- **Firecrawl** (αν συνδεθεί): Scrape client websites για changes, new content, competitor activity
+## Τεχνικές Λεπτομέρειες
 
-### Βήμα 4: Neuromarketing-driven Insight Generation
-Το AI χρησιμοποιεί tool calling για structured output, εφαρμόζοντας:
+### Νέα Αρχεία
+
+| Αρχείο | Περιγραφή |
+|--------|-----------|
+| `supabase/functions/brain-deep-analyze/index.ts` | Edge function: δέχεται insight, φέρνει related data, καλεί Gemini + Perplexity για deep analysis, επιστρέφει extended_analysis + action_plan + suggested_project + suggested_task |
+| `src/components/brain/BrainDeepDiveDialog.tsx` | Dialog: loading animation, markdown report, action plan steps, κουμπιά create project/task |
+| `src/components/brain/BrainCreateActionDialog.tsx` | Dialog: form toggle Project/Task, pre-filled fields, insert to DB |
+
+### Τροποποιήσεις
+
+| Αρχείο | Αλλαγή |
+|--------|--------|
+| `supabase/functions/brain-analyze/index.ts` | Fix prompt: ρητή απαίτηση market + neuro insights, fix auth (getClaims -> getUser), βελτιωμένες οδηγίες ανά κατηγορία |
+| `src/components/brain/BrainInsightCard.tsx` | Νέα κουμπιά: "Ανάλυση" + dropdown "Δημιούργησε..." (Έργο / Task), νέα props onDeepDive, onCreateProject, onCreateTask |
+| `src/pages/Brain.tsx` | Handlers deep dive + create, state management dialogs, edge function call |
+| `supabase/config.toml` | Entry `[functions.brain-deep-analyze]` |
+
+### Edge Function: brain-deep-analyze
 
 ```text
-Neuromarketing Tactics στα insights:
-1. Loss Aversion: "Ο πελάτης X χάνει ~€5K/μήνα χωρίς SEO" αντί "Θα κερδίσει €5K"
-2. Anchoring: "Παρόμοιοι πελάτες ξοδεύουν 3x περισσότερο σε digital"
-3. Social Proof: "Το 80% των πελατών σας στο retail έχουν και influencer campaigns"
-4. Scarcity: "Η προσφορά Google Ads Q1 λήγει σε 2 εβδομάδες"
-5. Reciprocity: "Μετά το +30% ROI στο Social, ιδανική στιγμή για upsell"
-6. Peak-End Rule: Πρόταση follow-up μετά από successful project delivery
-7. Decoy Effect: Παρουσίαση 3 πακέτων (Basic/Pro/Enterprise) στο upsell
+Input: { insight_id, insight }
+1. Fetch evidence entities (clients, projects, tasks) by IDs
+2. Call Perplexity for focused market research on insight topic
+3. Call Gemini with:
+   - Original insight + evidence data + market research
+   - Request: extended_analysis (markdown), action_plan [{step, timeline}],
+     suggested_project {name, description, client_id, budget},
+     suggested_task {title, description, priority}
+4. Return structured response
 ```
 
-### Βήμα 5: Firecrawl Integration
-Αν υπάρχει Firecrawl connector:
-- Scrape client websites για αλλαγές
-- Ανάλυση competitor presence
-- Εντοπισμός gaps στο digital footprint πελάτη
+### BrainInsightCard - Νέα κουμπιά
 
-Αν δεν υπάρχει: graceful skip, μόνο Perplexity + internal data.
+Δίπλα στα υπάρχοντα Dismiss/Take Action προστίθενται:
+- **Ανάλυση** (Microscope icon): triggers deep dive dialog
+- **Δημιούργησε** (Plus icon, dropdown): "Νέο Έργο" ή "Νέο Task"
 
-## Frontend Components
+### BrainCreateActionDialog
 
-### `src/pages/Brain.tsx`
-Κεντρική σελίδα με:
-- Animated brain pulse visualization (neural network aesthetic)
-- Summary stats bar (πόσα insights, κατηγορίες)
-- Category filter chips
-- Scrollable insight cards feed
-- "Analyze Now" button
+- Toggle: Project / Task
+- Project fields: name, description, client (select), budget, status=lead
+- Task fields: title, description, priority, estimated hours
+- Ολα pre-filled απο AI suggestions (αν υπάρχουν)
+- Submit: insert to `projects` ή `tasks` table, navigate to entity
 
-### `src/components/brain/BrainPulse.tsx`
-Animated SVG component:
-- Κεντρικό brain icon με concentric pulse rings
-- Glow effect κατά τη διάρκεια analysis
-- Status text ("Αναλύω 12 projects...")
+### Prompt Fix για Market & Neuro
 
-### `src/components/brain/BrainInsightCard.tsx`
-Κάθε insight card περιλαμβάνει:
-- Category badge + Neuro tactic badge
-- Priority indicator (color-coded)
-- Title + body (markdown rendered)
-- Evidence links (clickable, navigate εντός app)
-- Neuromarketing rationale (expandable tooltip)
-- Market citations (external links)
-- Action buttons: "Dismiss" / "Take Action" / "Share"
-
-### `src/components/brain/BrainCategoryFilter.tsx`
-Filter chips: All | Strategic | Sales | Productivity | Market | Alerts | Neuro
-
-## Sidebar & Routing
-
-- Route: `/brain` (αντικαθιστά `/intelligence/ai-insights`)
-- Sidebar: Νέο entry "Brain" στην Intelligence category με Brain icon
-- Redirect: `/intelligence/ai-insights` -> `/brain`
-
-## Edge Functions & Config
-
-### Νέα function: `brain-analyze`
-- Χρησιμοποιεί LOVABLE_API_KEY (Gemini) + PERPLEXITY_API_KEY
-- Tool calling για structured insight output
-- NLP + neuromarketing logic ενσωματωμένα στο system prompt
-- Αποθήκευση insights στη βάση
-
-### Firecrawl
-Θα ελέγξουμε αν υπάρχει Firecrawl connector. Αν όχι, θα ζητήσουμε σύνδεση. Αν ο χρήστης δεν θέλει, η λειτουργία θα δουλέψει μόνο με Perplexity + internal data.
-
-### config.toml update
+Προσθήκη στο system prompt:
 ```text
-[functions.brain-analyze]
-verify_jwt = false
+MANDATORY CATEGORY DISTRIBUTION:
+- At least 1 insight with category "market" (pure market news/trends from Perplexity data)
+- At least 1 insight with category "neuro" (psychological selling tactics for specific clients)
+- Category "market": External news, industry shifts, competitor moves - NOT internal data
+- Category "neuro": Pure neuromarketing play - specific selling script using psychology
 ```
 
-## Αρχεία
-
-| Ενέργεια | Αρχείο |
-|----------|--------|
-| Migration | `brain_insights` table + RLS |
-| Νέο | `supabase/functions/brain-analyze/index.ts` |
-| Νέο | `src/pages/Brain.tsx` |
-| Νέο | `src/components/brain/BrainPulse.tsx` |
-| Νέο | `src/components/brain/BrainInsightCard.tsx` |
-| Νέο | `src/components/brain/BrainCategoryFilter.tsx` |
-| Τροποποίηση | `src/App.tsx` - route /brain |
-| Τροποποίηση | `src/components/layout/AppSidebar.tsx` - Brain entry |
-
-## Ροή Χρήστη
-
-```text
-1. Πατάει "Brain" στο sidebar (Intelligence section)
-2. Βλέπει animated brain + τελευταία insights (αν υπάρχουν)
-3. Πατάει "Analyze Now" -> brain pulse animation starts
-4. Edge function τρέχει (~10-15 sec):
-   - Aggregates data
-   - NLP analysis (sentiment, keywords, patterns)
-   - Perplexity market search
-   - Firecrawl client website check (αν υπάρχει)
-   - Generates insights με neuromarketing framing
-5. Insights εμφανίζονται progressively
-6. Κάθε card έχει:
-   - Τεκμηριωμένη πρόταση
-   - Clickable links σε clients/projects/users
-   - Neuro tactic explanation (γιατί αυτή η προσέγγιση)
-   - Market citations (εξωτερικές πηγές)
-7. Dismiss / Take Action / Share
-```

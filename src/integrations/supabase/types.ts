@@ -137,6 +137,71 @@ export type Database = {
           },
         ]
       }
+      brain_insights: {
+        Row: {
+          body: string
+          category: string
+          citations: Json | null
+          company_id: string
+          created_at: string
+          evidence: Json | null
+          id: string
+          is_actioned: boolean
+          is_dismissed: boolean
+          market_context: string | null
+          neuro_rationale: string | null
+          neuro_tactic: string | null
+          nlp_metadata: Json | null
+          priority: string
+          subcategory: string | null
+          title: string
+        }
+        Insert: {
+          body: string
+          category?: string
+          citations?: Json | null
+          company_id: string
+          created_at?: string
+          evidence?: Json | null
+          id?: string
+          is_actioned?: boolean
+          is_dismissed?: boolean
+          market_context?: string | null
+          neuro_rationale?: string | null
+          neuro_tactic?: string | null
+          nlp_metadata?: Json | null
+          priority?: string
+          subcategory?: string | null
+          title: string
+        }
+        Update: {
+          body?: string
+          category?: string
+          citations?: Json | null
+          company_id?: string
+          created_at?: string
+          evidence?: Json | null
+          id?: string
+          is_actioned?: boolean
+          is_dismissed?: boolean
+          market_context?: string | null
+          neuro_rationale?: string | null
+          neuro_tactic?: string | null
+          nlp_metadata?: Json | null
+          priority?: string
+          subcategory?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_insights_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       briefs: {
         Row: {
           brief_type: string

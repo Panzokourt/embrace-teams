@@ -62,7 +62,7 @@ const categories: Category[] = [
   { id: 'communication', icon: MessageSquare, label: 'Communication', routePrefixes: ['/chat', '/inbox'] },
   { id: 'revenue', icon: DollarSign, label: 'Revenue', routePrefixes: ['/financials', '/pricing'] },
   { id: 'operations', icon: Users, label: 'Operations', routePrefixes: ['/hr', '/timesheets', '/knowledge', '/operations'] },
-  { id: 'intelligence', icon: BarChart3, label: 'Intelligence', routePrefixes: ['/reports', '/leaderboard', '/secretary', '/intelligence'] },
+  { id: 'intelligence', icon: BarChart3, label: 'Intelligence', routePrefixes: ['/reports', '/leaderboard', '/secretary', '/intelligence', '/brain'] },
   { id: 'governance', icon: ShieldCheck, label: 'Governance', routePrefixes: ['/governance'] },
   { id: 'settings', icon: Settings, label: 'Settings', routePrefixes: ['/settings'] },
 ];
@@ -109,7 +109,7 @@ const categoryNavItems: Record<CategoryId, NavItem[]> = {
     { title: 'Benchmarks', href: '/intelligence/benchmarks', icon: BarChart3 },
     { title: 'Forecasting', href: '/intelligence/forecasting', icon: BarChart3 },
     { title: 'Media Planning', href: '/intelligence/media-planning', icon: BarChart3 },
-    { title: 'AI Insights', href: '/intelligence/ai-insights', icon: Zap },
+    { title: 'Brain', href: '/brain', icon: Zap },
     { title: 'Leaderboard', href: '/leaderboard', icon: Trophy },
   ],
   governance: [
@@ -140,7 +140,7 @@ function detectCategory(pathname: string): CategoryId {
   if (pathname.startsWith('/chat') || pathname.startsWith('/inbox')) return 'communication';
   if (pathname.startsWith('/financials') || pathname.startsWith('/pricing')) return 'revenue';
   if (pathname.startsWith('/hr') || pathname.startsWith('/timesheets') || pathname.startsWith('/knowledge') || pathname.startsWith('/operations')) return 'operations';
-  if (pathname.startsWith('/reports') || pathname.startsWith('/leaderboard') || pathname.startsWith('/secretary') || pathname.startsWith('/intelligence')) return 'intelligence';
+  if (pathname.startsWith('/reports') || pathname.startsWith('/leaderboard') || pathname.startsWith('/secretary') || pathname.startsWith('/intelligence') || pathname.startsWith('/brain')) return 'intelligence';
   if (pathname.startsWith('/governance')) return 'governance';
   if (pathname.startsWith('/settings')) return 'settings';
   if (pathname === '/my-work' || pathname === '/' || pathname.startsWith('/dashboard')) return 'overview';

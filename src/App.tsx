@@ -62,6 +62,7 @@ import Benchmarks from "@/pages/Benchmarks";
 import Forecasting from "@/pages/Forecasting";
 import MediaPlanningPage from "@/pages/MediaPlanningPage";
 import AIInsights from "@/pages/AIInsights";
+import Brain from "@/pages/Brain";
 import GovernanceIntegrations from "@/pages/GovernanceIntegrations";
 import GovernanceAuditLog from "@/pages/GovernanceAuditLog";
 import GovernanceOwnershipMap from "@/pages/GovernanceOwnershipMap";
@@ -148,7 +149,8 @@ const App = () => (
                   <Route path="/intelligence/benchmarks" element={<Benchmarks />} />
                   <Route path="/intelligence/forecasting" element={<Forecasting />} />
                   <Route path="/intelligence/media-planning" element={<MediaPlanningPage />} />
-                  <Route path="/intelligence/ai-insights" element={<AIInsights />} />
+                  <Route path="/intelligence/ai-insights" element={<Navigate to="/brain" replace />} />
+                  <Route path="/brain" element={<Brain />} />
                   <Route path="/settings/roles" element={<RolesPermissions />} />
                   <Route path="/settings/billing" element={<BillingSettings />} />
                   <Route path="/settings/api-keys" element={<APIKeys />} />

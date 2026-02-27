@@ -1,59 +1,75 @@
 
-# Επαναφορά Templates & Εμφάνιση στη Δημιουργία Έργου
 
-## Πρόβλημα
+# Voice Command για τον AI Secretary
 
-Τα 7 έτοιμα templates υπάρχουν στη βάση αλλά δεν εμφανίζονται γιατί έχουν `company_id = NULL`, ενώ οι κανόνες ασφαλείας απαιτούν `company_id = get_user_company_id(...)`. Αποτέλεσμα: κανένας χρήστης δεν τα βλέπει.
+## Τι θα γίνει
 
-## Λύση
+Προσθήκη voice-to-text λειτουργίας στον Secretary με 3 σημεία πρόσβασης:
+- **Μικρόφωνο** δίπλα στο Send button στο input του Secretary
+- **Global shortcut** (Ctrl/Cmd + Shift + V) που ανοίγει voice popup από οποιαδήποτε σελίδα
+- **Floating popup** με animation ηχογράφησης, που στέλνει το transcript στον Secretary
 
-### 1. Ενημέρωση κανόνων πρόσβασης (Migration)
+## Τεχνική Προσέγγιση
 
-Αλλαγή στους κανόνες ώστε:
-- **SELECT**: Οι χρήστες βλέπουν τα templates της εταιρείας τους **ΚΑΙ** τα global (company_id IS NULL)
-- **ALL (CRUD)**: Managers/Admins διαχειρίζονται μόνο τα εταιρικά τους templates
-- Ίδια λογική και για deliverables/tasks που ανήκουν σε templates
+Θα χρησιμοποιηθεί το **Web Speech API** (SpeechRecognition) του browser -- δεν χρειάζεται API key ή εξωτερική υπηρεσία. Υποστηρίζεται σε Chrome, Edge, Safari. Fallback μήνυμα για browsers που δεν το υποστηρίζουν.
 
-Αυτό σημαίνει ότι τα 7 seed templates θα εμφανιστούν αμέσως σε όλους ως "global/system" templates, ενώ κάθε εταιρεία μπορεί να δημιουργήσει και τα δικά της.
+## Νέα Αρχεία
 
-### 2. Εμφάνιση templates στη δημιουργία έργου
+### 1. `src/hooks/useVoiceRecognition.ts`
+Custom hook που αναλαμβάνει:
+- Εκκίνηση/διακοπή SpeechRecognition
+- Γλώσσα: `el-GR` (ελληνικά) με fallback σε `en-US`
+- Real-time interim results (partial transcript)
+- Final transcript
+- Error handling + browser support check
 
-Στη σελίδα Projects, η λίστα templates ήδη φορτώνεται (fetchTemplates) και υπάρχει selector. Με τη διόρθωση RLS, τα templates θα εμφανίζονται αυτόματα χωρίς αλλαγή κώδικα στο frontend.
+### 2. `src/components/secretary/VoiceCommandPopup.tsx`
+Global floating popup (Dialog) που εμφανίζεται:
+- Animated mic icon (pulse animation κατά την ηχογράφηση)
+- Live transcript preview
+- Κουμπιά: Cancel / Send
+- Μετά το Send, στέλνει το κείμενο στον Secretary μέσω ενός shared callback
 
-### 3. Οπτική διαφοροποίηση (μικρή αλλαγή UI)
+### 3. `src/components/secretary/VoiceCommandProvider.tsx`
+Context provider στο AppLayout που:
+- Ακούει το global shortcut (Cmd+Shift+V)
+- Διαχειρίζεται το open/close του popup
+- Παρέχει `sendToSecretary(text)` function
+- Κάνει navigate στο `/secretary` αν χρειαστεί ή χρησιμοποιεί το panel
 
-Στο `ProjectTemplatesManager`, τα global templates (χωρίς company_id) θα εμφανίζονται με ένδειξη "System" και χωρίς δυνατότητα επεξεργασίας/διαγραφής -- μόνο αντιγραφή.
+## Τροποποιήσεις Υφιστάμενων Αρχείων
 
-## Τεχνικές Λεπτομέρειες
+### `src/components/secretary/MentionInput.tsx`
+- Προσθήκη mic button δίπλα στο Send
+- Κατά την ηχογράφηση: animated mic icon + interim text στο textarea
+- Μετά την ολοκλήρωση: auto-fill textarea με transcript
 
-### Migration SQL
+### `src/components/layout/AppLayout.tsx`
+- Wrap με `VoiceCommandProvider`
+- Render `VoiceCommandPopup` (global, πάντα διαθέσιμο)
+
+### `src/components/secretary/SecretaryChat.tsx`
+- Expose `sendMessage` μέσω ref ή context ώστε το global popup να μπορεί να στείλει μήνυμα
+
+## Ροή Χρήστη
 
 ```text
--- Drop & recreate SELECT policy on project_templates
--- New condition: company_id = get_user_company_id(uid) OR company_id IS NULL
+Σενάριο 1: Μέσα στο Secretary
+  -> Πατάει mic icon στο input
+  -> Μιλάει, βλέπει live transcript στο textarea
+  -> Πατάει Enter ή mic ξανά -> στέλνεται στο Secretary
 
--- Same pattern for project_template_deliverables and project_template_tasks
--- JOIN to parent template and check company_id IS NULL as alternative
+Σενάριο 2: Από οποιαδήποτε σελίδα (shortcut)
+  -> Cmd+Shift+V -> popup ανοίγει στο κέντρο
+  -> Μιλάει, βλέπει live transcript στο popup
+  -> Πατάει Send -> ανοίγει Secretary panel + στέλνεται μήνυμα
+  -> Πατάει Cancel ή Escape -> κλείνει χωρίς αποστολή
 ```
 
-### Αλλαγή UI
+## Σημαντικές Λεπτομέρειες
 
-| Αρχείο | Αλλαγή |
-|--------|--------|
-| Migration SQL | Ενημέρωση 3 SELECT + 2 SELECT πολιτικών |
-| `ProjectTemplatesManager.tsx` | Badge "System" + απενεργοποίηση edit/delete για global templates |
+- Δεν χρειάζεται database migration -- τα voice messages αποθηκεύονται κανονικά ως text στο `secretary_messages`
+- Το SpeechRecognition API είναι free και δεν χρειάζεται key
+- Continuous mode: ο χρήστης μπορεί να μιλάει συνεχόμενα χωρίς timeout
+- Ελληνικά ως default γλώσσα αναγνώρισης
 
-### Ροή μετά τη διόρθωση
-
-```text
-1. Χρήστης ανοίγει /blueprints -> Project Templates
-   -> Βλέπει 7 system templates + τυχόν εταιρικά
-
-2. Χρήστης πατάει "+ Νέο Έργο"
-   -> Στο dropdown "Template" βλέπει τα 7 templates
-   -> Επιλέγει ένα -> auto-fill τύπου, budget κλπ
-   -> Μετά τη δημιουργία: εφαρμόζονται deliverables & tasks
-
-3. Χρήστης μπορεί να αντιγράψει system template
-   -> Δημιουργείται εταιρικό αντίγραφο που μπορεί να επεξεργαστεί
-```

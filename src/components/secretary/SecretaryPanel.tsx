@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { Bot, Activity, Bell, MessageSquare, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -14,6 +14,7 @@ interface SecretaryPanelProps {
   activeTab: RightPanelTab;
   onTabChange: (tab: RightPanelTab) => void;
   onClose: () => void;
+  registerSendHandler?: (handler: (text: string) => void) => void;
 }
 
 const tabs = [
@@ -23,7 +24,7 @@ const tabs = [
   { id: "chat" as const, label: "Chat", icon: MessageSquare },
 ];
 
-export default function SecretaryPanel({ activeTab, onTabChange, onClose }: SecretaryPanelProps) {
+export default function SecretaryPanel({ activeTab, onTabChange, onClose, registerSendHandler }: SecretaryPanelProps) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "j") {
@@ -66,7 +67,7 @@ export default function SecretaryPanel({ activeTab, onTabChange, onClose }: Secr
 
       {/* Tab content */}
       <div className="flex-1 overflow-hidden">
-        {activeTab === "secretary" && <SecretaryChat mode="panel" />}
+        {activeTab === "secretary" && <SecretaryChat mode="panel" registerSendHandler={registerSendHandler} />}
         {activeTab === "activity" && <ActivityFeedContent active />}
         {activeTab === "notifications" && <NotificationList active />}
         {activeTab === "chat" && <ChatPanelView />}

@@ -4,11 +4,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import {
   TrendingUp, ShoppingCart, Zap, Globe, AlertTriangle, Sparkles,
-  Brain, ExternalLink, X, CheckCircle2, Share2, ChevronDown, ChevronUp,
+  Brain, X, CheckCircle2, ChevronDown, ChevronUp,
+  Microscope, Plus, FolderPlus, ListPlus,
 } from 'lucide-react';
 
 const categoryConfig: Record<string, { icon: any; label: string; color: string }> = {
@@ -58,9 +60,12 @@ interface BrainInsightCardProps {
   insight: BrainInsight;
   onDismiss?: (id: string) => void;
   onAction?: (id: string) => void;
+  onDeepDive?: (insight: BrainInsight) => void;
+  onCreateProject?: (insight: BrainInsight) => void;
+  onCreateTask?: (insight: BrainInsight) => void;
 }
 
-export function BrainInsightCard({ insight, onDismiss, onAction }: BrainInsightCardProps) {
+export function BrainInsightCard({ insight, onDismiss, onAction, onDeepDive, onCreateProject, onCreateTask }: BrainInsightCardProps) {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
   const cat = categoryConfig[insight.category] || categoryConfig.strategic;
@@ -73,7 +78,7 @@ export function BrainInsightCard({ insight, onDismiss, onAction }: BrainInsightC
       insight.is_dismissed && "opacity-50"
     )}>
       <CardContent className="p-4 space-y-3">
-        {/* Header: category + neuro tactic + priority */}
+        {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border", cat.color)}>
@@ -113,7 +118,7 @@ export function BrainInsightCard({ insight, onDismiss, onAction }: BrainInsightC
         {/* Title */}
         <h4 className="text-sm font-semibold leading-snug">{insight.title}</h4>
 
-        {/* Body (markdown, collapsible) */}
+        {/* Body */}
         <div className={cn("text-xs text-muted-foreground leading-relaxed prose prose-xs dark:prose-invert max-w-none", !expanded && "line-clamp-3")}>
           <ReactMarkdown>{insight.body}</ReactMarkdown>
         </div>
@@ -161,7 +166,37 @@ export function BrainInsightCard({ insight, onDismiss, onAction }: BrainInsightC
         )}
 
         {/* Actions */}
-        <div className="flex items-center gap-2 pt-1">
+        <div className="flex items-center gap-1.5 pt-1 flex-wrap">
+          {onDeepDive && (
+            <Button variant="ghost" size="sm" className="h-7 text-[11px] gap-1 text-primary hover:text-primary" onClick={() => onDeepDive(insight)}>
+              <Microscope className="h-3 w-3" /> Ανάλυση
+            </Button>
+          )}
+
+          {(onCreateProject || onCreateTask) && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-7 text-[11px] gap-1">
+                  <Plus className="h-3 w-3" /> Δημιούργησε...
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {onCreateProject && (
+                  <DropdownMenuItem onClick={() => onCreateProject(insight)} className="text-xs gap-2">
+                    <FolderPlus className="h-3.5 w-3.5" /> Νέο Έργο
+                  </DropdownMenuItem>
+                )}
+                {onCreateTask && (
+                  <DropdownMenuItem onClick={() => onCreateTask(insight)} className="text-xs gap-2">
+                    <ListPlus className="h-3.5 w-3.5" /> Νέο Task
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
+          <div className="flex-1" />
+
           {!insight.is_dismissed && onDismiss && insight.id && (
             <Button variant="ghost" size="sm" className="h-7 text-[11px] text-muted-foreground" onClick={() => onDismiss(insight.id!)}>
               <X className="h-3 w-3 mr-1" /> Dismiss
@@ -169,7 +204,7 @@ export function BrainInsightCard({ insight, onDismiss, onAction }: BrainInsightC
           )}
           {!insight.is_actioned && onAction && insight.id && (
             <Button variant="ghost" size="sm" className="h-7 text-[11px] text-muted-foreground" onClick={() => onAction(insight.id!)}>
-              <CheckCircle2 className="h-3 w-3 mr-1" /> Take Action
+              <CheckCircle2 className="h-3 w-3 mr-1" /> Done
             </Button>
           )}
         </div>

@@ -182,13 +182,29 @@ serve(async (req) => {
 6. **Peak-End Rule**: Suggest follow-up after successful project delivery.
 7. **Decoy Effect**: Suggest presenting 3 packages (Basic/Pro/Enterprise) for upsell.
 
+## MANDATORY CATEGORY DISTRIBUTION:
+You MUST generate insights across these categories. AT MINIMUM:
+- At least 1 insight with category **"market"**: Pure EXTERNAL market news, industry trends, competitor moves, regulatory changes. This MUST be based on the Perplexity/market intelligence data provided. NOT internal company data.
+- At least 1 insight with category **"neuro"**: A pure neuromarketing SELLING play — a specific psychological tactic with a ready-to-use script or framing for a specific client. Example: "Πείτε στον πελάτη Χ: Κάθε μέρα χωρίς SEO χάνετε €200 σε organic traffic (Loss Aversion)".
+- At least 1 "strategic", 1 "sales", 1 "productivity" or "alert" insight.
+
+Category definitions:
+- **strategic**: Long-term business decisions, resource allocation, growth opportunities
+- **sales**: Upsell, cross-sell, retention opportunities with specific clients
+- **productivity**: Team efficiency, workload, process improvements, deadline risks
+- **market**: EXTERNAL market trends, industry news, competitor analysis — NOT internal data
+- **alert**: Urgent issues requiring immediate attention (overdue tasks, budget overruns, client churn risk)
+- **neuro**: A pure neuromarketing play — a specific psychological selling tactic with a ready-to-use approach for a named client
+
 ## Output Rules:
-- Generate 5-10 insights covering different categories
+- Generate 6-12 insights covering ALL categories above
 - Each insight MUST have evidence linking to specific entities (clients, projects, users)
 - Each insight MUST apply at least one neuromarketing tactic
 - Write everything in GREEK
 - Be specific with numbers, names, and actionable recommendations
-- Include sentiment scores where relevant in nlp_metadata`;
+- Include sentiment scores where relevant in nlp_metadata
+- For "market" insights: include the market_context field with the source data
+- For "neuro" insights: include a ready-to-use selling script in the body`;
 
     const userPrompt = `Analyze this company data and generate intelligence insights:
 

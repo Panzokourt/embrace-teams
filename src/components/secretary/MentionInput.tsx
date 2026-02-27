@@ -2,8 +2,9 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Popover, PopoverContent, PopoverAnchor } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { User, FolderKanban, CheckSquare, FileText, Send, Loader2 } from "lucide-react";
+import { User, FolderKanban, CheckSquare, FileText, Send, Loader2, Mic, MicOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useVoiceRecognition } from "@/hooks/useVoiceRecognition";
 
 interface MentionResult {
   id: string;
@@ -188,6 +189,10 @@ export default function MentionInput({ value, onChange, onSend, disabled, placeh
           })}
         </PopoverContent>
       </Popover>
+      <VoiceMicButton
+        disabled={disabled}
+        onTranscript={(text) => onChange(value ? value + " " + text : text)}
+      />
       <Button
         onClick={onSend}
         disabled={!value.trim() || disabled}
@@ -197,5 +202,42 @@ export default function MentionInput({ value, onChange, onSend, disabled, placeh
         {disabled ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
       </Button>
     </div>
+  );
+}
+
+function VoiceMicButton({ disabled, onTranscript }: { disabled?: boolean; onTranscript: (text: string) => void }) {
+  const { isListening, fullTranscript, isSupported, start, stop } = useVoiceRecognition();
+  const prevTranscriptRef = useRef("");
+
+  useEffect(() => {
+    if (!isListening && fullTranscript && fullTranscript !== prevTranscriptRef.current) {
+      prevTranscriptRef.current = fullTranscript;
+      onTranscript(fullTranscript);
+    }
+  }, [isListening, fullTranscript, onTranscript]);
+
+  if (!isSupported) return null;
+
+  const toggle = () => {
+    if (isListening) stop();
+    else { prevTranscriptRef.current = ""; start(); }
+  };
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      disabled={disabled}
+      onClick={toggle}
+      className={cn(
+        "h-11 w-11 rounded-xl flex-shrink-0 relative",
+        isListening && "text-destructive"
+      )}
+      title={isListening ? "Σταμάτα ηχογράφηση" : "Φωνητική εντολή"}
+    >
+      {isListening && <span className="absolute inset-0 rounded-xl bg-destructive/10 animate-pulse" />}
+      {isListening ? <MicOff className="h-4 w-4 relative z-10" /> : <Mic className="h-4 w-4" />}
+    </Button>
   );
 }

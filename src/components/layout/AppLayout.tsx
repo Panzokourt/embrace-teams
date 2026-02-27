@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import AppSidebar from './AppSidebar';
 import TopBar from './TopBar';
 import SecretaryPanel, { type RightPanelTab } from '@/components/secretary/SecretaryPanel';
+import VoiceCommandProvider, { useVoiceCommand } from '@/components/secretary/VoiceCommandProvider';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Loader2 } from 'lucide-react';
 import ChatFloatingBubbles from '@/components/chat/ChatFloatingBubbles';
@@ -30,9 +31,10 @@ const RIGHT_PANEL_DEFAULT = 380;
 const RIGHT_PANEL_MIN = 300;
 const RIGHT_PANEL_MAX = 500;
 
-function AppLayoutInner() {
+function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: (() => void) | null) => void }) {
   const { user, loading, companyRole, postLoginRoute } = useAuth();
   const { layoutState, sidebarMode, rightPanelMode, density } = useLayout();
+  const { registerSendHandler } = useVoiceCommand();
 
   // Sidebar collapsed preference
   const [sidebarUserPref, setSidebarUserPref] = useState(() => {
@@ -94,6 +96,17 @@ function AppLayoutInner() {
 
   const closePanel = useCallback(() => setRightPanelOpen(false), []);
   const togglePanelSimple = useCallback(() => setRightPanelOpen(prev => !prev), []);
+
+  // Register open panel for voice command
+  useEffect(() => {
+    if (onRegisterOpenPanel) {
+      onRegisterOpenPanel(() => {
+        setActiveTab('secretary');
+        setRightPanelOpen(true);
+      });
+    }
+    return () => onRegisterOpenPanel?.(null);
+  }, [onRegisterOpenPanel]);
 
   // Close mobile sidebar on layout change
   useEffect(() => {
@@ -264,7 +277,7 @@ function AppLayoutInner() {
             className="absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-primary/20 active:bg-primary/30 transition-colors z-10"
             onMouseDown={onRightPanelResizeStart}
           />
-          <SecretaryPanel activeTab={activeTab} onTabChange={setActiveTab} onClose={closePanel} />
+          <SecretaryPanel activeTab={activeTab} onTabChange={setActiveTab} onClose={closePanel} registerSendHandler={registerSendHandler} />
         </div>
       )}
 
@@ -272,7 +285,7 @@ function AppLayoutInner() {
       {showDrawerRightPanel && (
         <Sheet open={true} onOpenChange={(open) => !open && closePanel()}>
           <SheetContent side="right" className="p-0 w-[90vw] max-w-[400px]">
-            <SecretaryPanel activeTab={activeTab} onTabChange={setActiveTab} onClose={closePanel} />
+            <SecretaryPanel activeTab={activeTab} onTabChange={setActiveTab} onClose={closePanel} registerSendHandler={registerSendHandler} />
           </SheetContent>
         </Sheet>
       )}
@@ -283,11 +296,21 @@ function AppLayoutInner() {
   );
 }
 
+function AppLayoutWithVoice() {
+  const [openPanelFn, setOpenPanelFn] = useState<(() => void) | null>(null);
+
+  return (
+    <VoiceCommandProvider onOpenSecretaryPanel={() => openPanelFn?.()}>
+      <AppLayoutInner onRegisterOpenPanel={setOpenPanelFn} />
+    </VoiceCommandProvider>
+  );
+}
+
 export default function AppLayout() {
   return (
     <FocusModeProvider>
       <LayoutProvider>
-        <AppLayoutInner />
+        <AppLayoutWithVoice />
       </LayoutProvider>
     </FocusModeProvider>
   );

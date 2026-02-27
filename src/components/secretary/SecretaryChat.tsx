@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import MentionInput from "./MentionInput";
 import ConversationSidebar from "./ConversationSidebar";
 import { parseAndRenderContent } from "./ActionRenderer";
+import { useLocation } from "react-router-dom";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -26,9 +27,10 @@ const quickActions = [
 
 interface SecretaryChatProps {
   mode: "full" | "panel";
+  registerSendHandler?: (handler: (text: string) => void) => void;
 }
 
-export default function SecretaryChat({ mode }: SecretaryChatProps) {
+export default function SecretaryChat({ mode, registerSendHandler }: SecretaryChatProps) {
   const { profile, user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -36,12 +38,26 @@ export default function SecretaryChat({ mode }: SecretaryChatProps) {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [sidebarKey, setSidebarKey] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const location = useLocation();
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, loading]);
+
+  // Register send handler for global voice command
+  const sendMessageRef = useRef<(text: string) => void>();
+
+  // Handle voice message from navigation state
+  useEffect(() => {
+    const state = location.state as { voiceMessage?: string } | null;
+    if (state?.voiceMessage) {
+      sendMessage(state.voiceMessage);
+      // Clear the state
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   const loadConversation = useCallback(async (id: string) => {
     const { data } = await supabase
@@ -169,6 +185,14 @@ export default function SecretaryChat({ mode }: SecretaryChatProps) {
       setLoading(false);
     }
   };
+
+  // Wire up voice command send handler
+  sendMessageRef.current = sendMessage;
+  useEffect(() => {
+    if (registerSendHandler) {
+      registerSendHandler((text: string) => sendMessageRef.current?.(text));
+    }
+  }, [registerSendHandler]);
 
   const firstName = profile?.full_name?.split(" ")[0] || "";
   const showSidebar = mode === "full";

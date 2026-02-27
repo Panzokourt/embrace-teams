@@ -376,39 +376,49 @@ export function ProjectTemplatesManager() {
           </p>
         ) : (
           <div className="space-y-3">
-            {templates.map(template => (
-              <div
-                key={template.id}
-                className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-muted/30 transition-colors"
-              >
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <GripVertical className="h-4 w-4 text-muted-foreground/30 flex-shrink-0" />
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium truncate">{template.name}</span>
-                      <Badge variant="secondary" className="text-xs">{getTypeLabel(template.project_type)}</Badge>
-                      {!template.is_active && (
-                        <Badge variant="outline" className="text-xs text-muted-foreground">Ανενεργό</Badge>
+            {templates.map(template => {
+              const isGlobal = !(template as any).company_id;
+              return (
+                <div
+                  key={template.id}
+                  className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-muted/30 transition-colors"
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <GripVertical className="h-4 w-4 text-muted-foreground/30 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium truncate">{template.name}</span>
+                        <Badge variant="secondary" className="text-xs">{getTypeLabel(template.project_type)}</Badge>
+                        {isGlobal && (
+                          <Badge className="text-xs bg-primary/10 text-primary border-primary/20">System</Badge>
+                        )}
+                        {!template.is_active && (
+                          <Badge variant="outline" className="text-xs text-muted-foreground">Ανενεργό</Badge>
+                        )}
+                      </div>
+                      {template.description && (
+                        <p className="text-sm text-muted-foreground truncate mt-0.5">{template.description}</p>
                       )}
                     </div>
-                    {template.description && (
-                      <p className="text-sm text-muted-foreground truncate mt-0.5">{template.description}</p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDuplicate(template)}>
+                      <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                    {!isGlobal && (
+                      <>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(template)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(template.id)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDuplicate(template)}>
-                    <Copy className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(template)}>
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(template.id)}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </CardContent>

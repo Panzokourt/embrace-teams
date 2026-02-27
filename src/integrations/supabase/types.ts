@@ -137,6 +137,63 @@ export type Database = {
           },
         ]
       }
+      brain_deep_dives: {
+        Row: {
+          action_plan: Json | null
+          company_id: string
+          created_at: string
+          extended_analysis: string
+          id: string
+          insight_category: string | null
+          insight_id: string | null
+          insight_title: string
+          suggested_project: Json | null
+          suggested_task: Json | null
+          user_id: string
+        }
+        Insert: {
+          action_plan?: Json | null
+          company_id: string
+          created_at?: string
+          extended_analysis: string
+          id?: string
+          insight_category?: string | null
+          insight_id?: string | null
+          insight_title: string
+          suggested_project?: Json | null
+          suggested_task?: Json | null
+          user_id: string
+        }
+        Update: {
+          action_plan?: Json | null
+          company_id?: string
+          created_at?: string
+          extended_analysis?: string
+          id?: string
+          insight_category?: string | null
+          insight_id?: string | null
+          insight_title?: string
+          suggested_project?: Json | null
+          suggested_task?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_deep_dives_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brain_deep_dives_insight_id_fkey"
+            columns: ["insight_id"]
+            isOneToOne: false
+            referencedRelation: "brain_insights"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brain_insights: {
         Row: {
           body: string

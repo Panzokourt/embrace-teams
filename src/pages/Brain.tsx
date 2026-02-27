@@ -1,28 +1,45 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { BrainPulse } from '@/components/brain/BrainPulse';
 import { BrainCategoryFilter } from '@/components/brain/BrainCategoryFilter';
 import { BrainInsightCard, type BrainInsight } from '@/components/brain/BrainInsightCard';
 import { BrainDeepDiveDialog, type DeepDiveResult } from '@/components/brain/BrainDeepDiveDialog';
 import { BrainCreateActionDialog } from '@/components/brain/BrainCreateActionDialog';
-import { Brain, RefreshCw, Sparkles, TrendingUp, AlertTriangle, Clock } from 'lucide-react';
+import { Brain, RefreshCw, Sparkles, TrendingUp, AlertTriangle, Clock, Archive } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+
+interface SavedDeepDive {
+  id: string;
+  insight_title: string;
+  insight_category: string | null;
+  extended_analysis: string;
+  action_plan: any[];
+  suggested_project: any;
+  suggested_task: any;
+  created_at: string;
+}
 
 export default function BrainPage() {
+  const { user, companyRole } = useAuth();
   const { toast } = useToast();
   const [insights, setInsights] = useState<BrainInsight[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('all');
   const [lastAnalyzed, setLastAnalyzed] = useState<Date | null>(null);
+  const [mainTab, setMainTab] = useState('insights');
 
   // Deep dive state
   const [deepDiveOpen, setDeepDiveOpen] = useState(false);
   const [deepDiveLoading, setDeepDiveLoading] = useState(false);
   const [deepDiveResult, setDeepDiveResult] = useState<DeepDiveResult | null>(null);
   const [deepDiveInsight, setDeepDiveInsight] = useState<BrainInsight | null>(null);
+  const [deepDiveSaved, setDeepDiveSaved] = useState(false);
 
   // Create action state
   const [createOpen, setCreateOpen] = useState(false);
@@ -30,6 +47,10 @@ export default function BrainPage() {
   const [createInsight, setCreateInsight] = useState<BrainInsight | null>(null);
   const [suggestedProject, setSuggestedProject] = useState<any>(null);
   const [suggestedTask, setSuggestedTask] = useState<any>(null);
+
+  // Saved deep dives
+  const [savedDives, setSavedDives] = useState<SavedDeepDive[]>([]);
+  const [loadingSaved, setLoadingSaved] = useState(false);
 
   // Load existing insights
   const loadInsights = useCallback(async () => {
@@ -52,7 +73,25 @@ export default function BrainPage() {
     }
   }, []);
 
+  const loadSavedDives = useCallback(async () => {
+    setLoadingSaved(true);
+    try {
+      const { data, error } = await supabase
+        .from('brain_deep_dives' as any)
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      setSavedDives((data as any[]) || []);
+    } catch (e) {
+      console.error('Error loading saved dives:', e);
+    } finally {
+      setLoadingSaved(false);
+    }
+  }, []);
+
   useEffect(() => { loadInsights(); }, [loadInsights]);
+  useEffect(() => { if (mainTab === 'saved') loadSavedDives(); }, [mainTab, loadSavedDives]);
 
   // Run analysis
   const runAnalysis = async () => {
@@ -103,6 +142,7 @@ export default function BrainPage() {
     setDeepDiveResult(null);
     setDeepDiveOpen(true);
     setDeepDiveLoading(true);
+    setDeepDiveSaved(false);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
@@ -125,6 +165,52 @@ export default function BrainPage() {
     } finally {
       setDeepDiveLoading(false);
     }
+  };
+
+  // Save deep dive
+  const handleSaveDeepDive = async () => {
+    if (!deepDiveResult || !deepDiveInsight) return;
+    try {
+      if (!user || !companyRole?.company_id) throw new Error('Not authenticated');
+
+      const { error } = await supabase.from('brain_deep_dives' as any).insert({
+        insight_id: deepDiveInsight.id || null,
+        company_id: companyRole.company_id,
+        user_id: user.id,
+        insight_title: deepDiveInsight.title,
+        insight_category: deepDiveInsight.category,
+        extended_analysis: deepDiveResult.extended_analysis,
+        action_plan: deepDiveResult.action_plan || [],
+        suggested_project: deepDiveResult.suggested_project || null,
+        suggested_task: deepDiveResult.suggested_task || null,
+      } as any);
+      if (error) throw error;
+      setDeepDiveSaved(true);
+      toast({ title: "✓ Αποθηκεύτηκε", description: "Η ανάλυση αποθηκεύτηκε στο Brain Archive" });
+    } catch (e: any) {
+      toast({ title: "Σφάλμα", description: e.message, variant: "destructive" });
+    }
+  };
+
+  // View saved deep dive
+  const handleViewSaved = (dive: SavedDeepDive) => {
+    setDeepDiveInsight({ title: dive.insight_title, category: dive.insight_category || 'strategic', body: '', evidence: [], priority: 'medium', neuro_tactic: '', neuro_rationale: '' });
+    setDeepDiveResult({
+      extended_analysis: dive.extended_analysis,
+      action_plan: dive.action_plan || [],
+      suggested_project: dive.suggested_project,
+      suggested_task: dive.suggested_task,
+    });
+    setDeepDiveSaved(true);
+    setDeepDiveOpen(true);
+    setDeepDiveLoading(false);
+  };
+
+  // Delete saved deep dive
+  const handleDeleteSaved = async (id: string) => {
+    await supabase.from('brain_deep_dives' as any).delete().eq('id', id);
+    setSavedDives(prev => prev.filter(d => d.id !== id));
+    toast({ title: "✓ Διαγράφηκε" });
   };
 
   // Create from insight (direct)
@@ -226,34 +312,82 @@ export default function BrainPage() {
         </div>
       )}
 
-      <BrainCategoryFilter activeCategory={activeCategory} onCategoryChange={setActiveCategory} counts={counts} />
+      {/* Main tabs: Insights / Saved */}
+      <Tabs value={mainTab} onValueChange={setMainTab}>
+        <TabsList className="h-8">
+          <TabsTrigger value="insights" className="text-xs gap-1.5"><Brain className="h-3 w-3" /> Insights</TabsTrigger>
+          <TabsTrigger value="saved" className="text-xs gap-1.5"><Archive className="h-3 w-3" /> Αρχείο Αναλύσεων</TabsTrigger>
+        </TabsList>
 
-      {/* Insights feed */}
-      <div className="space-y-3">
-        {isLoading ? (
-          <div className="text-center py-8 text-muted-foreground text-sm">Φόρτωση insights...</div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-12">
-            <Brain className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
-            <p className="text-sm text-muted-foreground">
-              {insights.length === 0 ? "Δεν υπάρχουν insights ακόμα. Πατήστε Analyze Now!" : "Δεν υπάρχουν insights σε αυτή την κατηγορία."}
-            </p>
+        <TabsContent value="insights" className="space-y-3 mt-3">
+          <BrainCategoryFilter activeCategory={activeCategory} onCategoryChange={setActiveCategory} counts={counts} />
+
+          {/* Insights feed */}
+          <div className="space-y-3">
+            {isLoading ? (
+              <div className="text-center py-8 text-muted-foreground text-sm">Φόρτωση insights...</div>
+            ) : filtered.length === 0 ? (
+              <div className="text-center py-12">
+                <Brain className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
+                <p className="text-sm text-muted-foreground">
+                  {insights.length === 0 ? "Δεν υπάρχουν insights ακόμα. Πατήστε Analyze Now!" : "Δεν υπάρχουν insights σε αυτή την κατηγορία."}
+                </p>
+              </div>
+            ) : (
+              filtered.map((insight, i) => (
+                <div key={insight.id || i} className="animate-in" style={{ animationDelay: `${i * 50}ms` }}>
+                  <BrainInsightCard
+                    insight={insight}
+                    onDismiss={handleDismiss}
+                    onAction={handleAction}
+                    onDeepDive={handleDeepDive}
+                    onCreateProject={handleCreateProject}
+                    onCreateTask={handleCreateTask}
+                  />
+                </div>
+              ))
+            )}
           </div>
-        ) : (
-          filtered.map((insight, i) => (
-            <div key={insight.id || i} className="animate-in" style={{ animationDelay: `${i * 50}ms` }}>
-              <BrainInsightCard
-                insight={insight}
-                onDismiss={handleDismiss}
-                onAction={handleAction}
-                onDeepDive={handleDeepDive}
-                onCreateProject={handleCreateProject}
-                onCreateTask={handleCreateTask}
-              />
+        </TabsContent>
+
+        <TabsContent value="saved" className="space-y-3 mt-3">
+          {loadingSaved ? (
+            <div className="text-center py-8 text-muted-foreground text-sm">Φόρτωση...</div>
+          ) : savedDives.length === 0 ? (
+            <div className="text-center py-12">
+              <Archive className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
+              <p className="text-sm text-muted-foreground">Δεν υπάρχουν αποθηκευμένες αναλύσεις.</p>
+              <p className="text-xs text-muted-foreground/60 mt-1">Πατήστε "Αποθήκευση" σε ένα Deep Dive για να το κρατήσετε εδώ.</p>
             </div>
-          ))
-        )}
-      </div>
+          ) : (
+            savedDives.map((dive) => (
+              <Card key={dive.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleViewSaved(dive)}>
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-sm font-semibold truncate">{dive.insight_title}</h4>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        {new Date(dive.created_at).toLocaleString('el-GR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        {dive.insight_category && ` • ${dive.insight_category}`}
+                        {dive.action_plan?.length ? ` • ${dive.action_plan.length} βήματα` : ''}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{dive.extended_analysis.slice(0, 200)}...</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-[11px] text-destructive shrink-0"
+                      onClick={(e) => { e.stopPropagation(); handleDeleteSaved(dive.id); }}
+                    >
+                      Διαγραφή
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* Deep Dive Dialog */}
       <BrainDeepDiveDialog
@@ -264,6 +398,8 @@ export default function BrainPage() {
         insightTitle={deepDiveInsight?.title || ''}
         onCreateProject={handleDeepDiveCreateProject}
         onCreateTask={handleDeepDiveCreateTask}
+        onSave={handleSaveDeepDive}
+        isSaved={deepDiveSaved}
       />
 
       {/* Create Action Dialog */}

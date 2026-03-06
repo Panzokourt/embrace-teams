@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, FolderKanban, Target, FileText, Timer, Calendar, Shield, Users, Clock } from 'lucide-react';
+import { Loader2, FolderKanban, Target, FileText, Timer, Calendar, Shield, Users, Clock, ShieldCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { EmployeeHeader } from '@/components/hr/EmployeeHeader';
@@ -17,6 +17,10 @@ import { toast } from 'sonner';
 import { LevelProgressBar } from '@/components/gamification/LevelProgressBar';
 import { SkillRadar } from '@/components/gamification/SkillRadar';
 import { XPActivityFeed } from '@/components/gamification/XPActivityFeed';
+import { PermissionModuleSelector } from '@/components/users/PermissionModuleSelector';
+import { useRBAC, DEFAULT_ROLE_PERMISSIONS } from '@/hooks/useRBAC';
+import { PermissionType } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
 
 interface UserData {
   id: string;
@@ -57,6 +61,19 @@ export default function EmployeeProfile() {
   const [activityLog, setActivityLog] = useState<any[]>([]);
 
   const { balances, requests, cancelRequest } = useLeaveManagement(id);
+  const { users: companyUsers, updateUserPermissions, refreshData: refreshRBAC } = useRBAC();
+  const [userPermissions, setUserPermissions] = useState<PermissionType[]>([]);
+  const [savingPermissions, setSavingPermissions] = useState(false);
+
+  // Find this user in RBAC data to get their permissions
+  useEffect(() => {
+    if (id && companyUsers.length > 0) {
+      const found = companyUsers.find(u => u.user_id === id);
+      if (found) {
+        setUserPermissions([...found.permissions]);
+      }
+    }
+  }, [id, companyUsers]);
 
   useEffect(() => {
     if (id) fetchAll();
@@ -142,6 +159,12 @@ export default function EmployeeProfile() {
           <TabsTrigger value="timesheets">Timesheets</TabsTrigger>
           <TabsTrigger value="leaves">Άδειες</TabsTrigger>
           <TabsTrigger value="documents">Έγγραφα</TabsTrigger>
+          {(isCompanyAdmin || isManager) && (
+            <TabsTrigger value="permissions" className="gap-1.5">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Δικαιώματα
+            </TabsTrigger>
+          )}
           <TabsTrigger value="gamification">🏆 Score</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
@@ -260,6 +283,45 @@ export default function EmployeeProfile() {
         <TabsContent value="documents">
           <HRDocuments userId={id!} />
         </TabsContent>
+
+        {(isCompanyAdmin || isManager) && (
+          <TabsContent value="permissions">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5" />
+                  Δικαιώματα Χρήστη
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <PermissionModuleSelector
+                  selectedPermissions={userPermissions}
+                  onChange={setUserPermissions}
+                />
+                <div className="flex justify-end">
+                  <Button
+                    disabled={savingPermissions}
+                    onClick={async () => {
+                      if (!id) return;
+                      setSavingPermissions(true);
+                      try {
+                        await updateUserPermissions(id, userPermissions);
+                        toast.success('Τα δικαιώματα αποθηκεύτηκαν');
+                      } catch (err: any) {
+                        toast.error(err.message || 'Σφάλμα αποθήκευσης');
+                      } finally {
+                        setSavingPermissions(false);
+                      }
+                    }}
+                  >
+                    {savingPermissions && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                    Αποθήκευση Δικαιωμάτων
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
         <TabsContent value="gamification">
           <div className="space-y-6">

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useRBAC, type CompanyUser } from '@/hooks/useRBAC';
@@ -9,9 +10,17 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
-import { Loader2, Building2, Users, Shield, UserPlus, XCircle, CheckCircle, Clock, AlertTriangle, Activity } from 'lucide-react';
+import { Loader2, Building2, Users, Shield, UserPlus, XCircle, CheckCircle, Clock, AlertTriangle, Activity, MoreHorizontal, ExternalLink, ShieldCheck, UserX, UserCheck } from 'lucide-react';
 import { InviteUserDialog } from '@/components/users/InviteUserDialog';
+import { EditPermissionsDialog } from '@/components/users/EditPermissionsDialog';
 import { CompanyRole } from '@/contexts/AuthContext';
 import { OrgGeneralTab } from '@/components/organization/OrgGeneralTab';
 import { OrgSecurityTab } from '@/components/organization/OrgSecurityTab';
@@ -28,11 +37,15 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export default function OrganizationSettings() {
+  const navigate = useNavigate();
   const { company, isOwner, isCompanyAdmin, refreshUserData } = useAuth();
   const { users, invitations, loading, updateUserRole, updateUserStatus, cancelInvitation, refreshData } = useRBAC();
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [editPermUser, setEditPermUser] = useState<CompanyUser | null>(null);
 
-  // Company extra data
+  // Extra profile data for members table
+  const [profileExtras, setProfileExtras] = useState<Map<string, { job_title: string | null; department: string | null; phone: string | null }>>(new Map());
+
   const [companyData, setCompanyData] = useState<any>(null);
   const [joinRequests, setJoinRequests] = useState<any[]>([]);
 
@@ -42,6 +55,23 @@ export default function OrganizationSettings() {
       fetchJoinRequests();
     }
   }, [company]);
+
+  // Fetch extra profile data when users change
+  useEffect(() => {
+    const fetchExtras = async () => {
+      if (users.length === 0) return;
+      const userIds = users.map(u => u.user_id);
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, job_title, department, phone')
+        .in('id', userIds);
+      
+      const map = new Map<string, { job_title: string | null; department: string | null; phone: string | null }>();
+      data?.forEach(p => map.set(p.id, { job_title: p.job_title, department: p.department, phone: p.phone }));
+      setProfileExtras(map);
+    };
+    fetchExtras();
+  }, [users]);
 
   const fetchCompanyData = async () => {
     if (!company) return;
@@ -180,56 +210,99 @@ export default function OrganizationSettings() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Χρήστης</TableHead>
+                      <TableHead>Θέση</TableHead>
+                      <TableHead>Τμήμα</TableHead>
+                      <TableHead>Τηλέφωνο</TableHead>
                       <TableHead>Ρόλος</TableHead>
                       <TableHead>Κατάσταση</TableHead>
-                      <TableHead className="text-right">Ενέργειες</TableHead>
+                      <TableHead className="w-10"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.map((u) => (
-                      <TableRow key={u.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={u.avatar_url || undefined} />
-                              <AvatarFallback className="bg-muted text-foreground text-xs">
-                                {u.full_name?.charAt(0) || u.email.charAt(0).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="font-medium text-foreground text-sm">{u.full_name || 'Χωρίς όνομα'}</p>
-                              <p className="text-xs text-muted-foreground">{u.email}</p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {isCompanyAdmin && u.role !== 'owner' ? (
-                            <Select value={u.role} onValueChange={(v) => handleRoleChange(u.user_id, v)}>
-                              <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {Object.entries(ROLE_LABELS).filter(([k]) => k !== 'owner' || isOwner).map(([k, v]) => (
-                                  <SelectItem key={k} value={k}>{v}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            <Badge variant="secondary">{ROLE_LABELS[u.role] || u.role}</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={u.status === 'active' ? 'default' : 'secondary'}>
-                            {STATUS_LABELS[u.status] || u.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {isCompanyAdmin && u.role !== 'owner' && (
-                            <Button size="sm" variant="ghost" onClick={() => handleStatusToggle(u.user_id, u.status)}>
-                              {u.status === 'active' ? 'Αναστολή' : 'Ενεργοποίηση'}
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {users.map((u) => {
+                      const extras = profileExtras.get(u.user_id);
+                      return (
+                        <TableRow key={u.id} className="group">
+                          <TableCell>
+                            <button
+                              onClick={() => navigate(`/hr/employee/${u.user_id}`)}
+                              className="flex items-center gap-3 text-left hover:opacity-80 transition-opacity"
+                            >
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={u.avatar_url || undefined} />
+                                <AvatarFallback className="bg-muted text-foreground text-xs">
+                                  {u.full_name?.charAt(0) || u.email.charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="font-medium text-foreground text-sm hover:underline">{u.full_name || 'Χωρίς όνομα'}</p>
+                                <p className="text-xs text-muted-foreground">{u.email}</p>
+                              </div>
+                            </button>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-muted-foreground">{extras?.job_title || '—'}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-muted-foreground">{extras?.department || '—'}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-muted-foreground">{extras?.phone || '—'}</span>
+                          </TableCell>
+                          <TableCell>
+                            {isCompanyAdmin && u.role !== 'owner' ? (
+                              <Select value={u.role} onValueChange={(v) => handleRoleChange(u.user_id, v)}>
+                                <SelectTrigger className="w-28 h-8"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {Object.entries(ROLE_LABELS).filter(([k]) => k !== 'owner' || isOwner).map(([k, v]) => (
+                                    <SelectItem key={k} value={k}>{v}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Badge variant="secondary">{ROLE_LABELS[u.role] || u.role}</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={u.status === 'active' ? 'default' : 'secondary'}>
+                              {STATUS_LABELS[u.status] || u.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {isCompanyAdmin && u.role !== 'owner' && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => navigate(`/hr/employee/${u.user_id}`)}>
+                                    <ExternalLink className="h-4 w-4 mr-2" />
+                                    Προβολή Προφίλ
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => setEditPermUser(u)}>
+                                    <ShieldCheck className="h-4 w-4 mr-2" />
+                                    Δικαιώματα
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => handleStatusToggle(u.user_id, u.status)}
+                                    className={u.status === 'active' ? 'text-destructive' : ''}
+                                  >
+                                    {u.status === 'active' ? (
+                                      <><UserX className="h-4 w-4 mr-2" />Αναστολή</>
+                                    ) : (
+                                      <><UserCheck className="h-4 w-4 mr-2" />Ενεργοποίηση</>
+                                    )}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               )}
@@ -282,6 +355,7 @@ export default function OrganizationSettings() {
       </Tabs>
 
       <InviteUserDialog open={inviteOpen} onOpenChange={setInviteOpen} onSuccess={() => refreshData()} />
+      <EditPermissionsDialog user={editPermUser} open={!!editPermUser} onOpenChange={(o) => { if (!o) setEditPermUser(null); }} onSuccess={() => refreshData()} />
     </div>
   );
 }

@@ -251,21 +251,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setCompany(null);
         }
       } else if (activeRoles.length === 1) {
-        // Check if onboarding_completed
-        const needsWelcome = profileData && !profileData.onboarding_completed;
-        setPostLoginRoute(needsWelcome ? '/welcome' : '/');
+        const needsOnboarding = profileData && !profileData.onboarding_completed;
+        setPostLoginRoute(needsOnboarding ? '/onboarding' : '/');
         selectCompany(activeRoles[0], companies);
       } else {
-        // Check if we have a saved preference
         const savedCompanyId = localStorage.getItem('activeCompanyId');
         const savedRole = savedCompanyId ? activeRoles.find(r => r.company_id === savedCompanyId) : null;
-        const needsWelcome = profileData && !profileData.onboarding_completed;
+        const needsOnboarding = profileData && !profileData.onboarding_completed;
         if (savedRole) {
-          setPostLoginRoute(needsWelcome ? '/welcome' : '/');
+          setPostLoginRoute(needsOnboarding ? '/onboarding' : '/');
           selectCompany(savedRole, companies);
         } else {
-          setPostLoginRoute(needsWelcome ? '/welcome' : '/select-workspace');
-          // Default to first
+          setPostLoginRoute(needsOnboarding ? '/onboarding' : '/select-workspace');
           selectCompany(activeRoles[0], companies);
         }
       }

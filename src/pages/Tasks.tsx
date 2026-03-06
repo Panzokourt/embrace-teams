@@ -758,233 +758,386 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
     </DndContext>
   );
 
-  return (
-    <div className="page-shell">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in">
-        <PageHeader
-          icon={CheckSquare}
-          title="Tasks"
-          subtitle="Διαχείριση εργασιών και παραδοτέων"
-          breadcrumbs={[{ label: 'Εργασία', href: '/work' }, { label: 'Tasks' }]}
-        />
+  const completedTasksCount = tasks.filter(t => t.status === 'completed').length;
+  const taskProgressPercent = tasks.length > 0 ? Math.round((completedTasksCount / tasks.length) * 100) : 0;
 
-        <div className="flex items-center gap-3">
-          <UnifiedViewToggle 
-            viewMode={viewMode} 
-            onViewModeChange={setViewMode}
+  return (
+    <div className={embedded ? 'space-y-4' : 'page-shell'}>
+      {/* Header — full PageHeader only when standalone */}
+      {!embedded && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in">
+          <PageHeader
+            icon={CheckSquare}
+            title="Tasks"
+            subtitle="Διαχείριση εργασιών και παραδοτέων"
+            breadcrumbs={[{ label: 'Εργασία', href: '/work' }, { label: 'Tasks' }]}
           />
 
-          {canManage && (
-            <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Νέο Task
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>{editingTask ? 'Επεξεργασία Task' : 'Δημιουργία Νέου Task'}</DialogTitle>
-                  <DialogDescription>
-                    {editingTask ? 'Ενημερώστε τα στοιχεία του task' : 'Προσθέστε ένα νέο task σε ένα έργο'}
-                  </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="title">Τίτλος *</Label>
-                    <Input
-                      id="title"
-                      value={formData.title}
-                      onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                      placeholder="π.χ. Competitor Analysis"
-                      required
-                    />
-                  </div>
+          <div className="flex items-center gap-3">
+            <UnifiedViewToggle 
+              viewMode={viewMode} 
+              onViewModeChange={setViewMode}
+            />
 
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Περιγραφή</Label>
-                    <Textarea
-                      id="description"
-                      value={formData.description}
-                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                      rows={3}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="project">Έργο *</Label>
-                    <Select
-                      value={formData.project_id}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, project_id: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Επιλέξτε έργο" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {projects.map(project => (
-                          <SelectItem key={project.id} value={project.id}>
-                            {project.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="assigned_to">Ανάθεση σε</Label>
-                    <Select
-                      value={formData.assigned_to}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, assigned_to: value === 'none' ? '' : value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Χωρίς ανάθεση" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Χωρίς ανάθεση</SelectItem>
-                        {users.map(u => (
-                          <SelectItem key={u.id} value={u.id}>
-                            <div className="flex items-center gap-2">
-                              <Avatar className="h-4 w-4">
-                                <AvatarFallback className="text-[8px]">{getInitials(u.full_name)}</AvatarFallback>
-                              </Avatar>
-                              {u.full_name || u.email}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {canManage && (
+              <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Νέο Task
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>{editingTask ? 'Επεξεργασία Task' : 'Δημιουργία Νέου Task'}</DialogTitle>
+                    <DialogDescription>
+                      {editingTask ? 'Ενημερώστε τα στοιχεία του task' : 'Προσθέστε ένα νέο task σε ένα έργο'}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="status">Κατάσταση</Label>
-                      <Select
-                        value={formData.status}
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as TaskStatus }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="todo">Προς υλοποίηση</SelectItem>
-                          <SelectItem value="in_progress">Σε εξέλιξη</SelectItem>
-                          <SelectItem value="review">Αναθεώρηση</SelectItem>
-                          <SelectItem value="internal_review">Εσωτ. Έγκριση</SelectItem>
-                          <SelectItem value="client_review">Έγκριση Πελάτη</SelectItem>
-                          <SelectItem value="completed">Ολοκληρώθηκε</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="priority">Προτεραιότητα</Label>
-                      <Select
-                        value={formData.priority}
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, priority: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="low">Χαμηλή</SelectItem>
-                          <SelectItem value="medium">Μεσαία</SelectItem>
-                          <SelectItem value="high">Υψηλή</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="start_date">Έναρξη</Label>
+                      <Label htmlFor="title">Τίτλος *</Label>
                       <Input
-                        id="start_date"
-                        type="date"
-                        value={formData.start_date}
-                        onChange={(e) => setFormData(prev => ({ ...prev, start_date: e.target.value }))}
+                        id="title"
+                        value={formData.title}
+                        onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                        placeholder="π.χ. Competitor Analysis"
+                        required
                       />
                     </div>
+
                     <div className="space-y-2">
-                      <Label htmlFor="due_date">Προθεσμία</Label>
-                      <Input
-                        id="due_date"
-                        type="date"
-                        value={formData.due_date}
-                        onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))}
+                      <Label htmlFor="description">Περιγραφή</Label>
+                      <Textarea
+                        id="description"
+                        value={formData.description}
+                        onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                        rows={3}
                       />
                     </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="task_type">Τύπος</Label>
+                      <Label htmlFor="project">Έργο *</Label>
                       <Select
-                        value={formData.task_type}
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, task_type: value }))}
+                        value={formData.project_id}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, project_id: value }))}
                       >
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Επιλέξτε έργο" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="task">Task</SelectItem>
-                          <SelectItem value="milestone">Milestone</SelectItem>
-                          <SelectItem value="bug">Bug</SelectItem>
-                          <SelectItem value="feature">Feature</SelectItem>
+                          {projects.map(project => (
+                            <SelectItem key={project.id} value={project.id}>
+                              {project.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="task_category">Κατηγορία</Label>
+                      <Label htmlFor="assigned_to">Ανάθεση σε</Label>
                       <Select
-                        value={formData.task_category || 'none'}
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, task_category: value === 'none' ? '' : value }))}
+                        value={formData.assigned_to}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, assigned_to: value === 'none' ? '' : value }))}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Επιλέξτε" />
+                          <SelectValue placeholder="Χωρίς ανάθεση" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">Καμία</SelectItem>
-                          <SelectItem value="research">Έρευνα</SelectItem>
-                          <SelectItem value="design">Σχεδιασμός</SelectItem>
-                          <SelectItem value="development">Ανάπτυξη</SelectItem>
-                          <SelectItem value="content">Περιεχόμενο</SelectItem>
-                          <SelectItem value="marketing">Marketing</SelectItem>
-                          <SelectItem value="admin">Διοικητικά</SelectItem>
+                          <SelectItem value="none">Χωρίς ανάθεση</SelectItem>
+                          {users.map(u => (
+                            <SelectItem key={u.id} value={u.id}>
+                              <div className="flex items-center gap-2">
+                                <Avatar className="h-4 w-4">
+                                  <AvatarFallback className="text-[8px]">{getInitials(u.full_name)}</AvatarFallback>
+                                </Avatar>
+                                {u.full_name || u.email}
+                              </div>
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="estimated_hours">Εκτίμηση (ώρες)</Label>
-                      <Input
-                        id="estimated_hours"
-                        type="number"
-                        min="0"
-                        step="0.5"
-                        value={formData.estimated_hours}
-                        onChange={(e) => setFormData(prev => ({ ...prev, estimated_hours: e.target.value }))}
-                        placeholder="π.χ. 4"
-                      />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="priority">Προτεραιότητα</Label>
+                        <Select
+                          value={formData.priority}
+                          onValueChange={(value) => setFormData(prev => ({ ...prev, priority: value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="low">Χαμηλή</SelectItem>
+                            <SelectItem value="medium">Μέτρια</SelectItem>
+                            <SelectItem value="high">Υψηλή</SelectItem>
+                            <SelectItem value="critical">Κρίσιμη</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="status">Κατάσταση</Label>
+                        <Select
+                          value={formData.status}
+                          onValueChange={(value) => setFormData(prev => ({ ...prev, status: value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="todo">Προς υλοποίηση</SelectItem>
+                            <SelectItem value="in_progress">Σε εξέλιξη</SelectItem>
+                            <SelectItem value="review">Προς έλεγχο</SelectItem>
+                            <SelectItem value="internal_review">Εσωτ. Έγκριση</SelectItem>
+                            <SelectItem value="client_review">Έγκριση Πελάτη</SelectItem>
+                            <SelectItem value="completed">Ολοκληρώθηκε</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                  </div>
 
-                  <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
-                      Ακύρωση
-                    </Button>
-                    <Button type="submit" disabled={saving}>
-                      {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                      {editingTask ? 'Αποθήκευση' : 'Δημιουργία'}
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
-          )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="start_date">Έναρξη</Label>
+                        <Input
+                          id="start_date"
+                          type="date"
+                          value={formData.start_date}
+                          onChange={(e) => setFormData(prev => ({ ...prev, start_date: e.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="due_date">Προθεσμία</Label>
+                        <Input
+                          id="due_date"
+                          type="date"
+                          value={formData.due_date}
+                          onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="task_type">Τύπος</Label>
+                        <Select
+                          value={formData.task_type}
+                          onValueChange={(value) => setFormData(prev => ({ ...prev, task_type: value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="task">Task</SelectItem>
+                            <SelectItem value="milestone">Milestone</SelectItem>
+                            <SelectItem value="bug">Bug</SelectItem>
+                            <SelectItem value="feature">Feature</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="task_category">Κατηγορία</Label>
+                        <Select
+                          value={formData.task_category || 'none'}
+                          onValueChange={(value) => setFormData(prev => ({ ...prev, task_category: value === 'none' ? '' : value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Επιλέξτε" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Καμία</SelectItem>
+                            <SelectItem value="research">Έρευνα</SelectItem>
+                            <SelectItem value="design">Σχεδιασμός</SelectItem>
+                            <SelectItem value="development">Ανάπτυξη</SelectItem>
+                            <SelectItem value="content">Περιεχόμενο</SelectItem>
+                            <SelectItem value="marketing">Marketing</SelectItem>
+                            <SelectItem value="admin">Διοικητικά</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="estimated_hours">Εκτίμηση (ώρες)</Label>
+                        <Input
+                          id="estimated_hours"
+                          type="number"
+                          min="0"
+                          step="0.5"
+                          value={formData.estimated_hours}
+                          onChange={(e) => setFormData(prev => ({ ...prev, estimated_hours: e.target.value }))}
+                          placeholder="π.χ. 4"
+                        />
+                      </div>
+                    </div>
+
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
+                        Ακύρωση
+                      </Button>
+                      <Button type="submit" disabled={saving}>
+                        {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                        {editingTask ? 'Αποθήκευση' : 'Δημιουργία'}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Embedded toolbar — mimics Deliverables tab style */}
+      {embedded && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3">
+              <UnifiedViewToggle 
+                viewMode={viewMode} 
+                onViewModeChange={setViewMode}
+              />
+            </div>
+            {canManage && (
+              <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Νέο Task
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>{editingTask ? 'Επεξεργασία Task' : 'Δημιουργία Νέου Task'}</DialogTitle>
+                    <DialogDescription>
+                      {editingTask ? 'Ενημερώστε τα στοιχεία του task' : 'Προσθέστε ένα νέο task σε ένα έργο'}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="title">Τίτλος *</Label>
+                      <Input
+                        id="title"
+                        value={formData.title}
+                        onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                        placeholder="π.χ. Competitor Analysis"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="description">Περιγραφή</Label>
+                      <Textarea
+                        id="description"
+                        value={formData.description}
+                        onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                        rows={3}
+                      />
+                    </div>
+                    {!projectId && (
+                      <div className="space-y-2">
+                        <Label htmlFor="project">Έργο *</Label>
+                        <Select
+                          value={formData.project_id}
+                          onValueChange={(value) => setFormData(prev => ({ ...prev, project_id: value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Επιλέξτε έργο" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {projects.map(project => (
+                              <SelectItem key={project.id} value={project.id}>
+                                {project.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      <Label htmlFor="assigned_to">Ανάθεση σε</Label>
+                      <Select
+                        value={formData.assigned_to}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, assigned_to: value === 'none' ? '' : value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Χωρίς ανάθεση" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Χωρίς ανάθεση</SelectItem>
+                          {users.map(u => (
+                            <SelectItem key={u.id} value={u.id}>
+                              {u.full_name || u.email}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Προτεραιότητα</Label>
+                        <Select value={formData.priority} onValueChange={(v) => setFormData(prev => ({ ...prev, priority: v }))}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="low">Χαμηλή</SelectItem>
+                            <SelectItem value="medium">Μέτρια</SelectItem>
+                            <SelectItem value="high">Υψηλή</SelectItem>
+                            <SelectItem value="critical">Κρίσιμη</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Κατάσταση</Label>
+                        <Select value={formData.status} onValueChange={(v) => setFormData(prev => ({ ...prev, status: v }))}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="todo">Προς υλοποίηση</SelectItem>
+                            <SelectItem value="in_progress">Σε εξέλιξη</SelectItem>
+                            <SelectItem value="review">Προς έλεγχο</SelectItem>
+                            <SelectItem value="completed">Ολοκληρώθηκε</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Έναρξη</Label>
+                        <Input type="date" value={formData.start_date} onChange={(e) => setFormData(prev => ({ ...prev, start_date: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Προθεσμία</Label>
+                        <Input type="date" value={formData.due_date} onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))} />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>Ακύρωση</Button>
+                      <Button type="submit" disabled={saving}>
+                        {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                        {editingTask ? 'Αποθήκευση' : 'Δημιουργία'}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+
+          {/* Progress summary like Deliverables */}
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex-1 space-y-2 max-w-lg">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">
+                  Πρόοδος: {completedTasksCount}/{tasks.length} tasks
+                </span>
+                <span className="font-medium">{taskProgressPercent}%</span>
+              </div>
+              <Progress value={taskProgressPercent} className="h-2" />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">

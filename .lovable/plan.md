@@ -1,50 +1,66 @@
 
 
-# Plan: Project Header Cleanup + Task Detail Improvements
+# Org Chart — Full Rebuild Plan
 
-## 1. Remove date/time line from project header
-**File**: `src/pages/ProjectDetail.tsx` (lines 330-340)
+## Πρόβλημα
 
-Remove the sub-info row that shows dates, duration, and timer badge since they already appear in the right-side info card. Keep only the client name, but make it a clickable link.
+Το τρέχον οργανόγραμμα είναι ένα static rendered tree μέσα σε ScrollArea με βασικό zoom (CSS scale). Δεν υποστηρίζει pan/drag-to-move, δεν έχει infinite canvas, τα nodes δεν είναι clickable για detail, δεν υπάρχουν views (by department, by person), και τα templates δεν αξιοποιούν το υπάρχον προσωπικό.
 
-## 2. Make client name clickable
-**File**: `src/pages/ProjectDetail.tsx` (line 331)
+## Λύση
 
-Change the `<span>` to a `<Link to={/clients/${project.client_id}}>` so clicking the client name navigates to the client detail page.
+Πλήρες rebuild του OrgChart σε **infinite canvas** στυλ Miro με pan+zoom, πολλαπλά views, clickable nodes με detail panel, και smart templates.
 
-## 3. Remove folder dropdown
-**File**: `src/pages/ProjectDetail.tsx` (lines 299-326)
+## Τεχνική Προσέγγιση
 
-Remove the entire folder dropdown from the header.
+### 1. Infinite Canvas Engine (χωρίς εξωτερική βιβλιοθήκη)
+- Custom React canvas με `transform: translate(x, y) scale(z)` σε ένα wrapper div
+- **Mouse wheel** → zoom (centered on cursor)
+- **Middle-click drag** ή **Space+drag** → pan (hand tool)
+- **Touch**: pinch-to-zoom, two-finger pan
+- Mini-map στο corner (optional, phase 2)
+- Fit-to-screen button, zoom controls
 
-## 4. Task detail — move status/date/people info into card on right panel
-The right panel already has Assignment, Timeline, Status Flow, and Properties cards (lines 631-765). The sticky action bar (lines 354-433) has inline status, priority, due date, and assignee chips. The user wants these consolidated into the cards. This is already mostly done — the action bar is a quick-access bar. I'll keep the action bar minimal (back + title + timer + complete toggle) and ensure the right panel cards are the primary source for metadata.
+### 2. Views (3 modes)
+- **Hierarchy View** (default): Κλασικό tree ανά reporting line — αυτό που υπάρχει τώρα αλλά σε canvas
+- **Department View**: Grouped κάρτες ανά department σε columns/clusters, κάθε cluster δείχνει τα μέλη
+- **List View**: Compact table/list με sorting, φιλτράρισμα, search — γρήγορη εύρεση ατόμου
 
-Actually looking at screenshot 3, the user is showing the action bar items. Let me keep status in the action bar but ensure the right panel cards are prominent and complete.
+Toggle μεταξύ views μέσω tabs στο header.
 
-## 5. Multi-assignee support for tasks
-**Database**: Create a `task_assignees` junction table (`task_id`, `user_id`) to support multiple assignees. Keep `assigned_to` on tasks for backward compatibility / primary assignee.
+### 3. Interactive Nodes
+- **Click** σε node → slide-in panel (sheet) δεξιά με:
+  - Profile info (avatar, name, email, phone)
+  - Position & department
+  - Direct reports count
+  - Link to Employee Profile (`/hr/employee/:id`)
+  - Quick actions (edit, reassign, add subordinate)
+- **Hover** → subtle highlight + tooltip με title
+- **Vacant positions** → dashed border, prominent "Κενή θέση" badge, click to assign
+- Connector lines μεταξύ nodes: animated SVG paths αντί για div borders
 
-**File**: `src/pages/TaskDetail.tsx` — Update the Assignment card to show multiple avatars and allow adding/removing assignees via a multi-select popover.
+### 4. Smart Templates & Auto-build
+- Βελτίωση του Wizard: αφού επιλεγεί template, **auto-match** υπάρχοντα profiles σε positions βάσει `job_title` ή `department`
+- **Gap Analysis panel**: Μετά τη δημιουργία, δείχνει πόσες θέσεις είναι κενές, ποια departments λείπουν, ποια levels δεν έχουν κάλυψη
+- Wizard step: "Αντιστοίχιση Προσωπικού" — drag-drop ή auto-suggest
 
-## 6. Status Flow — make stages clearer
-**File**: `src/pages/TaskDetail.tsx` (lines 686-722)
+### 5. SVG Connector Lines
+- Αντικατάσταση CSS div lines με SVG `<path>` elements (bezier curves)
+- Animated flow direction (subtle dash animation)
+- Color-coded κατά department
 
-The current dots are tiny (h-6 w-6) with no labels. Redesign:
-- Larger dots or pill-shaped steps
-- Show the label below each step (not just "Todo" and "Done" at edges)
-- Current step highlighted with contrasting color and label text
-- Past steps show checkmark with success color
-- Better connector lines
+## Αρχεία
 
----
-
-### Summary of changes
-
-| File | Change |
+| Αρχείο | Αλλαγή |
 |---|---|
-| `src/pages/ProjectDetail.tsx` | Remove date/timer sub-info line; make client name a clickable Link; remove folder dropdown |
-| `src/pages/TaskDetail.tsx` | Redesign Status Flow with visible labels per step; improve Assignment card UI |
-| New migration | Create `task_assignees` table for multi-assignee support |
-| `src/pages/TaskDetail.tsx` | Add multi-assignee logic (fetch, display, add/remove) in Assignment card |
+| `src/pages/OrgChart.tsx` | **Rewrite** — Infinite canvas, views, SVG connectors, detail panel |
+| `src/components/org-chart/OrgChartCanvas.tsx` | **New** — Pan+zoom canvas wrapper |
+| `src/components/org-chart/OrgNodeCard.tsx` | **New** — Redesigned node card (clickable, expandable) |
+| `src/components/org-chart/OrgDetailPanel.tsx` | **New** — Slide-in sheet for node details |
+| `src/components/org-chart/OrgDepartmentView.tsx` | **New** — Department-grouped view |
+| `src/components/org-chart/OrgListView.tsx` | **New** — Table/list view |
+| `src/components/org-chart/OrgConnectors.tsx` | **New** — SVG connector line renderer |
+| `src/components/org-chart/OrgChartWizard.tsx` | **Update** — Add auto-match step + gap analysis |
+| `src/components/org-chart/DraggableOrgNode.tsx` | **Remove** — Replaced by new OrgNodeCard |
+
+Δεν χρειάζονται DB changes — το schema `org_chart_positions` καλύπτει ήδη hierarchy, department, user_id, color, level, sort_order.
 

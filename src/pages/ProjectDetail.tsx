@@ -296,47 +296,15 @@ export default function ProjectDetailPage() {
                 <Badge variant="outline" className={statusConfig.className}>{statusConfig.label}</Badge>
               )}
 
-              {/* Folder dropdown */}
-              {canEdit && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-0.5 text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground hover:bg-secondary/50">
-                      <FolderInput className="h-3 w-3" />
-                      {folders.find(f => f.id === (project as any).folder_id)?.name || 'Φάκελος'}
-                      <span className="ml-0.5 opacity-60">▾</span>
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    <DropdownMenuItem onClick={async () => {
-                      await supabase.from('projects').update({ folder_id: null }).eq('id', project.id);
-                      toast.success('Αφαιρέθηκε από φάκελο'); fetchProjectData();
-                    }} className={!(project as any).folder_id ? 'font-semibold' : ''}>
-                      Χωρίς φάκελο
-                    </DropdownMenuItem>
-                    {folders.map(f => (
-                      <DropdownMenuItem key={f.id} onClick={async () => {
-                        await supabase.from('projects').update({ folder_id: f.id }).eq('id', project.id);
-                        toast.success(`Μετακινήθηκε στο "${f.name}"`); fetchProjectData();
-                      }} className={(project as any).folder_id === f.id ? 'font-semibold' : ''}>
-                        {f.name}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
             </div>
 
             {/* Sub-info */}
             <div className="flex items-center gap-3 mt-1 flex-wrap text-sm text-muted-foreground">
-              {project.client && <span className="font-medium text-foreground">{project.client.name}</span>}
-              {project.start_date && (
-                <span className="flex items-center gap-1">
-                  <Calendar className="h-3.5 w-3.5" />
-                  {format(new Date(project.start_date), 'd MMM yyyy', { locale: el })}
-                  {project.end_date && <> → {format(new Date(project.end_date), 'd MMM yyyy', { locale: el })}</>}
-                </span>
+              {project.client && project.client_id && (
+                <Link to={`/clients/${project.client_id}`} className="font-medium text-foreground hover:text-primary transition-colors">
+                  {project.client.name}
+                </Link>
               )}
-              {dueDateInfo && <span className={cn('font-medium', dueDateInfo.className)}>· {dueDateInfo.label}</span>}
             </div>
           </div>
 

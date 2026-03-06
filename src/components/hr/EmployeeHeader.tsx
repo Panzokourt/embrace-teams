@@ -3,10 +3,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Mail, Phone, Briefcase, Building2, Calendar, Pencil, Check, X } from 'lucide-react';
+import { ArrowLeft, Pencil, Check, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { format } from 'date-fns';
-import { el } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { XPBadge } from '@/components/gamification/XPBadge';
@@ -45,11 +43,9 @@ const statusColors: Record<string, string> = {
   invited: 'bg-primary/10 text-primary border-primary/20',
 };
 
-type EditableField = 'full_name' | 'job_title' | 'phone' | 'hire_date' | null;
-
 export function EmployeeHeader({ user, departmentName, roleName, canEdit = false, onUserUpdate }: EmployeeHeaderProps) {
   const navigate = useNavigate();
-  const [editingField, setEditingField] = useState<EditableField>(null);
+  const [editingName, setEditingName] = useState(false);
   const [editValue, setEditValue] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -57,33 +53,27 @@ export function EmployeeHeader({ user, departmentName, roleName, canEdit = false
     ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     : user.email.slice(0, 2).toUpperCase();
 
-  const startEdit = (field: EditableField, currentValue: string | null) => {
+  const startEditName = () => {
     if (!canEdit) return;
-    setEditingField(field);
-    setEditValue(currentValue || '');
+    setEditingName(true);
+    setEditValue(user.full_name || '');
   };
 
   const cancelEdit = () => {
-    setEditingField(null);
+    setEditingName(false);
     setEditValue('');
   };
 
-  const saveEdit = async () => {
-    if (!editingField) return;
+  const saveName = async () => {
     setSaving(true);
     try {
-      const updateData: Record<string, string | null> = {
-        [editingField]: editValue.trim() || null,
-      };
-      const { error } = await supabase
-        .from('profiles')
-        .update(updateData)
-        .eq('id', user.id);
+      const val = editValue.trim() || null;
+      const { error } = await supabase.from('profiles').update({ full_name: val }).eq('id', user.id);
       if (error) throw error;
-      onUserUpdate?.(updateData);
+      onUserUpdate?.({ full_name: val as string });
       toast.success('Ενημερώθηκε επιτυχώς');
-      setEditingField(null);
-    } catch (err) {
+      setEditingName(false);
+    } catch {
       toast.error('Σφάλμα κατά την αποθήκευση');
     } finally {
       setSaving(false);
@@ -91,44 +81,8 @@ export function EmployeeHeader({ user, departmentName, roleName, canEdit = false
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') saveEdit();
+    if (e.key === 'Enter') saveName();
     else if (e.key === 'Escape') cancelEdit();
-  };
-
-  const renderEditable = (field: EditableField, value: string | null, displayValue: string, icon: React.ReactNode, inputType = 'text') => {
-    if (editingField === field) {
-      return (
-        <span className="flex items-center gap-1.5">
-          {icon}
-          <Input
-            type={inputType}
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            autoFocus
-            className="h-6 text-sm px-1.5 py-0 w-40"
-            disabled={saving}
-          />
-          <Button variant="ghost" size="icon" className="h-5 w-5" onClick={saveEdit} disabled={saving}>
-            <Check className="h-3 w-3 text-success" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-5 w-5" onClick={cancelEdit} disabled={saving}>
-            <X className="h-3 w-3 text-destructive" />
-          </Button>
-        </span>
-      );
-    }
-    return (
-      <span
-        className={`flex items-center gap-1.5 group ${canEdit ? 'cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1 transition-colors' : ''}`}
-        onClick={() => startEdit(field, value)}
-        title={canEdit ? 'Κλικ για επεξεργασία' : undefined}
-      >
-        {icon}
-        {displayValue}
-        {canEdit && <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />}
-      </span>
-    );
   };
 
   return (
@@ -145,7 +99,7 @@ export function EmployeeHeader({ user, departmentName, roleName, canEdit = false
           </Avatar>
           <div className="flex-1 space-y-1">
             <div className="flex items-center gap-3 flex-wrap">
-              {editingField === 'full_name' ? (
+              {editingName ? (
                 <span className="flex items-center gap-1.5">
                   <Input
                     value={editValue}
@@ -155,7 +109,7 @@ export function EmployeeHeader({ user, departmentName, roleName, canEdit = false
                     className="h-8 text-xl font-bold px-2 w-64"
                     disabled={saving}
                   />
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={saveEdit} disabled={saving}>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={saveName} disabled={saving}>
                     <Check className="h-3.5 w-3.5 text-success" />
                   </Button>
                   <Button variant="ghost" size="icon" className="h-6 w-6" onClick={cancelEdit} disabled={saving}>
@@ -165,7 +119,7 @@ export function EmployeeHeader({ user, departmentName, roleName, canEdit = false
               ) : (
                 <h1
                   className={`text-2xl font-bold tracking-tight group ${canEdit ? 'cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1 transition-colors' : ''}`}
-                  onClick={() => startEdit('full_name', user.full_name)}
+                  onClick={startEditName}
                   title={canEdit ? 'Κλικ για επεξεργασία' : undefined}
                 >
                   {user.full_name || 'Χωρίς όνομα'}
@@ -177,27 +131,6 @@ export function EmployeeHeader({ user, departmentName, roleName, canEdit = false
               </Badge>
               {roleName && <Badge variant="outline">{roleName}</Badge>}
               <XPBadge userId={user.id} size="md" />
-            </div>
-            <div className="flex items-center gap-4 flex-wrap text-sm text-muted-foreground">
-              {renderEditable('job_title', user.job_title, user.job_title || 'Προσθήκη θέσης', <Briefcase className="h-3.5 w-3.5" />)}
-              {departmentName && (
-                <span className="flex items-center gap-1.5">
-                  <Building2 className="h-3.5 w-3.5" />
-                  {departmentName}
-                </span>
-              )}
-              <span className="flex items-center gap-1.5">
-                <Mail className="h-3.5 w-3.5" />
-                {user.email}
-              </span>
-              {renderEditable('phone', user.phone, user.phone || 'Προσθήκη τηλ.', <Phone className="h-3.5 w-3.5" />)}
-              {renderEditable(
-                'hire_date',
-                user.hire_date,
-                user.hire_date ? `Πρόσληψη: ${format(new Date(user.hire_date), 'd MMM yyyy', { locale: el })}` : 'Ημ. πρόσληψης',
-                <Calendar className="h-3.5 w-3.5" />,
-                'date'
-              )}
             </div>
           </div>
           <div className="flex items-center gap-2">

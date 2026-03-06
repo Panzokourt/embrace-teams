@@ -10,7 +10,6 @@ import WorkDayClock from '@/components/topbar/WorkDayClock';
 import { useAuth } from '@/contexts/AuthContext';
 
 import { useLayout } from '@/contexts/LayoutContext';
-import { useLayout } from '@/contexts/LayoutContext';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 interface SearchResult {

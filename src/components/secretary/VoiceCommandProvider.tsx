@@ -39,13 +39,13 @@ export default function VoiceCommandProvider({ children, onOpenSecretaryPanel }:
     // If we have a registered send handler (Secretary is mounted), use it
     if (sendHandler) {
       sendHandler(text);
-      // Open the panel if not on secretary page
-      if (!location.pathname.includes("/secretary") && onOpenSecretaryPanel) {
+      // Open the panel
+      if (onOpenSecretaryPanel) {
         onOpenSecretaryPanel();
       }
     } else {
-      // Navigate to secretary page with the text as state
-      navigate("/secretary", { state: { voiceMessage: text } });
+      // Open secretary panel via custom event
+      window.dispatchEvent(new CustomEvent('open-secretary-panel'));
     }
   }, [sendHandler, navigate, location.pathname, onOpenSecretaryPanel]);
 

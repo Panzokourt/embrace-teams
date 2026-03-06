@@ -10,29 +10,25 @@ import Auth from "@/pages/Auth";
 import Dashboard from "@/pages/Dashboard";
 import MyWork from "@/pages/MyWork";
 import Work from "@/pages/Work";
-import Projects from "@/pages/Projects";
 import ProjectDetail from "@/pages/ProjectDetail";
-import Tasks from "@/pages/Tasks";
+import TaskDetail from "@/pages/TaskDetail";
 import Financials from "@/pages/Financials";
 import Reports from "@/pages/Reports";
 import Clients from "@/pages/Clients";
 import ClientDetail from "@/pages/ClientDetail";
 import Settings from "@/pages/Settings";
-import Calendar from "@/pages/Calendar";
 import CalendarHub from "@/pages/CalendarHub";
 import Files from "@/pages/Files";
 import Blueprints from "@/pages/Blueprints";
 import HR from "@/pages/HR";
 import Timesheets from "@/pages/Timesheets";
 import EmployeeProfile from "@/pages/EmployeeProfile";
-import TaskDetail from "@/pages/TaskDetail";
 import NotFound from "./pages/NotFound";
 import Onboarding from "@/pages/Onboarding";
 import WorkspaceSelector from "@/pages/WorkspaceSelector";
 import AcceptInvite from "@/pages/AcceptInvite";
 import WelcomeWizard from "@/pages/WelcomeWizard";
 import OrganizationSettings from "@/pages/OrganizationSettings";
-import Secretary from "@/pages/Secretary";
 import Chat from "@/pages/Chat";
 import Contacts from "@/pages/Contacts";
 import ContactDetail from "@/pages/ContactDetail";
@@ -45,34 +41,11 @@ import GovernanceAccess from "@/pages/GovernanceAccess";
 import GovernanceVault from "@/pages/GovernanceVault";
 import GovernanceCompliance from "@/pages/GovernanceCompliance";
 import Knowledge from "@/pages/Knowledge";
-import KnowledgePlaybook from "@/pages/KnowledgePlaybook";
 import KnowledgeArticle from "@/pages/KnowledgeArticle";
-import KnowledgeTemplates from "@/pages/KnowledgeTemplates";
-import KnowledgeReviews from "@/pages/KnowledgeReviews";
 import { ChatProvider } from "@/contexts/ChatContext";
-// New placeholder pages
-import Campaigns from "@/pages/Campaigns";
-import Backlog from "@/pages/Backlog";
 import PricingPage from "@/pages/PricingPage";
 import ServiceDetailPage from "@/pages/ServiceDetailPage";
-import Capacity from "@/pages/Capacity";
-import ResourcePlanning from "@/pages/ResourcePlanning";
-import Performance from "@/pages/Performance";
-import CrossClientInsights from "@/pages/CrossClientInsights";
-import Benchmarks from "@/pages/Benchmarks";
-import Forecasting from "@/pages/Forecasting";
-import MediaPlanningPage from "@/pages/MediaPlanningPage";
-import AIInsights from "@/pages/AIInsights";
 import Brain from "@/pages/Brain";
-import GovernanceIntegrations from "@/pages/GovernanceIntegrations";
-import GovernanceAuditLog from "@/pages/GovernanceAuditLog";
-import GovernanceOwnershipMap from "@/pages/GovernanceOwnershipMap";
-import RolesPermissions from "@/pages/RolesPermissions";
-import BillingSettings from "@/pages/BillingSettings";
-import APIKeys from "@/pages/APIKeys";
-import WebhooksSettings from "@/pages/WebhooksSettings";
-import BrandingSettings from "@/pages/BrandingSettings";
-import FeatureFlags from "@/pages/FeatureFlags";
 
 function RedirectUserToEmployee() {
   const { id } = useParams();
@@ -119,7 +92,6 @@ const App = () => (
                   <Route path="/calendar" element={<CalendarHub />} />
                   <Route path="/files" element={<Files />} />
                   <Route path="/blueprints" element={<Blueprints />} />
-                  <Route path="/secretary" element={<Secretary />} />
                   <Route path="/chat" element={<Chat />} />
                   <Route path="/contacts" element={<Contacts />} />
                   <Route path="/contacts/:id" element={<ContactDetail />} />
@@ -131,34 +103,38 @@ const App = () => (
                   <Route path="/governance/access" element={<GovernanceAccess />} />
                   <Route path="/governance/vault" element={<GovernanceVault />} />
                   <Route path="/governance/compliance" element={<GovernanceCompliance />} />
-                  <Route path="/governance/integrations" element={<GovernanceIntegrations />} />
-                  <Route path="/governance/audit-log" element={<GovernanceAuditLog />} />
-                  <Route path="/governance/ownership-map" element={<GovernanceOwnershipMap />} />
                   <Route path="/knowledge" element={<Knowledge />} />
-                  <Route path="/knowledge/playbook" element={<KnowledgePlaybook />} />
                   <Route path="/knowledge/articles/:id" element={<KnowledgeArticle />} />
-                  <Route path="/knowledge/templates" element={<KnowledgeTemplates />} />
-                  <Route path="/knowledge/reviews" element={<KnowledgeReviews />} />
-                  {/* New placeholder pages */}
-                  <Route path="/campaigns" element={<Campaigns />} />
-                  <Route path="/backlog" element={<Backlog />} />
+                  {/* Redirects from removed KB sub-pages */}
+                  <Route path="/knowledge/playbook" element={<Navigate to="/knowledge?tab=playbook" replace />} />
+                  <Route path="/knowledge/templates" element={<Navigate to="/knowledge?tab=templates" replace />} />
+                  <Route path="/knowledge/reviews" element={<Navigate to="/knowledge?tab=reviews" replace />} />
+                  {/* Pricing & Services */}
                   <Route path="/pricing" element={<PricingPage />} />
                   <Route path="/pricing/services/:id" element={<ServiceDetailPage />} />
-                  <Route path="/operations/capacity" element={<Capacity />} />
-                  <Route path="/operations/resource-planning" element={<ResourcePlanning />} />
-                  <Route path="/intelligence/performance" element={<Performance />} />
-                  <Route path="/intelligence/insights" element={<CrossClientInsights />} />
-                  <Route path="/intelligence/benchmarks" element={<Benchmarks />} />
-                  <Route path="/intelligence/forecasting" element={<Forecasting />} />
-                  <Route path="/intelligence/media-planning" element={<MediaPlanningPage />} />
-                  <Route path="/intelligence/ai-insights" element={<Navigate to="/brain" replace />} />
+                  {/* Brain */}
                   <Route path="/brain" element={<Brain />} />
-                  <Route path="/settings/roles" element={<RolesPermissions />} />
-                  <Route path="/settings/billing" element={<BillingSettings />} />
-                  <Route path="/settings/api-keys" element={<APIKeys />} />
-                  <Route path="/settings/webhooks" element={<WebhooksSettings />} />
-                  <Route path="/settings/branding" element={<BrandingSettings />} />
-                  <Route path="/settings/feature-flags" element={<FeatureFlags />} />
+                  <Route path="/intelligence/ai-insights" element={<Navigate to="/brain" replace />} />
+                  {/* Redirects from removed placeholder pages */}
+                  <Route path="/secretary" element={<Navigate to="/my-work" replace />} />
+                  <Route path="/campaigns" element={<Navigate to="/work" replace />} />
+                  <Route path="/backlog" element={<Navigate to="/calendar" replace />} />
+                  <Route path="/operations/capacity" element={<Navigate to="/hr" replace />} />
+                  <Route path="/operations/resource-planning" element={<Navigate to="/hr" replace />} />
+                  <Route path="/intelligence/performance" element={<Navigate to="/reports" replace />} />
+                  <Route path="/intelligence/insights" element={<Navigate to="/reports" replace />} />
+                  <Route path="/intelligence/benchmarks" element={<Navigate to="/reports" replace />} />
+                  <Route path="/intelligence/forecasting" element={<Navigate to="/reports" replace />} />
+                  <Route path="/intelligence/media-planning" element={<Navigate to="/reports" replace />} />
+                  <Route path="/governance/integrations" element={<Navigate to="/governance" replace />} />
+                  <Route path="/governance/audit-log" element={<Navigate to="/governance/compliance" replace />} />
+                  <Route path="/governance/ownership-map" element={<Navigate to="/governance" replace />} />
+                  <Route path="/settings/roles" element={<Navigate to="/settings/organization" replace />} />
+                  <Route path="/settings/billing" element={<Navigate to="/settings" replace />} />
+                  <Route path="/settings/api-keys" element={<Navigate to="/settings" replace />} />
+                  <Route path="/settings/webhooks" element={<Navigate to="/settings" replace />} />
+                  <Route path="/settings/branding" element={<Navigate to="/settings" replace />} />
+                  <Route path="/settings/feature-flags" element={<Navigate to="/settings" replace />} />
                   {/* Redirects from old routes */}
                   <Route path="/users" element={<Navigate to="/hr?tab=staff" replace />} />
                   <Route path="/users/:id" element={<RedirectUserToEmployee />} />

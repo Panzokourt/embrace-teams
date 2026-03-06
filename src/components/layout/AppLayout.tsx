@@ -85,6 +85,16 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
+  // Listen for sidebar secretary button
+  useEffect(() => {
+    const handler = () => {
+      setRightPanelOpen(true);
+      setActiveTab('secretary');
+    };
+    window.addEventListener('open-secretary-panel', handler);
+    return () => window.removeEventListener('open-secretary-panel', handler);
+  }, []);
+
   const togglePanel = useCallback((tab: RightPanelTab) => {
     if (rightPanelOpen && activeTab === tab) {
       setRightPanelOpen(false);

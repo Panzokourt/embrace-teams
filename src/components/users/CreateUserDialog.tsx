@@ -17,20 +17,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
-import { Checkbox } from '@/components/ui/checkbox';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { Loader2, Eye, EyeOff, Wand2 } from 'lucide-react';
 import { CompanyRole, AccessScope, PermissionType } from '@/contexts/AuthContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { PERMISSION_CATEGORIES, DEFAULT_ROLE_PERMISSIONS } from '@/hooks/useRBAC';
+import { DEFAULT_ROLE_PERMISSIONS } from '@/hooks/useRBAC';
+import { PermissionModuleSelector } from './PermissionModuleSelector';
 
 interface CreateUserDialogProps {
   open: boolean;
@@ -46,17 +39,11 @@ const ROLE_OPTIONS: { value: CompanyRole; label: string }[] = [
   { value: 'billing', label: 'Billing' },
 ];
 
-interface Team {
-  id: string;
-  name: string;
-}
-
 export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDialogProps) {
   const { isSuperAdmin } = useAuth();
   const [saving, setSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Form state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -67,32 +54,24 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
   const [role, setRole] = useState<CompanyRole>('member');
   const [accessScope, setAccessScope] = useState<AccessScope>('assigned');
   const [selectedPermissions, setSelectedPermissions] = useState<PermissionType[]>([]);
-  const [teams, setTeams] = useState<Team[]>([]);
   const [users, setUsers] = useState<{ id: string; full_name: string | null }[]>([]);
 
-  // Fetch teams and users for dropdowns
   useEffect(() => {
     if (open) {
-      fetchTeamsAndUsers();
-      // Set default permissions for standard role
+      fetchUsers();
       setSelectedPermissions(DEFAULT_ROLE_PERMISSIONS.member);
     }
   }, [open]);
 
-  // Update permissions when role changes
   useEffect(() => {
     if (role !== 'owner') {
       setSelectedPermissions(DEFAULT_ROLE_PERMISSIONS[role]);
     }
   }, [role]);
 
-  const fetchTeamsAndUsers = async () => {
-    const [teamsRes, usersRes] = await Promise.all([
-      supabase.from('teams').select('id, name'),
-      supabase.from('profiles').select('id, full_name')
-    ]);
-    setTeams(teamsRes.data || []);
-    setUsers(usersRes.data || []);
+  const fetchUsers = async () => {
+    const { data } = await supabase.from('profiles').select('id, full_name');
+    setUsers(data || []);
   };
 
   const generatePassword = () => {
@@ -159,24 +138,6 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
       toast.error(error.message || 'Σφάλμα κατά τη δημιουργία χρήστη');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const togglePermission = (permission: PermissionType) => {
-    setSelectedPermissions(prev => 
-      prev.includes(permission)
-        ? prev.filter(p => p !== permission)
-        : [...prev, permission]
-    );
-  };
-
-  const toggleAllCategory = (category: string, permissions: readonly string[]) => {
-    const permsArray = [...permissions];
-    const allSelected = permsArray.every(p => selectedPermissions.includes(p as PermissionType));
-    if (allSelected) {
-      setSelectedPermissions(prev => prev.filter(p => !permsArray.includes(p)));
-    } else {
-      setSelectedPermissions(prev => [...new Set([...prev, ...permsArray.map(p => p as PermissionType)])]);
     }
   };
 
@@ -305,7 +266,7 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
             {/* Role Selection */}
             <div className="space-y-2">
               <Label>Ρόλος</Label>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 {isSuperAdmin && (
                   <Button
                     type="button"
@@ -344,40 +305,11 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
               </Select>
             </div>
 
-            {/* Permissions */}
-            <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="permissions">
-                <AccordionTrigger>
-                  Δικαιώματα ({selectedPermissions.length} επιλεγμένα)
-                </AccordionTrigger>
-                <AccordionContent>
-                  <div className="space-y-4 pt-2">
-                    {Object.entries(PERMISSION_CATEGORIES).map(([category, perms]) => (
-                      <div key={category} className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Checkbox
-                            checked={perms.every(p => selectedPermissions.includes(p as PermissionType))}
-                            onCheckedChange={() => toggleAllCategory(category, perms)}
-                          />
-                          <span className="font-medium text-sm">{category}</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-1 ml-6">
-                          {perms.map(perm => (
-                            <div key={perm} className="flex items-center gap-2">
-                              <Checkbox
-                                checked={selectedPermissions.includes(perm as PermissionType)}
-                                onCheckedChange={() => togglePermission(perm as PermissionType)}
-                              />
-                              <span className="text-xs text-muted-foreground">{perm}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
+            {/* Module Permissions */}
+            <PermissionModuleSelector
+              selectedPermissions={selectedPermissions}
+              onChange={setSelectedPermissions}
+            />
           </div>
         </div>
 

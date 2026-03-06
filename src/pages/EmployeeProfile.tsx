@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, FolderKanban, Target, FileText, Timer, Calendar, Shield, Users, Clock } from 'lucide-react';
+import { Loader2, FolderKanban, Target, FileText, Timer, Calendar, Shield, Users, Clock, ShieldCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { EmployeeHeader } from '@/components/hr/EmployeeHeader';
@@ -17,6 +17,10 @@ import { toast } from 'sonner';
 import { LevelProgressBar } from '@/components/gamification/LevelProgressBar';
 import { SkillRadar } from '@/components/gamification/SkillRadar';
 import { XPActivityFeed } from '@/components/gamification/XPActivityFeed';
+import { PermissionModuleSelector } from '@/components/users/PermissionModuleSelector';
+import { useRBAC, DEFAULT_ROLE_PERMISSIONS } from '@/hooks/useRBAC';
+import { PermissionType } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
 
 interface UserData {
   id: string;

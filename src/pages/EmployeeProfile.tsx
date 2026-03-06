@@ -61,6 +61,19 @@ export default function EmployeeProfile() {
   const [activityLog, setActivityLog] = useState<any[]>([]);
 
   const { balances, requests, cancelRequest } = useLeaveManagement(id);
+  const { users: companyUsers, updateUserPermissions, refreshData: refreshRBAC } = useRBAC();
+  const [userPermissions, setUserPermissions] = useState<PermissionType[]>([]);
+  const [savingPermissions, setSavingPermissions] = useState(false);
+
+  // Find this user in RBAC data to get their permissions
+  useEffect(() => {
+    if (id && companyUsers.length > 0) {
+      const found = companyUsers.find(u => u.user_id === id);
+      if (found) {
+        setUserPermissions([...found.permissions]);
+      }
+    }
+  }, [id, companyUsers]);
 
   useEffect(() => {
     if (id) fetchAll();

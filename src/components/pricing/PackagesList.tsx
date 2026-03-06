@@ -159,10 +159,10 @@ export default function PackagesList() {
                   <TableCell>
                     <span className="text-sm">{formatDuration(pkg.duration_type, pkg.duration_value)}</span>
                   </TableCell>
-                  <TableCell className="text-right">€{pkg.list_price.toLocaleString('el-GR', { minimumFractionDigits: 2 })}</TableCell>
+                  <TableCell className="text-right">€{pkg.list_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                   <TableCell className="text-right">{pkg.discount_percent > 0 ? `${pkg.discount_percent}%` : '—'}</TableCell>
-                  <TableCell className="text-right font-medium">€{(pkg.final_price || 0).toLocaleString('el-GR', { minimumFractionDigits: 2 })}</TableCell>
-                  <TableCell className="text-right text-muted-foreground">€{(pkg.internal_cost || 0).toLocaleString('el-GR', { minimumFractionDigits: 2 })}</TableCell>
+                  <TableCell className="text-right font-medium">€{(pkg.final_price || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                  <TableCell className="text-right text-muted-foreground">€{(pkg.internal_cost || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                   <TableCell className="text-right"><MarginBadge pct={pkg.margin_pct || 0} /></TableCell>
                   {canManage && (
                     <TableCell>

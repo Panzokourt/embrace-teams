@@ -22,6 +22,18 @@ export interface AIPackageSuggestion {
   items: { service_id: string; quantity: number; duration_months: number; rationale: string }[];
 }
 
+function formatDuration(type: string, value: number): string {
+  const labels: Record<string, string> = {
+    fixed_days: `${value} ημέρες`,
+    monthly: value === 1 ? 'Μηνιαίο' : `${value} μήνες`,
+    quarterly: '3μηνο',
+    semi_annual: '6μηνο',
+    annual: 'Ετήσιο',
+    custom_months: `${value} μήνες`,
+  };
+  return labels[type] || `${value} μήνες`;
+}
+
 function MarginBadge({ pct }: { pct: number }) {
   if (pct >= 40) return <Badge className="bg-primary/15 text-primary border-primary/30"><TrendingUp className="h-3 w-3 mr-1" />{pct.toFixed(1)}%</Badge>;
   if (pct >= 0) return <Badge variant="secondary"><Minus className="h-3 w-3 mr-1" />{pct.toFixed(1)}%</Badge>;
@@ -123,6 +135,7 @@ export default function PackagesList() {
               <TableRow>
                 <TableHead>Πακέτο</TableHead>
                 <TableHead className="text-center">Υπηρεσίες</TableHead>
+                <TableHead>Διάρκεια</TableHead>
                 <TableHead className="text-right">Τιμή</TableHead>
                 <TableHead className="text-right">Έκπτωση</TableHead>
                 <TableHead className="text-right">Τελική</TableHead>
@@ -142,6 +155,9 @@ export default function PackagesList() {
                   </TableCell>
                   <TableCell className="text-center">
                     <Badge variant="outline">{pkg.items?.length || 0}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm">{formatDuration(pkg.duration_type, pkg.duration_value)}</span>
                   </TableCell>
                   <TableCell className="text-right">€{pkg.list_price.toLocaleString('el-GR', { minimumFractionDigits: 2 })}</TableCell>
                   <TableCell className="text-right">{pkg.discount_percent > 0 ? `${pkg.discount_percent}%` : '—'}</TableCell>

@@ -22,7 +22,7 @@ import { toast } from 'sonner';
 import {
   ArrowLeft, Loader2, CheckCircle2, Clock, Circle, AlertCircle,
   FolderOpen, MessageSquare, Timer, ChevronRight, Flag, Plus,
-  Paperclip, Check, Pencil, CalendarIcon, History, User
+  Paperclip, Check, Pencil, CalendarIcon, History, User, X as XIcon, UserPlus
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -779,6 +779,102 @@ function MetaRow({ label, children }: { label: string; children: React.ReactNode
     <div className="flex items-center gap-3">
       <span className="text-[11px] text-muted-foreground w-20 shrink-0">{label}</span>
       <div className="flex-1 min-w-0">{children}</div>
+    </div>
+  );
+}
+
+/* Multi-assignee manager component */
+function TaskAssigneeManager({ taskId, profiles }: { taskId: string; profiles: Profile[] }) {
+  const [assignees, setAssignees] = useState<{ user_id: string; full_name: string | null }[]>([]);
+  const [popoverOpen, setPopoverOpen] = useState(false);
+
+  const fetchAssignees = useCallback(async () => {
+    const { data } = await supabase
+      .from('task_assignees')
+      .select('user_id')
+      .eq('task_id', taskId);
+    
+    if (data && data.length > 0) {
+      const userIds = data.map(d => d.user_id);
+      const { data: profs } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', userIds);
+      setAssignees((profs || []).map(p => ({ user_id: p.id, full_name: p.full_name })));
+    } else {
+      setAssignees([]);
+    }
+  }, [taskId]);
+
+  useEffect(() => { fetchAssignees(); }, [fetchAssignees]);
+
+  const addAssignee = async (userId: string) => {
+    const { error } = await supabase.from('task_assignees').insert({ task_id: taskId, user_id: userId });
+    if (!error) fetchAssignees();
+  };
+
+  const removeAssignee = async (userId: string) => {
+    await supabase.from('task_assignees').delete().eq('task_id', taskId).eq('user_id', userId);
+    fetchAssignees();
+  };
+
+  const assignedIds = new Set(assignees.map(a => a.user_id));
+  const available = profiles.filter(p => !assignedIds.has(p.id));
+
+  return (
+    <div className="space-y-2">
+      {/* Current assignees */}
+      <div className="flex flex-wrap gap-1.5">
+        {assignees.map(a => (
+          <div key={a.user_id} className="flex items-center gap-1.5 bg-muted rounded-full pl-1 pr-2 py-0.5">
+            <Avatar className="h-5 w-5">
+              <AvatarFallback className="text-[9px] bg-primary/10 text-primary">
+                {a.full_name?.[0]?.toUpperCase() || '?'}
+              </AvatarFallback>
+            </Avatar>
+            <span className="text-xs">{a.full_name || 'Χρήστης'}</span>
+            <button onClick={() => removeAssignee(a.user_id)} className="h-3.5 w-3.5 rounded-full hover:bg-destructive/20 flex items-center justify-center">
+              <XIcon className="h-2.5 w-2.5 text-muted-foreground hover:text-destructive" />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {assignees.length === 0 && (
+        <p className="text-xs text-muted-foreground">Χωρίς ανάθεση</p>
+      )}
+
+      {/* Add assignee popover */}
+      <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+        <PopoverTrigger asChild>
+          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-muted-foreground">
+            <UserPlus className="h-3.5 w-3.5" />
+            Προσθήκη
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-56 p-1" align="start">
+          <ScrollArea className="max-h-48">
+            {available.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-3">Δεν υπάρχουν διαθέσιμα μέλη</p>
+            ) : (
+              available.map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => { addAssignee(p.id); }}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs rounded-md hover:bg-muted transition-colors text-left"
+                >
+                  <Avatar className="h-5 w-5">
+                    <AvatarFallback className="text-[9px] bg-primary/10 text-primary">
+                      {p.full_name?.[0]?.toUpperCase() || '?'}
+                    </AvatarFallback>
+                  </Avatar>
+                  {p.full_name || p.email}
+                </button>
+              ))
+            )}
+          </ScrollArea>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }

@@ -1,66 +1,64 @@
 
 
-# Org Chart — Full Rebuild Plan
+# Plan: Redesign Employee Profile — Client-style Card Layout
 
-## Πρόβλημα
+## Current State
+The Employee Profile (`EmployeeProfile.tsx`) has a flat tab layout with minimal content in the Overview tab — just "Ομάδες" (which should be "Τμήμα") and Leave Balance. No stat cards, no rich overview. The Client Detail page uses a 12-column grid with a smart header and dedicated cards — that's the target aesthetic.
 
-Το τρέχον οργανόγραμμα είναι ένα static rendered tree μέσα σε ScrollArea με βασικό zoom (CSS scale). Δεν υποστηρίζει pan/drag-to-move, δεν έχει infinite canvas, τα nodes δεν είναι clickable για detail, δεν υπάρχουν views (by department, by person), και τα templates δεν αξιοποιούν το υπάρχον προσωπικό.
+## Changes
 
-## Λύση
+### 1. Redesign Overview Tab — Card-based Layout
 
-Πλήρες rebuild του OrgChart σε **infinite canvas** στυλ Miro με pan+zoom, πολλαπλά views, clickable nodes με detail panel, και smart templates.
+Replace the current empty overview with a rich grid layout:
 
-## Τεχνική Προσέγγιση
+**Top row — KPI stat cards** (4 mini cards):
+- Ενεργά Έργα (count from `projects`)
+- Ανοιχτές Εργασίες (count from `tasks` where status ≠ done)
+- Ώρες Μήνα (sum `duration_minutes` from `time_entries` for current month)
+- Υπόλοιπο Αδειών (sum from `balances`)
 
-### 1. Infinite Canvas Engine (χωρίς εξωτερική βιβλιοθήκη)
-- Custom React canvas με `transform: translate(x, y) scale(z)` σε ένα wrapper div
-- **Mouse wheel** → zoom (centered on cursor)
-- **Middle-click drag** ή **Space+drag** → pan (hand tool)
-- **Touch**: pinch-to-zoom, two-finger pan
-- Mini-map στο corner (optional, phase 2)
-- Fit-to-screen button, zoom controls
+**Main grid (12-col like ClientDetail)**:
 
-### 2. Views (3 modes)
-- **Hierarchy View** (default): Κλασικό tree ανά reporting line — αυτό που υπάρχει τώρα αλλά σε canvas
-- **Department View**: Grouped κάρτες ανά department σε columns/clusters, κάθε cluster δείχνει τα μέλη
-- **List View**: Compact table/list με sorting, φιλτράρισμα, search — γρήγορη εύρεση ατόμου
+Left column (7 cols):
+- **Στοιχεία Επικοινωνίας** card — Email, Phone, Hire Date (inline editable as already supported by EmployeeHeader)
+- **Θέση & Τμήμα** card — Job title, Department, Role badge
+- **Πρόσφατη Δραστηριότητα** card — Last 5 activity log entries
 
-Toggle μεταξύ views μέσω tabs στο header.
+Right column (5 cols):
+- **Έργα** card — List of projects with status badges (clickable → project detail)
+- **Tasks Snapshot** card — Overdue / This Week / Open counts (reuse pattern from `ClientTasksSnapshot`)
+- **Υπόλοιπο Αδειών** card — Compact leave balance
 
-### 3. Interactive Nodes
-- **Click** σε node → slide-in panel (sheet) δεξιά με:
-  - Profile info (avatar, name, email, phone)
-  - Position & department
-  - Direct reports count
-  - Link to Employee Profile (`/hr/employee/:id`)
-  - Quick actions (edit, reassign, add subordinate)
-- **Hover** → subtle highlight + tooltip με title
-- **Vacant positions** → dashed border, prominent "Κενή θέση" badge, click to assign
-- Connector lines μεταξύ nodes: animated SVG paths αντί για div borders
+### 2. Fix "Ομάδες" → "Τμήμα"
+Remove the Teams card. Show Department info in the new "Θέση & Τμήμα" card.
 
-### 4. Smart Templates & Auto-build
-- Βελτίωση του Wizard: αφού επιλεγεί template, **auto-match** υπάρχοντα profiles σε positions βάσει `job_title` ή `department`
-- **Gap Analysis panel**: Μετά τη δημιουργία, δείχνει πόσες θέσεις είναι κενές, ποια departments λείπουν, ποια levels δεν έχουν κάλυψη
-- Wizard step: "Αντιστοίχιση Προσωπικού" — drag-drop ή auto-suggest
+### 3. EmployeeHeader Cleanup
+The header already works well with cover photo + avatar. Keep it as-is — it matches the client smart header pattern.
 
-### 5. SVG Connector Lines
-- Αντικατάσταση CSS div lines με SVG `<path>` elements (bezier curves)
-- Animated flow direction (subtle dash animation)
-- Color-coded κατά department
+### 4. New Component: `EmployeeStatsCard.tsx`
+Small reusable stat card (icon, number, label) used for the KPI row. Similar to the `StatCard` used in Dashboard.
 
-## Αρχεία
+### 5. Compute Stats in `EmployeeProfile.tsx`
+Add computed values:
+- `activeProjects` = projects with status ≠ completed
+- `openTasks` = tasks where status ≠ done  
+- `overdueTasks` = open tasks with due_date < now
+- `monthlyHours` = sum of `duration_minutes` for current month from timeEntries
+- `leaveBalance` = sum of remaining leave days
 
-| Αρχείο | Αλλαγή |
+## Files
+
+| File | Change |
 |---|---|
-| `src/pages/OrgChart.tsx` | **Rewrite** — Infinite canvas, views, SVG connectors, detail panel |
-| `src/components/org-chart/OrgChartCanvas.tsx` | **New** — Pan+zoom canvas wrapper |
-| `src/components/org-chart/OrgNodeCard.tsx` | **New** — Redesigned node card (clickable, expandable) |
-| `src/components/org-chart/OrgDetailPanel.tsx` | **New** — Slide-in sheet for node details |
-| `src/components/org-chart/OrgDepartmentView.tsx` | **New** — Department-grouped view |
-| `src/components/org-chart/OrgListView.tsx` | **New** — Table/list view |
-| `src/components/org-chart/OrgConnectors.tsx` | **New** — SVG connector line renderer |
-| `src/components/org-chart/OrgChartWizard.tsx` | **Update** — Add auto-match step + gap analysis |
-| `src/components/org-chart/DraggableOrgNode.tsx` | **Remove** — Replaced by new OrgNodeCard |
+| `src/pages/EmployeeProfile.tsx` | **Rewrite Overview tab** — KPI row + 12-col grid with cards. Compute stats. Remove teams references. |
+| `src/components/hr/EmployeeStatsCard.tsx` | **New** — Mini stat card component (icon, value, label) |
 
-Δεν χρειάζονται DB changes — το schema `org_chart_positions` καλύπτει ήδη hierarchy, department, user_id, color, level, sort_order.
+No DB changes needed. All data is already fetched.
+
+## Additional Feature Ideas (for follow-up)
+- **Quick Actions** in header: Send Message, Assign to Project, Start Timer
+- **Skills & Certifications** card in Overview
+- **Attendance/Presence** indicator (online status from work day clock)
+- **Notes/Comments** section for manager-to-employee notes
+- **Performance Goals** card with progress tracking
 

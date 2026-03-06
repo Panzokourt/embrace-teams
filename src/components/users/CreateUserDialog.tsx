@@ -248,22 +248,77 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
             {/* Additional Info */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="jobTitle">Τίτλος / Θέση</Label>
-                <Input
-                  id="jobTitle"
-                  value={jobTitle}
-                  onChange={(e) => setJobTitle(e.target.value)}
-                  placeholder="π.χ. Senior Developer"
-                />
+                <Label>Τίτλος / Θέση</Label>
+                <Popover open={jobTitleOpen} onOpenChange={setJobTitleOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={jobTitleOpen}
+                      className="w-full justify-between font-normal"
+                    >
+                      {jobTitle || <span className="text-muted-foreground">π.χ. Senior Developer</span>}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <Command>
+                      <CommandInput
+                        placeholder="Αναζήτηση ή νέα θέση..."
+                        value={jobTitleSearch}
+                        onValueChange={setJobTitleSearch}
+                      />
+                      <CommandList>
+                        <CommandEmpty>
+                          {jobTitleSearch.trim() ? (
+                            <button
+                              className="w-full px-3 py-2 text-sm text-left hover:bg-accent rounded cursor-pointer"
+                              onClick={() => {
+                                setJobTitle(jobTitleSearch.trim());
+                                setJobTitleOpen(false);
+                                setJobTitleSearch('');
+                              }}
+                            >
+                              Προσθήκη: <span className="font-medium">"{jobTitleSearch.trim()}"</span>
+                            </button>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">Πληκτρολογήστε για αναζήτηση</span>
+                          )}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {jobTitleOptions.map((title) => (
+                            <CommandItem
+                              key={title}
+                              value={title}
+                              onSelect={() => {
+                                setJobTitle(title);
+                                setJobTitleOpen(false);
+                                setJobTitleSearch('');
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", jobTitle === title ? "opacity-100" : "opacity-0")} />
+                              {title}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="department">Τμήμα</Label>
-                <Input
-                  id="department"
-                  value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
-                  placeholder="π.χ. Development"
-                />
+                <Label>Τμήμα</Label>
+                <Select value={department} onValueChange={setDepartment}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Επιλέξτε τμήμα" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Κανένα</SelectItem>
+                    {departments.map(d => (
+                      <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

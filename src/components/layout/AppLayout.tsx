@@ -49,9 +49,7 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
   });
 
   // Right panel
-  const [rightPanelOpen, setRightPanelOpen] = useState(() => {
-    try { return localStorage.getItem(PANEL_OPEN_KEY) === 'true'; } catch { return false; }
-  });
+  const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<RightPanelTab>(() => {
     try { return (localStorage.getItem(PANEL_TAB_KEY) as RightPanelTab) || 'secretary'; } catch { return 'secretary'; }
   });
@@ -225,7 +223,9 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
   if (postLoginRoute === '/select-workspace') return <Navigate to="/select-workspace" replace />;
 
   const isMobile = layoutState === 'mobile';
-  const showDockedRightPanel = rightPanelOpen && !isMobile;
+  const isOverlay = rightPanelMode === 'overlay';
+  const showDockedRightPanel = rightPanelOpen && !isMobile && !isOverlay;
+  const showOverlayRightPanel = rightPanelOpen && !isMobile && isOverlay;
   const showDrawerRightPanel = rightPanelOpen && isMobile;
 
   const effectiveSidebarWidth = sidebarMode === 'hidden' ? 0 : sidebarCollapsed ? SIDEBAR_COLLAPSED_W : sidebarWidth;
@@ -276,7 +276,7 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
         </main>
       </div>
 
-      {/* Docked right panel (non-mobile) */}
+      {/* Docked right panel (wide layout only) */}
       {showDockedRightPanel && (
         <div
           className="h-full shrink-0 overflow-hidden relative"
@@ -289,6 +289,19 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
           />
           <SecretaryPanel activeTab={activeTab} onTabChange={setActiveTab} onClose={closePanel} registerSendHandler={registerSendHandler} />
         </div>
+      )}
+
+      {/* Overlay right panel (standard/narrow layouts) */}
+      {showOverlayRightPanel && (
+        <>
+          <div className="fixed inset-0 bg-black/20 z-30" onClick={closePanel} />
+          <div
+            className="fixed top-0 right-0 h-full z-40 shadow-2xl"
+            style={{ width: Math.min(rightPanelWidth, 400) }}
+          >
+            <SecretaryPanel activeTab={activeTab} onTabChange={setActiveTab} onClose={closePanel} registerSendHandler={registerSendHandler} />
+          </div>
+        </>
       )}
 
       {/* Mobile: Drawer right panel */}

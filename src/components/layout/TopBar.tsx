@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import WorkDayClock from '@/components/topbar/WorkDayClock';
 import { useFocusMode } from '@/contexts/FocusContext';
 import { useAuth } from '@/contexts/AuthContext';
-import CompanySwitcher from './CompanySwitcher';
+
 import { XPBadge } from '@/components/gamification/XPBadge';
 import { useLayout } from '@/contexts/LayoutContext';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -110,7 +110,7 @@ export default function TopBar({ onPanelToggle, rightPanelOpen, onMobileMenuTogg
   }, {});
 
   return (
-    <div className="sticky top-0 z-20 h-12 border-b border-border/40 bg-card/80 backdrop-blur-lg px-2 md:px-4 flex items-center gap-1.5 shrink-0">
+    <div className="sticky top-0 z-20 h-12 border-b border-border/40 bg-card/80 backdrop-blur-lg px-3 md:px-4 flex items-center gap-3 shrink-0">
       {/* Hamburger for mobile */}
       {showHamburger && (
         <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={onMobileMenuToggle}>
@@ -118,22 +118,17 @@ export default function TopBar({ onPanelToggle, rightPanelOpen, onMobileMenuTogg
         </Button>
       )}
 
-      {/* Company Switcher */}
-      <CompanySwitcher compact={isNarrow} />
-
-      <div className="w-px h-5 bg-border shrink-0" />
-
       {/* Work Day Clock — hidden on mobile */}
       {!isMobile && <WorkDayClock compact={isNarrow} />}
 
-      {!isMobile && <div className="w-px h-5 bg-border shrink-0" />}
+      {!isMobile && <div className="w-px h-5 bg-border/50 shrink-0" />}
 
       {/* Search */}
       <div className="flex-1 min-w-0 max-w-xl">
         <Popover open={searchOpen} onOpenChange={setSearchOpen}>
           <PopoverTrigger asChild>
             <button
-              className="flex h-8 w-full items-center gap-2 rounded-lg border border-border/60 px-2.5 text-sm transition-colors focus:outline-none bg-muted text-muted-foreground hover:bg-muted/80 min-w-0"
+              className="flex h-8 w-full items-center gap-2 rounded-lg border border-border/60 px-2.5 text-xs transition-colors focus:outline-none bg-muted text-muted-foreground hover:bg-muted/80 min-w-0"
               onClick={() => setSearchOpen(true)}
             >
               <Search className="h-3.5 w-3.5 shrink-0" />
@@ -174,7 +169,7 @@ export default function TopBar({ onPanelToggle, rightPanelOpen, onMobileMenuTogg
       </div>
 
       {/* Right actions */}
-      <div className="flex items-center gap-1 shrink-0">
+      <div className="flex items-center gap-2 shrink-0">
         {/* XP Badge — hide on mobile */}
         {!isMobile && <XPBadge userId={user?.id} size="sm" showXP={!isNarrow} />}
 

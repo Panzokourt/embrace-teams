@@ -1,5 +1,4 @@
-import { useUserXP, getLevelColor, getLevelTitle, getNextLevelThreshold } from '@/hooks/useUserXP';
-import { Progress } from '@/components/ui/progress';
+import { useUserXP, getLevelColor, getLevelTitle, getNextLevelThreshold, getLevelThreshold } from '@/hooks/useUserXP';
 import { Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -8,12 +7,16 @@ interface LevelProgressBarProps {
 }
 
 export function LevelProgressBar({ userId }: LevelProgressBarProps) {
-  const { level, totalXP, levelProgress, loading } = useUserXP(userId);
+  const { level, totalXP, loading } = useUserXP(userId);
 
   if (loading) return null;
 
   const colorClass = getLevelColor(level);
+  const currentThreshold = getLevelThreshold(level);
   const nextThreshold = getNextLevelThreshold(level);
+  const xpInLevel = totalXP - currentThreshold;
+  const xpNeeded = nextThreshold - currentThreshold;
+  const pct = xpNeeded > 0 ? Math.min(100, Math.max(0, (xpInLevel / xpNeeded) * 100)) : 100;
 
   return (
     <div className="space-y-2">
@@ -27,7 +30,12 @@ export function LevelProgressBar({ userId }: LevelProgressBarProps) {
           {totalXP} / {nextThreshold} XP
         </span>
       </div>
-      <Progress value={levelProgress} className="h-2" />
+      <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
+        <div
+          className="h-full rounded-full bg-primary transition-all duration-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
     </div>
   );
 }

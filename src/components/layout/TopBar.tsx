@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import WorkDayClock from '@/components/topbar/WorkDayClock';
 import { useFocusMode } from '@/contexts/FocusContext';
 import { useAuth } from '@/contexts/AuthContext';
+import CompanySwitcher from './CompanySwitcher';
 import { XPBadge } from '@/components/gamification/XPBadge';
 import { useLayout } from '@/contexts/LayoutContext';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -116,6 +117,11 @@ export default function TopBar({ onPanelToggle, rightPanelOpen, onMobileMenuTogg
           <Menu className="h-4 w-4" />
         </Button>
       )}
+
+      {/* Company Switcher */}
+      <CompanySwitcher compact={isNarrow} />
+
+      <div className="w-px h-5 bg-border shrink-0" />
 
       {/* Work Day Clock — hidden on mobile */}
       {!isMobile && <WorkDayClock compact={isNarrow} />}

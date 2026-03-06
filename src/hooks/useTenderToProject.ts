@@ -8,6 +8,7 @@ interface TenderData {
   client_id: string | null;
   budget: number;
   submission_deadline: string | null;
+  company_id: string;
 }
 
 interface TenderSuggestionData {
@@ -29,11 +30,12 @@ export async function convertTenderToProject(tender: TenderData): Promise<string
         name: tender.name,
         description: tender.description,
         client_id: tender.client_id,
-        status: 'active',
+        status: 'active' as const,
         budget: tender.budget,
         agency_fee_percentage: 30,
         start_date: new Date().toISOString().split('T')[0],
         end_date: tender.submission_deadline,
+        company_id: tender.company_id,
       })
       .select('id')
       .single();

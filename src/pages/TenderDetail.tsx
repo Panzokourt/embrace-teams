@@ -59,6 +59,7 @@ interface Tender {
   name: string;
   description: string | null;
   client_id: string | null;
+  company_id: string;
   stage: TenderStage;
   budget: number;
   submission_deadline: string | null;
@@ -239,7 +240,8 @@ export default function TenderDetailPage() {
         description: tender.description,
         client_id: tender.client_id,
         budget: tender.budget,
-        submission_deadline: tender.submission_deadline
+        submission_deadline: tender.submission_deadline,
+        company_id: tender.company_id,
       },
       (projectId) => {
         navigate(`/projects/${projectId}`);

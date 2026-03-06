@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { useDocumentParser } from '@/hooks/useDocumentParser';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -130,6 +131,7 @@ export function TenderCreationWizard({
   onComplete, 
   onCancel 
 }: TenderCreationWizardProps) {
+  const { company } = useAuth();
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
@@ -259,19 +261,21 @@ export function TenderCreationWizard({
     setSaving(true);
     try {
       // Create tender
+      const tenderPayload: any = {
+        name: formData.name,
+        description: formData.description || null,
+        client_id: formData.client_id || null,
+        stage: 'identification' as TenderStage,
+        budget: parseFloat(formData.budget) || 0,
+        submission_deadline: formData.submission_deadline || null,
+        tender_type: tenderType,
+        source_email: formData.source_email || null,
+        probability: parseInt(formData.probability) || 50
+      };
+      if (company) tenderPayload.company_id = company.id;
       const { data: tender, error: tenderError } = await supabase
         .from('tenders')
-        .insert({
-          name: formData.name,
-          description: formData.description || null,
-          client_id: formData.client_id || null,
-          stage: 'identification' as TenderStage,
-          budget: parseFloat(formData.budget) || 0,
-          submission_deadline: formData.submission_deadline || null,
-          tender_type: tenderType,
-          source_email: formData.source_email || null,
-          probability: parseInt(formData.probability) || 50
-        })
+        .insert(tenderPayload)
         .select()
         .single();
 

@@ -50,7 +50,7 @@ const defaultForm = {
 };
 
 export default function ServicesCatalog() {
-  const { isAdmin, isManager } = useAuth();
+  const { isAdmin, isManager, company } = useAuth();
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -77,7 +77,7 @@ export default function ServicesCatalog() {
       try { roleHours = JSON.parse(form.role_hours); } catch {}
       try { roleRates = JSON.parse(form.role_rates); } catch {}
 
-      const payload = {
+      const payload: any = {
         name: form.name,
         description: form.description || null,
         category: form.category,
@@ -88,6 +88,9 @@ export default function ServicesCatalog() {
         role_hours: roleHours,
         role_rates: roleRates,
       };
+      if (!editing && company) {
+        payload.company_id = company.id;
+      }
 
       if (editing) {
         const { error } = await supabase.from('services').update(payload).eq('id', editing.id);

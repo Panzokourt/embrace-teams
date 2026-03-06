@@ -142,7 +142,7 @@ export function BriefFormDialog({
     try {
       const title = getTitle();
       const dataWithUsers = { ...formData, assigned_users: selectedUserIds };
-      const payload = {
+      const payload: any = {
         brief_type: definition.type,
         title,
         data: dataWithUsers as any,
@@ -151,6 +151,9 @@ export function BriefFormDialog({
         client_id: selectedClientId || null,
         project_id: selectedProjectId || null,
       };
+      if (!briefId && company) {
+        payload.company_id = company.id;
+      }
 
       if (briefId) {
         const { error } = await supabase.from('briefs').update(payload).eq('id', briefId);

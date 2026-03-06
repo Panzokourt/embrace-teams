@@ -17,13 +17,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import { toast } from 'sonner';
-import { Loader2, Eye, EyeOff, Wand2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Wand2, Check, ChevronsUpDown } from 'lucide-react';
 import { CompanyRole, AccessScope, PermissionType } from '@/contexts/AuthContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { DEFAULT_ROLE_PERMISSIONS } from '@/hooks/useRBAC';
 import { PermissionModuleSelector } from './PermissionModuleSelector';
+import { cn } from '@/lib/utils';
 
 interface CreateUserDialogProps {
   open: boolean;
@@ -40,7 +54,7 @@ const ROLE_OPTIONS: { value: CompanyRole; label: string }[] = [
 ];
 
 export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDialogProps) {
-  const { isSuperAdmin } = useAuth();
+  const { isSuperAdmin, company } = useAuth();
   const [saving, setSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -55,10 +69,16 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
   const [accessScope, setAccessScope] = useState<AccessScope>('assigned');
   const [selectedPermissions, setSelectedPermissions] = useState<PermissionType[]>([]);
   const [users, setUsers] = useState<{ id: string; full_name: string | null }[]>([]);
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [jobTitleOptions, setJobTitleOptions] = useState<string[]>([]);
+  const [jobTitleOpen, setJobTitleOpen] = useState(false);
+  const [jobTitleSearch, setJobTitleSearch] = useState('');
 
   useEffect(() => {
     if (open) {
       fetchUsers();
+      fetchDepartments();
+      fetchJobTitles();
       setSelectedPermissions(DEFAULT_ROLE_PERMISSIONS.member);
     }
   }, [open]);
@@ -72,6 +92,19 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
   const fetchUsers = async () => {
     const { data } = await supabase.from('profiles').select('id, full_name');
     setUsers(data || []);
+  };
+
+  const fetchDepartments = async () => {
+    const companyId = company?.id;
+    if (!companyId) return;
+    const { data } = await supabase.from('departments').select('id, name').eq('company_id', companyId).order('name');
+    setDepartments(data || []);
+  };
+
+  const fetchJobTitles = async () => {
+    const { data } = await supabase.from('profiles').select('job_title').not('job_title', 'is', null);
+    const titles = [...new Set((data || []).map(p => p.job_title).filter(Boolean) as string[])].sort();
+    setJobTitleOptions(titles);
   };
 
   const generatePassword = () => {
@@ -117,7 +150,7 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
           full_name: fullName,
           role,
           job_title: jobTitle || null,
-          department: department || null,
+          department: department && department !== 'none' ? department : null,
           phone: phone || null,
           reports_to: reportsTo === 'none' ? null : reportsTo,
           hire_date: new Date().toISOString().split('T')[0],
@@ -215,22 +248,77 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
             {/* Additional Info */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="jobTitle">Τίτλος / Θέση</Label>
-                <Input
-                  id="jobTitle"
-                  value={jobTitle}
-                  onChange={(e) => setJobTitle(e.target.value)}
-                  placeholder="π.χ. Senior Developer"
-                />
+                <Label>Τίτλος / Θέση</Label>
+                <Popover open={jobTitleOpen} onOpenChange={setJobTitleOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={jobTitleOpen}
+                      className="w-full justify-between font-normal"
+                    >
+                      {jobTitle || <span className="text-muted-foreground">π.χ. Senior Developer</span>}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <Command>
+                      <CommandInput
+                        placeholder="Αναζήτηση ή νέα θέση..."
+                        value={jobTitleSearch}
+                        onValueChange={setJobTitleSearch}
+                      />
+                      <CommandList>
+                        <CommandEmpty>
+                          {jobTitleSearch.trim() ? (
+                            <button
+                              className="w-full px-3 py-2 text-sm text-left hover:bg-accent rounded cursor-pointer"
+                              onClick={() => {
+                                setJobTitle(jobTitleSearch.trim());
+                                setJobTitleOpen(false);
+                                setJobTitleSearch('');
+                              }}
+                            >
+                              Προσθήκη: <span className="font-medium">"{jobTitleSearch.trim()}"</span>
+                            </button>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">Πληκτρολογήστε για αναζήτηση</span>
+                          )}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {jobTitleOptions.map((title) => (
+                            <CommandItem
+                              key={title}
+                              value={title}
+                              onSelect={() => {
+                                setJobTitle(title);
+                                setJobTitleOpen(false);
+                                setJobTitleSearch('');
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", jobTitle === title ? "opacity-100" : "opacity-0")} />
+                              {title}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="department">Τμήμα</Label>
-                <Input
-                  id="department"
-                  value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
-                  placeholder="π.χ. Development"
-                />
+                <Label>Τμήμα</Label>
+                <Select value={department} onValueChange={setDepartment}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Επιλέξτε τμήμα" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Κανένα</SelectItem>
+                    {departments.map(d => (
+                      <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

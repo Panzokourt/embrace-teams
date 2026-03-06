@@ -11,7 +11,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Trash2, Loader2, TrendingUp, TrendingDown } from 'lucide-react';
+import { Plus, Trash2, Loader2, TrendingUp, TrendingDown, Sparkles, X } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import type { AIPackageSuggestion } from './PackagesList';
 
 interface PackageItemRow {
   service_id: string;
@@ -26,9 +28,10 @@ interface Props {
   pkg: ServicePackage | null;
   services: ServiceWithCosts[];
   onSaved: () => void;
+  aiSuggestion?: AIPackageSuggestion | null;
 }
 
-export default function PackageFormDialog({ open, onOpenChange, pkg, services, onSaved }: Props) {
+export default function PackageFormDialog({ open, onOpenChange, pkg, services, onSaved, aiSuggestion }: Props) {
   const { company } = useAuth();
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState('');
@@ -36,9 +39,26 @@ export default function PackageFormDialog({ open, onOpenChange, pkg, services, o
   const [listPrice, setListPrice] = useState('');
   const [discountPercent, setDiscountPercent] = useState('0');
   const [items, setItems] = useState<PackageItemRow[]>([]);
+  const [showAiBanner, setShowAiBanner] = useState(false);
 
   useEffect(() => {
-    if (pkg) {
+    if (aiSuggestion && !pkg) {
+      // Pre-fill from AI suggestion
+      setName(aiSuggestion.package_name);
+      setDescription(aiSuggestion.description);
+      setListPrice(aiSuggestion.list_price.toString());
+      setDiscountPercent(aiSuggestion.discount_percent.toString());
+      setItems(aiSuggestion.items.map(item => {
+        const svc = services.find(s => s.id === item.service_id);
+        return {
+          service_id: item.service_id,
+          quantity: item.quantity.toString(),
+          duration_months: item.duration_months.toString(),
+          unit_price: svc ? svc.list_price.toString() : '0',
+        };
+      }));
+      setShowAiBanner(true);
+    } else if (pkg) {
       setName(pkg.name);
       setDescription(pkg.description || '');
       setListPrice(pkg.list_price.toString());
@@ -49,14 +69,16 @@ export default function PackageFormDialog({ open, onOpenChange, pkg, services, o
         duration_months: i.duration_months.toString(),
         unit_price: i.unit_price.toString(),
       })));
+      setShowAiBanner(false);
     } else {
       setName('');
       setDescription('');
       setListPrice('');
       setDiscountPercent('0');
       setItems([]);
+      setShowAiBanner(false);
     }
-  }, [pkg, open]);
+  }, [pkg, open, aiSuggestion]);
 
   const addItem = () => {
     setItems(prev => [...prev, { service_id: '', quantity: '1', duration_months: '1', unit_price: '0' }]);
@@ -159,6 +181,17 @@ export default function PackageFormDialog({ open, onOpenChange, pkg, services, o
         </DialogHeader>
 
         <div className="space-y-6">
+          {showAiBanner && (
+            <Alert className="border-primary/30 bg-primary/5">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <AlertDescription className="flex items-center justify-between">
+                <span>Προτεινόμενο από AI — ελέγξτε και προσαρμόστε πριν αποθηκεύσετε</span>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowAiBanner(false)}>
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
           {/* Basic info */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2 col-span-2">

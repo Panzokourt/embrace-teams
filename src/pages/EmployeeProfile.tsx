@@ -159,6 +159,12 @@ export default function EmployeeProfile() {
           <TabsTrigger value="timesheets">Timesheets</TabsTrigger>
           <TabsTrigger value="leaves">Άδειες</TabsTrigger>
           <TabsTrigger value="documents">Έγγραφα</TabsTrigger>
+          {(isCompanyAdmin || isManager) && (
+            <TabsTrigger value="permissions" className="gap-1.5">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Δικαιώματα
+            </TabsTrigger>
+          )}
           <TabsTrigger value="gamification">🏆 Score</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>

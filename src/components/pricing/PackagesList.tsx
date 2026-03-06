@@ -1,16 +1,26 @@
 import { useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { usePackages, useServices, ServicePackage } from '@/hooks/usePricingData';
+import { usePackages, useServices, ServicePackage, ServiceWithCosts } from '@/hooks/usePricingData';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { EditDeleteActions } from '@/components/dialogs/EditDeleteActions';
 import { toast } from 'sonner';
-import { Plus, Search, Loader2, Package, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Plus, Search, Loader2, Package, TrendingUp, TrendingDown, Minus, Sparkles } from 'lucide-react';
 import PackageFormDialog from './PackageFormDialog';
+
+export interface AIPackageSuggestion {
+  package_name: string;
+  description: string;
+  list_price: number;
+  discount_percent: number;
+  items: { service_id: string; quantity: number; duration_months: number; rationale: string }[];
+}
 
 function MarginBadge({ pct }: { pct: number }) {
   if (pct >= 40) return <Badge className="bg-primary/15 text-primary border-primary/30"><TrendingUp className="h-3 w-3 mr-1" />{pct.toFixed(1)}%</Badge>;
@@ -25,8 +35,45 @@ export default function PackagesList() {
   const [search, setSearch] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ServicePackage | null>(null);
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiInitialData, setAiInitialData] = useState<AIPackageSuggestion | null>(null);
 
   const canManage = isAdmin || isManager;
+
+  const handleAISuggest = async () => {
+    const activeServices = services.filter(s => s.is_active && !s.archived_at);
+    if (activeServices.length === 0) {
+      toast.error('Δεν υπάρχουν ενεργές υπηρεσίες για ανάλυση');
+      return;
+    }
+    setAiLoading(true);
+    try {
+      const payload = activeServices.map(s => ({
+        id: s.id, name: s.name, category: s.category,
+        list_price: s.list_price, total_cost: s.total_cost || 0,
+        margin_pct: s.margin_pct || 0,
+      }));
+      const { data, error } = await supabase.functions.invoke('suggest-package', {
+        body: { services: payload, prompt: aiPrompt || undefined },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      const suggestion = data.suggestion as AIPackageSuggestion;
+      setAiInitialData(suggestion);
+      setAiDialogOpen(false);
+      setAiPrompt('');
+      setEditing(null);
+      setFormOpen(true);
+      toast.success('AI πρόταση πακέτου έτοιμη!');
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Σφάλμα AI πρότασης');
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const filtered = useMemo(() => {
     if (!search) return packages;
@@ -50,9 +97,14 @@ export default function PackagesList() {
           <Input placeholder="Αναζήτηση πακέτου..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
         </div>
         {canManage && (
-          <Button onClick={() => { setEditing(null); setFormOpen(true); }}>
-            <Plus className="h-4 w-4 mr-2" />Νέο Πακέτο
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setAiDialogOpen(true)}>
+              <Sparkles className="h-4 w-4 mr-2" />AI Πρόταση
+            </Button>
+            <Button onClick={() => { setEditing(null); setAiInitialData(null); setFormOpen(true); }}>
+              <Plus className="h-4 w-4 mr-2" />Νέο Πακέτο
+            </Button>
+          </div>
         )}
       </div>
 
@@ -114,11 +166,40 @@ export default function PackagesList() {
 
       <PackageFormDialog
         open={formOpen}
-        onOpenChange={setFormOpen}
+        onOpenChange={(open) => { setFormOpen(open); if (!open) setAiInitialData(null); }}
         pkg={editing}
         services={services}
         onSaved={refetch}
+        aiSuggestion={aiInitialData}
       />
+
+      {/* AI Prompt Dialog */}
+      <Dialog open={aiDialogOpen} onOpenChange={setAiDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              AI Πρόταση Πακέτου
+            </DialogTitle>
+            <DialogDescription>
+              Περιγράψτε τι τύπο πακέτου θέλετε (προαιρετικό)
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={aiPrompt}
+            onChange={e => setAiPrompt(e.target.value)}
+            placeholder="π.χ. Digital marketing πακέτο για μικρή επιχείρηση..."
+            rows={3}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAiDialogOpen(false)}>Ακύρωση</Button>
+            <Button onClick={handleAISuggest} disabled={aiLoading}>
+              {aiLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
+              Δημιουργία με AI
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

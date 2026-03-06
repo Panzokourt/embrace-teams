@@ -17,13 +17,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import { toast } from 'sonner';
-import { Loader2, Eye, EyeOff, Wand2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Wand2, Check, ChevronsUpDown } from 'lucide-react';
 import { CompanyRole, AccessScope, PermissionType } from '@/contexts/AuthContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { DEFAULT_ROLE_PERMISSIONS } from '@/hooks/useRBAC';
 import { PermissionModuleSelector } from './PermissionModuleSelector';
+import { cn } from '@/lib/utils';
 
 interface CreateUserDialogProps {
   open: boolean;

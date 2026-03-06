@@ -190,6 +190,8 @@ export interface ServicePackage {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  duration_type: string;
+  duration_value: number;
   // Computed
   items?: PackageItem[];
   internal_cost?: number;

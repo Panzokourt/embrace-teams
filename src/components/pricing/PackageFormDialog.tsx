@@ -38,6 +38,8 @@ export default function PackageFormDialog({ open, onOpenChange, pkg, services, o
   const [description, setDescription] = useState('');
   const [listPrice, setListPrice] = useState('');
   const [discountPercent, setDiscountPercent] = useState('0');
+  const [durationType, setDurationType] = useState('monthly');
+  const [durationValue, setDurationValue] = useState('1');
   const [items, setItems] = useState<PackageItemRow[]>([]);
   const [showAiBanner, setShowAiBanner] = useState(false);
 
@@ -48,6 +50,8 @@ export default function PackageFormDialog({ open, onOpenChange, pkg, services, o
       setDescription(aiSuggestion.description);
       setListPrice(aiSuggestion.list_price.toString());
       setDiscountPercent(aiSuggestion.discount_percent.toString());
+      setDurationType((aiSuggestion as any).duration_type || 'monthly');
+      setDurationValue(((aiSuggestion as any).duration_value || 1).toString());
       setItems(aiSuggestion.items.map(item => {
         const svc = services.find(s => s.id === item.service_id);
         return {
@@ -63,6 +67,8 @@ export default function PackageFormDialog({ open, onOpenChange, pkg, services, o
       setDescription(pkg.description || '');
       setListPrice(pkg.list_price.toString());
       setDiscountPercent((pkg.discount_percent || 0).toString());
+      setDurationType(pkg.duration_type || 'monthly');
+      setDurationValue((pkg.duration_value || 1).toString());
       setItems((pkg.items || []).map(i => ({
         service_id: i.service_id,
         quantity: i.quantity.toString(),
@@ -75,6 +81,8 @@ export default function PackageFormDialog({ open, onOpenChange, pkg, services, o
       setDescription('');
       setListPrice('');
       setDiscountPercent('0');
+      setDurationType('monthly');
+      setDurationValue('1');
       setItems([]);
       setShowAiBanner(false);
     }
@@ -133,6 +141,8 @@ export default function PackageFormDialog({ open, onOpenChange, pkg, services, o
         description: description || null,
         list_price: parseFloat(listPrice) || 0,
         discount_percent: parseFloat(discountPercent) || 0,
+        duration_type: durationType,
+        duration_value: parseInt(durationValue) || 1,
       };
 
       let packageId = pkg?.id;
@@ -201,6 +211,32 @@ export default function PackageFormDialog({ open, onOpenChange, pkg, services, o
             <div className="space-y-2 col-span-2">
               <Label>Περιγραφή</Label>
               <Textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} />
+            </div>
+          </div>
+
+          {/* Duration */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Τύπος Διάρκειας</Label>
+              <Select value={durationType} onValueChange={v => {
+                setDurationType(v);
+                const autoValues: Record<string, string> = { monthly: '1', quarterly: '3', semi_annual: '6', annual: '12' };
+                if (autoValues[v]) setDurationValue(autoValues[v]);
+              }}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="monthly">Μηνιαίο</SelectItem>
+                  <SelectItem value="quarterly">Τριμηνιαίο</SelectItem>
+                  <SelectItem value="semi_annual">Εξαμηνιαίο</SelectItem>
+                  <SelectItem value="annual">Ετήσιο</SelectItem>
+                  <SelectItem value="fixed_days">Σταθερές Ημέρες</SelectItem>
+                  <SelectItem value="custom_months">Custom (μήνες)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>{durationType === 'fixed_days' ? 'Ημέρες' : 'Μήνες'}</Label>
+              <Input type="number" min="1" value={durationValue} onChange={e => setDurationValue(e.target.value)} />
             </div>
           </div>
 

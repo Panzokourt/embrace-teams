@@ -64,6 +64,8 @@ ${servicesSummary}`;
                   description: { type: "string", description: "Σύντομη περιγραφή πακέτου" },
                   list_price: { type: "number", description: "Προτεινόμενη τιμή πακέτου σε EUR" },
                   discount_percent: { type: "number", description: "Ποσοστό έκπτωσης (0-50)" },
+                  duration_type: { type: "string", enum: ["monthly", "quarterly", "semi_annual", "annual", "fixed_days", "custom_months"], description: "Τύπος διάρκειας πακέτου" },
+                  duration_value: { type: "number", description: "Τιμή διάρκειας (π.χ. 3 για μήνες, 60 για ημέρες)" },
                   items: {
                     type: "array",
                     items: {
@@ -79,7 +81,7 @@ ${servicesSummary}`;
                     },
                   },
                 },
-                required: ["package_name", "description", "list_price", "discount_percent", "items"],
+                required: ["package_name", "description", "list_price", "discount_percent", "duration_type", "duration_value", "items"],
                 additionalProperties: false,
               },
             },

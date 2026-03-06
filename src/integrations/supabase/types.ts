@@ -4302,6 +4302,8 @@ export type Database = {
           created_at: string | null
           description: string | null
           discount_percent: number | null
+          duration_type: string
+          duration_value: number
           id: string
           is_active: boolean | null
           list_price: number
@@ -4313,6 +4315,8 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           discount_percent?: number | null
+          duration_type?: string
+          duration_value?: number
           id?: string
           is_active?: boolean | null
           list_price?: number
@@ -4324,6 +4328,8 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           discount_percent?: number | null
+          duration_type?: string
+          duration_value?: number
           id?: string
           is_active?: boolean | null
           list_price?: number

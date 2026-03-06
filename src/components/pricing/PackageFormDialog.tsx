@@ -253,7 +253,7 @@ export default function PackageFormDialog({ open, onOpenChange, pkg, services, o
             <div className="space-y-2">
               <Label>Τελική Τιμή</Label>
               <div className="h-10 flex items-center rounded-xl border border-border bg-muted/30 px-3.5 text-sm font-medium">
-                €{computedValues.finalPrice.toFixed(2)}
+                €{computedValues.finalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </div>
           </div>
@@ -285,6 +285,7 @@ export default function PackageFormDialog({ open, onOpenChange, pkg, services, o
                   <TableBody>
                     {items.map((item, idx) => {
                       const lineTotal = (parseFloat(item.unit_price) || 0) * (parseInt(item.quantity) || 1) * (parseInt(item.duration_months) || 1);
+                      const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                       return (
                         <TableRow key={idx}>
                           <TableCell>
@@ -308,7 +309,7 @@ export default function PackageFormDialog({ open, onOpenChange, pkg, services, o
                           <TableCell>
                             <Input type="number" step="0.01" className="h-8 text-xs text-right w-24" value={item.unit_price} onChange={e => updateItem(idx, 'unit_price', e.target.value)} />
                           </TableCell>
-                          <TableCell className="text-right font-medium text-sm">€{lineTotal.toFixed(2)}</TableCell>
+                          <TableCell className="text-right font-medium text-sm">€{fmt(lineTotal)}</TableCell>
                           <TableCell>
                             <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeItem(idx)}>
                               <Trash2 className="h-3.5 w-3.5" />
@@ -329,20 +330,20 @@ export default function PackageFormDialog({ open, onOpenChange, pkg, services, o
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
               <div>
                 <span className="text-muted-foreground block text-xs">Τιμή items</span>
-                <span className="font-medium">€{computedValues.sumItemPrices.toFixed(2)}</span>
+                <span className="font-medium">€{computedValues.sumItemPrices.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
               <div>
                 <span className="text-muted-foreground block text-xs">Τελική τιμή</span>
-                <span className="font-medium">€{computedValues.finalPrice.toFixed(2)}</span>
+                <span className="font-medium">€{computedValues.finalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
               <div>
                 <span className="text-muted-foreground block text-xs">Κόστος</span>
-                <span className="font-medium">€{computedValues.itemsCost.toFixed(2)}</span>
+                <span className="font-medium">€{computedValues.itemsCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
               <div>
                 <span className="text-muted-foreground block text-xs">Margin €</span>
                 <span className={`font-semibold ${computedValues.marginEur >= 0 ? 'text-primary' : 'text-destructive'}`}>
-                  €{computedValues.marginEur.toFixed(2)}
+                  €{computedValues.marginEur.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
               <div>

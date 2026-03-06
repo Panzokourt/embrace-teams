@@ -53,7 +53,8 @@ import { ChatProvider } from "@/contexts/ChatContext";
 // New placeholder pages
 import Campaigns from "@/pages/Campaigns";
 import Backlog from "@/pages/Backlog";
-import Pricing from "@/pages/Pricing";
+import PricingPage from "@/pages/PricingPage";
+import ServiceDetailPage from "@/pages/ServiceDetailPage";
 import Capacity from "@/pages/Capacity";
 import ResourcePlanning from "@/pages/ResourcePlanning";
 import Performance from "@/pages/Performance";
@@ -141,7 +142,8 @@ const App = () => (
                   {/* New placeholder pages */}
                   <Route path="/campaigns" element={<Campaigns />} />
                   <Route path="/backlog" element={<Backlog />} />
-                  <Route path="/pricing" element={<Pricing />} />
+                  <Route path="/pricing" element={<PricingPage />} />
+                  <Route path="/pricing/services/:id" element={<ServiceDetailPage />} />
                   <Route path="/operations/capacity" element={<Capacity />} />
                   <Route path="/operations/resource-planning" element={<ResourcePlanning />} />
                   <Route path="/intelligence/performance" element={<Performance />} />

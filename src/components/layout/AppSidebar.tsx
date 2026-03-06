@@ -85,9 +85,8 @@ const categoryNavItems: Record<CategoryId, NavItem[]> = {
   ],
   revenue: [
     { title: 'Dashboard', href: '/financials?tab=dashboard', icon: LayoutDashboard, permission: 'financials.view' },
-    { title: 'Services', href: '/financials?tab=services', icon: FileText, permission: 'financials.view' },
+    { title: 'Υπηρεσίες & Τιμολόγηση', href: '/pricing', icon: FileText, permission: 'financials.view' },
     { title: 'Contracts', href: '/financials?tab=contracts', icon: FileText, permission: 'financials.view' },
-    { title: 'Pricing', href: '/pricing', icon: DollarSign },
     { title: 'Invoices', href: '/financials?tab=invoices', icon: FileText, permission: 'financials.view' },
     { title: 'Expenses', href: '/financials?tab=expenses', icon: DollarSign, permission: 'financials.view' },
     { title: 'Profitability', href: '/financials?tab=reports', icon: BarChart3, permission: 'financials.view' },

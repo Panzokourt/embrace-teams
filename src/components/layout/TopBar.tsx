@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, FolderKanban, CheckSquare, FileText, Users, PanelRightOpen, PanelRightClose, BookUser, Menu } from 'lucide-react';
+import { Search, FolderKanban, CheckSquare, FileText, Users, PanelRightOpen, PanelRightClose, BookUser, Zap, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import WorkDayClock from '@/components/topbar/WorkDayClock';
+import { useFocusMode } from '@/contexts/FocusContext';
 import { useAuth } from '@/contexts/AuthContext';
-
+import { XPBadge } from '@/components/gamification/XPBadge';
 import { useLayout } from '@/contexts/LayoutContext';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
@@ -35,6 +36,7 @@ interface TopBarProps {
 
 export default function TopBar({ onPanelToggle, rightPanelOpen, onMobileMenuToggle, showHamburger }: TopBarProps) {
   const navigate = useNavigate();
+  const { enterFocus } = useFocusMode();
   const { user } = useAuth();
   const { layoutState } = useLayout();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -167,6 +169,28 @@ export default function TopBar({ onPanelToggle, rightPanelOpen, onMobileMenuTogg
 
       {/* Right actions */}
       <div className="flex items-center gap-2 shrink-0">
+        {/* XP Badge — hide on mobile */}
+        {!isMobile && <XPBadge userId={user?.id} size="sm" showXP={!isNarrow} />}
+
+        {/* Work Mode */}
+        <Tooltip delayDuration={300}>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => enterFocus()}
+              className={cn(
+                "gap-1.5 bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 hover:from-violet-600/30 hover:to-fuchsia-600/30 text-violet-400 hover:text-violet-300 border border-violet-500/20 h-8 px-2.5",
+                isNarrow && "px-2"
+              )}
+            >
+              <Zap className="h-3.5 w-3.5 shrink-0" />
+              {!isNarrow && <span className="text-xs font-semibold">Work Mode</span>}
+            </Button>
+          </TooltipTrigger>
+          {isNarrow && <TooltipContent>Work Mode</TooltipContent>}
+        </Tooltip>
+
         {/* Panel toggle */}
         <Tooltip delayDuration={300}>
           <TooltipTrigger asChild>

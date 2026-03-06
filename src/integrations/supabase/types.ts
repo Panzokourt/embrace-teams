@@ -1429,6 +1429,48 @@ export type Database = {
           },
         ]
       }
+      employee_cost_overrides: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          effective_from: string | null
+          employee_id: string
+          hourly_cost: number
+          id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          effective_from?: string | null
+          employee_id: string
+          hourly_cost: number
+          id?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          effective_from?: string | null
+          employee_id?: string
+          hourly_cost?: number
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_cost_overrides_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_cost_overrides_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expenses: {
         Row: {
           amount: number
@@ -3235,6 +3277,51 @@ export type Database = {
           },
         ]
       }
+      package_items: {
+        Row: {
+          duration_months: number | null
+          id: string
+          package_id: string
+          quantity: number | null
+          service_id: string
+          sort_order: number | null
+          unit_price: number
+        }
+        Insert: {
+          duration_months?: number | null
+          id?: string
+          package_id: string
+          quantity?: number | null
+          service_id: string
+          sort_order?: number | null
+          unit_price?: number
+        }
+        Update: {
+          duration_months?: number | null
+          id?: string
+          package_id?: string
+          quantity?: number | null
+          service_id?: string
+          sort_order?: number | null
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "package_items_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "service_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "package_items_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -3865,6 +3952,188 @@ export type Database = {
           },
         ]
       }
+      proposal_items: {
+        Row: {
+          custom_description: string | null
+          custom_name: string | null
+          discount_percent: number | null
+          duration_months: number | null
+          id: string
+          item_type: string | null
+          package_id: string | null
+          proposal_id: string
+          quantity: number | null
+          service_id: string | null
+          sort_order: number | null
+          unit_cost: number
+          unit_price: number
+        }
+        Insert: {
+          custom_description?: string | null
+          custom_name?: string | null
+          discount_percent?: number | null
+          duration_months?: number | null
+          id?: string
+          item_type?: string | null
+          package_id?: string | null
+          proposal_id: string
+          quantity?: number | null
+          service_id?: string | null
+          sort_order?: number | null
+          unit_cost?: number
+          unit_price?: number
+        }
+        Update: {
+          custom_description?: string | null
+          custom_name?: string | null
+          discount_percent?: number | null
+          duration_months?: number | null
+          id?: string
+          item_type?: string | null
+          package_id?: string | null
+          proposal_id?: string
+          quantity?: number | null
+          service_id?: string | null
+          sort_order?: number | null
+          unit_cost?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_items_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "service_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_items_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_items_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposal_snapshots: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          proposal_id: string
+          snapshot_data: Json
+          version: number
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          proposal_id: string
+          snapshot_data: Json
+          version: number
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          proposal_id?: string
+          snapshot_data?: Json
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_snapshots_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_snapshots_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposals: {
+        Row: {
+          assumptions: string | null
+          client_id: string | null
+          company_id: string
+          created_at: string | null
+          created_by: string | null
+          discount_percent: number | null
+          id: string
+          name: string
+          notes: string | null
+          status: string | null
+          updated_at: string | null
+          valid_until: string | null
+          version: number | null
+        }
+        Insert: {
+          assumptions?: string | null
+          client_id?: string | null
+          company_id: string
+          created_at?: string | null
+          created_by?: string | null
+          discount_percent?: number | null
+          id?: string
+          name: string
+          notes?: string | null
+          status?: string | null
+          updated_at?: string | null
+          valid_until?: string | null
+          version?: number | null
+        }
+        Update: {
+          assumptions?: string | null
+          client_id?: string | null
+          company_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          discount_percent?: number | null
+          id?: string
+          name?: string
+          notes?: string | null
+          status?: string | null
+          updated_at?: string | null
+          valid_until?: string | null
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposals_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rbac_audit_log: {
         Row: {
           action: string
@@ -3908,6 +4177,41 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "rbac_audit_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      role_default_costs: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          hourly_cost: number
+          id: string
+          level: string | null
+          role_title: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          hourly_cost?: number
+          id?: string
+          level?: string | null
+          role_title: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          hourly_cost?: number
+          id?: string
+          level?: string | null
+          role_title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_default_costs_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
@@ -3992,57 +4296,199 @@ export type Database = {
           },
         ]
       }
+      service_packages: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          description: string | null
+          discount_percent: number | null
+          id: string
+          is_active: boolean | null
+          list_price: number
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          description?: string | null
+          discount_percent?: number | null
+          id?: string
+          is_active?: boolean | null
+          list_price?: number
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          description?: string | null
+          discount_percent?: number | null
+          id?: string
+          is_active?: boolean | null
+          list_price?: number
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_packages_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_role_costs: {
+        Row: {
+          company_id: string
+          cost_source: string | null
+          created_at: string | null
+          department_id: string | null
+          employee_id: string | null
+          estimated_hours: number
+          hourly_cost: number
+          id: string
+          level: string | null
+          role_title: string
+          service_id: string
+          total_cost: number | null
+        }
+        Insert: {
+          company_id: string
+          cost_source?: string | null
+          created_at?: string | null
+          department_id?: string | null
+          employee_id?: string | null
+          estimated_hours?: number
+          hourly_cost?: number
+          id?: string
+          level?: string | null
+          role_title: string
+          service_id: string
+          total_cost?: number | null
+        }
+        Update: {
+          company_id?: string
+          cost_source?: string | null
+          created_at?: string | null
+          department_id?: string | null
+          employee_id?: string | null
+          estimated_hours?: number
+          hourly_cost?: number
+          id?: string
+          level?: string | null
+          role_title?: string
+          service_id?: string
+          total_cost?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_role_costs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_role_costs_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_role_costs_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_role_costs_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       services: {
         Row: {
+          archived_at: string | null
           category: string
           company_id: string | null
           created_at: string
+          deliverables: string[] | null
+          department_id: string | null
           description: string | null
+          estimated_turnaround: string | null
+          external_cost: number | null
           id: string
           internal_cost: number | null
           is_active: boolean
           list_price: number
           name: string
+          notes: string | null
+          pricing_model: string | null
           pricing_unit: string
           role_hours: Json | null
           role_rates: Json | null
           sort_order: number
+          subcategory: string | null
           target_margin: number | null
           template_id: string | null
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           category?: string
           company_id?: string | null
           created_at?: string
+          deliverables?: string[] | null
+          department_id?: string | null
           description?: string | null
+          estimated_turnaround?: string | null
+          external_cost?: number | null
           id?: string
           internal_cost?: number | null
           is_active?: boolean
           list_price?: number
           name: string
+          notes?: string | null
+          pricing_model?: string | null
           pricing_unit?: string
           role_hours?: Json | null
           role_rates?: Json | null
           sort_order?: number
+          subcategory?: string | null
           target_margin?: number | null
           template_id?: string | null
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           category?: string
           company_id?: string | null
           created_at?: string
+          deliverables?: string[] | null
+          department_id?: string | null
           description?: string | null
+          estimated_turnaround?: string | null
+          external_cost?: number | null
           id?: string
           internal_cost?: number | null
           is_active?: boolean
           list_price?: number
           name?: string
+          notes?: string | null
+          pricing_model?: string | null
           pricing_unit?: string
           role_hours?: Json | null
           role_rates?: Json | null
           sort_order?: number
+          subcategory?: string | null
           target_margin?: number | null
           template_id?: string | null
           updated_at?: string
@@ -4053,6 +4499,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "services_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
             referencedColumns: ["id"]
           },
           {

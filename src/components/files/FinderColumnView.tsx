@@ -109,10 +109,19 @@ export function FinderColumnView({
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((f) => ({ kind: 'folder' as const, data: f }));
 
-    const childFiles = filteredFiles
-      .filter((f) => f.folder_id === parentId)
-      .sort((a, b) => a.file_name.localeCompare(b.file_name))
-      .map((f) => ({ kind: 'file' as const, data: f }));
+    let childFiles: ColumnItem[];
+    
+    // At root level: if no root folders exist, show ALL files regardless of folder_id
+    if (parentId === null && childFolders.length === 0) {
+      childFiles = filteredFiles
+        .sort((a, b) => a.file_name.localeCompare(b.file_name))
+        .map((f) => ({ kind: 'file' as const, data: f }));
+    } else {
+      childFiles = filteredFiles
+        .filter((f) => f.folder_id === parentId)
+        .sort((a, b) => a.file_name.localeCompare(b.file_name))
+        .map((f) => ({ kind: 'file' as const, data: f }));
+    }
 
     return [...childFolders, ...childFiles];
   }

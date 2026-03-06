@@ -469,50 +469,6 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Admin Only - Company Settings */}
-      {isAdmin && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Building2 className="h-5 w-5" />
-              <CardTitle>Ρυθμίσεις Εταιρείας</CardTitle>
-              <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">
-                Admin Only
-              </Badge>
-            </div>
-            <CardDescription>
-              Γενικές ρυθμίσεις για την εταιρεία
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="companyName">Επωνυμία Εταιρείας</Label>
-                <Input
-                  id="companyName"
-                  placeholder="Agency Name"
-                  defaultValue="Agency Command Center"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="defaultFee">Default Agency Fee (%)</Label>
-                <Input
-                  id="defaultFee"
-                  type="number"
-                  placeholder="30"
-                  defaultValue="30"
-                />
-              </div>
-            </div>
-
-            <Button disabled={saving}>
-              <Save className="h-4 w-4 mr-2" />
-              Αποθήκευση
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Security */}
       <Card>
         <CardHeader>

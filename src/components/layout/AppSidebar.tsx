@@ -57,12 +57,12 @@ interface Category {
 
 const categories: Category[] = [
   { id: 'overview', icon: LayoutDashboard, label: 'Overview', routePrefixes: ['/my-work', '/', '/dashboard'] },
-  { id: 'work', icon: Briefcase, label: 'Work', routePrefixes: ['/work', '/projects', '/tasks', '/calendar', '/files', '/blueprints', '/campaigns', '/backlog'] },
+  { id: 'work', icon: Briefcase, label: 'Work', routePrefixes: ['/work', '/projects', '/tasks', '/calendar', '/files', '/blueprints'] },
   { id: 'clients', icon: Building2, label: 'Clients', routePrefixes: ['/clients', '/contacts'] },
   { id: 'communication', icon: MessageSquare, label: 'Communication', routePrefixes: ['/chat', '/inbox'] },
   { id: 'revenue', icon: DollarSign, label: 'Revenue', routePrefixes: ['/financials', '/pricing'] },
   { id: 'operations', icon: Users, label: 'Operations', routePrefixes: ['/hr', '/timesheets', '/knowledge', '/operations'] },
-  { id: 'intelligence', icon: BarChart3, label: 'Intelligence', routePrefixes: ['/reports', '/leaderboard', '/secretary', '/intelligence', '/brain'] },
+  { id: 'intelligence', icon: BarChart3, label: 'Intelligence', routePrefixes: ['/reports', '/brain'] },
   { id: 'governance', icon: ShieldCheck, label: 'Governance', routePrefixes: ['/governance'] },
   { id: 'settings', icon: Settings, label: 'Settings', routePrefixes: ['/settings'] },
 ];
@@ -94,22 +94,11 @@ const categoryNavItems: Record<CategoryId, NavItem[]> = {
   operations: [
     { title: 'Team & HR', href: '/hr', icon: UserCog },
     { title: 'Timesheets', href: '/timesheets', icon: Timer },
-    { title: 'Capacity', href: '/operations/capacity', icon: Users },
-    { title: 'Resource Planning', href: '/operations/resource-planning', icon: CalendarDays },
     { title: 'Knowledge Base', href: '/knowledge', icon: BookOpen },
-    { title: 'Playbook', href: '/knowledge/playbook', icon: FileText },
-    { title: 'Templates & SOPs', href: '/knowledge/templates', icon: FileStack },
-    { title: 'Review Queue', href: '/knowledge/reviews', icon: CheckSquare },
   ],
   intelligence: [
     { title: 'Reports Hub', href: '/reports', icon: BarChart3, permission: 'financials.view' },
-    { title: 'Performance', href: '/intelligence/performance', icon: BarChart3 },
-    { title: 'Cross-client Insights', href: '/intelligence/insights', icon: BarChart3 },
-    { title: 'Benchmarks', href: '/intelligence/benchmarks', icon: BarChart3 },
-    { title: 'Forecasting', href: '/intelligence/forecasting', icon: BarChart3 },
-    { title: 'Media Planning', href: '/intelligence/media-planning', icon: BarChart3 },
     { title: 'Brain', href: '/brain', icon: Zap },
-    { title: 'Leaderboard', href: '/leaderboard', icon: Trophy },
   ],
   governance: [
     { title: 'Dashboard', href: '/governance', icon: ShieldCheck },
@@ -117,29 +106,20 @@ const categoryNavItems: Record<CategoryId, NavItem[]> = {
     { title: 'Access Control', href: '/governance/access', icon: UserCog },
     { title: 'Vault', href: '/governance/vault', icon: FileArchive },
     { title: 'Compliance', href: '/governance/compliance', icon: FileText },
-    { title: 'Integrations', href: '/governance/integrations', icon: Globe },
-    { title: 'Audit Log', href: '/governance/audit-log', icon: FileText },
-    { title: 'Ownership Map', href: '/governance/ownership-map', icon: Globe },
   ],
   settings: [
     { title: 'General', href: '/settings', icon: Settings, permission: 'settings.company' },
     { title: 'Organization', href: '/settings/organization', icon: Building2, permission: 'settings.company' },
-    { title: 'Roles & Permissions', href: '/settings/roles', icon: UserCog, permission: 'settings.company' },
-    { title: 'Billing', href: '/settings/billing', icon: DollarSign, permission: 'settings.company' },
-    { title: 'API Keys', href: '/settings/api-keys', icon: Settings, permission: 'settings.company' },
-    { title: 'Webhooks', href: '/settings/webhooks', icon: Settings, permission: 'settings.company' },
-    { title: 'Branding', href: '/settings/branding', icon: Settings, permission: 'settings.company' },
-    { title: 'Feature Flags', href: '/settings/feature-flags', icon: Settings, permission: 'settings.company' },
   ],
 };
 
 function detectCategory(pathname: string): CategoryId {
-  if (pathname.startsWith('/work') || pathname.startsWith('/projects') || pathname.startsWith('/tasks') || pathname.startsWith('/calendar') || pathname.startsWith('/files') || pathname.startsWith('/blueprints') || pathname.startsWith('/campaigns') || pathname.startsWith('/backlog')) return 'work';
+  if (pathname.startsWith('/work') || pathname.startsWith('/projects') || pathname.startsWith('/tasks') || pathname.startsWith('/calendar') || pathname.startsWith('/files') || pathname.startsWith('/blueprints')) return 'work';
   if (pathname.startsWith('/clients') || pathname.startsWith('/contacts')) return 'clients';
   if (pathname.startsWith('/chat') || pathname.startsWith('/inbox')) return 'communication';
   if (pathname.startsWith('/financials') || pathname.startsWith('/pricing')) return 'revenue';
   if (pathname.startsWith('/hr') || pathname.startsWith('/timesheets') || pathname.startsWith('/knowledge') || pathname.startsWith('/operations')) return 'operations';
-  if (pathname.startsWith('/reports') || pathname.startsWith('/leaderboard') || pathname.startsWith('/secretary') || pathname.startsWith('/intelligence') || pathname.startsWith('/brain')) return 'intelligence';
+  if (pathname.startsWith('/reports') || pathname.startsWith('/brain')) return 'intelligence';
   if (pathname.startsWith('/governance')) return 'governance';
   if (pathname.startsWith('/settings')) return 'settings';
   if (pathname === '/my-work' || pathname === '/' || pathname.startsWith('/dashboard')) return 'overview';
@@ -307,7 +287,7 @@ export default function AppSidebar({
         <Tooltip delayDuration={300}>
           <TooltipTrigger asChild>
             <button
-              onClick={() => { navigate('/secretary'); handleNavClick(); }}
+              onClick={() => { window.dispatchEvent(new CustomEvent('open-secretary-panel')); handleNavClick(); }}
               className={cn(
                 "flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200",
                 isMobile

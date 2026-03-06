@@ -317,12 +317,13 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
-      {/* ── 2-COLUMN LAYOUT ────────────────────────────────────────────────── */}
-      <div className="flex gap-6 items-start">
-        {/* ── LEFT: Tabs (75%) ──────────────────────────────────── */}
-        <div className="flex-1 min-w-0 space-y-4">
-          <Tabs defaultValue="deliverables" className="space-y-3">
+      {/* ── TABS LAYOUT ────────────────────────────────────────────────── */}
+      <div className="space-y-4">
+          <Tabs defaultValue="overview" className="space-y-3">
             <TabsList className="h-auto gap-1 flex-wrap">
+              <TabsTrigger value="overview" className="text-xs gap-1">
+                <FolderInput className="h-3.5 w-3.5" /> Επισκόπηση
+              </TabsTrigger>
               <TabsTrigger value="deliverables" className="text-xs gap-1">
                 <ListChecks className="h-3.5 w-3.5" /> Παραδοτέα
               </TabsTrigger>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -37,12 +38,13 @@ interface ActivityFeedContentProps {
 
 export function ActivityFeedContent({ active = true }: ActivityFeedContentProps) {
   const navigate = useNavigate();
+  const { company } = useAuth();
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
   const initialLoadDone = useRef(false);
 
   useEffect(() => {
-    if (!active) return;
+    if (!active || !company) return;
 
     fetchActivities();
 
@@ -78,13 +80,15 @@ export function ActivityFeedContent({ active = true }: ActivityFeedContentProps)
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [active]);
+  }, [active, company]);
 
   const fetchActivities = async () => {
+    if (!company) return;
     try {
       const { data, error } = await supabase
         .from('activity_log')
         .select('*')
+        .eq('company_id', company.id)
         .order('created_at', { ascending: false })
         .limit(50);
 

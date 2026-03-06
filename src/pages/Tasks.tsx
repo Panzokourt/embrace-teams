@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { usePagination } from '@/hooks/usePagination';
+import { PaginationControls } from '@/components/shared/PaginationControls';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useTasksRealtime } from '@/hooks/useRealtimeSubscription';
@@ -111,6 +113,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
   const { isAdmin, isManager } = useAuth();
   const { logCreate, logUpdate, logDelete, logStatusChange } = useActivityLogger();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const pagination = usePagination(100);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -150,13 +153,20 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
 
   const fetchTasks = useCallback(async () => {
     try {
+      // Get count
+      let countQuery = supabase.from('tasks').select('*', { count: 'exact', head: true });
+      if (projectId) countQuery = countQuery.eq('project_id', projectId);
+      const { count } = await countQuery;
+      pagination.setTotalCount(count || 0);
+
       let query = supabase
         .from('tasks')
         .select(`
           *,
           project:projects(name)
         `)
-        .order('due_date', { ascending: true, nullsFirst: false });
+        .order('due_date', { ascending: true, nullsFirst: false })
+        .range(pagination.from, pagination.to);
 
       if (projectId) {
         query = query.eq('project_id', projectId);
@@ -185,7 +195,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, pagination.from, pagination.to]);
 
   const fetchProjects = async () => {
     try {
@@ -1041,6 +1051,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
           {viewMode === 'kanban' && renderKanbanView()}
         </>
       )}
+      <PaginationControls pagination={pagination} />
     </div>
   );
 }

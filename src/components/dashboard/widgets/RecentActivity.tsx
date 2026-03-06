@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { Activity } from 'lucide-react';
@@ -14,10 +15,12 @@ interface ActivityItem {
 }
 
 export default function RecentActivity() {
+  const { company } = useAuth();
   const [items, setItems] = useState<ActivityItem[]>([]);
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
+    if (!company) return;
     fetchItems();
 
     const channel = supabase
@@ -43,14 +46,18 @@ export default function RecentActivity() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [company]);
 
   const fetchItems = async () => {
-    const { data } = await supabase
+    if (!company) return;
+    let query = supabase
       .from('activity_log')
       .select('id, action, entity_type, entity_name, created_at')
       .order('created_at', { ascending: false })
       .limit(10);
+    
+    query = query.eq('company_id', company.id);
+    const { data } = await query;
     if (data) setItems(data);
   };
 

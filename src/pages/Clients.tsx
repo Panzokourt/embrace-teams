@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useActivityLogger } from '@/hooks/useActivityLogger';
+import { usePagination } from '@/hooks/usePagination';
+import { PaginationControls } from '@/components/shared/PaginationControls';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -59,6 +61,7 @@ export default function ClientsPage() {
   const { isAdmin, isManager, company } = useAuth();
   const { logCreate, logUpdate, logDelete } = useActivityLogger();
   const { data: categories = [] } = useProjectCategories();
+  const pagination = usePagination(50);
   const [clients, setClients] = useState<Client[]>([]);
 
   // Build sector options dynamically
@@ -87,14 +90,22 @@ export default function ClientsPage() {
 
   useEffect(() => {
     fetchClients();
-  }, []);
+  }, [pagination.page]);
 
   const fetchClients = async () => {
     try {
+      // Get total count first
+      const { count } = await supabase
+        .from('clients')
+        .select('*', { count: 'exact', head: true });
+      
+      pagination.setTotalCount(count || 0);
+
       const { data: clientsData, error } = await supabase
         .from('clients')
         .select('*')
-        .order('name');
+        .order('name')
+        .range(pagination.from, pagination.to);
 
       if (error) throw error;
 
@@ -455,6 +466,7 @@ export default function ClientsPage() {
           canManage={canManage}
         />
       )}
+      <PaginationControls pagination={pagination} />
     </div>
   );
 }

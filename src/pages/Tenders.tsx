@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { usePagination } from '@/hooks/usePagination';
+import { PaginationControls } from '@/components/shared/PaginationControls';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useTendersRealtime } from '@/hooks/useRealtimeSubscription';
@@ -108,6 +110,7 @@ export default function TendersPage() {
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
   const [profiles, setProfiles] = useState<{ id: string; full_name: string | null; email: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const pagination = usePagination(50);
   const [searchQuery, setSearchQuery] = useState('');
   const [stageFilter, setStageFilter] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -139,13 +142,19 @@ export default function TendersPage() {
 
   const fetchTenders = useCallback(async () => {
     try {
+      const { count } = await supabase
+        .from('tenders')
+        .select('*', { count: 'exact', head: true });
+      pagination.setTotalCount(count || 0);
+
       const { data, error } = await supabase
         .from('tenders')
         .select(`
           *,
           client:clients(name)
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(pagination.from, pagination.to);
 
       if (error) throw error;
       setTenders(data || []);
@@ -155,7 +164,7 @@ export default function TendersPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [pagination.from, pagination.to]);
 
   const fetchClients = async () => {
     try {
@@ -814,6 +823,7 @@ export default function TendersPage() {
           {viewMode === 'kanban' && renderKanbanView()}
         </>
       )}
+      <PaginationControls pagination={pagination} />
     </div>
   );
 }

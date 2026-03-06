@@ -128,7 +128,7 @@ export default function TopBar({ onPanelToggle, rightPanelOpen, onMobileMenuTogg
         <Popover open={searchOpen} onOpenChange={setSearchOpen}>
           <PopoverTrigger asChild>
             <button
-              className="flex h-8 w-full items-center gap-2 rounded-lg border border-border/60 px-2.5 text-sm transition-colors focus:outline-none bg-muted text-muted-foreground hover:bg-muted/80 min-w-0"
+              className="flex h-8 w-full items-center gap-2 rounded-lg border border-border/60 px-2.5 text-xs transition-colors focus:outline-none bg-muted text-muted-foreground hover:bg-muted/80 min-w-0"
               onClick={() => setSearchOpen(true)}
             >
               <Search className="h-3.5 w-3.5 shrink-0" />

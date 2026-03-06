@@ -1,21 +1,21 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { useRBAC, type CompanyUser, type Invitation } from '@/hooks/useRBAC';
+import { useRBAC, type CompanyUser } from '@/hooks/useRBAC';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { Loader2, Building2, Users, Shield, UserPlus, XCircle, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
+import { Loader2, Building2, Users, Shield, UserPlus, XCircle, CheckCircle, Clock, AlertTriangle, Activity } from 'lucide-react';
 import { InviteUserDialog } from '@/components/users/InviteUserDialog';
 import { CompanyRole } from '@/contexts/AuthContext';
+import { OrgGeneralTab } from '@/components/organization/OrgGeneralTab';
+import { OrgSecurityTab } from '@/components/organization/OrgSecurityTab';
+import { OrgActivityTab } from '@/components/organization/OrgActivityTab';
 
 const ROLE_LABELS: Record<string, string> = {
   owner: 'Owner', admin: 'Admin', manager: 'Manager',
@@ -32,88 +32,47 @@ export default function OrganizationSettings() {
   const { users, invitations, loading, updateUserRole, updateUserStatus, cancelInvitation, refreshData } = useRBAC();
   const [inviteOpen, setInviteOpen] = useState(false);
 
-  // Company settings state
-  const [companyName, setCompanyName] = useState(company?.name || '');
-  const [companyDomain, setCompanyDomain] = useState(company?.domain || '');
-  const [allowDomainRequests, setAllowDomainRequests] = useState(true);
-  const [ssoEnforced, setSsoEnforced] = useState(false);
-  const [savingSettings, setSavingSettings] = useState(false);
-
-  // Join requests
+  // Company extra data
+  const [companyData, setCompanyData] = useState<any>(null);
   const [joinRequests, setJoinRequests] = useState<any[]>([]);
-  const [loadingJoinRequests, setLoadingJoinRequests] = useState(false);
 
   useEffect(() => {
     if (company) {
-      setCompanyName(company.name);
-      setCompanyDomain(company.domain);
-      fetchCompanySettings();
+      fetchCompanyData();
       fetchJoinRequests();
     }
   }, [company]);
 
-  const fetchCompanySettings = async () => {
+  const fetchCompanyData = async () => {
     if (!company) return;
     const { data } = await supabase
       .from('companies')
-      .select('allow_domain_requests, sso_enforced, domain_verified')
+      .select('allow_domain_requests, sso_enforced, domain_verified, settings')
       .eq('id', company.id)
       .single();
-    if (data) {
-      setAllowDomainRequests((data as any).allow_domain_requests ?? true);
-      setSsoEnforced((data as any).sso_enforced ?? false);
-    }
+    setCompanyData(data);
   };
 
   const fetchJoinRequests = async () => {
     if (!company) return;
-    setLoadingJoinRequests(true);
     const { data } = await supabase
       .from('join_requests')
       .select('*, profiles:user_id(email, full_name)')
       .eq('company_id', company.id)
       .eq('status', 'pending');
     setJoinRequests(data || []);
-    setLoadingJoinRequests(false);
-  };
-
-  const handleSaveSettings = async () => {
-    if (!company) return;
-    setSavingSettings(true);
-    const { error } = await supabase
-      .from('companies')
-      .update({
-        name: companyName,
-        domain: companyDomain,
-        allow_domain_requests: allowDomainRequests,
-        sso_enforced: ssoEnforced
-      } as any)
-      .eq('id', company.id);
-    setSavingSettings(false);
-    if (error) {
-      toast.error('Σφάλμα αποθήκευσης');
-    } else {
-      toast.success('Ρυθμίσεις αποθηκεύτηκαν');
-      await refreshUserData();
-    }
   };
 
   const handleApproveJoinRequest = async (requestId: string, userId: string) => {
     if (!company) return;
-    // Update join request
     await supabase
       .from('join_requests')
       .update({ status: 'approved', reviewed_by: (await supabase.auth.getUser()).data.user?.id, reviewed_at: new Date().toISOString() })
       .eq('id', requestId);
-
-    // Create user_company_roles entry
     await supabase
       .from('user_company_roles')
       .insert({ user_id: userId, company_id: company.id, role: 'member', status: 'active', access_scope: 'assigned' });
-
-    // Update profile status
     await supabase.from('profiles').update({ status: 'active' } as any).eq('id', userId);
-
     toast.success('Αίτημα εγκρίθηκε');
     fetchJoinRequests();
     refreshData();
@@ -158,16 +117,27 @@ export default function OrganizationSettings() {
         <p className="text-muted-foreground">{company.name}</p>
       </div>
 
-      <Tabs defaultValue="members">
+      <Tabs defaultValue="general">
         <TabsList>
-          <TabsTrigger value="members" className="gap-2"><Users className="h-4 w-4" />Μέλη</TabsTrigger>
           <TabsTrigger value="general" className="gap-2"><Building2 className="h-4 w-4" />Γενικά</TabsTrigger>
+          <TabsTrigger value="members" className="gap-2"><Users className="h-4 w-4" />Μέλη</TabsTrigger>
           <TabsTrigger value="security" className="gap-2"><Shield className="h-4 w-4" />Ασφάλεια</TabsTrigger>
+          <TabsTrigger value="activity" className="gap-2"><Activity className="h-4 w-4" />Activity Log</TabsTrigger>
         </TabsList>
+
+        {/* General Tab */}
+        <TabsContent value="general">
+          <OrgGeneralTab
+            companyId={company.id}
+            initialName={company.name}
+            initialDomain={company.domain}
+            settings={(companyData?.settings as Record<string, any>) || {}}
+            isOwner={isOwner}
+          />
+        </TabsContent>
 
         {/* Members Tab */}
         <TabsContent value="members" className="space-y-6">
-          {/* Join Requests */}
           {joinRequests.length > 0 && (
             <Card className="border-warning/30">
               <CardHeader className="pb-3">
@@ -193,12 +163,9 @@ export default function OrganizationSettings() {
             </Card>
           )}
 
-          {/* Members list */}
           <Card className="border-border/40">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <div>
-                <CardTitle className="text-lg">Μέλη ({users.length})</CardTitle>
-              </div>
+              <CardTitle className="text-lg">Μέλη ({users.length})</CardTitle>
               {isCompanyAdmin && (
                 <Button size="sm" onClick={() => setInviteOpen(true)} className="gap-2">
                   <UserPlus className="h-4 w-4" />Πρόσκληση
@@ -256,11 +223,7 @@ export default function OrganizationSettings() {
                         </TableCell>
                         <TableCell className="text-right">
                           {isCompanyAdmin && u.role !== 'owner' && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleStatusToggle(u.user_id, u.status)}
-                            >
+                            <Button size="sm" variant="ghost" onClick={() => handleStatusToggle(u.user_id, u.status)}>
                               {u.status === 'active' ? 'Αναστολή' : 'Ενεργοποίηση'}
                             </Button>
                           )}
@@ -273,7 +236,6 @@ export default function OrganizationSettings() {
             </CardContent>
           </Card>
 
-          {/* Pending Invitations */}
           {invitations.filter(i => i.status === 'pending').length > 0 && (
             <Card className="border-border/40">
               <CardHeader className="pb-3">
@@ -299,60 +261,23 @@ export default function OrganizationSettings() {
           )}
         </TabsContent>
 
-        {/* General Tab */}
-        <TabsContent value="general">
-          <Card className="border-border/40">
-            <CardHeader>
-              <CardTitle>Γενικές ρυθμίσεις</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 max-w-lg">
-              <div className="space-y-2">
-                <Label>Όνομα εταιρείας</Label>
-                <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} disabled={!isOwner} />
-              </div>
-              <div className="space-y-2">
-                <Label>Domain</Label>
-                <Input value={companyDomain} onChange={(e) => setCompanyDomain(e.target.value)} disabled={!isOwner} />
-              </div>
-              {isOwner && (
-                <Button onClick={handleSaveSettings} disabled={savingSettings}>
-                  {savingSettings && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                  Αποθήκευση
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         {/* Security Tab */}
         <TabsContent value="security">
-          <Card className="border-border/40">
-            <CardHeader>
-              <CardTitle>Ασφάλεια & Domain</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6 max-w-lg">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-foreground">Domain join requests</p>
-                  <p className="text-sm text-muted-foreground">Επιτρέψτε αιτήματα εισόδου μέσω @{company.domain}</p>
-                </div>
-                <Switch checked={allowDomainRequests} onCheckedChange={setAllowDomainRequests} disabled={!isOwner} />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-foreground">SSO Enforcement</p>
-                  <p className="text-sm text-muted-foreground">Υποχρεωτική σύνδεση μόνο μέσω SSO</p>
-                </div>
-                <Switch checked={ssoEnforced} onCheckedChange={setSsoEnforced} disabled={!isOwner} />
-              </div>
-              {isOwner && (
-                <Button onClick={handleSaveSettings} disabled={savingSettings}>
-                  {savingSettings && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                  Αποθήκευση
-                </Button>
-              )}
-            </CardContent>
-          </Card>
+          {companyData && (
+            <OrgSecurityTab
+              companyId={company.id}
+              domain={company.domain}
+              domainVerified={(companyData as any)?.domain_verified ?? false}
+              initialAllowDomainRequests={(companyData as any)?.allow_domain_requests ?? true}
+              initialSsoEnforced={(companyData as any)?.sso_enforced ?? false}
+              isOwner={isOwner}
+            />
+          )}
+        </TabsContent>
+
+        {/* Activity Tab */}
+        <TabsContent value="activity">
+          <OrgActivityTab companyId={company.id} />
         </TabsContent>
       </Tabs>
 

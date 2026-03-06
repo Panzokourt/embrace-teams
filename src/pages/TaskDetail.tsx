@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -630,18 +631,11 @@ export default function TaskDetailPage() {
 
           {/* RIGHT: Smart Meta Panel */}
           <div className="hidden lg:flex flex-col gap-4 w-72 shrink-0 sticky top-[60px]">
-            {/* Assignment Card */}
+            {/* Assignment Card — Multi-assignee */}
             <Card>
-              <CardContent className="p-4 space-y-2">
+              <CardContent className="p-4 space-y-3">
                 <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ανάθεση</h4>
-                <EnhancedInlineEditCell
-                  value={task.assigned_to}
-                  onSave={async (v) => { await updateField('assigned_to', v); }}
-                  type="select"
-                  options={assigneeOptions}
-                  placeholder="Χωρίς ανάθεση"
-                  displayValue={task.assignee?.full_name || undefined}
-                />
+                <TaskAssigneeManager taskId={task.id} profiles={profiles} />
               </CardContent>
             </Card>
 
@@ -683,41 +677,51 @@ export default function TaskDetailPage() {
               </CardContent>
             </Card>
 
-            {/* Status Flow Card */}
+            {/* Status Flow Card — Redesigned */}
             <Card>
               <CardContent className="p-4">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Ροή Κατάστασης</h4>
-                <div className="flex items-center gap-0.5">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">Ροή Κατάστασης</h4>
+                <div className="flex flex-col gap-0">
                   {STATUS_ORDER.map((s, i) => {
                     const conf = STATUS_CONFIG[s];
                     const isCurrent = task.status === s;
                     const isPast = STATUS_ORDER.indexOf(task.status) > i;
+                    const isLast = i === STATUS_ORDER.length - 1;
                     return (
-                      <div key={s} className="flex items-center gap-0.5 flex-1">
-                        <button
-                          onClick={() => handleStatusChange(s)}
-                          className={cn(
-                            "h-6 w-6 rounded-full flex items-center justify-center transition-all shrink-0 text-[9px]",
-                            isCurrent && cn("ring-2 ring-offset-1 ring-offset-background", conf.dotColor, "ring-current text-background scale-110"),
-                            isPast && !isCurrent && "bg-success/20 text-success",
-                            !isCurrent && !isPast && "bg-muted text-muted-foreground hover:bg-muted/80"
+                      <div key={s} className="flex items-stretch gap-3">
+                        {/* Dot + connector line */}
+                        <div className="flex flex-col items-center w-5">
+                          <button
+                            onClick={() => handleStatusChange(s)}
+                            className={cn(
+                              "h-5 w-5 rounded-full flex items-center justify-center shrink-0 transition-all border-2",
+                              isCurrent && "border-primary bg-primary text-primary-foreground scale-110 shadow-sm",
+                              isPast && !isCurrent && "border-success bg-success/20 text-success",
+                              !isCurrent && !isPast && "border-border bg-muted text-muted-foreground hover:border-muted-foreground"
+                            )}
+                          >
+                            {isPast && !isCurrent && <Check className="h-3 w-3" />}
+                            {isCurrent && <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground" />}
+                          </button>
+                          {!isLast && (
+                            <div className={cn(
+                              "w-0.5 flex-1 min-h-[16px]",
+                              isPast ? "bg-success/40" : "bg-border"
+                            )} />
                           )}
-                          style={isCurrent ? { backgroundColor: 'currentColor' } : undefined}
-                          title={conf.label}
-                        >
-                          {isPast && !isCurrent && <Check className="h-3 w-3" />}
-                          {isCurrent && <div className="h-2 w-2 rounded-full bg-background" />}
-                        </button>
-                        {i < STATUS_ORDER.length - 1 && (
-                          <div className={cn("h-px flex-1", isPast ? "bg-success/40" : "bg-border")} />
-                        )}
+                        </div>
+                        {/* Label */}
+                        <div className={cn(
+                          "pb-3 text-xs pt-0.5",
+                          isCurrent && "font-semibold text-foreground",
+                          isPast && !isCurrent && "text-success font-medium",
+                          !isCurrent && !isPast && "text-muted-foreground"
+                        )}>
+                          {conf.label}
+                        </div>
                       </div>
                     );
                   })}
-                </div>
-                <div className="flex justify-between mt-2">
-                  <span className="text-[9px] text-muted-foreground">Todo</span>
-                  <span className="text-[9px] text-muted-foreground">Done</span>
                 </div>
               </CardContent>
             </Card>

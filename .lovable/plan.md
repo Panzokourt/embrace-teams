@@ -1,44 +1,35 @@
 
 
-# AI Package Generator
+# Προσθήκη Διάρκειας Πακέτου
 
-## Overview
-Add an "AI Suggest Package" button to the Packages tab that uses Lovable AI (Gemini) to analyze the company's existing services and suggest an optimized package with service selection, quantities, pricing, and discount — auto-filling the PackageFormDialog.
+## Τι αλλάζει
 
-## Architecture
+Προσθήκη δύο πεδίων στον πίνακα `service_packages`:
+- **`duration_type`**: Τύπος διάρκειας (`fixed_days`, `monthly`, `quarterly`, `semi_annual`, `annual`, `custom_months`)
+- **`duration_value`**: Αριθμητική τιμή (π.χ. 60 μέρες, 3 μήνες κλπ)
 
-### Edge Function: `supabase/functions/suggest-package/index.ts`
-- Receives: list of available services (name, category, list_price, total_cost, margin_pct), optional user prompt (e.g. "Digital marketing package for small business")
-- Uses Lovable AI Gateway with **tool calling** to return structured output:
-  - `package_name`, `description`, `list_price`, `discount_percent`
-  - `items[]`: `{ service_id, quantity, duration_months, rationale }`
-- Model: `google/gemini-3-flash-preview`
-- System prompt in Greek, agency/services context
+Αυτό καλύπτει όλα τα σενάρια:
+- Retainer μηνιαίο → `monthly`, value: 1
+- Retainer 3μηνο → `quarterly`, value: 3
+- 60 μέρες → `fixed_days`, value: 60
+- Ετήσιο → `annual`, value: 12
 
-### Frontend Changes
+## Αλλαγές
 
-**PackagesList.tsx**:
-- Add "AI Πρόταση" button (Sparkles icon) next to "Νέο Πακέτο"
-- Opens a small dialog/popover asking for optional prompt (e.g. "Τι τύπο πακέτου θέλετε;")
-- On submit: calls edge function, receives structured suggestion, opens PackageFormDialog pre-filled
+### 1. Database Migration
+- `ALTER TABLE service_packages ADD COLUMN duration_type text DEFAULT 'monthly'`
+- `ALTER TABLE service_packages ADD COLUMN duration_value integer DEFAULT 1`
 
-**PackageFormDialog.tsx**:
-- Accept optional `initialData` prop to pre-fill from AI suggestion
-- Show a dismissible banner "Προτεινόμενο από AI — ελέγξτε και προσαρμόστε" when AI-generated
+### 2. Frontend — `PackageFormDialog.tsx`
+- Νέα πεδία στο form: dropdown για τύπο διάρκειας + input για τιμή
+- Αυτόματη ενημέρωση value βάσει τύπου (π.χ. quarterly → 3)
 
-### Config
-- Add `[functions.suggest-package]` to `supabase/config.toml`
+### 3. Frontend — `PackagesList.tsx`
+- Νέα στήλη "Διάρκεια" στον πίνακα με human-readable label (π.χ. "3 μήνες", "60 ημέρες", "Ετήσιο")
 
-## Flow
-1. User clicks "AI Πρόταση" → enters optional description → "Δημιουργία με AI"
-2. Edge function sends services data + prompt to Gemini via tool calling
-3. Returns structured package suggestion
-4. PackageFormDialog opens pre-filled with AI data
-5. User reviews, adjusts, saves normally
+### 4. Frontend — `usePricingData.ts`
+- Προσθήκη `duration_type` και `duration_value` στο `ServicePackage` interface
 
-## Files to create/edit
-- **Create**: `supabase/functions/suggest-package/index.ts`
-- **Edit**: `supabase/config.toml` (add function entry)
-- **Edit**: `src/components/pricing/PackagesList.tsx` (add AI button + dialog)
-- **Edit**: `src/components/pricing/PackageFormDialog.tsx` (accept initialData prop)
+### 5. Edge Function — `suggest-package`
+- Προσθήκη `duration_type` / `duration_value` στο tool schema ώστε το AI να προτείνει και διάρκεια
 

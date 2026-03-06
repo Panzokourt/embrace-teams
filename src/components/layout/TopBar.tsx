@@ -169,7 +169,7 @@ export default function TopBar({ onPanelToggle, rightPanelOpen, onMobileMenuTogg
       </div>
 
       {/* Right actions */}
-      <div className="flex items-center gap-1 shrink-0">
+      <div className="flex items-center gap-2 shrink-0">
         {/* XP Badge — hide on mobile */}
         {!isMobile && <XPBadge userId={user?.id} size="sm" showXP={!isNarrow} />}
 

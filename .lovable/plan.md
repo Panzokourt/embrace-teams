@@ -1,66 +1,76 @@
 
 
-# Org Chart — Full Rebuild Plan
+# Plan: Streamline Permissions in Invitation & Enhance Members Table
 
-## Πρόβλημα
+## Problem Summary
 
-Το τρέχον οργανόγραμμα είναι ένα static rendered tree μέσα σε ScrollArea με βασικό zoom (CSS scale). Δεν υποστηρίζει pan/drag-to-move, δεν έχει infinite canvas, τα nodes δεν είναι clickable για detail, δεν υπάρχουν views (by department, by person), και τα templates δεν αξιοποιούν το υπάρχον προσωπικό.
+1. **InviteUserDialog** shows 12 permission categories with ~41 individual checkboxes — too granular for an invitation. Should be simplified but **kept**.
+2. **CreateUserDialog** has the same overwhelming permissions accordion.
+3. **OrganizationSettings Members table** is minimal — no job title, department, phone; rows aren't clickable; no proper action menu.
+4. **HR Staff vs Org Settings Members** — both show members but with different actions. Need clear differentiation.
 
-## Λύση
+## Changes
 
-Πλήρες rebuild του OrgChart σε **infinite canvas** στυλ Miro με pan+zoom, πολλαπλά views, clickable nodes με detail panel, και smart templates.
+### 1. Simplify Permissions UI in InviteUserDialog & CreateUserDialog
 
-## Τεχνική Προσέγγιση
+Replace the 12-category, 41-checkbox accordion with a **module-level toggle** approach:
 
-### 1. Infinite Canvas Engine (χωρίς εξωτερική βιβλιοθήκη)
-- Custom React canvas με `transform: translate(x, y) scale(z)` σε ένα wrapper div
-- **Mouse wheel** → zoom (centered on cursor)
-- **Middle-click drag** ή **Space+drag** → pan (hand tool)
-- **Touch**: pinch-to-zoom, two-finger pan
-- Mini-map στο corner (optional, phase 2)
-- Fit-to-screen button, zoom controls
+| Module | Controls | Maps to permissions |
+|---|---|---|
+| Clients | View / Manage | `clients.view`, `clients.create/edit/delete` |
+| Projects | View / Manage | `projects.view`, `projects.create/edit/delete` |
+| Tasks | View / Manage / Assign | `tasks.*` |
+| Deliverables | View / Manage / Approve | `deliverables.*` |
+| Finance | View / Manage | `financials.*` |
+| Reports | View / Export | `reports.*` |
+| Tenders | View / Manage | `tenders.*` |
+| Files | View / Upload / Delete | `files.*` |
+| Settings | Company / Billing / Security | `settings.*` |
+| Users | View / Invite / Edit / Suspend | `users.*` |
 
-### 2. Views (3 modes)
-- **Hierarchy View** (default): Κλασικό tree ανά reporting line — αυτό που υπάρχει τώρα αλλά σε canvas
-- **Department View**: Grouped κάρτες ανά department σε columns/clusters, κάθε cluster δείχνει τα μέλη
-- **List View**: Compact table/list με sorting, φιλτράρισμα, search — γρήγορη εύρεση ατόμου
+Each module gets a **row** with toggle switches for "View" and "Manage" (which auto-enables all CRUD permissions for that module). This replaces the accordion with a clean, compact table.
 
-Toggle μεταξύ views μέσω tabs στο header.
+The underlying `PERMISSION_CATEGORIES` and DB model stay the same — only the UI is simplified. Role selection auto-sets the toggles (as it does now). User can override.
 
-### 3. Interactive Nodes
-- **Click** σε node → slide-in panel (sheet) δεξιά με:
-  - Profile info (avatar, name, email, phone)
-  - Position & department
-  - Direct reports count
-  - Link to Employee Profile (`/hr/employee/:id`)
-  - Quick actions (edit, reassign, add subordinate)
-- **Hover** → subtle highlight + tooltip με title
-- **Vacant positions** → dashed border, prominent "Κενή θέση" badge, click to assign
-- Connector lines μεταξύ nodes: animated SVG paths αντί για div borders
+**Files**: `InviteUserDialog.tsx`, `CreateUserDialog.tsx` — replace accordion with compact permission table component. Extract shared `PermissionModuleSelector` component.
 
-### 4. Smart Templates & Auto-build
-- Βελτίωση του Wizard: αφού επιλεγεί template, **auto-match** υπάρχοντα profiles σε positions βάσει `job_title` ή `department`
-- **Gap Analysis panel**: Μετά τη δημιουργία, δείχνει πόσες θέσεις είναι κενές, ποια departments λείπουν, ποια levels δεν έχουν κάλυψη
-- Wizard step: "Αντιστοίχιση Προσωπικού" — drag-drop ή auto-suggest
+### 2. Remove Client/Project Assignment from Invitation
 
-### 5. SVG Connector Lines
-- Αντικατάσταση CSS div lines με SVG `<path>` elements (bezier curves)
-- Animated flow direction (subtle dash animation)
-- Color-coded κατά department
+Keep access scope (company vs assigned) but **remove** the client/project checkbox lists from the invitation dialog. These are configured post-onboarding via EditPermissionsDialog. Invitation should be lightweight: Email → Role → Access Scope → Module permissions → Send.
 
-## Αρχεία
+### 3. Enhance OrganizationSettings Members Table
 
-| Αρχείο | Αλλαγή |
+- Add columns: **Θέση**, **Τμήμα**, **Τηλέφωνο**
+- Fetch `job_title`, `department`, `phone` from profiles alongside roles
+- Make user name/avatar **clickable** → navigates to `/hr/employee/:userId`
+- Replace "Αναστολή/Ενεργοποίηση" button with a **dropdown menu** (MoreHorizontal): "Προβολή Προφίλ", "Δικαιώματα", "Αναστολή/Ενεργοποίηση"
+- Open `EditPermissionsDialog` from the dropdown
+
+**Files**: `OrganizationSettings.tsx` — update table, add profile data fetching, add navigation + action menu. Update `useRBAC.ts` `CompanyUser` type to include `job_title`, `department`, `phone`.
+
+### 4. Align HR Staff and Org Settings
+
+- **Org Settings Members** = role/access/permissions management (admin focus)
+- **HR Staff** = employee profiles, departments, org chart, leaves (HR focus)
+- Both link to the same `/hr/employee/:id` profile page
+- Ensure the profile page has a "Δικαιώματα" tab for editing permissions (add it)
+
+**Files**: `EmployeeProfile.tsx` — add a "Δικαιώματα" tab that shows the `EditPermissionsDialog` content inline (for admins only).
+
+### 5. New Shared Component
+
+Create `src/components/users/PermissionModuleSelector.tsx` — compact module-level permission toggles used by both InviteUserDialog, CreateUserDialog, and EmployeeProfile permissions tab.
+
+## File Summary
+
+| File | Change |
 |---|---|
-| `src/pages/OrgChart.tsx` | **Rewrite** — Infinite canvas, views, SVG connectors, detail panel |
-| `src/components/org-chart/OrgChartCanvas.tsx` | **New** — Pan+zoom canvas wrapper |
-| `src/components/org-chart/OrgNodeCard.tsx` | **New** — Redesigned node card (clickable, expandable) |
-| `src/components/org-chart/OrgDetailPanel.tsx` | **New** — Slide-in sheet for node details |
-| `src/components/org-chart/OrgDepartmentView.tsx` | **New** — Department-grouped view |
-| `src/components/org-chart/OrgListView.tsx` | **New** — Table/list view |
-| `src/components/org-chart/OrgConnectors.tsx` | **New** — SVG connector line renderer |
-| `src/components/org-chart/OrgChartWizard.tsx` | **Update** — Add auto-match step + gap analysis |
-| `src/components/org-chart/DraggableOrgNode.tsx` | **Remove** — Replaced by new OrgNodeCard |
+| `src/components/users/PermissionModuleSelector.tsx` | **New** — Shared compact permission UI |
+| `src/components/users/InviteUserDialog.tsx` | **Simplify** — Use PermissionModuleSelector, remove client/project lists |
+| `src/components/users/CreateUserDialog.tsx` | **Simplify** — Use PermissionModuleSelector, remove permissions accordion |
+| `src/pages/OrganizationSettings.tsx` | **Enhance** — Add columns, clickable rows, action dropdown, EditPermissionsDialog |
+| `src/hooks/useRBAC.ts` | **Update** — Extend CompanyUser with job_title/department/phone, update fetchUsers |
+| `src/pages/EmployeeProfile.tsx` | **Update** — Add "Δικαιώματα" tab for admins |
 
-Δεν χρειάζονται DB changes — το schema `org_chart_positions` καλύπτει ήδη hierarchy, department, user_id, color, level, sort_order.
+No DB changes needed.
 

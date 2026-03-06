@@ -194,14 +194,15 @@ export function ActivityLog({ entityType, entityId, limit = 20 }: ActivityLogPro
   );
 }
 
-// Helper function to log activities
+// Helper function to log activities — now accepts company_id for tenant isolation
 export async function logActivity(
   userId: string,
   action: string,
   entityType: string,
   entityId: string,
   entityName?: string,
-  details?: Record<string, unknown>
+  details?: Record<string, unknown>,
+  companyId?: string
 ) {
   try {
     await supabase.from('activity_log').insert([{
@@ -211,6 +212,7 @@ export async function logActivity(
       entity_id: entityId,
       entity_name: entityName || null,
       details: (details || null) as any,
+      company_id: companyId || null,
     }]);
   } catch (error) {
     console.error('Error logging activity:', error);

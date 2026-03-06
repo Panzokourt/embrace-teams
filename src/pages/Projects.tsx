@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { usePagination } from '@/hooks/usePagination';
+import { PaginationControls } from '@/components/shared/PaginationControls';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
@@ -108,6 +110,7 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
   const [projects, setProjects] = useState<Project[]>([]);
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const pagination = usePagination(50);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -154,10 +157,17 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
 
   const fetchProjects = useCallback(async () => {
     try {
+      // Get total count
+      const { count } = await supabase
+        .from('projects')
+        .select('*', { count: 'exact', head: true });
+      pagination.setTotalCount(count || 0);
+
       const { data, error } = await supabase
         .from('projects')
         .select(`*, client:clients(name)`)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(pagination.from, pagination.to);
 
       if (error) throw error;
 
@@ -194,7 +204,7 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [pagination.from, pagination.to]);
 
   const fetchClients = async () => {
     try {
@@ -1072,6 +1082,7 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
           {viewMode === 'kanban' && renderKanbanView()}
         </>
       )}
+      <PaginationControls pagination={pagination} />
     </div>
   );
 }

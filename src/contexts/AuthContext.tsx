@@ -270,18 +270,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // Fetch permissions
-      const { data: permissionsData } = await supabase
-        .from('user_permissions')
-        .select('permission, granted')
-        .eq('user_id', userId)
-        .eq('granted', true);
+      // Fetch permissions — company-scoped
+      const activeRole = roles.find(r => r.status === 'active');
+      if (activeRole) {
+        const { data: permissionsData } = await supabase
+          .from('user_permissions')
+          .select('permission, granted')
+          .eq('user_id', userId)
+          .eq('company_id', activeRole.company_id)
+          .eq('granted', true);
 
-      if (permissionsData) {
-        setPermissions(permissionsData.map(p => p.permission as PermissionType));
+        if (permissionsData) {
+          setPermissions(permissionsData.map(p => p.permission as PermissionType));
+        }
+      } else {
+        setPermissions([]);
       }
 
-      // Fetch legacy roles
+      // DEPRECATED: Legacy user_roles — kept for backward compat only, NOT used for authorization
+      // TODO: Remove this fetch entirely once all legacy references are cleaned up
       const { data: rolesData } = await supabase
         .from('user_roles')
         .select('role')
@@ -312,10 +319,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .then(() => {});
   };
 
-  const switchCompany = (companyId: string) => {
+  const switchCompany = async (companyId: string) => {
     const role = allCompanyRoles.find(r => r.company_id === companyId);
     if (role) {
       selectCompany(role, allCompanies);
+      // Re-fetch permissions for the new company context
+      if (user) {
+        const { data: permissionsData } = await supabase
+          .from('user_permissions')
+          .select('permission, granted')
+          .eq('user_id', user.id)
+          .eq('company_id', companyId)
+          .eq('granted', true);
+
+        if (permissionsData) {
+          setPermissions(permissionsData.map(p => p.permission as PermissionType));
+        } else {
+          setPermissions([]);
+        }
+      }
     }
   };
 
@@ -382,10 +404,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isBillingRole = role === 'billing';
   const isApproved = companyRole?.status === 'active' || profile?.status === 'active';
   
-  // Legacy
-  const isAdmin = legacyRoles.includes('admin') || isOwner || role === 'admin';
-  const isEmployee = legacyRoles.includes('employee') || isMember;
-  const isClient = legacyRoles.includes('client');
+  // Legacy compatibility — now derived solely from company role, NOT from user_roles table
+  // DEPRECATED: These will be removed in a future version. Use companyRole checks instead.
+  const isAdmin = isOwner || role === 'admin';
+  const isEmployee = isMember || isManager;
+  const isClient = role === 'billing'; // closest legacy mapping
 
   return (
     <AuthContext.Provider value={{

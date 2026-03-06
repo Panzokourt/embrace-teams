@@ -349,6 +349,201 @@ export default function ProjectDetailPage() {
               </TabsTrigger>
             </TabsList>
 
+            <TabsContent value="overview">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Project Info Card */}
+                <Card>
+                  <CardContent className="p-5 space-y-3">
+                    <p className="text-sm font-semibold">Πληροφορίες Έργου</p>
+
+                    {/* Description - inline edit */}
+                    <div className="group">
+                      <p className="text-xs text-muted-foreground mb-1">Περιγραφή</p>
+                      {editingDescription ? (
+                        <div className="space-y-2">
+                          <Textarea
+                            value={descriptionDraft}
+                            onChange={e => setDescriptionDraft(e.target.value)}
+                            rows={3}
+                            className="text-sm"
+                            autoFocus
+                            onKeyDown={e => {
+                              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                                updateProjectField('description', descriptionDraft.trim() || null);
+                                setEditingDescription(false);
+                              }
+                            }}
+                          />
+                          <div className="flex gap-1">
+                            <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setEditingDescription(false)}>
+                              <X className="h-3 w-3" />
+                            </Button>
+                            <Button size="sm" className="h-6 px-2 text-xs" onClick={() => {
+                              updateProjectField('description', descriptionDraft.trim() || null);
+                              setEditingDescription(false);
+                            }}>
+                              <Save className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p
+                          className={cn(
+                            "text-sm cursor-pointer rounded px-1 -mx-1 py-0.5 hover:bg-muted/50 transition-colors",
+                            !project.description && "text-muted-foreground italic"
+                          )}
+                          onClick={() => {
+                            if (!canEdit) return;
+                            setDescriptionDraft(project.description || '');
+                            setEditingDescription(true);
+                          }}
+                        >
+                          {project.description || 'Προσθέστε περιγραφή...'}
+                          {canEdit && <Pencil className="h-3 w-3 ml-1 inline opacity-0 group-hover:opacity-50" />}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Client */}
+                    {project.client && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Πελάτης</span>
+                        <span className="text-sm font-medium">{project.client.name}</span>
+                      </div>
+                    )}
+
+                    {/* Budget - inline edit */}
+                    <div className="group flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Budget</span>
+                      {editingBudget ? (
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            value={budgetDraft}
+                            onChange={e => setBudgetDraft(e.target.value)}
+                            className="h-6 w-24 text-xs"
+                            autoFocus
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                updateProjectField('budget', parseFloat(budgetDraft) || 0);
+                                setEditingBudget(false);
+                              }
+                              if (e.key === 'Escape') setEditingBudget(false);
+                            }}
+                            onBlur={() => {
+                              updateProjectField('budget', parseFloat(budgetDraft) || 0);
+                              setEditingBudget(false);
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <span
+                          className="text-sm font-medium cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 transition-colors"
+                          onClick={() => { if (!canEdit) return; setBudgetDraft(project.budget.toString()); setEditingBudget(true); }}
+                        >
+                          €{project.budget.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Agency Fee - inline edit */}
+                    <div className="group flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Agency Fee</span>
+                      {editingFee ? (
+                        <Input
+                          type="number"
+                          value={feeDraft}
+                          onChange={e => setFeeDraft(e.target.value)}
+                          className="h-6 w-16 text-xs"
+                          autoFocus
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              updateProjectField('agency_fee_percentage', parseFloat(feeDraft) || 0);
+                              setEditingFee(false);
+                            }
+                            if (e.key === 'Escape') setEditingFee(false);
+                          }}
+                          onBlur={() => {
+                            updateProjectField('agency_fee_percentage', parseFloat(feeDraft) || 0);
+                            setEditingFee(false);
+                          }}
+                        />
+                      ) : (
+                        <span
+                          className="text-sm font-medium cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 transition-colors"
+                          onClick={() => { if (!canEdit) return; setFeeDraft(project.agency_fee_percentage.toString()); setEditingFee(true); }}
+                        >
+                          {project.agency_fee_percentage}%
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Dates */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Έναρξη</span>
+                      <input
+                        type="date"
+                        value={project.start_date || ''}
+                        onChange={e => updateProjectField('start_date', e.target.value || null)}
+                        disabled={!canEdit}
+                        className="text-xs bg-transparent border-none outline-none text-foreground cursor-pointer disabled:cursor-default"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Λήξη</span>
+                      <input
+                        type="date"
+                        value={project.end_date || ''}
+                        onChange={e => updateProjectField('end_date', e.target.value || null)}
+                        disabled={!canEdit}
+                        className="text-xs bg-transparent border-none outline-none text-foreground cursor-pointer disabled:cursor-default"
+                      />
+                    </div>
+
+                    {dueDateInfo && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className={cn('font-medium', dueDateInfo.className)}>{dueDateInfo.label}</span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Καταγεγραμμένες Ώρες</span>
+                      <span className="text-sm font-medium flex items-center gap-1">
+                        <Timer className="h-3.5 w-3.5 text-muted-foreground" />
+                        {totalTrackedHours}h
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Tasks</span>
+                      <span className="text-sm font-medium">{completedTasks}/{tasks.length} ολοκληρωμένα</span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Παραδοτέα</span>
+                      <span className="text-sm font-medium">{completedDeliverables}/{deliverables.length} ολοκληρωμένα</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Team Card */}
+                <Card>
+                  <CardContent className="p-5">
+                    <ProjectTeamManager
+                      projectId={project.id}
+                      canEdit={canEdit}
+                      compact
+                      showFullNames
+                      projectLeadId={project.project_lead_id}
+                      accountManagerId={project.account_manager_id}
+                      onUpdateProjectRole={(field, value) => updateProjectField(field, value)}
+                    />
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
             <TabsContent value="deliverables">
               <ProjectDeliverablesTable projectId={project.id} projectName={project.name} />
             </TabsContent>
@@ -394,205 +589,6 @@ export default function ProjectDetailPage() {
               </Card>
             </TabsContent>
           </Tabs>
-        </div>
-
-        {/* ── RIGHT: Project Meta Panel (25%) ──────────────────────────────── */}
-        <div className="w-72 xl:w-80 shrink-0 space-y-4 hidden lg:block">
-          {/* Card 1: Πληροφορίες Έργου (merged Summary + Details) */}
-          <Card>
-            <CardContent className="p-4 space-y-3">
-              <p className="text-sm font-semibold">Πληροφορίες Έργου</p>
-
-              {/* Description - inline edit */}
-              <div className="group">
-                <p className="text-xs text-muted-foreground mb-1">Περιγραφή</p>
-                {editingDescription ? (
-                  <div className="space-y-2">
-                    <Textarea
-                      value={descriptionDraft}
-                      onChange={e => setDescriptionDraft(e.target.value)}
-                      rows={3}
-                      className="text-sm"
-                      autoFocus
-                      onKeyDown={e => {
-                        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                          updateProjectField('description', descriptionDraft.trim() || null);
-                          setEditingDescription(false);
-                        }
-                      }}
-                    />
-                    <div className="flex gap-1">
-                      <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setEditingDescription(false)}>
-                        <X className="h-3 w-3" />
-                      </Button>
-                      <Button size="sm" className="h-6 px-2 text-xs" onClick={() => {
-                        updateProjectField('description', descriptionDraft.trim() || null);
-                        setEditingDescription(false);
-                      }}>
-                        <Save className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <p
-                    className={cn(
-                      "text-sm cursor-pointer rounded px-1 -mx-1 py-0.5 hover:bg-muted/50 transition-colors",
-                      !project.description && "text-muted-foreground italic"
-                    )}
-                    onClick={() => {
-                      if (!canEdit) return;
-                      setDescriptionDraft(project.description || '');
-                      setEditingDescription(true);
-                    }}
-                  >
-                    {project.description || 'Προσθέστε περιγραφή...'}
-                    {canEdit && <Pencil className="h-3 w-3 ml-1 inline opacity-0 group-hover:opacity-50" />}
-                  </p>
-                )}
-              </div>
-
-              {/* Client */}
-              {project.client && (
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Πελάτης</span>
-                  <span className="text-sm font-medium">{project.client.name}</span>
-                </div>
-              )}
-
-              {/* Budget - inline edit */}
-              <div className="group flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Budget</span>
-                {editingBudget ? (
-                  <div className="flex items-center gap-1">
-                    <Input
-                      type="number"
-                      value={budgetDraft}
-                      onChange={e => setBudgetDraft(e.target.value)}
-                      className="h-6 w-24 text-xs"
-                      autoFocus
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          updateProjectField('budget', parseFloat(budgetDraft) || 0);
-                          setEditingBudget(false);
-                        }
-                        if (e.key === 'Escape') setEditingBudget(false);
-                      }}
-                      onBlur={() => {
-                        updateProjectField('budget', parseFloat(budgetDraft) || 0);
-                        setEditingBudget(false);
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <span
-                    className="text-sm font-medium cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 transition-colors"
-                    onClick={() => { if (!canEdit) return; setBudgetDraft(project.budget.toString()); setEditingBudget(true); }}
-                  >
-                    €{project.budget.toLocaleString()}
-                  </span>
-                )}
-              </div>
-
-              {/* Agency Fee - inline edit */}
-              <div className="group flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Agency Fee</span>
-                {editingFee ? (
-                  <Input
-                    type="number"
-                    value={feeDraft}
-                    onChange={e => setFeeDraft(e.target.value)}
-                    className="h-6 w-16 text-xs"
-                    autoFocus
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        updateProjectField('agency_fee_percentage', parseFloat(feeDraft) || 0);
-                        setEditingFee(false);
-                      }
-                      if (e.key === 'Escape') setEditingFee(false);
-                    }}
-                    onBlur={() => {
-                      updateProjectField('agency_fee_percentage', parseFloat(feeDraft) || 0);
-                      setEditingFee(false);
-                    }}
-                  />
-                ) : (
-                  <span
-                    className="text-sm font-medium cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 transition-colors"
-                    onClick={() => { if (!canEdit) return; setFeeDraft(project.agency_fee_percentage.toString()); setEditingFee(true); }}
-                  >
-                    {project.agency_fee_percentage}%
-                  </span>
-                )}
-              </div>
-
-              {/* Dates */}
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Έναρξη</span>
-                <input
-                  type="date"
-                  value={project.start_date || ''}
-                  onChange={e => updateProjectField('start_date', e.target.value || null)}
-                  disabled={!canEdit}
-                  className="text-xs bg-transparent border-none outline-none text-foreground cursor-pointer disabled:cursor-default"
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Λήξη</span>
-                <input
-                  type="date"
-                  value={project.end_date || ''}
-                  onChange={e => updateProjectField('end_date', e.target.value || null)}
-                  disabled={!canEdit}
-                  className="text-xs bg-transparent border-none outline-none text-foreground cursor-pointer disabled:cursor-default"
-                />
-              </div>
-
-              {/* Days remaining */}
-              {dueDateInfo && (
-                <div className="flex items-center gap-2 text-xs">
-                  <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className={cn('font-medium', dueDateInfo.className)}>{dueDateInfo.label}</span>
-                </div>
-              )}
-
-              {/* Tracked hours */}
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Καταγεγραμμένες Ώρες</span>
-                <span className="text-sm font-medium flex items-center gap-1">
-                  <Timer className="h-3.5 w-3.5 text-muted-foreground" />
-                  {totalTrackedHours}h
-                </span>
-              </div>
-
-              {/* Tasks count */}
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Tasks</span>
-                <span className="text-sm font-medium">{completedTasks}/{tasks.length} ολοκληρωμένα</span>
-              </div>
-
-              {/* Deliverables count */}
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Παραδοτέα</span>
-                <span className="text-sm font-medium">{completedDeliverables}/{deliverables.length} ολοκληρωμένα</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Card 2: Team */}
-          <Card>
-            <CardContent className="p-4">
-              <ProjectTeamManager
-                projectId={project.id}
-                canEdit={canEdit}
-                compact
-                showFullNames
-                projectLeadId={project.project_lead_id}
-                accountManagerId={project.account_manager_id}
-                onUpdateProjectRole={(field, value) => updateProjectField(field, value)}
-              />
-            </CardContent>
-          </Card>
-        </div>
       </div>
     </div>
   );

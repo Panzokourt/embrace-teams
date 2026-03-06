@@ -15,7 +15,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import {
-  Network, Plus, Building2, Loader2, Wand2, Shield, Database,
+  Network, Plus, Building2, Loader2, Wand2, Shield,
   LayoutGrid, List, GitBranch
 } from 'lucide-react';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -42,7 +42,6 @@ export default function OrgChartPage() {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [selectedNode, setSelectedNode] = useState<OrgPosition | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
-  const [loadingDummyData, setLoadingDummyData] = useState(false);
   const treeContainerRef = useRef<HTMLDivElement>(null);
 
   // Form state
@@ -207,37 +206,6 @@ export default function OrgChartPage() {
     setDetailOpen(true);
   };
 
-  // Dummy data
-  const DUMMY_NAMES = [
-    'Αλέξανδρος Παπαδόπουλος', 'Μαρία Γεωργίου', 'Νίκος Κωνσταντίνου',
-    'Ελένη Αντωνίου', 'Γιώργος Δημητρίου', 'Κατερίνα Νικολάου',
-    'Δημήτρης Βασιλείου', 'Σοφία Παναγιώτου', 'Χρήστος Ιωάννου',
-    'Αναστασία Χριστοδούλου', 'Θάνος Μιχαήλ', 'Εύα Σταματίου',
-  ];
-
-  const addDummyUsers = async () => {
-    if (!company || positions.length === 0) { toast.error('Δεν υπάρχουν θέσεις'); return; }
-    setLoadingDummyData(true);
-    try {
-      for (let i = 0; i < positions.length; i++) {
-        const pos = positions[i];
-        const dummyName = DUMMY_NAMES[i % DUMMY_NAMES.length];
-        const dummyEmail = `dummy${i + 1}@${company.name.toLowerCase().replace(/\s+/g, '')}.com`;
-        const { data: profile } = await supabase
-          .from('profiles').upsert({ id: crypto.randomUUID(), email: dummyEmail, full_name: dummyName, status: 'active' }, { onConflict: 'email' })
-          .select('id').single();
-        if (profile) {
-          await supabase.from('org_chart_positions').update({ user_id: profile.id }).eq('id', pos.id);
-        } else {
-          const { data: ep } = await supabase.from('profiles').select('id').eq('email', dummyEmail).single();
-          if (ep) await supabase.from('org_chart_positions').update({ user_id: ep.id }).eq('id', pos.id);
-        }
-      }
-      toast.success('Demo data προστέθηκαν!');
-      fetchData();
-    } catch { toast.error('Σφάλμα'); } finally { setLoadingDummyData(false); }
-  };
-
   // Gap stats
   const stats = useMemo(() => {
     const total = positions.length;
@@ -324,10 +292,6 @@ export default function OrgChartPage() {
 
             {canEdit && (
               <>
-                <Button variant="outline" size="sm" onClick={addDummyUsers} disabled={loadingDummyData || positions.length === 0}>
-                  {loadingDummyData ? <Loader2 className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />}
-                  <span className="ml-1.5 hidden sm:inline">Demo</span>
-                </Button>
                 <Button variant="outline" size="sm" onClick={() => setWizardOpen(true)}>
                   <Wand2 className="h-4 w-4" />
                   <span className="ml-1.5 hidden sm:inline">Wizard</span>

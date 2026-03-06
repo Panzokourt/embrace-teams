@@ -1,41 +1,49 @@
 
 
-# Αναδομή Organization Settings & Fix Save Error
+# Multi-Company Management — Company Switcher & Δημιουργία Πολλαπλών Εταιρειών
 
-## Πρόβλημα
-Το σφάλμα αποθήκευσης είναι **409 Conflict**: το domain "advize.gr" υπάρχει ήδη σε άλλη εταιρεία. Ο κώδικας δείχνει γενικό "Σφάλμα αποθήκευσης" χωρίς να εξηγεί τι πήγε στραβά. Επίσης, η δομή της σελίδας Organization Settings χρειάζεται βελτίωση — τα General και Security tabs πρέπει να γίνουν πιο ολοκληρωμένα.
+## Τρέχουσα Κατάσταση
+
+Η βάση **ήδη υποστηρίζει** πολλαπλές εταιρείες ανά χρήστη (`user_company_roles` με composite key `user_id + company_id`). Ο `WorkspaceSelector` υπάρχει αλλά εμφανίζεται μόνο κατά το login. Δεν υπάρχει τρόπος να δημιουργήσεις νέα εταιρεία ή να αλλάξεις εταιρεία **μέσα από την εφαρμογή** αφού έχεις μπει.
+
+## Ορολογία
+
+Προτείνω να χρησιμοποιούμε **"Εταιρεία"** παντού στο UI (αντί για "Organization" ή "Workspace"). Στη βάση παραμένει `companies`. Κάθε εταιρεία = ξεχωριστό ΑΦΜ, ξεχωριστά δεδομένα.
 
 ## Αλλαγές
 
-### 1. Fix Save Error Handling
-- Parse the Supabase error response properly
-- Detect `23505` (unique constraint violation on domain) and show a specific message: "Αυτό το domain χρησιμοποιείται ήδη από άλλη εταιρεία"
-- Add input validation before save (trim, non-empty name, valid domain format)
+### 1. Company Switcher στο TopBar
+Προσθήκη dropdown αριστερά στο TopBar που δείχνει:
+- Το logo + όνομα της τρέχουσας εταιρείας
+- Dropdown με όλες τις εταιρείες του χρήστη
+- Κουμπί "+ Νέα εταιρεία" στο κάτω μέρος (οδηγεί σε dialog δημιουργίας)
 
-### 2. Restructure Organization Settings Page
-Ανανέωση του `OrganizationSettings.tsx` με πιο ολοκληρωμένη δομή:
+Το dropdown θα καλεί `switchCompany()` από το AuthContext — η λογική re-fetch permissions υπάρχει ήδη.
 
-**Tab: Γενικά**
+### 2. Create Company Dialog
+Νέο component `CreateCompanyDialog` — ο χρήστης δίνει:
 - Όνομα εταιρείας
-- Domain (with validation + duplicate error feedback)
-- Logo upload (placeholder for now)
-- Company description/industry (from `settings` jsonb)
-- Timezone / language preferences
+- Domain (ανεξάρτητο από το email domain)
+- ΑΦΜ (προαιρετικό)
 
-**Tab: Μέλη** (existing — keep as is, minor cleanup)
+Αυτό καλεί `create_company_with_owner` RPC (υπάρχει ήδη), μετά κάνει refresh και switch στη νέα εταιρεία.
 
-**Tab: Ασφάλεια** (existing — merge the two save buttons, add domain verification status badge)
+### 3. Domain Flexibility
+Σήμερα το `create_company_with_owner` δέχεται domain παράμετρο ελεύθερα — δεν απαιτεί matching με το email. Αυτό είναι ήδη σωστό. Ο χρήστης με `koupant@gmail.com` μπορεί να δημιουργήσει εταιρεία με domain `advize.gr` και μια άλλη με domain `mscomm.gr`.
 
-**Tab: Activity Log** (new)
-- Show recent company-scoped activity entries using the new `company_id` on `activity_log`
+### 4. Ασφάλεια
+- Ο `create_company_with_owner` χρησιμοποιεί `auth.uid()` — ασφαλές
+- Κάθε νέα εταιρεία δημιουργεί αυτόματα owner role — ασφαλές
+- Τα RLS policies φιλτράρουν ήδη με `company_id` — τα δεδομένα είναι πλήρως απομονωμένα
+- Δεν χρειάζεται αλλαγή στη βάση
 
-### 3. Separate Save Per Section
-Currently both General and Security share `handleSaveSettings` which sends ALL fields. Refactor to:
-- `handleSaveGeneral` — saves only name + domain
-- `handleSaveSecurity` — saves only allow_domain_requests + sso_enforced
+## Αρχεία
 
-This prevents accidental overwrites and makes error handling cleaner.
+| Αρχείο | Αλλαγή |
+|--------|--------|
+| `src/components/layout/CompanySwitcher.tsx` | **Νέο** — Dropdown με εταιρείες + "Νέα εταιρεία" |
+| `src/components/layout/CreateCompanyDialog.tsx` | **Νέο** — Dialog δημιουργίας εταιρείας |
+| `src/components/layout/TopBar.tsx` | Προσθήκη `<CompanySwitcher />` αριστερά, πριν το search |
 
-### Files to Edit
-- `src/pages/OrganizationSettings.tsx` — full refactor with better error handling, validation, activity tab, section-specific saves
+Δεν απαιτούνται αλλαγές σε database, AuthContext ή RLS — η υποδομή υπάρχει ήδη.
 

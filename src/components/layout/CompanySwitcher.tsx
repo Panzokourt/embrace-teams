@@ -8,9 +8,10 @@ import CreateCompanyDialog from './CreateCompanyDialog';
 
 interface CompanySwitcherProps {
   compact?: boolean;
+  iconOnly?: boolean;
 }
 
-export default function CompanySwitcher({ compact }: CompanySwitcherProps) {
+export default function CompanySwitcher({ compact, iconOnly }: CompanySwitcherProps) {
   const { company, allCompanies, switchCompany } = useAuth();
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -31,16 +32,17 @@ export default function CompanySwitcher({ compact }: CompanySwitcherProps) {
             size="sm"
             className={cn(
               "gap-1.5 h-8 max-w-[200px] shrink-0",
-              compact && "max-w-[140px] px-1.5"
+              compact && "max-w-[140px] px-1.5",
+              iconOnly && "h-9 w-9 p-0 max-w-none"
             )}
           >
             {company?.logo_url ? (
               <img src={company.logo_url} alt="" className="h-4 w-4 rounded-sm object-contain shrink-0" />
             ) : (
-              <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
             )}
-            <span className="truncate text-xs font-medium">{company?.name || 'Εταιρεία'}</span>
-            <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+            {!iconOnly && <span className="truncate text-xs font-medium">{company?.name || 'Εταιρεία'}</span>}
+            {!iconOnly && <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-[220px]">

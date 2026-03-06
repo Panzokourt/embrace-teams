@@ -103,7 +103,7 @@ interface FileContent {
 
 export default function ProjectsPage({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
-  const { isAdmin, isManager } = useAuth();
+  const { isAdmin, isManager, company } = useAuth();
   const { logCreate, logUpdate, logDelete, logStatusChange } = useActivityLogger();
   const [projects, setProjects] = useState<Project[]>([]);
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
@@ -266,7 +266,7 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
     setSaving(true);
 
     try {
-      const projectData = {
+      const projectData: any = {
         name: formData.name,
         description: formData.description || null,
         client_id: formData.client_id || null,
@@ -277,6 +277,9 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
         end_date: formData.end_date || null,
         metadata: (Object.keys(projectMetadata).length > 0 ? projectMetadata : {}) as Json,
       };
+      if (!editingProject && company) {
+        projectData.company_id = company.id;
+      }
 
       if (editingProject) {
         const { data, error } = await supabase

@@ -82,6 +82,7 @@ interface Tender {
   name: string;
   description: string | null;
   client_id: string | null;
+  company_id: string;
   stage: TenderStage;
   budget: number;
   submission_deadline: string | null;
@@ -100,7 +101,7 @@ const stageConfig: Record<TenderStage, { icon: React.ReactNode; label: string; c
 
 export default function TendersPage() {
   const navigate = useNavigate();
-  const { isAdmin, isManager } = useAuth();
+  const { isAdmin, isManager, company } = useAuth();
   const { handleStageChange } = useTenderToProject();
   const { logCreate, logUpdate, logDelete, logStatusChange } = useActivityLogger();
   const [tenders, setTenders] = useState<Tender[]>([]);
@@ -219,7 +220,7 @@ export default function TendersPage() {
     setSaving(true);
 
     try {
-      const tenderData = {
+      const tenderData: any = {
         name: formData.name,
         description: formData.description || null,
         client_id: formData.client_id || null,
@@ -227,6 +228,9 @@ export default function TendersPage() {
         budget: parseFloat(formData.budget) || 0,
         submission_deadline: formData.submission_deadline || null,
       };
+      if (!editingTender && company) {
+        tenderData.company_id = company.id;
+      }
 
       if (editingTender) {
         const { data, error } = await supabase
@@ -388,7 +392,8 @@ export default function TendersPage() {
           description: draggedTender.description,
           client_id: draggedTender.client_id,
           budget: draggedTender.budget,
-          submission_deadline: draggedTender.submission_deadline
+          submission_deadline: draggedTender.submission_deadline,
+          company_id: draggedTender.company_id,
         },
         (projectId) => {
           // Navigate to new project after creation

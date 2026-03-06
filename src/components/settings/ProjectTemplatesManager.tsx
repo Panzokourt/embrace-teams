@@ -90,7 +90,7 @@ interface ProjectTemplate {
 }
 
 export function ProjectTemplatesManager() {
-  const { user } = useAuth();
+  const { user, company } = useAuth();
   const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -164,17 +164,19 @@ export function ProjectTemplatesManager() {
   const handleDuplicate = async (template: ProjectTemplate) => {
     try {
       const details = await fetchTemplateDetails(template.id);
+      const dupData: any = {
+        name: `${template.name} (αντίγραφο)`,
+        description: template.description,
+        project_type: template.project_type,
+        default_budget: template.default_budget,
+        default_agency_fee_percentage: template.default_agency_fee_percentage,
+        is_active: false,
+        sort_order: templates.length,
+      };
+      if (company) dupData.company_id = company.id;
       const { data: newTemplate, error } = await supabase
         .from('project_templates')
-        .insert({
-          name: `${template.name} (αντίγραφο)`,
-          description: template.description,
-          project_type: template.project_type,
-          default_budget: template.default_budget,
-          default_agency_fee_percentage: template.default_agency_fee_percentage,
-          is_active: false,
-          sort_order: templates.length,
-        })
+        .insert(dupData)
         .select()
         .single();
 
@@ -264,12 +266,15 @@ export function ProjectTemplatesManager() {
 
     setSaving(true);
     try {
-      const templateData = {
+      const templateData: any = {
         name: formData.name,
         description: formData.description || null,
         project_type: formData.project_type,
         is_active: formData.is_active,
       };
+      if (!editingTemplate && company) {
+        templateData.company_id = company.id;
+      }
 
       let templateId: string;
 

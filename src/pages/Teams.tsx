@@ -65,7 +65,7 @@ const TEAM_COLORS = [
 ];
 
 export default function TeamsPage() {
-  const { isAdmin, isManager } = useAuth();
+  const { isAdmin, isManager, company } = useAuth();
   const [teams, setTeams] = useState<Team[]>([]);
   const [availableUsers, setAvailableUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -176,12 +176,15 @@ export default function TeamsPage() {
     setSaving(true);
 
     try {
-      const teamData = {
+      const teamData: any = {
         name: formData.name,
         description: formData.description || null,
         color: formData.color,
         team_lead_id: formData.team_lead_id === 'none' ? null : formData.team_lead_id,
       };
+      if (!editingTeam && company) {
+        teamData.company_id = company.id;
+      }
 
       if (editingTeam) {
         const { data, error } = await supabase

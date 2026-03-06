@@ -56,7 +56,7 @@ interface Client {
 }
 
 export default function ClientsPage() {
-  const { isAdmin, isManager } = useAuth();
+  const { isAdmin, isManager, company } = useAuth();
   const { logCreate, logUpdate, logDelete } = useActivityLogger();
   const { data: categories = [] } = useProjectCategories();
   const [clients, setClients] = useState<Client[]>([]);
@@ -140,7 +140,7 @@ export default function ClientsPage() {
     setSaving(true);
 
     try {
-      const clientData = {
+      const clientData: any = {
         name: formData.name,
         contact_email: formData.contact_email || null,
         contact_phone: formData.contact_phone || null,
@@ -152,6 +152,9 @@ export default function ClientsPage() {
         secondary_phone: formData.secondary_phone || null,
         tags: formData.tags,
       };
+      if (!editingClient && company) {
+        clientData.company_id = company.id;
+      }
 
       if (editingClient) {
         const { data, error } = await supabase

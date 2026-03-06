@@ -180,6 +180,223 @@ export function useEmployeeOverrides() {
   return { overrides, loading, refetch: fetchOverrides };
 }
 
+export interface ServicePackage {
+  id: string;
+  company_id: string;
+  name: string;
+  description: string | null;
+  list_price: number;
+  discount_percent: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  // Computed
+  items?: PackageItem[];
+  internal_cost?: number;
+  final_price?: number;
+  margin_eur?: number;
+  margin_pct?: number;
+}
+
+export interface PackageItem {
+  id: string;
+  package_id: string;
+  service_id: string;
+  quantity: number;
+  duration_months: number;
+  unit_price: number;
+  sort_order: number;
+  // Joined
+  service_name?: string;
+  service_cost?: number;
+}
+
+export interface Proposal {
+  id: string;
+  company_id: string;
+  client_id: string | null;
+  name: string;
+  status: string;
+  version: number;
+  notes: string | null;
+  assumptions: string | null;
+  discount_percent: number;
+  valid_until: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined
+  client_name?: string;
+  creator_name?: string;
+  // Computed
+  items?: ProposalItem[];
+  total_revenue?: number;
+  total_cost?: number;
+  margin_eur?: number;
+  margin_pct?: number;
+}
+
+export interface ProposalItem {
+  id: string;
+  proposal_id: string;
+  service_id: string | null;
+  package_id: string | null;
+  item_type: string;
+  custom_name: string | null;
+  custom_description: string | null;
+  quantity: number;
+  duration_months: number;
+  unit_price: number;
+  unit_cost: number;
+  discount_percent: number;
+  sort_order: number;
+  // Joined
+  display_name?: string;
+}
+
+export interface ProposalSnapshot {
+  id: string;
+  proposal_id: string;
+  version: number;
+  snapshot_data: any;
+  created_at: string;
+  created_by: string | null;
+}
+
+export function usePackages() {
+  const { company } = useAuth();
+  const [packages, setPackages] = useState<ServicePackage[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchPackages = useCallback(async () => {
+    if (!company?.id) return;
+    setLoading(true);
+
+    const { data: pkgData } = await supabase
+      .from('service_packages' as any)
+      .select('*')
+      .eq('company_id', company.id)
+      .order('created_at', { ascending: false });
+
+    const { data: itemsData } = await supabase
+      .from('package_items' as any)
+      .select('*')
+      .in('package_id', (pkgData || []).map((p: any) => p.id));
+
+    // Get services for cost lookup
+    const { data: svcData } = await supabase
+      .from('services')
+      .select('id, name, list_price')
+      .eq('company_id', company.id);
+
+    const { data: costsData } = await supabase
+      .from('service_role_costs' as any)
+      .select('service_id, total_cost')
+      .eq('company_id', company.id);
+
+    const svcMap = new Map((svcData || []).map((s: any) => [s.id, s]));
+    const costsByService = new Map<string, number>();
+    ((costsData || []) as any[]).forEach(c => {
+      costsByService.set(c.service_id, (costsByService.get(c.service_id) || 0) + (c.total_cost || 0));
+    });
+
+    const enriched = ((pkgData || []) as any[]).map(pkg => {
+      const items = ((itemsData || []) as any[])
+        .filter(i => i.package_id === pkg.id)
+        .map(i => ({
+          ...i,
+          service_name: svcMap.get(i.service_id)?.name || 'Άγνωστη',
+          service_cost: (costsByService.get(i.service_id) || 0) + ((svcMap.get(i.service_id) as any)?.external_cost || 0),
+        }));
+
+      const internalCost = items.reduce((s: number, i: any) => s + (i.service_cost || 0) * i.quantity * i.duration_months, 0);
+      const finalPrice = pkg.list_price * (1 - (pkg.discount_percent || 0) / 100);
+      const marginEur = finalPrice - internalCost;
+      const marginPct = finalPrice > 0 ? (marginEur / finalPrice) * 100 : 0;
+
+      return {
+        ...pkg,
+        items,
+        internal_cost: internalCost,
+        final_price: finalPrice,
+        margin_eur: marginEur,
+        margin_pct: marginPct,
+      } as ServicePackage;
+    });
+
+    setPackages(enriched);
+    setLoading(false);
+  }, [company?.id]);
+
+  useEffect(() => { fetchPackages(); }, [fetchPackages]);
+  return { packages, loading, refetch: fetchPackages };
+}
+
+export function useProposals() {
+  const { company } = useAuth();
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchProposals = useCallback(async () => {
+    if (!company?.id) return;
+    setLoading(true);
+
+    const { data: propData } = await supabase
+      .from('proposals' as any)
+      .select('*')
+      .eq('company_id', company.id)
+      .order('created_at', { ascending: false });
+
+    // Get client names
+    const clientIds = [...new Set(((propData || []) as any[]).map(p => p.client_id).filter(Boolean))];
+    const { data: clientsData } = clientIds.length > 0
+      ? await supabase.from('clients').select('id, name').in('id', clientIds)
+      : { data: [] };
+    const clientMap = new Map((clientsData || []).map((c: any) => [c.id, c.name]));
+
+    // Get creator names
+    const creatorIds = [...new Set(((propData || []) as any[]).map(p => p.created_by).filter(Boolean))];
+    const { data: profilesData } = creatorIds.length > 0
+      ? await supabase.from('profiles').select('id, full_name').in('id', creatorIds)
+      : { data: [] };
+    const profileMap = new Map((profilesData || []).map((p: any) => [p.id, p.full_name]));
+
+    // Get proposal items
+    const propIds = ((propData || []) as any[]).map(p => p.id);
+    const { data: itemsData } = propIds.length > 0
+      ? await supabase.from('proposal_items' as any).select('*').in('proposal_id', propIds)
+      : { data: [] };
+
+    const enriched = ((propData || []) as any[]).map(p => {
+      const items = ((itemsData || []) as any[]).filter(i => i.proposal_id === p.id);
+      const totalRevenue = items.reduce((s: number, i: any) => {
+        const linePrice = i.unit_price * i.quantity * i.duration_months * (1 - (i.discount_percent || 0) / 100);
+        return s + linePrice;
+      }, 0) * (1 - (p.discount_percent || 0) / 100);
+      const totalCost = items.reduce((s: number, i: any) => s + i.unit_cost * i.quantity * i.duration_months, 0);
+      const marginEur = totalRevenue - totalCost;
+      const marginPct = totalRevenue > 0 ? (marginEur / totalRevenue) * 100 : 0;
+
+      return {
+        ...p,
+        client_name: clientMap.get(p.client_id) || null,
+        creator_name: profileMap.get(p.created_by) || null,
+        items,
+        total_revenue: totalRevenue,
+        total_cost: totalCost,
+        margin_eur: marginEur,
+        margin_pct: marginPct,
+      } as Proposal;
+    });
+
+    setProposals(enriched);
+    setLoading(false);
+  }, [company?.id]);
+
+  useEffect(() => { fetchProposals(); }, [fetchProposals]);
+  return { proposals, loading, refetch: fetchProposals };
+}
+
 export async function resolveHourlyCost(
   companyId: string,
   roleTitle: string,

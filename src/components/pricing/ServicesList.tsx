@@ -11,8 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { EditDeleteActions } from '@/components/dialogs/EditDeleteActions';
 import { toast } from 'sonner';
-import { Plus, Search, Copy, Archive, Loader2, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Plus, Search, Copy, Archive, Loader2, TrendingUp, TrendingDown, Minus, FileUp } from 'lucide-react';
 import ServiceForm from './ServiceForm';
+import ServiceImportWizard from './ServiceImportWizard';
 
 const CATEGORIES = [
   { value: 'all', label: 'Όλες' },
@@ -62,6 +63,7 @@ export default function ServicesList() {
   const [marginFilter, setMarginFilter] = useState('all');
   const [showArchived, setShowArchived] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editingService, setEditingService] = useState<ServiceWithCosts | null>(null);
   
   const canManage = isAdmin || isManager;
@@ -139,9 +141,14 @@ export default function ServicesList() {
           <Archive className="h-4 w-4 mr-1" />{showArchived ? 'Ενεργές' : 'Αρχείο'}
         </Button>
         {canManage && (
-          <Button onClick={() => { setEditingService(null); setFormOpen(true); }}>
-            <Plus className="h-4 w-4 mr-2" />Νέα Υπηρεσία
-          </Button>
+          <>
+            <Button variant="outline" onClick={() => setImportOpen(true)}>
+              <FileUp className="h-4 w-4 mr-2" />Import
+            </Button>
+            <Button onClick={() => { setEditingService(null); setFormOpen(true); }}>
+              <Plus className="h-4 w-4 mr-2" />Νέα Υπηρεσία
+            </Button>
+          </>
         )}
       </div>
 
@@ -205,6 +212,12 @@ export default function ServicesList() {
         onOpenChange={setFormOpen}
         service={editingService}
         onSaved={refetch}
+      />
+
+      <ServiceImportWizard
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={refetch}
       />
     </div>
   );

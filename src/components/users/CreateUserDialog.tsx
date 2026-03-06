@@ -69,10 +69,16 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
   const [accessScope, setAccessScope] = useState<AccessScope>('assigned');
   const [selectedPermissions, setSelectedPermissions] = useState<PermissionType[]>([]);
   const [users, setUsers] = useState<{ id: string; full_name: string | null }[]>([]);
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [jobTitleOptions, setJobTitleOptions] = useState<string[]>([]);
+  const [jobTitleOpen, setJobTitleOpen] = useState(false);
+  const [jobTitleSearch, setJobTitleSearch] = useState('');
 
   useEffect(() => {
     if (open) {
       fetchUsers();
+      fetchDepartments();
+      fetchJobTitles();
       setSelectedPermissions(DEFAULT_ROLE_PERMISSIONS.member);
     }
   }, [open]);
@@ -86,6 +92,20 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
   const fetchUsers = async () => {
     const { data } = await supabase.from('profiles').select('id, full_name');
     setUsers(data || []);
+  };
+
+  const fetchDepartments = async () => {
+    const { company } = useAuth.getState?.() || {};
+    const companyId = company?.id;
+    if (!companyId) return;
+    const { data } = await supabase.from('departments').select('id, name').eq('company_id', companyId).order('name');
+    setDepartments(data || []);
+  };
+
+  const fetchJobTitles = async () => {
+    const { data } = await supabase.from('profiles').select('job_title').not('job_title', 'is', null);
+    const titles = [...new Set((data || []).map(p => p.job_title).filter(Boolean) as string[])].sort();
+    setJobTitleOptions(titles);
   };
 
   const generatePassword = () => {

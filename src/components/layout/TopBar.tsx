@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import WorkDayClock from '@/components/topbar/WorkDayClock';
 import { useFocusMode } from '@/contexts/FocusContext';
 import { useAuth } from '@/contexts/AuthContext';
-import CompanySwitcher from './CompanySwitcher';
+
 import { XPBadge } from '@/components/gamification/XPBadge';
 import { useLayout } from '@/contexts/LayoutContext';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -110,7 +110,7 @@ export default function TopBar({ onPanelToggle, rightPanelOpen, onMobileMenuTogg
   }, {});
 
   return (
-    <div className="sticky top-0 z-20 h-12 border-b border-border/40 bg-card/80 backdrop-blur-lg px-2 md:px-4 flex items-center gap-1.5 shrink-0">
+    <div className="sticky top-0 z-20 h-12 border-b border-border/40 bg-card/80 backdrop-blur-lg px-3 md:px-4 flex items-center gap-3 shrink-0">
       {/* Hamburger for mobile */}
       {showHamburger && (
         <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={onMobileMenuToggle}>
@@ -118,15 +118,10 @@ export default function TopBar({ onPanelToggle, rightPanelOpen, onMobileMenuTogg
         </Button>
       )}
 
-      {/* Company Switcher */}
-      <CompanySwitcher compact={isNarrow} />
-
-      <div className="w-px h-5 bg-border shrink-0" />
-
       {/* Work Day Clock — hidden on mobile */}
       {!isMobile && <WorkDayClock compact={isNarrow} />}
 
-      {!isMobile && <div className="w-px h-5 bg-border shrink-0" />}
+      {!isMobile && <div className="w-px h-5 bg-border/50 shrink-0" />}
 
       {/* Search */}
       <div className="flex-1 min-w-0 max-w-xl">

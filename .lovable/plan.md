@@ -1,74 +1,66 @@
 
 
-# Plan: Fix My Work Navigation + Finder-style Files UI
+# Org Chart — Full Rebuild Plan
 
-## Issue 1: My Work Sidebar Bug
+## Πρόβλημα
 
-**Root cause**: In `AppSidebar.tsx` line 126, the `detectCategory` function maps `/my-work` to `'overview'` instead of `'work'`:
+Το τρέχον οργανόγραμμα είναι ένα static rendered tree μέσα σε ScrollArea με βασικό zoom (CSS scale). Δεν υποστηρίζει pan/drag-to-move, δεν έχει infinite canvas, τα nodes δεν είναι clickable για detail, δεν υπάρχουν views (by department, by person), και τα templates δεν αξιοποιούν το υπάρχον προσωπικό.
 
-```
-if (pathname === '/my-work' || pathname === '/' || ...) return 'overview';
-```
+## Λύση
 
-Since `/my-work` is listed under the Work category in the sidebar (line 451), navigating there causes the detected category to flip to Overview, making the sidebar switch away from the Work section.
+Πλήρες rebuild του OrgChart σε **infinite canvas** στυλ Miro με pan+zoom, πολλαπλά views, clickable nodes με detail panel, και smart templates.
 
-**Fix**: Move `/my-work` out of the overview check in `detectCategory`. The work check on line 118 already handles paths starting with `/work` but not `/my-work`. Add `/my-work` to the work category detection.
+## Τεχνική Προσέγγιση
 
-**Files**: `src/components/layout/AppSidebar.tsx` — 2-line change in `detectCategory` and `categories` route prefixes.
+### 1. Infinite Canvas Engine (χωρίς εξωτερική βιβλιοθήκη)
+- Custom React canvas με `transform: translate(x, y) scale(z)` σε ένα wrapper div
+- **Mouse wheel** → zoom (centered on cursor)
+- **Middle-click drag** ή **Space+drag** → pan (hand tool)
+- **Touch**: pinch-to-zoom, two-finger pan
+- Mini-map στο corner (optional, phase 2)
+- Fit-to-screen button, zoom controls
 
----
+### 2. Views (3 modes)
+- **Hierarchy View** (default): Κλασικό tree ανά reporting line — αυτό που υπάρχει τώρα αλλά σε canvas
+- **Department View**: Grouped κάρτες ανά department σε columns/clusters, κάθε cluster δείχνει τα μέλη
+- **List View**: Compact table/list με sorting, φιλτράρισμα, search — γρήγορη εύρεση ατόμου
 
-## Issue 2: Finder-style Files UI
+Toggle μεταξύ views μέσω tabs στο header.
 
-The user wants a macOS Finder "column view" experience — multiple columns side by side, each showing the contents of the selected folder, drilling deeper as you navigate. Clean, not chaotic.
+### 3. Interactive Nodes
+- **Click** σε node → slide-in panel (sheet) δεξιά με:
+  - Profile info (avatar, name, email, phone)
+  - Position & department
+  - Direct reports count
+  - Link to Employee Profile (`/hr/employee/:id`)
+  - Quick actions (edit, reassign, add subordinate)
+- **Hover** → subtle highlight + tooltip με title
+- **Vacant positions** → dashed border, prominent "Κενή θέση" badge, click to assign
+- Connector lines μεταξύ nodes: animated SVG paths αντί για div borders
 
-### Design
+### 4. Smart Templates & Auto-build
+- Βελτίωση του Wizard: αφού επιλεγεί template, **auto-match** υπάρχοντα profiles σε positions βάσει `job_title` ή `department`
+- **Gap Analysis panel**: Μετά τη δημιουργία, δείχνει πόσες θέσεις είναι κενές, ποια departments λείπουν, ποια levels δεν έχουν κάλυψη
+- Wizard step: "Αντιστοίχιση Προσωπικού" — drag-drop ή auto-suggest
 
-**Layout**: A horizontal multi-column browser (like Finder's column view):
-- Each column shows the contents of a folder level
-- Clicking a folder opens a new column to the right showing its children
-- Clicking a file shows a preview/info panel on the right
-- Breadcrumb path bar at the top
-- Search bar integrated in the toolbar
-- Upload button in toolbar
+### 5. SVG Connector Lines
+- Αντικατάσταση CSS div lines με SVG `<path>` elements (bezier curves)
+- Animated flow direction (subtle dash animation)
+- Color-coded κατά department
 
-**Column structure**:
-```text
-┌─────────────┬──────────────┬──────────────┬─────────────────┐
-│ Root        │ Subfolder    │ Contents     │ Preview Panel   │
-│             │              │              │                 │
-│ 📁 Clients  │ 📁 Reports   │ 📄 file.pdf  │ file.pdf        │
-│ 📁 Projects │ 📁 Invoices  │ 📄 doc.docx  │ PDF - 198 KB    │
-│ 📁 HR       │              │ 📁 Archive   │ Created: ...    │
-│             │              │              │ By: ...         │
-└─────────────┴──────────────┴──────────────┴─────────────────┘
-```
+## Αρχεία
 
-Each column:
-- Shows folders first (with folder icon + chevron), then files
-- Selected item is highlighted
-- Scrollable independently
-- Consistent width (~200px per column)
-
-Preview panel (rightmost):
-- File thumbnail/icon
-- File name, size, type
-- Upload date, uploader
-- Download / Preview / Delete actions
-
-### Components
-
-| File | Change |
+| Αρχείο | Αλλαγή |
 |---|---|
-| `src/components/layout/AppSidebar.tsx` | Fix `detectCategory` to map `/my-work` → `'work'`; add `/my-work` to work category routePrefixes |
-| `src/components/files/FinderColumnView.tsx` | **New** — Finder-style column browser component with multi-column navigation, file preview panel |
-| `src/components/files/CentralFileExplorer.tsx` | **Rewrite** — Replace tabs/table layout with FinderColumnView. Keep filter bar (search, client, project filters) but simplify. Remove the by-client/by-project/by-date tab views in favor of the column navigation. |
-| `src/components/files/FileExplorer.tsx` | **Update** — Use FinderColumnView instead of FolderTree + FilesTableView side-by-side for the project-scoped file tab |
+| `src/pages/OrgChart.tsx` | **Rewrite** — Infinite canvas, views, SVG connectors, detail panel |
+| `src/components/org-chart/OrgChartCanvas.tsx` | **New** — Pan+zoom canvas wrapper |
+| `src/components/org-chart/OrgNodeCard.tsx` | **New** — Redesigned node card (clickable, expandable) |
+| `src/components/org-chart/OrgDetailPanel.tsx` | **New** — Slide-in sheet for node details |
+| `src/components/org-chart/OrgDepartmentView.tsx` | **New** — Department-grouped view |
+| `src/components/org-chart/OrgListView.tsx` | **New** — Table/list view |
+| `src/components/org-chart/OrgConnectors.tsx` | **New** — SVG connector line renderer |
+| `src/components/org-chart/OrgChartWizard.tsx` | **Update** — Add auto-match step + gap analysis |
+| `src/components/org-chart/DraggableOrgNode.tsx` | **Remove** — Replaced by new OrgNodeCard |
 
-### Key behaviors
-- Columns auto-scroll horizontally when drilling deep (like Finder)
-- Upload via toolbar button or drag-and-drop onto a column
-- Right-click context menu on files/folders for rename, delete, move
-- Folder creation via "+" button in each column header
-- All existing CRUD operations (upload, delete, rename, move) preserved — just new UI shell
+Δεν χρειάζονται DB changes — το schema `org_chart_positions` καλύπτει ήδη hierarchy, department, user_id, color, level, sort_order.
 

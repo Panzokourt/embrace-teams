@@ -150,7 +150,7 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
           full_name: fullName,
           role,
           job_title: jobTitle || null,
-          department: department || null,
+          department: department && department !== 'none' ? department : null,
           phone: phone || null,
           reports_to: reportsTo === 'none' ? null : reportsTo,
           hire_date: new Date().toISOString().split('T')[0],

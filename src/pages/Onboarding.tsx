@@ -5,59 +5,64 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Loader2, Building2, Link2, ArrowLeft, Clock } from 'lucide-react';
+import {
+  Loader2, PartyPopper, Building2, User, Settings, Rocket,
+  ChevronRight, ChevronLeft, Sun, Moon, Link2, ArrowLeft, Clock
+} from 'lucide-react';
+import { useTheme } from '@/contexts/ThemeContext';
 import olsenyLogo from '@/assets/olseny-logo.png';
 
-type Step = 'loading' | 'choose' | 'create-org' | 'domain-join' | 'pending';
+type WizardStep = 'loading' | 'welcome' | 'company' | 'profile' | 'preferences' | 'ready' | 'pending';
+
+interface DomainCompany {
+  id: string;
+  name: string;
+  logo_url: string | null;
+}
 
 export default function Onboarding() {
   const navigate = useNavigate();
   const { user, profile, companyRole, signOut, refreshUserData } = useAuth();
-  const [step, setStep] = useState<Step>('loading');
+  const { theme, setTheme } = useTheme();
 
-  // If user already has an active company role, redirect to main app immediately
+  const [step, setStep] = useState<WizardStep>('loading');
+  const [loading, setLoading] = useState(false);
+  const [autoCheckDone, setAutoCheckDone] = useState(false);
+
+  // Domain detection state
+  const [isPersonalEmail, setIsPersonalEmail] = useState(true);
+  const [emailDomain, setEmailDomain] = useState('');
+  const [domainCompanies, setDomainCompanies] = useState<DomainCompany[]>([]);
+  const [suggestedCompanyName, setSuggestedCompanyName] = useState('');
+  const [invitationCompanyName, setInvitationCompanyName] = useState('');
+
+  // Company setup state
+  const [companyMode, setCompanyMode] = useState<'create' | 'join' | null>(null);
+  const [companyName, setCompanyName] = useState('');
+  const [companyDomain, setCompanyDomain] = useState('');
+
+  // Profile fields
+  const [phone, setPhone] = useState('');
+  const [jobTitle, setJobTitle] = useState('');
+
+  // Pending info
+  const [pendingCompanyName, setPendingCompanyName] = useState('');
+
+  // If user already has an active company role, redirect
   useEffect(() => {
     if (companyRole) {
       navigate('/', { replace: true });
     }
   }, [companyRole, navigate]);
-  const [loading, setLoading] = useState(false);
-  const [autoOnboardRan, setAutoOnboardRan] = useState(false);
 
-  // Create org state
-  const [companyName, setCompanyName] = useState('');
-  const [companyDomain, setCompanyDomain] = useState('');
-
-  // Domain join state
-  const [domainCompanies, setDomainCompanies] = useState<any[]>([]);
-  const [domainChecked, setDomainChecked] = useState(false);
-
-  // Pending info
-  const [pendingCompanyName, setPendingCompanyName] = useState('');
-
-  const emailDomain = user?.email?.split('@')[1] || '';
-  const isPersonalEmail = [
-    'gmail.com','gmail.gr','googlemail.com',
-    'yahoo.com','yahoo.gr','yahoo.co.uk',
-    'hotmail.com','hotmail.gr','hotmail.co.uk',
-    'outlook.com','outlook.gr',
-    'live.com','live.gr','windowslive.com',
-    'icloud.com','me.com',
-    'protonmail.com','proton.me',
-    'aol.com','mail.com','zoho.com',
-    'yandex.com','yandex.ru',
-    'msn.com','inbox.com',
-    'gmx.com','gmx.de','gmx.net'
-  ].includes(emailDomain);
-
-  // Auto-onboard on mount
+  // Auto-onboard check on mount
   useEffect(() => {
-    if (!user || autoOnboardRan) return;
-    setAutoOnboardRan(true);
+    if (!user || autoCheckDone) return;
+    setAutoCheckDone(true);
 
-    const runAutoOnboard = async () => {
+    const runCheck = async () => {
       try {
         const { data, error } = await supabase.rpc('auto_onboard_user');
         if (error) throw error;
@@ -65,53 +70,73 @@ export default function Onboarding() {
         const result = data as any;
         switch (result.action) {
           case 'invitation_accepted':
-            toast.success(`Η πρόσκλησή σας για "${result.company_name}" έγινε αποδεκτή αυτόματα!`);
+            setInvitationCompanyName(result.company_name || '');
             await refreshUserData();
-            navigate('/welcome', { replace: true });
+            // Skip to profile step — company already set
+            setStep('profile');
+            toast.success(`Η πρόσκλησή σας για "${result.company_name}" έγινε αποδεκτή!`);
             return;
-          case 'created_company':
-            toast.success(`Η εταιρεία "${result.company_name}" δημιουργήθηκε αυτόματα!`);
-            await refreshUserData();
-            navigate('/', { replace: true });
-            return;
-          case 'join_requested':
-            setPendingCompanyName(result.company_name || '');
-            setStep('pending');
-            return;
-          case 'already_requested':
-            setPendingCompanyName(result.company_name || '');
-            setStep('pending');
-            return;
+
           case 'already_member':
             await refreshUserData();
             navigate('/', { replace: true });
             return;
-          case 'personal_email':
+
+          case 'needs_onboarding':
+            setEmailDomain(result.domain || '');
+            setIsPersonalEmail(result.is_personal_email || false);
+            setDomainCompanies(result.domain_companies || []);
+            setSuggestedCompanyName(result.suggested_company_name || '');
+            // Pre-fill company name from domain
+            if (result.suggested_company_name) {
+              setCompanyName(result.suggested_company_name);
+              setCompanyDomain(result.domain || '');
+            }
+            setStep('welcome');
+            return;
+
           default:
-            setStep('choose');
+            setStep('welcome');
             return;
         }
       } catch (error: any) {
         console.error('Auto-onboard error:', error);
-        setStep('choose');
+        setStep('welcome');
       }
     };
 
-    runAutoOnboard();
+    runCheck();
   }, [user]);
 
-  const handleCreateOrg = async () => {
+  // Wizard steps (excluding loading and pending)
+  const wizardSteps: WizardStep[] = ['welcome', 'company', 'profile', 'preferences', 'ready'];
+  const currentIndex = wizardSteps.indexOf(step);
+  const progressPercent = step === 'loading' ? 0 : step === 'pending' ? 50
+    : ((currentIndex + 1) / wizardSteps.length) * 100;
+
+  const goNext = () => {
+    if (currentIndex >= 0 && currentIndex < wizardSteps.length - 1) {
+      setStep(wizardSteps[currentIndex + 1]);
+    }
+  };
+  const goBack = () => {
+    if (currentIndex > 0) {
+      setStep(wizardSteps[currentIndex - 1]);
+    }
+  };
+
+  const handleCreateCompany = async () => {
     if (!companyName.trim()) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc('create_company_with_owner', {
+      const { error } = await supabase.rpc('create_company_with_owner', {
         _name: companyName.trim(),
-        _domain: companyDomain.trim() || emailDomain
+        _domain: companyDomain.trim() || emailDomain || 'default.com'
       });
       if (error) throw error;
       toast.success('Η εταιρεία δημιουργήθηκε!');
       await refreshUserData();
-      navigate('/', { replace: true });
+      goNext(); // Go to profile step
     } catch (error: any) {
       toast.error(error.message || 'Σφάλμα δημιουργίας');
     } finally {
@@ -119,19 +144,23 @@ export default function Onboarding() {
     }
   };
 
-  const handleCheckDomain = async () => {
-    if (isPersonalEmail) {
-      toast.error('Χρησιμοποιήστε εταιρικό email για αυτή τη λειτουργία');
-      return;
-    }
+  const handleRequestJoin = async (company: DomainCompany) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc('find_companies_by_domain', {
-        _domain: emailDomain
-      });
-      if (error) throw error;
-      setDomainCompanies(data || []);
-      setDomainChecked(true);
+      const { error } = await supabase
+        .from('join_requests')
+        .insert({ user_id: user!.id, company_id: company.id });
+      if (error) {
+        if (error.message?.includes('duplicate')) {
+          toast.error('Έχετε ήδη στείλει αίτημα');
+        } else {
+          throw error;
+        }
+        return;
+      }
+      setPendingCompanyName(company.name);
+      setStep('pending');
+      toast.success('Το αίτημα στάλθηκε!');
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -139,21 +168,19 @@ export default function Onboarding() {
     }
   };
 
-  const handleRequestJoin = async (companyId: string) => {
+  const handleFinish = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from('join_requests')
-        .insert({ user_id: user!.id, company_id: companyId });
-      if (error) throw error;
-      setStep('pending');
-      toast.success('Το αίτημα στάλθηκε!');
-    } catch (error: any) {
-      if (error.message?.includes('duplicate')) {
-        toast.error('Έχετε ήδη στείλει αίτημα');
-      } else {
-        toast.error(error.message);
-      }
+      const updates: Record<string, any> = { onboarding_completed: true };
+      if (phone.trim()) updates.phone = phone.trim();
+      if (jobTitle.trim()) updates.job_title = jobTitle.trim();
+
+      await supabase.from('profiles').update(updates).eq('id', user!.id);
+      await refreshUserData();
+      toast.success('Καλωσήρθατε! 🎉');
+      navigate('/', { replace: true });
+    } catch (err: any) {
+      toast.error(err.message || 'Σφάλμα');
     } finally {
       setLoading(false);
     }
@@ -162,110 +189,31 @@ export default function Onboarding() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <div className="w-full max-w-lg">
+        {/* Logo */}
         <div className="flex items-center gap-3 mb-8 justify-center">
           <img src={olsenyLogo} alt="Olseny" className="h-10 w-10 rounded-lg" />
           <span className="text-2xl font-bold text-foreground">OLSENY</span>
         </div>
 
+        {/* Progress bar */}
+        {step !== 'loading' && (
+          <div className="w-full h-1.5 bg-muted rounded-full mb-8 overflow-hidden">
+            <div
+              className="h-full bg-primary rounded-full transition-all duration-500"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        )}
+
+        {/* Loading */}
         {step === 'loading' && (
           <div className="flex flex-col items-center justify-center py-16">
-            <Loader2 className="h-8 w-8 animate-spin text-foreground mb-4" />
+            <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
             <p className="text-muted-foreground">Ρύθμιση λογαριασμού...</p>
           </div>
         )}
 
-        {step === 'choose' && (
-          <div className="space-y-4">
-            <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold text-foreground">Καλωσήρθατε, {profile?.full_name || 'χρήστη'}!</h1>
-              <p className="text-muted-foreground mt-2">Πώς θέλετε να ξεκινήσετε;</p>
-            </div>
-
-            <Card className="cursor-pointer hover:border-primary/40 transition-colors border-border/40" onClick={() => setStep('create-org')}>
-              <CardContent className="flex items-center gap-4 p-6">
-                <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center text-foreground"><Building2 className="h-6 w-6" /></div>
-                <div>
-                  <h3 className="font-semibold text-foreground">Δημιουργία εταιρείας</h3>
-                  <p className="text-sm text-muted-foreground">Δημιουργήστε νέο workspace και γίνετε Owner</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {!isPersonalEmail && (
-              <Card className="cursor-pointer hover:border-primary/40 transition-colors border-border/40" onClick={() => { setStep('domain-join'); handleCheckDomain(); }}>
-                <CardContent className="flex items-center gap-4 p-6">
-                  <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center text-foreground"><Link2 className="h-6 w-6" /></div>
-                  <div>
-                    <h3 className="font-semibold text-foreground">Αίτημα μέσω domain</h3>
-                    <p className="text-sm text-muted-foreground">Βρείτε εταιρεία με domain @{emailDomain}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            <div className="text-center pt-4">
-              <Button variant="ghost" size="sm" onClick={signOut} className="text-muted-foreground">
-                <ArrowLeft className="h-4 w-4 mr-2" />Αποσύνδεση
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {step === 'create-org' && (
-          <Card className="border-border/40">
-            <CardHeader>
-              <Button variant="ghost" size="sm" className="w-fit -ml-2 mb-2" onClick={() => setStep('choose')}>
-                <ArrowLeft className="h-4 w-4 mr-1" />Πίσω
-              </Button>
-              <CardTitle>Δημιουργία εταιρείας</CardTitle>
-              <CardDescription>Θα γίνετε Owner αυτού του workspace</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Όνομα εταιρείας *</Label>
-                <Input placeholder="Η εταιρεία μου" value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Domain</Label>
-                <Input placeholder={emailDomain || 'company.com'} value={companyDomain} onChange={(e) => setCompanyDomain(e.target.value)} />
-                <p className="text-xs text-muted-foreground">Χρησιμοποιείται για domain-based join requests</p>
-              </div>
-              <Button className="w-full" onClick={handleCreateOrg} disabled={loading || !companyName.trim()}>
-                {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Δημιουργία
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {step === 'domain-join' && (
-          <Card className="border-border/40">
-            <CardHeader>
-              <Button variant="ghost" size="sm" className="w-fit -ml-2 mb-2" onClick={() => setStep('choose')}>
-                <ArrowLeft className="h-4 w-4 mr-1" />Πίσω
-              </Button>
-              <CardTitle>Αίτημα μέσω domain</CardTitle>
-              <CardDescription>Εταιρείες με domain @{emailDomain}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading && <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-foreground" /></div>}
-              {domainChecked && !loading && domainCompanies.length === 0 && (
-                <p className="text-center text-muted-foreground py-8">Δεν βρέθηκαν εταιρείες με αυτό το domain</p>
-              )}
-              {domainCompanies.map((company) => (
-                <div key={company.id} className="flex items-center justify-between p-4 rounded-xl border border-border/40 mb-3">
-                  <div>
-                    <p className="font-medium text-foreground">{company.name}</p>
-                  </div>
-                  <Button size="sm" onClick={() => handleRequestJoin(company.id)} disabled={loading}>
-                    Αίτημα
-                  </Button>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
-
+        {/* Pending */}
         {step === 'pending' && (
           <Card className="border-border/40">
             <CardContent className="text-center py-12">
@@ -278,6 +226,221 @@ export default function Onboarding() {
                 Ο διαχειριστής θα εγκρίνει το αίτημά σας. Θα ενημερωθείτε μόλις γίνει αποδεκτό.
               </p>
               <Button variant="outline" onClick={signOut}>Αποσύνδεση</Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Main wizard card */}
+        {!['loading', 'pending'].includes(step) && (
+          <Card className="border-border/40">
+            <CardContent className="py-10 px-8">
+
+              {/* Step: Welcome */}
+              {step === 'welcome' && (
+                <div className="text-center space-y-6">
+                  <PartyPopper className="h-16 w-16 text-primary mx-auto" />
+                  <h1 className="text-2xl font-bold text-foreground">
+                    Καλωσήρθατε, {profile?.full_name || 'χρήστη'}!
+                  </h1>
+                  <p className="text-muted-foreground">
+                    Ας ρυθμίσουμε μαζί τον χώρο εργασίας σας σε λίγα βήματα.
+                  </p>
+                  <Button onClick={goNext} className="w-full">
+                    Ας ξεκινήσουμε <ChevronRight className="h-4 w-4 ml-2" />
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={signOut} className="text-muted-foreground">
+                    <ArrowLeft className="h-4 w-4 mr-2" />Αποσύνδεση
+                  </Button>
+                </div>
+              )}
+
+              {/* Step: Company Setup */}
+              {step === 'company' && (
+                <div className="space-y-6">
+                  <div className="text-center mb-4">
+                    <Building2 className="h-10 w-10 text-primary mx-auto mb-2" />
+                    <h2 className="text-xl font-semibold text-foreground">Ο χώρος εργασίας σας</h2>
+                    <p className="text-sm text-muted-foreground">
+                      {isPersonalEmail
+                        ? 'Δημιουργήστε μια νέα εταιρεία'
+                        : domainCompanies.length > 0
+                          ? `Βρέθηκαν εταιρείες με domain @${emailDomain}`
+                          : `Δημιουργήστε εταιρεία για @${emailDomain}`
+                      }
+                    </p>
+                  </div>
+
+                  {/* Domain companies found — show join options */}
+                  {!isPersonalEmail && domainCompanies.length > 0 && companyMode !== 'create' && (
+                    <div className="space-y-3">
+                      <Label className="text-muted-foreground text-xs uppercase tracking-wider">Υπάρχουσες εταιρείες</Label>
+                      {domainCompanies.map((dc) => (
+                        <div key={dc.id} className="flex items-center justify-between p-4 rounded-xl border border-border/40">
+                          <div className="flex items-center gap-3">
+                            {dc.logo_url ? (
+                              <img src={dc.logo_url} alt={dc.name} className="h-8 w-8 rounded-lg" />
+                            ) : (
+                              <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
+                                <Building2 className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                            )}
+                            <span className="font-medium text-foreground">{dc.name}</span>
+                          </div>
+                          <Button size="sm" onClick={() => handleRequestJoin(dc)} disabled={loading}>
+                            <Link2 className="h-3.5 w-3.5 mr-1.5" />Αίτημα
+                          </Button>
+                        </div>
+                      ))}
+                      <div className="text-center pt-2">
+                        <Button variant="ghost" size="sm" onClick={() => setCompanyMode('create')} className="text-muted-foreground">
+                          Ή δημιουργήστε νέα εταιρεία
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Create company form */}
+                  {(isPersonalEmail || domainCompanies.length === 0 || companyMode === 'create') && (
+                    <div className="space-y-4">
+                      {companyMode === 'create' && domainCompanies.length > 0 && (
+                        <Button variant="ghost" size="sm" className="-ml-2" onClick={() => setCompanyMode(null)}>
+                          <ArrowLeft className="h-4 w-4 mr-1" />Πίσω στις υπάρχουσες
+                        </Button>
+                      )}
+                      <div className="space-y-2">
+                        <Label>Όνομα εταιρείας *</Label>
+                        <Input
+                          placeholder="Η εταιρεία μου"
+                          value={companyName}
+                          onChange={(e) => setCompanyName(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Domain</Label>
+                        <Input
+                          placeholder={emailDomain || 'company.com'}
+                          value={companyDomain}
+                          onChange={(e) => setCompanyDomain(e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">Για αυτόματη αναγνώριση νέων μελών</p>
+                      </div>
+                      <Button
+                        className="w-full"
+                        onClick={handleCreateCompany}
+                        disabled={loading || !companyName.trim()}
+                      >
+                        {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                        Δημιουργία & συνέχεια
+                      </Button>
+                    </div>
+                  )}
+
+                  <div className="flex gap-3 pt-2">
+                    <Button variant="outline" onClick={goBack} className="flex-1">
+                      <ChevronLeft className="h-4 w-4 mr-1" /> Πίσω
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step: Profile */}
+              {step === 'profile' && (
+                <div className="space-y-6">
+                  <div className="text-center mb-4">
+                    <User className="h-10 w-10 text-primary mx-auto mb-2" />
+                    <h2 className="text-xl font-semibold text-foreground">Το προφίλ σας</h2>
+                    <p className="text-sm text-muted-foreground">Προαιρετικά στοιχεία</p>
+                    {invitationCompanyName && (
+                      <p className="text-xs text-primary mt-1">Εταιρεία: {invitationCompanyName}</p>
+                    )}
+                  </div>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Τηλέφωνο</Label>
+                      <Input placeholder="+30 210 1234567" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Θέση εργασίας</Label>
+                      <Input placeholder="π.χ. Project Manager" value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    {!invitationCompanyName && (
+                      <Button variant="outline" onClick={goBack} className="flex-1">
+                        <ChevronLeft className="h-4 w-4 mr-1" /> Πίσω
+                      </Button>
+                    )}
+                    <Button onClick={goNext} className="flex-1">
+                      Συνέχεια <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step: Preferences */}
+              {step === 'preferences' && (
+                <div className="space-y-6">
+                  <div className="text-center mb-4">
+                    <Settings className="h-10 w-10 text-primary mx-auto mb-2" />
+                    <h2 className="text-xl font-semibold text-foreground">Προτιμήσεις</h2>
+                    <p className="text-sm text-muted-foreground">Προσαρμόστε την εμπειρία σας</p>
+                  </div>
+                  <div className="space-y-4">
+                    <Label>Θέμα εμφάνισης</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => setTheme('light')}
+                        className={`flex items-center gap-3 p-4 rounded-xl border transition-colors ${
+                          theme === 'light' ? 'border-primary bg-primary/5' : 'border-border/40 hover:border-primary/40'
+                        }`}
+                      >
+                        <Sun className="h-5 w-5 text-foreground" />
+                        <span className="text-sm font-medium text-foreground">Φωτεινό</span>
+                      </button>
+                      <button
+                        onClick={() => setTheme('dark')}
+                        className={`flex items-center gap-3 p-4 rounded-xl border transition-colors ${
+                          theme === 'dark' ? 'border-primary bg-primary/5' : 'border-border/40 hover:border-primary/40'
+                        }`}
+                      >
+                        <Moon className="h-5 w-5 text-foreground" />
+                        <span className="text-sm font-medium text-foreground">Σκοτεινό</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <Button variant="outline" onClick={goBack} className="flex-1">
+                      <ChevronLeft className="h-4 w-4 mr-1" /> Πίσω
+                    </Button>
+                    <Button onClick={goNext} className="flex-1">
+                      Συνέχεια <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step: Ready */}
+              {step === 'ready' && (
+                <div className="text-center space-y-6">
+                  <Rocket className="h-16 w-16 text-primary mx-auto" />
+                  <h2 className="text-xl font-semibold text-foreground">Είστε έτοιμοι!</h2>
+                  <div className="text-left bg-muted/50 rounded-xl p-4 space-y-2 text-sm">
+                    <p className="text-muted-foreground"><strong className="text-foreground">Email:</strong> {profile?.email}</p>
+                    {jobTitle && <p className="text-muted-foreground"><strong className="text-foreground">Θέση:</strong> {jobTitle}</p>}
+                    {phone && <p className="text-muted-foreground"><strong className="text-foreground">Τηλέφωνο:</strong> {phone}</p>}
+                  </div>
+                  <div className="flex gap-3">
+                    <Button variant="outline" onClick={goBack} className="flex-1">
+                      <ChevronLeft className="h-4 w-4 mr-1" /> Πίσω
+                    </Button>
+                    <Button onClick={handleFinish} disabled={loading} className="flex-1">
+                      {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      Μπείτε στον χώρο εργασίας
+                    </Button>
+                  </div>
+                </div>
+              )}
+
             </CardContent>
           </Card>
         )}

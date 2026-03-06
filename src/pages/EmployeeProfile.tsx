@@ -284,6 +284,45 @@ export default function EmployeeProfile() {
           <HRDocuments userId={id!} />
         </TabsContent>
 
+        {(isCompanyAdmin || isManager) && (
+          <TabsContent value="permissions">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5" />
+                  Δικαιώματα Χρήστη
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <PermissionModuleSelector
+                  selectedPermissions={userPermissions}
+                  onChange={setUserPermissions}
+                />
+                <div className="flex justify-end">
+                  <Button
+                    disabled={savingPermissions}
+                    onClick={async () => {
+                      if (!id) return;
+                      setSavingPermissions(true);
+                      try {
+                        await updateUserPermissions(id, userPermissions);
+                        toast.success('Τα δικαιώματα αποθηκεύτηκαν');
+                      } catch (err: any) {
+                        toast.error(err.message || 'Σφάλμα αποθήκευσης');
+                      } finally {
+                        setSavingPermissions(false);
+                      }
+                    }}
+                  >
+                    {savingPermissions && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                    Αποθήκευση Δικαιωμάτων
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
         <TabsContent value="gamification">
           <div className="space-y-6">
             <LevelProgressBar userId={id} />

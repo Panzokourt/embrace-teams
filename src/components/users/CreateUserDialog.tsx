@@ -54,7 +54,7 @@ const ROLE_OPTIONS: { value: CompanyRole; label: string }[] = [
 ];
 
 export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDialogProps) {
-  const { isSuperAdmin } = useAuth();
+  const { isSuperAdmin, company } = useAuth();
   const [saving, setSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 

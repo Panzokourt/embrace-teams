@@ -1,34 +1,66 @@
 
 
-# Org Chart — Διόρθωση Connectors, Auto-assign Προσωπικού & Αφαίρεση Demo
+# Org Chart — Full Rebuild Plan
 
-## Προβλήματα
+## Πρόβλημα
 
-1. **Connectors δεν λειτουργούν**: Το `OrgConnectors` χρησιμοποιεί `getBoundingClientRect()` που δίνει screen coordinates ΜΕ το zoom/pan transform εφαρμοσμένο. Αφού το SVG είναι μέσα στο ίδιο transformed div, οι συντεταγμένες δεν αντιστοιχούν. Πρέπει να χρησιμοποιήσουμε `offsetTop`/`offsetLeft` σχετικά με τον container.
-2. **Δεν φαίνονται τα υπάρχοντα άτομα**: Στο wizard δεν υπάρχει βήμα αντιστοίχισης υπαρχόντων profiles σε θέσεις.
-3. **Demo button** πρέπει να αφαιρεθεί.
+Το τρέχον οργανόγραμμα είναι ένα static rendered tree μέσα σε ScrollArea με βασικό zoom (CSS scale). Δεν υποστηρίζει pan/drag-to-move, δεν έχει infinite canvas, τα nodes δεν είναι clickable για detail, δεν υπάρχουν views (by department, by person), και τα templates δεν αξιοποιούν το υπάρχον προσωπικό.
 
-## Αλλαγές
+## Λύση
 
-### 1. `OrgConnectors.tsx` — Fix connector paths
-Αντικατάσταση `getBoundingClientRect()` με **`offsetTop`/`offsetLeft` relative positioning**. Αναδρομικός υπολογισμός offset σε σχέση με τον container div, ώστε οι γραμμές να είναι ανεξάρτητες από zoom/pan. Επίσης recompute on expand/collapse events.
+Πλήρες rebuild του OrgChart σε **infinite canvas** στυλ Miro με pan+zoom, πολλαπλά views, clickable nodes με detail panel, και smart templates.
 
-### 2. `OrgChartWizard.tsx` — Auto-assign step
-- Νέο βήμα (Step 2.5) "Αντιστοίχιση Προσωπικού": Μετά την επιλογή template, φέρνουμε τα profiles και κάνουμε auto-suggest matching βάσει `job_title` → `position_title` ή `department`.
-- Ο χρήστης βλέπει πίνακα: Θέση | Προτεινόμενο Άτομο (dropdown) | Status
-- Αφαίρεση dummy names logic και checkbox "Προσθήκη δοκιμαστικών ονομάτων".
-- Κατά τη δημιουργία: αν υπάρχει matched profile, γράφει `user_id` στο position.
+## Τεχνική Προσέγγιση
 
-### 3. `OrgChart.tsx` — Αφαίρεση Demo
-- Αφαίρεση `addDummyUsers` function, `DUMMY_NAMES`, `loadingDummyData` state
-- Αφαίρεση Demo button από header
-- Αφαίρεση `Database` import
+### 1. Infinite Canvas Engine (χωρίς εξωτερική βιβλιοθήκη)
+- Custom React canvas με `transform: translate(x, y) scale(z)` σε ένα wrapper div
+- **Mouse wheel** → zoom (centered on cursor)
+- **Middle-click drag** ή **Space+drag** → pan (hand tool)
+- **Touch**: pinch-to-zoom, two-finger pan
+- Mini-map στο corner (optional, phase 2)
+- Fit-to-screen button, zoom controls
+
+### 2. Views (3 modes)
+- **Hierarchy View** (default): Κλασικό tree ανά reporting line — αυτό που υπάρχει τώρα αλλά σε canvas
+- **Department View**: Grouped κάρτες ανά department σε columns/clusters, κάθε cluster δείχνει τα μέλη
+- **List View**: Compact table/list με sorting, φιλτράρισμα, search — γρήγορη εύρεση ατόμου
+
+Toggle μεταξύ views μέσω tabs στο header.
+
+### 3. Interactive Nodes
+- **Click** σε node → slide-in panel (sheet) δεξιά με:
+  - Profile info (avatar, name, email, phone)
+  - Position & department
+  - Direct reports count
+  - Link to Employee Profile (`/hr/employee/:id`)
+  - Quick actions (edit, reassign, add subordinate)
+- **Hover** → subtle highlight + tooltip με title
+- **Vacant positions** → dashed border, prominent "Κενή θέση" badge, click to assign
+- Connector lines μεταξύ nodes: animated SVG paths αντί για div borders
+
+### 4. Smart Templates & Auto-build
+- Βελτίωση του Wizard: αφού επιλεγεί template, **auto-match** υπάρχοντα profiles σε positions βάσει `job_title` ή `department`
+- **Gap Analysis panel**: Μετά τη δημιουργία, δείχνει πόσες θέσεις είναι κενές, ποια departments λείπουν, ποια levels δεν έχουν κάλυψη
+- Wizard step: "Αντιστοίχιση Προσωπικού" — drag-drop ή auto-suggest
+
+### 5. SVG Connector Lines
+- Αντικατάσταση CSS div lines με SVG `<path>` elements (bezier curves)
+- Animated flow direction (subtle dash animation)
+- Color-coded κατά department
 
 ## Αρχεία
 
 | Αρχείο | Αλλαγή |
 |---|---|
-| `src/components/org-chart/OrgConnectors.tsx` | **Rewrite** — offset-based positioning αντί getBoundingClientRect |
-| `src/components/org-chart/OrgChartWizard.tsx` | **Update** — Auto-assign step, αφαίρεση dummy logic |
-| `src/pages/OrgChart.tsx` | **Update** — Αφαίρεση Demo button/logic, pass profiles στο Wizard |
+| `src/pages/OrgChart.tsx` | **Rewrite** — Infinite canvas, views, SVG connectors, detail panel |
+| `src/components/org-chart/OrgChartCanvas.tsx` | **New** — Pan+zoom canvas wrapper |
+| `src/components/org-chart/OrgNodeCard.tsx` | **New** — Redesigned node card (clickable, expandable) |
+| `src/components/org-chart/OrgDetailPanel.tsx` | **New** — Slide-in sheet for node details |
+| `src/components/org-chart/OrgDepartmentView.tsx` | **New** — Department-grouped view |
+| `src/components/org-chart/OrgListView.tsx` | **New** — Table/list view |
+| `src/components/org-chart/OrgConnectors.tsx` | **New** — SVG connector line renderer |
+| `src/components/org-chart/OrgChartWizard.tsx` | **Update** — Add auto-match step + gap analysis |
+| `src/components/org-chart/DraggableOrgNode.tsx` | **Remove** — Replaced by new OrgNodeCard |
+
+Δεν χρειάζονται DB changes — το schema `org_chart_positions` καλύπτει ήδη hierarchy, department, user_id, color, level, sort_order.
 

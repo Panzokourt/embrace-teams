@@ -17,6 +17,18 @@ interface PathData {
   key: string;
 }
 
+function getOffsetRelativeTo(el: HTMLElement, container: HTMLElement): { top: number; left: number; width: number; height: number } {
+  let top = 0;
+  let left = 0;
+  let current: HTMLElement | null = el;
+  while (current && current !== container) {
+    top += current.offsetTop;
+    left += current.offsetLeft;
+    current = current.offsetParent as HTMLElement | null;
+  }
+  return { top, left, width: el.offsetWidth, height: el.offsetHeight };
+}
+
 export function OrgConnectors({ lines, containerRef }: OrgConnectorsProps) {
   const [paths, setPaths] = useState<PathData[]>([]);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -25,21 +37,20 @@ export function OrgConnectors({ lines, containerRef }: OrgConnectorsProps) {
     const container = containerRef.current;
     if (!container) return;
 
-    const cRect = container.getBoundingClientRect();
     const newPaths: PathData[] = [];
 
     for (const line of lines) {
-      const parentEl = container.querySelector(`[data-node-id="${line.parentId}"]`);
-      const childEl = container.querySelector(`[data-node-id="${line.childId}"]`);
+      const parentEl = container.querySelector(`[data-node-id="${line.parentId}"]`) as HTMLElement | null;
+      const childEl = container.querySelector(`[data-node-id="${line.childId}"]`) as HTMLElement | null;
       if (!parentEl || !childEl) continue;
 
-      const pRect = parentEl.getBoundingClientRect();
-      const chRect = childEl.getBoundingClientRect();
+      const pOffset = getOffsetRelativeTo(parentEl, container);
+      const chOffset = getOffsetRelativeTo(childEl, container);
 
-      const x1 = pRect.left + pRect.width / 2 - cRect.left;
-      const y1 = pRect.bottom - cRect.top;
-      const x2 = chRect.left + chRect.width / 2 - cRect.left;
-      const y2 = chRect.top - cRect.top;
+      const x1 = pOffset.left + pOffset.width / 2;
+      const y1 = pOffset.top + pOffset.height;
+      const x2 = chOffset.left + chOffset.width / 2;
+      const y2 = chOffset.top;
 
       const midY = y1 + (y2 - y1) * 0.5;
 
@@ -65,12 +76,12 @@ export function OrgConnectors({ lines, containerRef }: OrgConnectorsProps) {
     };
   }, [computePaths]);
 
-  // Recompute periodically after mount for layout settling
+  // Recompute after layout settling
   useEffect(() => {
     const timers = [
-      setTimeout(computePaths, 100),
-      setTimeout(computePaths, 300),
-      setTimeout(computePaths, 600),
+      setTimeout(computePaths, 50),
+      setTimeout(computePaths, 200),
+      setTimeout(computePaths, 500),
     ];
     return () => timers.forEach(clearTimeout);
   }, [computePaths]);
@@ -93,8 +104,8 @@ export function OrgConnectors({ lines, containerRef }: OrgConnectorsProps) {
           key={p.key}
           d={p.d}
           fill="none"
-          stroke={p.color + '40'}
-          strokeWidth={2}
+          stroke={p.color + '60'}
+          strokeWidth={2.5}
           strokeLinecap="round"
           style={{
             strokeDasharray: '6 4',

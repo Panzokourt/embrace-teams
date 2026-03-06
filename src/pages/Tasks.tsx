@@ -9,6 +9,7 @@ import { useActivityLogger } from '@/hooks/useActivityLogger';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -882,7 +883,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
                         <Label htmlFor="status">Κατάσταση</Label>
                         <Select
                           value={formData.status}
-                          onValueChange={(value) => setFormData(prev => ({ ...prev, status: value }))}
+                          onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as TaskStatus }))}
                         >
                           <SelectTrigger>
                             <SelectValue />
@@ -1090,7 +1091,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
                       </div>
                       <div className="space-y-2">
                         <Label>Κατάσταση</Label>
-                        <Select value={formData.status} onValueChange={(v) => setFormData(prev => ({ ...prev, status: v }))}>
+                        <Select value={formData.status} onValueChange={(v) => setFormData(prev => ({ ...prev, status: v as TaskStatus }))}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="todo">Προς υλοποίηση</SelectItem>

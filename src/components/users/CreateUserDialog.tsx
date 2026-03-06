@@ -95,7 +95,6 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
   };
 
   const fetchDepartments = async () => {
-    const { company } = useAuth.getState?.() || {};
     const companyId = company?.id;
     if (!companyId) return;
     const { data } = await supabase.from('departments').select('id, name').eq('company_id', companyId).order('name');

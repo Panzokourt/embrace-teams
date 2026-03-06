@@ -217,7 +217,7 @@ export default function Onboarding() {
         {step === 'pending' && (
           <Card className="border-border/40">
             <CardContent className="text-center py-12">
-              <Clock className="h-16 w-16 text-amber-500 mx-auto mb-4" />
+              <Clock className="h-16 w-16 text-primary mx-auto mb-4" />
               <h2 className="text-xl font-semibold text-foreground mb-2">Σε αναμονή έγκρισης</h2>
               <p className="text-muted-foreground mb-2">
                 Το αίτημά σας για ένταξη στην εταιρεία {pendingCompanyName && <strong>"{pendingCompanyName}"</strong>} έχει σταλεί.

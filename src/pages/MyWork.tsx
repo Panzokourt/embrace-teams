@@ -37,6 +37,7 @@ import {
 import { format, isBefore, startOfDay, endOfWeek, startOfTomorrow, isAfter } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { useFocusMode } from '@/contexts/FocusContext';
+import { PendingApprovalsCard } from '@/components/work/PendingApprovalsCard';
 
 // ── Types ──────────────────────────────────────────
 interface TaskWithProject {

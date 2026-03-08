@@ -74,6 +74,16 @@ function getContextualQuickActions(pathname: string) {
       { label: "☀️ Daily Briefing", prompt: "Τι έχω σήμερα;" },
     ];
   }
+  // Brain page
+  if (pathname === "/brain") {
+    return [
+      { label: "🧠 Τρέξε Ανάλυση", prompt: "Τρέξε ανάλυση Brain" },
+      { label: "💡 Insights", prompt: "Δείξε μου τα τελευταία Brain insights" },
+      { label: "🔴 High Priority", prompt: "Δείξε μου τα high priority Brain insights" },
+      { label: "📈 Market Insights", prompt: "Δείξε μου τα market insights από το Brain" },
+      { label: "🧪 Neuro Tactics", prompt: "Δείξε μου τα neuromarketing insights" },
+    ];
+  }
   // Clients page
   if (pathname === "/clients" || pathname.match(/^\/clients\/[^/]+$/)) {
     return [

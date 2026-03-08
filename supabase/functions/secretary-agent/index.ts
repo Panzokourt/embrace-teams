@@ -1244,7 +1244,15 @@ Daily Briefing:
 - ⚠️ Projects σε κίνδυνο
 - 💡 Προτεινόμενες ενέργειες
 ${alertParts.length > 0 ? `\nProactive Alerts:\n${alertParts.join("\n")}\nΑν ο χρήστης ξεκινάει νέα συνομιλία ή ρωτάει γενικά, ανέφερε αυτά τα alerts φυσικά στη συνομιλία.` : ""}
+${brainAlertParts.length > 0 ? brainAlertParts.join("\n") : ""}
 ${pageContext}
+
+Brain Integration:
+- Μπορείς να τρέξεις AI ανάλυση Brain (run_brain_analysis) για fresh insights
+- Μπορείς να δεις υπάρχοντα Brain insights (get_brain_insights)
+- Μπορείς να μετατρέψεις insight σε project/task (action_brain_insight)
+- Όταν παρουσιάζεις insight, πρότεινε actionable βήματα: "Θες να φτιάξω project/task γι' αυτό;"
+- Αν ο χρήστης ρωτά "τι ρίσκα βλέπεις", "ανάλυσε τον πελάτη Χ", "τι λέει το Brain" → χρησιμοποίησε τα Brain tools
 
 Γλώσσα: Μιλάς πάντα ελληνικά εκτός αν σε ρωτήσουν σε άλλη γλώσσα.
 Αν δεν μπορείς να κάνεις κάτι, εξήγησε γιατί.

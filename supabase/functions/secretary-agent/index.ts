@@ -1182,6 +1182,16 @@ serve(async (req) => {
     if (behindScheduleCount > 0) alertParts.push(`- ⚠️ ${behindScheduleCount} project(s) έχουν ξεπεράσει το deadline`);
     if (todayEventsCount > 0) alertParts.push(`- 📅 ${todayEventsCount} event(s) σήμερα`);
 
+    // Brain alerts
+    const brainAlertParts: string[] = [];
+    if (brainAlerts && brainAlerts.length > 0) {
+      brainAlertParts.push(`\nBrain Alerts (τελευταία 48h):`);
+      for (const ba of brainAlerts) {
+        brainAlertParts.push(`- [${ba.priority}/${ba.category}] ${ba.title} (id: ${ba.id})`);
+      }
+      brainAlertParts.push(`Αν σχετίζονται με αυτά που ρωτά ο χρήστης, ανέφερέ τα και πρότεινε "Θες να φτιάξω project/task γι' αυτό;"`);
+    }
+
     // Build context awareness
     let pageContext = "";
     if (current_page) {

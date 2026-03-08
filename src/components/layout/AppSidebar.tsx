@@ -299,7 +299,7 @@ export default function AppSidebar({
         <Tooltip delayDuration={300}>
           <TooltipTrigger asChild>
             <button
-              onClick={() => { window.dispatchEvent(new CustomEvent('open-secretary-panel')); handleNavClick(); }}
+              onClick={() => { navigate('/secretary'); handleNavClick(); }}
               className={cn(
                 "flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200",
                 isMobile

@@ -46,6 +46,7 @@ import { ChatProvider } from "@/contexts/ChatContext";
 import PricingPage from "@/pages/PricingPage";
 import ServiceDetailPage from "@/pages/ServiceDetailPage";
 import Brain from "@/pages/Brain";
+import Secretary from "@/pages/Secretary";
 
 function RedirectUserToEmployee() {
   const { id } = useParams();
@@ -116,7 +117,7 @@ const App = () => (
                   <Route path="/brain" element={<Brain />} />
                   <Route path="/intelligence/ai-insights" element={<Navigate to="/brain" replace />} />
                   {/* Redirects from removed placeholder pages */}
-                  <Route path="/secretary" element={<Navigate to="/my-work" replace />} />
+                  <Route path="/secretary" element={<Secretary />} />
                   <Route path="/campaigns" element={<Navigate to="/work" replace />} />
                   <Route path="/backlog" element={<Navigate to="/calendar" replace />} />
                   <Route path="/operations/capacity" element={<Navigate to="/hr" replace />} />

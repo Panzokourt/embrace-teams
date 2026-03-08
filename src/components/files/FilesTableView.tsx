@@ -245,6 +245,7 @@ export function FilesTableView({
       setSortField(field);
       setSortDirection('asc');
     }
+    pagination.reset();
   };
 
   const getSortIcon = (field: SortField) => {

@@ -462,6 +462,93 @@ const toolDefinitions = [
       },
     },
   },
+  // ── SMART INTAKE & PLANNING TOOLS ──
+  {
+    type: "function",
+    function: {
+      name: "smart_project_plan",
+      description: "Use AI to generate a complete project plan (deliverables, tasks, team roles) from a natural language description. Returns a structured plan for preview before execution.",
+      parameters: {
+        type: "object",
+        properties: {
+          description: { type: "string", description: "Natural language description of the project/campaign (e.g. 'SEO campaign for client X, budget 5000€, 3 months')" },
+          client_id: { type: "string", description: "Client ID if known" },
+          budget: { type: "number", description: "Total budget in euros" },
+          duration_months: { type: "number", description: "Duration in months" },
+          template_hint: { type: "string", description: "Optional template hint (e.g. 'seo', 'social_media', 'branding')" },
+        },
+        required: ["description"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "execute_project_plan",
+      description: "Execute a previously generated project plan: creates project, deliverables, tasks, and team assignments in the database",
+      parameters: {
+        type: "object",
+        properties: {
+          plan: {
+            type: "object",
+            description: "The plan object from smart_project_plan",
+            properties: {
+              name: { type: "string" },
+              description: { type: "string" },
+              deliverables: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    budget_pct: { type: "number" },
+                    tasks: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          title: { type: "string" },
+                          priority: { type: "string" },
+                          days_offset_start: { type: "number" },
+                          days_offset_due: { type: "number" },
+                          estimated_hours: { type: "number" },
+                          role_hint: { type: "string" },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              suggested_roles: { type: "array", items: { type: "string" } },
+            },
+          },
+          client_id: { type: "string", description: "Client ID" },
+          budget: { type: "number", description: "Total budget" },
+          start_date: { type: "string", description: "Start date YYYY-MM-DD (defaults to today)" },
+          team_members: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                user_id: { type: "string" },
+                role: { type: "string" },
+              },
+            },
+            description: "Team members to assign",
+          },
+        },
+        required: ["plan"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_risk_radar",
+      description: "Comprehensive risk analysis: overdue tasks, budget overruns, unassigned tasks, stale projects, team capacity issues. Returns a structured risk report.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
 ];
 
 // ── Tool execution ────────────────────────────────────────────────

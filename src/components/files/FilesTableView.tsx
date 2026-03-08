@@ -201,13 +201,22 @@ export function FilesTableView({
     });
   }, [filteredFiles, sortField, sortDirection, folders]);
 
+  // Update pagination total count
+  if (pagination.totalCount !== sortedFiles.length) {
+    pagination.setTotalCount(sortedFiles.length);
+  }
+
+  const pagedFiles = useMemo(() => {
+    return sortedFiles.slice(pagination.from, pagination.to + 1);
+  }, [sortedFiles, pagination.from, pagination.to]);
+
   // Group files by folder
   const groupedFiles = useMemo(() => {
     if (groupBy !== 'status') return new Map();
 
     const groups = new Map<string, { label: React.ReactNode; files: FileAttachment[] }>();
     
-    sortedFiles.forEach(file => {
+    pagedFiles.forEach(file => {
       const folder = folders.find(f => f.id === file.folder_id);
       const key = folder?.id || 'no-folder';
       const label = folder ? (

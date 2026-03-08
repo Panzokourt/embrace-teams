@@ -14,7 +14,7 @@ import { WorkflowBuilder } from '@/components/workflows/WorkflowBuilder';
 import { IntakeRequestDialog } from '@/components/workflows/IntakeRequestDialog';
 import { IntakeRequestsList } from '@/components/workflows/IntakeRequestsList';
 import { IntakeRequestDetail } from '@/components/workflows/IntakeRequestDetail';
-import PageHeader from '@/components/shared/PageHeader';
+import { PageHeader } from '@/components/shared/PageHeader';
 
 export default function Workflows() {
   const { workflows, loading, createWorkflow, updateWorkflow, deleteWorkflow } = useIntakeWorkflows();

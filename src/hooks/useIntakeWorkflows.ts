@@ -205,7 +205,8 @@ export function useWorkflowStages(workflowId: string | null) {
 }
 
 export function useIntakeRequests() {
-  const { companyId, user } = useAuth();
+  const { company, user } = useAuth();
+  const companyId = company?.id;
   const [requests, setRequests] = useState<IntakeRequest[]>([]);
   const [loading, setLoading] = useState(true);
 

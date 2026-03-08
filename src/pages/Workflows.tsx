@@ -64,7 +64,7 @@ export default function Workflows() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <PageHeader title="Workflows" subtitle="Manage intake workflows and requests">
+      <PageHeader icon={GitBranch} title="Workflows" subtitle="Manage intake workflows and requests">
         <Button onClick={() => setRequestDialogOpen(true)} className="gap-1.5">
           <Inbox className="h-4 w-4" /> New Request
         </Button>

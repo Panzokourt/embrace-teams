@@ -42,6 +42,10 @@ import { type ColumnConfig } from '@/components/shared/ColumnVisibilityToggle';
 import { exportToCSV, exportToExcel, formatters } from '@/utils/exportUtils';
 import { cn } from '@/lib/utils';
 import type { FileFolder } from './FolderTree';
+import { usePagination } from '@/hooks/usePagination';
+import { PaginationControls } from '@/components/shared/PaginationControls';
+
+const PAGE_SIZE = 25;
 
 export interface FileAttachment {
   id: string;

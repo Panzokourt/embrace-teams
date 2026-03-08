@@ -283,6 +283,47 @@ function AttentionPanel({
   const [overdueOpen, setOverdueOpen] = useState(true);
   const [highOpen, setHighOpen] = useState(true);
 
+  const overduePagination = usePagination(6);
+  const highPriorityPagination = usePagination(6);
+  const internalReviewPagination = usePagination(6);
+  const approvalPagination = usePagination(6);
+
+  useEffect(() => {
+    overduePagination.setTotalCount(overdueTasks.length);
+  }, [overdueTasks.length, overduePagination]);
+
+  useEffect(() => {
+    highPriorityPagination.setTotalCount(highPriorityTasks.length);
+  }, [highPriorityTasks.length, highPriorityPagination]);
+
+  useEffect(() => {
+    internalReviewPagination.setTotalCount(internalReviewTasks.length);
+  }, [internalReviewTasks.length, internalReviewPagination]);
+
+  useEffect(() => {
+    approvalPagination.setTotalCount(approvalTasks.length);
+  }, [approvalTasks.length, approvalPagination]);
+
+  const pagedOverdueTasks = useMemo(
+    () => overdueTasks.slice(overduePagination.from, overduePagination.to + 1),
+    [overdueTasks, overduePagination.from, overduePagination.to],
+  );
+
+  const pagedHighPriorityTasks = useMemo(
+    () => highPriorityTasks.slice(highPriorityPagination.from, highPriorityPagination.to + 1),
+    [highPriorityTasks, highPriorityPagination.from, highPriorityPagination.to],
+  );
+
+  const pagedInternalReviewTasks = useMemo(
+    () => internalReviewTasks.slice(internalReviewPagination.from, internalReviewPagination.to + 1),
+    [internalReviewTasks, internalReviewPagination.from, internalReviewPagination.to],
+  );
+
+  const pagedApprovalTasks = useMemo(
+    () => approvalTasks.slice(approvalPagination.from, approvalPagination.to + 1),
+    [approvalTasks, approvalPagination.from, approvalPagination.to],
+  );
+
   const SectionHeader = ({ emoji, label, count, open, onToggle }: { emoji: string; label: string; count: number; open: boolean; onToggle: () => void }) => (
     <button
       onClick={onToggle}
@@ -335,9 +376,18 @@ function AttentionPanel({
           <>
             <SectionHeader emoji="🔴" label="Εκπρόθεσμα" count={overdueTasks.length} open={overdueOpen} onToggle={() => setOverdueOpen(v => !v)} />
             {overdueOpen && (
-              <div className="divide-y divide-border/50">
-                {overdueTasks.map(task => <TaskMiniRow key={task.id} task={task} isOverdue />)}
-              </div>
+              <>
+                <ScrollArea className="max-h-64">
+                  <div className="divide-y divide-border/50">
+                    {pagedOverdueTasks.map(task => <TaskMiniRow key={task.id} task={task} isOverdue />)}
+                  </div>
+                </ScrollArea>
+                {overdueTasks.length > overduePagination.pageSize && (
+                  <div className="px-4 md:px-6 border-t border-border/50">
+                    <PaginationControls pagination={overduePagination} />
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
@@ -347,9 +397,18 @@ function AttentionPanel({
           <>
             <SectionHeader emoji="🟠" label="Υψηλή Προτεραιότητα" count={highPriorityTasks.length} open={highOpen} onToggle={() => setHighOpen(v => !v)} />
             {highOpen && (
-              <div className="divide-y divide-border/50">
-                {highPriorityTasks.map(task => <TaskMiniRow key={task.id} task={task} />)}
-              </div>
+              <>
+                <ScrollArea className="max-h-64">
+                  <div className="divide-y divide-border/50">
+                    {pagedHighPriorityTasks.map(task => <TaskMiniRow key={task.id} task={task} />)}
+                  </div>
+                </ScrollArea>
+                {highPriorityTasks.length > highPriorityPagination.pageSize && (
+                  <div className="px-4 md:px-6 border-t border-border/50">
+                    <PaginationControls pagination={highPriorityPagination} />
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
@@ -360,23 +419,30 @@ function AttentionPanel({
             <div className="px-4 md:px-6 py-2 bg-muted/20 border-b border-border/50">
               <span className="text-xs font-semibold">🏢 Εσωτερική Έγκριση ({internalReviewTasks.length})</span>
             </div>
-            <div className="divide-y divide-border/50">
-              {internalReviewTasks.map(task => (
-                <div key={task.id} className="flex items-center gap-3 px-4 md:px-6 py-3">
-                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onOpenTask(task)}>
-                    <p className="text-sm font-medium text-foreground hover:text-primary">{task.title}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
-                      {(task as any).assignee?.full_name && <span className="text-xs text-muted-foreground">· {(task as any).assignee.full_name}</span>}
+            <ScrollArea className="max-h-64">
+              <div className="divide-y divide-border/50">
+                {pagedInternalReviewTasks.map(task => (
+                  <div key={task.id} className="flex items-center gap-3 px-4 md:px-6 py-3">
+                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onOpenTask(task)}>
+                      <p className="text-sm font-medium text-foreground hover:text-primary">{task.title}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
+                        {(task as any).assignee?.full_name && <span className="text-xs text-muted-foreground">· {(task as any).assignee.full_name}</span>}
+                      </div>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-success hover:text-success" onClick={() => onApproveInternal(task)}><Check className="h-4 w-4" /></Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onRejectInternal(task)}><X className="h-4 w-4" /></Button>
                     </div>
                   </div>
-                  <div className="flex gap-1.5">
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-success hover:text-success" onClick={() => onApproveInternal(task)}><Check className="h-4 w-4" /></Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onRejectInternal(task)}><X className="h-4 w-4" /></Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </ScrollArea>
+            {internalReviewTasks.length > internalReviewPagination.pageSize && (
+              <div className="px-4 md:px-6 border-t border-border/50">
+                <PaginationControls pagination={internalReviewPagination} />
+              </div>
+            )}
           </>
         )}
 
@@ -386,21 +452,28 @@ function AttentionPanel({
             <div className="px-4 md:px-6 py-2 bg-muted/20 border-b border-border/50">
               <span className="text-xs font-semibold">🤝 Έγκριση Πελάτη ({approvalTasks.length})</span>
             </div>
-            <div className="divide-y divide-border/50">
-              {approvalTasks.map(task => (
-                <div key={task.id} className="flex items-center gap-3 px-4 md:px-6 py-3">
-                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onOpenTask(task)}>
-                    <p className="text-sm font-medium text-foreground hover:text-primary">{task.title}</p>
-                    <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
+            <ScrollArea className="max-h-64">
+              <div className="divide-y divide-border/50">
+                {pagedApprovalTasks.map(task => (
+                  <div key={task.id} className="flex items-center gap-3 px-4 md:px-6 py-3">
+                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onOpenTask(task)}>
+                      <p className="text-sm font-medium text-foreground hover:text-primary">{task.title}</p>
+                      <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
+                    </div>
+                    <Badge variant={getPriorityColor(task.priority)} className="text-[10px]">{task.priority}</Badge>
+                    <div className="flex gap-1.5">
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-success hover:text-success" onClick={() => onApproveClient(task)}><Check className="h-4 w-4" /></Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onRejectClient(task)}><X className="h-4 w-4" /></Button>
+                    </div>
                   </div>
-                  <Badge variant={getPriorityColor(task.priority)} className="text-[10px]">{task.priority}</Badge>
-                  <div className="flex gap-1.5">
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-success hover:text-success" onClick={() => onApproveClient(task)}><Check className="h-4 w-4" /></Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onRejectClient(task)}><X className="h-4 w-4" /></Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </ScrollArea>
+            {approvalTasks.length > approvalPagination.pageSize && (
+              <div className="px-4 md:px-6 border-t border-border/50">
+                <PaginationControls pagination={approvalPagination} />
+              </div>
+            )}
           </>
         )}
       </CardContent>

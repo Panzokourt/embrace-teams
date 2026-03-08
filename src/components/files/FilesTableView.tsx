@@ -147,6 +147,8 @@ export function FilesTableView({
     defaultColumns: DEFAULT_COLUMNS,
   });
 
+  const pagination = usePagination(PAGE_SIZE);
+
   // Filter files by selected folder and search query
   const filteredFiles = useMemo(() => {
     let result = files;

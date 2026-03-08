@@ -568,7 +568,7 @@ export function FilesTableView({
           <Input
             placeholder="Αναζήτηση με όνομα ή τύπο..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => { setSearchQuery(e.target.value); pagination.reset(); }}
             className="pl-9 pr-9"
           />
           {searchQuery && (

@@ -1143,6 +1143,23 @@ serve(async (req) => {
     const companyRole = companyRoleRes.data;
     const companyId = companyRole?.company_id || "";
 
+    // Fetch Brain alerts (high-priority insights from last 48h)
+    const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    const { data: brainAlerts } = await supabase
+      .from("brain_insights")
+      .select("id, title, category, priority, body")
+      .eq("company_id", companyId)
+      .eq("is_dismissed", false)
+      .eq("is_actioned", false)
+      .eq("priority", "high")
+      .gte("created_at", twoDaysAgo)
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    const profile = profileRes.data;
+    const companyRole = companyRoleRes.data;
+    const companyId = companyRole?.company_id || "";
+
     const overdueCount = overdueRes.count || 0;
     const behindScheduleCount = (behindScheduleRes.data || []).length;
     const todayEventsCount = todayEventsRes.count || 0;

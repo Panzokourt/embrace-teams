@@ -18,10 +18,11 @@ interface ChatMessage {
 
 const defaultQuickActions = [
   { label: "📋 Tasks μου", prompt: "Δείξε μου τα tasks μου" },
+  { label: "🎯 Smart Plan", prompt: "Θέλω να σχεδιάσω ένα νέο project" },
   { label: "📝 Νέο Brief", prompt: "Θέλω να δημιουργήσω ένα νέο brief" },
   { label: "🚀 Νέο Project", prompt: "Θέλω να δημιουργήσω ένα νέο project" },
   { label: "📅 Νέο Meeting", prompt: "Θέλω να δημιουργήσω ένα νέο meeting" },
-  { label: "⏱ Log Time", prompt: "Θέλω να καταχωρήσω χρόνο εργασίας" },
+  { label: "⚠️ Risk Radar", prompt: "Τρέξε Risk Radar analysis" },
   { label: "☀️ Daily Briefing", prompt: "Τι έχω σήμερα;" },
   { label: "🧠 Brain Analysis", prompt: "Τρέξε ανάλυση Brain" },
   { label: "💡 Insights", prompt: "Δείξε μου τα τελευταία Brain insights" },

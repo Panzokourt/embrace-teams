@@ -462,6 +462,93 @@ const toolDefinitions = [
       },
     },
   },
+  // ── SMART INTAKE & PLANNING TOOLS ──
+  {
+    type: "function",
+    function: {
+      name: "smart_project_plan",
+      description: "Use AI to generate a complete project plan (deliverables, tasks, team roles) from a natural language description. Returns a structured plan for preview before execution.",
+      parameters: {
+        type: "object",
+        properties: {
+          description: { type: "string", description: "Natural language description of the project/campaign (e.g. 'SEO campaign for client X, budget 5000€, 3 months')" },
+          client_id: { type: "string", description: "Client ID if known" },
+          budget: { type: "number", description: "Total budget in euros" },
+          duration_months: { type: "number", description: "Duration in months" },
+          template_hint: { type: "string", description: "Optional template hint (e.g. 'seo', 'social_media', 'branding')" },
+        },
+        required: ["description"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "execute_project_plan",
+      description: "Execute a previously generated project plan: creates project, deliverables, tasks, and team assignments in the database",
+      parameters: {
+        type: "object",
+        properties: {
+          plan: {
+            type: "object",
+            description: "The plan object from smart_project_plan",
+            properties: {
+              name: { type: "string" },
+              description: { type: "string" },
+              deliverables: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    budget_pct: { type: "number" },
+                    tasks: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          title: { type: "string" },
+                          priority: { type: "string" },
+                          days_offset_start: { type: "number" },
+                          days_offset_due: { type: "number" },
+                          estimated_hours: { type: "number" },
+                          role_hint: { type: "string" },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              suggested_roles: { type: "array", items: { type: "string" } },
+            },
+          },
+          client_id: { type: "string", description: "Client ID" },
+          budget: { type: "number", description: "Total budget" },
+          start_date: { type: "string", description: "Start date YYYY-MM-DD (defaults to today)" },
+          team_members: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                user_id: { type: "string" },
+                role: { type: "string" },
+              },
+            },
+            description: "Team members to assign",
+          },
+        },
+        required: ["plan"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_risk_radar",
+      description: "Comprehensive risk analysis: overdue tasks, budget overruns, unassigned tasks, stale projects, team capacity issues. Returns a structured risk report.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
 ];
 
 // ── Tool execution ────────────────────────────────────────────────
@@ -1076,6 +1163,365 @@ async function executeTool(
         return { error: "Unknown action_type" };
       }
 
+      // ── SMART INTAKE & PLANNING EXECUTORS ──
+
+      case "smart_project_plan": {
+        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+        if (!LOVABLE_API_KEY) return { error: "AI not configured" };
+
+        const planPrompt = `Είσαι expert project planner για agency επικοινωνίας/marketing.
+Δημιούργησε ένα πλήρες project plan βασισμένο στην περιγραφή.
+
+Περιγραφή: ${args.description}
+${args.budget ? `Budget: €${args.budget}` : ""}
+${args.duration_months ? `Διάρκεια: ${args.duration_months} μήνες` : ""}
+${args.template_hint ? `Τύπος: ${args.template_hint}` : ""}
+
+Επέστρεψε ένα JSON object:
+{
+  "name": "Project name",
+  "description": "Brief description",
+  "deliverables": [
+    {
+      "name": "Deliverable name",
+      "budget_pct": 30,
+      "tasks": [
+        {
+          "title": "Task title",
+          "priority": "high|medium|low",
+          "days_offset_start": 0,
+          "days_offset_due": 14,
+          "estimated_hours": 8,
+          "role_hint": "seo_specialist"
+        }
+      ]
+    }
+  ],
+  "suggested_roles": ["project_lead", "seo_specialist", "content_writer"]
+}
+
+Κανόνες:
+- 3-6 deliverables ανάλογα πολυπλοκότητα
+- 2-5 tasks ανά deliverable
+- budget_pct να αθροίζουν σε 100
+- days_offset relative to project start
+- Ρεαλιστικά estimated_hours
+- role_hint πρέπει να αντιστοιχεί σε ρόλους agency (project_lead, designer, copywriter, seo_specialist, social_media_manager, developer, account_manager, media_planner)`;
+
+        const planResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-3-flash-preview",
+            messages: [{ role: "user", content: planPrompt }],
+            tools: [{
+              type: "function",
+              function: {
+                name: "output_plan",
+                description: "Output the structured project plan",
+                parameters: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    description: { type: "string" },
+                    deliverables: { type: "array", items: { type: "object", properties: { name: { type: "string" }, budget_pct: { type: "number" }, tasks: { type: "array", items: { type: "object", properties: { title: { type: "string" }, priority: { type: "string" }, days_offset_start: { type: "number" }, days_offset_due: { type: "number" }, estimated_hours: { type: "number" }, role_hint: { type: "string" } } } } } } },
+                    suggested_roles: { type: "array", items: { type: "string" } },
+                  },
+                  required: ["name", "description", "deliverables", "suggested_roles"],
+                },
+              },
+            }],
+            tool_choice: { type: "function", function: { name: "output_plan" } },
+          }),
+        });
+
+        if (!planResp.ok) {
+          const errText = await planResp.text();
+          console.error("Plan AI error:", errText);
+          return { error: "Failed to generate plan" };
+        }
+
+        const planResult = await planResp.json();
+        const toolCall = planResult.choices?.[0]?.message?.tool_calls?.[0];
+        if (!toolCall) return { error: "AI did not return a plan" };
+
+        let plan;
+        try {
+          plan = JSON.parse(toolCall.function.arguments);
+        } catch {
+          return { error: "Failed to parse plan" };
+        }
+
+        // Enrich with budget amounts
+        if (args.budget && plan.deliverables) {
+          for (const d of plan.deliverables) {
+            d.budget_amount = Math.round((d.budget_pct / 100) * args.budget);
+          }
+        }
+
+        const totalTasks = (plan.deliverables || []).reduce((s: number, d: any) => s + (d.tasks?.length || 0), 0);
+        const totalHours = (plan.deliverables || []).reduce((s: number, d: any) =>
+          s + (d.tasks || []).reduce((ts: number, t: any) => ts + (t.estimated_hours || 0), 0), 0);
+
+        return {
+          success: true,
+          plan,
+          summary: {
+            deliverables_count: plan.deliverables?.length || 0,
+            total_tasks: totalTasks,
+            total_estimated_hours: totalHours,
+            suggested_roles: plan.suggested_roles || [],
+            budget: args.budget || null,
+            duration_months: args.duration_months || null,
+          },
+          message: "Plan generated. Present it to the user and ask for confirmation before executing with execute_project_plan.",
+        };
+      }
+
+      case "execute_project_plan": {
+        const plan = args.plan;
+        if (!plan || !plan.name) return { error: "Invalid plan object" };
+
+        const startDate = args.start_date || new Date().toISOString().split("T")[0];
+        const startMs = new Date(startDate).getTime();
+
+        // Calculate end date from max days_offset_due
+        let maxDayOffset = 30;
+        for (const d of plan.deliverables || []) {
+          for (const t of d.tasks || []) {
+            if (t.days_offset_due > maxDayOffset) maxDayOffset = t.days_offset_due;
+          }
+        }
+        const endDate = new Date(startMs + maxDayOffset * 86400000).toISOString().split("T")[0];
+
+        // 1. Create project
+        const { data: project, error: projErr } = await supabase.from("projects").insert({
+          name: plan.name,
+          description: plan.description || null,
+          client_id: args.client_id || null,
+          budget: args.budget || null,
+          start_date: startDate,
+          end_date: endDate,
+          status: "active",
+          company_id: companyId,
+        }).select("id, name, status, budget").single();
+        if (projErr) throw projErr;
+
+        // 2. Add creator to team
+        await supabase.from("project_user_access").insert({
+          project_id: project.id, user_id: userId, role: "project_lead",
+        }).select().maybeSingle();
+
+        // 3. Add team members
+        if (args.team_members && args.team_members.length > 0) {
+          const teamRows = args.team_members.map((m: any) => ({
+            project_id: project.id,
+            user_id: m.user_id,
+            role: m.role || "member",
+          }));
+          await supabase.from("project_user_access").upsert(teamRows, { onConflict: "project_id,user_id" });
+        }
+
+        // 4. Create deliverables and tasks
+        let totalTasksCreated = 0;
+        let totalDeliverablesCreated = 0;
+
+        for (const del of plan.deliverables || []) {
+          const delBudget = args.budget ? Math.round((del.budget_pct / 100) * args.budget) : null;
+          const maxTaskDue = Math.max(...(del.tasks || []).map((t: any) => t.days_offset_due || 30));
+          const delDueDate = new Date(startMs + maxTaskDue * 86400000).toISOString().split("T")[0];
+
+          const { data: deliverable, error: delErr } = await supabase.from("deliverables").insert({
+            project_id: project.id,
+            name: del.name,
+            budget: delBudget,
+            due_date: delDueDate,
+          }).select("id, name").single();
+          if (delErr) { console.error("Deliverable error:", delErr); continue; }
+          totalDeliverablesCreated++;
+
+          for (const task of del.tasks || []) {
+            const taskDue = new Date(startMs + (task.days_offset_due || 14) * 86400000).toISOString().split("T")[0];
+            const { error: taskErr } = await supabase.from("tasks").insert({
+              project_id: project.id,
+              deliverable_id: deliverable.id,
+              title: task.title,
+              priority: task.priority || "medium",
+              due_date: taskDue,
+              estimated_hours: task.estimated_hours || null,
+              status: "todo",
+              company_id: companyId,
+            });
+            if (!taskErr) totalTasksCreated++;
+          }
+        }
+
+        return {
+          success: true,
+          project,
+          created: {
+            deliverables: totalDeliverablesCreated,
+            tasks: totalTasksCreated,
+            team_members: (args.team_members?.length || 0) + 1,
+          },
+          message: `Project "${project.name}" created with ${totalDeliverablesCreated} deliverables and ${totalTasksCreated} tasks.`,
+        };
+      }
+
+      case "get_risk_radar": {
+        const today = new Date().toISOString().split("T")[0];
+        const threeDaysLater = new Date(Date.now() + 3 * 86400000).toISOString().split("T")[0];
+        const twoWeeksAgo = new Date(Date.now() - 14 * 86400000).toISOString();
+
+        const [overdueRes, upcomingUnassignedRes, projectBudgetsRes, staleProjectsRes, capacityRes] = await Promise.all([
+          // Overdue tasks grouped info
+          supabase.from("tasks")
+            .select("id, title, due_date, priority, project_id, projects(name), assigned_to, profiles!tasks_assigned_to_fkey(full_name)")
+            .lt("due_date", today)
+            .neq("status", "done")
+            .neq("status", "cancelled")
+            .order("due_date", { ascending: true })
+            .limit(20),
+          // Tasks due in 3 days without assignee
+          supabase.from("tasks")
+            .select("id, title, due_date, priority, project_id, projects(name)")
+            .gte("due_date", today)
+            .lte("due_date", threeDaysLater)
+            .is("assigned_to", null)
+            .neq("status", "done")
+            .neq("status", "cancelled")
+            .limit(20),
+          // Active projects with budgets and expenses
+          supabase.from("projects")
+            .select("id, name, budget, status")
+            .eq("company_id", companyId)
+            .eq("status", "active")
+            .not("budget", "is", null),
+          // Projects with no task updates in 14+ days
+          supabase.from("projects")
+            .select("id, name, status, updated_at")
+            .eq("company_id", companyId)
+            .eq("status", "active")
+            .lt("updated_at", twoWeeksAgo)
+            .limit(10),
+          // Users with many open tasks
+          supabase.rpc("get_user_company_id", { _user_id: userId }).then(async () => {
+            const { data } = await supabase
+              .from("tasks")
+              .select("assigned_to, profiles!tasks_assigned_to_fkey(full_name)")
+              .neq("status", "done")
+              .neq("status", "cancelled")
+              .not("assigned_to", "is", null);
+            // Count tasks per user
+            const counts: Record<string, { name: string; count: number }> = {};
+            for (const t of data || []) {
+              const uid = t.assigned_to;
+              if (!counts[uid]) counts[uid] = { name: (t as any).profiles?.full_name || "Unknown", count: 0 };
+              counts[uid].count++;
+            }
+            return Object.entries(counts)
+              .filter(([_, v]) => v.count >= 10)
+              .map(([uid, v]) => ({ user_id: uid, name: v.name, open_tasks: v.count }))
+              .sort((a, b) => b.open_tasks - a.open_tasks);
+          }),
+        ]);
+
+        // Check budget overruns
+        const budgetOverruns: any[] = [];
+        for (const proj of projectBudgetsRes.data || []) {
+          if (!proj.budget) continue;
+          const { data: expenses } = await supabase
+            .from("expenses")
+            .select("amount")
+            .eq("project_id", proj.id);
+          const totalExpenses = (expenses || []).reduce((s: number, e: any) => s + (e.amount || 0), 0);
+          if (totalExpenses > proj.budget) {
+            budgetOverruns.push({
+              project_id: proj.id,
+              project_name: proj.name,
+              budget: proj.budget,
+              total_expenses: totalExpenses,
+              overrun_pct: Math.round(((totalExpenses - proj.budget) / proj.budget) * 100),
+            });
+          }
+        }
+
+        const risks: any[] = [];
+
+        // Overdue tasks
+        const overdueTasks = overdueRes.data || [];
+        if (overdueTasks.length > 0) {
+          risks.push({
+            type: "overdue_tasks",
+            severity: "high",
+            title: `${overdueTasks.length} overdue task(s)`,
+            details: overdueTasks.slice(0, 5).map((t: any) => ({
+              task: t.title,
+              due: t.due_date,
+              project: t.projects?.name,
+              assigned_to: (t as any).profiles?.full_name || "Unassigned",
+            })),
+          });
+        }
+
+        // Budget overruns
+        if (budgetOverruns.length > 0) {
+          risks.push({
+            type: "budget_overrun",
+            severity: "high",
+            title: `${budgetOverruns.length} project(s) over budget`,
+            details: budgetOverruns,
+          });
+        }
+
+        // Upcoming unassigned
+        const unassigned = upcomingUnassignedRes.data || [];
+        if (unassigned.length > 0) {
+          risks.push({
+            type: "unassigned_urgent",
+            severity: "medium",
+            title: `${unassigned.length} task(s) due in 3 days without assignee`,
+            details: unassigned.slice(0, 5).map((t: any) => ({
+              task: t.title,
+              due: t.due_date,
+              project: t.projects?.name,
+            })),
+          });
+        }
+
+        // Stale projects
+        const stale = staleProjectsRes.data || [];
+        if (stale.length > 0) {
+          risks.push({
+            type: "stale_projects",
+            severity: "medium",
+            title: `${stale.length} project(s) with no activity for 14+ days`,
+            details: stale.map((p: any) => ({ project: p.name, last_update: p.updated_at })),
+          });
+        }
+
+        // Capacity issues
+        const overloaded = await capacityRes;
+        if (overloaded.length > 0) {
+          risks.push({
+            type: "capacity_overload",
+            severity: "medium",
+            title: `${overloaded.length} team member(s) with 10+ open tasks`,
+            details: overloaded.slice(0, 5),
+          });
+        }
+
+        return {
+          success: true,
+          risk_count: risks.length,
+          risks,
+          scanned_at: new Date().toISOString(),
+        };
+      }
+
       default:
         return { error: `Unknown tool: ${toolName}` };
     }
@@ -1253,6 +1699,17 @@ Brain Integration:
 - Μπορείς να μετατρέψεις insight σε project/task (action_brain_insight)
 - Όταν παρουσιάζεις insight, πρότεινε actionable βήματα: "Θες να φτιάξω project/task γι' αυτό;"
 - Αν ο χρήστης ρωτά "τι ρίσκα βλέπεις", "ανάλυσε τον πελάτη Χ", "τι λέει το Brain" → χρησιμοποίησε τα Brain tools
+
+Smart Intake & Planning:
+- Αν ο χρήστης περιγράφει ένα αίτημα/project σε φυσική γλώσσα (π.χ. "θέλω καμπάνια SEO για τον πελάτη Χ, budget 5000€, 3 μήνες"), χρησιμοποίησε smart_project_plan
+- Παρουσίασε το πλάνο αναλυτικά (deliverables, tasks, timeline, roles) και ζήτα επιβεβαίωση πριν προχωρήσεις
+- Μετά την επιβεβαίωση, χρησιμοποίησε execute_project_plan με το ίδιο plan object
+- Αν ο χρήστης θέλει αλλαγές στο πλάνο, τροποποίησε και ξαναπαρουσίασε
+
+Risk Radar:
+- Αν ο χρήστης ρωτά "τι ρίσκα υπάρχουν", "τι πρέπει να προσέξω", "risk check", "risk radar" → get_risk_radar
+- Στο daily briefing, αν υπάρχουν σοβαρά ρίσκα, ανέφερέ τα
+- Παρουσίασε τα ρίσκα κατά severity (high πρώτα) με actionable suggestions
 
 Γλώσσα: Μιλάς πάντα ελληνικά εκτός αν σε ρωτήσουν σε άλλη γλώσσα.
 Αν δεν μπορείς να κάνεις κάτι, εξήγησε γιατί.

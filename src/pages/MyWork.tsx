@@ -688,7 +688,64 @@ export default function MyWork() {
   const briefIcons: Record<string, any> = { Palette, Monitor, FileText, Globe, Calendar, MessageSquare };
   const selectedDef = selectedBriefType ? getBriefDefinition(selectedBriefType) : null;
 
-  const backlogIds = useMemo(() => backlogTasks.map(t => t.id), [backlogTasks]);
+  const pagedTodayTasks = useMemo(
+    () => orderedTodayTasks.slice(todayPagination.from, todayPagination.to + 1),
+    [orderedTodayTasks, todayPagination.from, todayPagination.to],
+  );
+  const pagedBacklogTasks = useMemo(
+    () => backlogTasks.slice(backlogPagination.from, backlogPagination.to + 1),
+    [backlogTasks, backlogPagination.from, backlogPagination.to],
+  );
+  const pagedWeekEntries = useMemo(
+    () => Object.entries(weekTasksByDay).slice(weekPagination.from, weekPagination.to + 1),
+    [weekTasksByDay, weekPagination.from, weekPagination.to],
+  );
+  const pagedUpcomingTasks = useMemo(
+    () => upcomingTasks.slice(upcomingPagination.from, upcomingPagination.to + 1),
+    [upcomingTasks, upcomingPagination.from, upcomingPagination.to],
+  );
+  const pagedProjects = useMemo(
+    () => myProjects.slice(projectsPagination.from, projectsPagination.to + 1),
+    [myProjects, projectsPagination.from, projectsPagination.to],
+  );
+  const pagedBalances = useMemo(
+    () => balances.slice(leaveBalancePagination.from, leaveBalancePagination.to + 1),
+    [balances, leaveBalancePagination.from, leaveBalancePagination.to],
+  );
+  const pagedLeaveApprovals = useMemo(
+    () => pendingApprovals.slice(leaveApprovalsPagination.from, leaveApprovalsPagination.to + 1),
+    [pendingApprovals, leaveApprovalsPagination.from, leaveApprovalsPagination.to],
+  );
+
+  const backlogIds = useMemo(() => pagedBacklogTasks.map(t => t.id), [pagedBacklogTasks]);
+
+  useEffect(() => {
+    todayPagination.setTotalCount(orderedTodayTasks.length);
+  }, [orderedTodayTasks.length, todayPagination]);
+
+  useEffect(() => {
+    backlogPagination.setTotalCount(backlogTasks.length);
+  }, [backlogTasks.length, backlogPagination]);
+
+  useEffect(() => {
+    weekPagination.setTotalCount(Object.keys(weekTasksByDay).length);
+  }, [weekTasksByDay, weekPagination]);
+
+  useEffect(() => {
+    upcomingPagination.setTotalCount(upcomingTasks.length);
+  }, [upcomingTasks.length, upcomingPagination]);
+
+  useEffect(() => {
+    projectsPagination.setTotalCount(myProjects.length);
+  }, [myProjects.length, projectsPagination]);
+
+  useEffect(() => {
+    leaveBalancePagination.setTotalCount(balances.length);
+  }, [balances.length, leaveBalancePagination]);
+
+  useEffect(() => {
+    leaveApprovalsPagination.setTotalCount(pendingApprovals.length);
+  }, [pendingApprovals.length, leaveApprovalsPagination]);
 
   if (loading) {
     return (

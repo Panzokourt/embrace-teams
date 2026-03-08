@@ -2410,6 +2410,242 @@ export type Database = {
           },
         ]
       }
+      intake_request_history: {
+        Row: {
+          action: string
+          actor_id: string
+          comment: string | null
+          created_at: string
+          id: string
+          request_id: string
+          stage_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          request_id: string
+          stage_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          request_id?: string
+          stage_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intake_request_history_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "intake_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intake_request_history_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "intake_workflow_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      intake_requests: {
+        Row: {
+          client_id: string | null
+          company_id: string
+          created_at: string
+          current_stage_id: string | null
+          description: string | null
+          form_data: Json | null
+          id: string
+          project_id: string | null
+          requested_by: string
+          status: string
+          title: string
+          updated_at: string
+          workflow_id: string
+        }
+        Insert: {
+          client_id?: string | null
+          company_id: string
+          created_at?: string
+          current_stage_id?: string | null
+          description?: string | null
+          form_data?: Json | null
+          id?: string
+          project_id?: string | null
+          requested_by: string
+          status?: string
+          title: string
+          updated_at?: string
+          workflow_id: string
+        }
+        Update: {
+          client_id?: string | null
+          company_id?: string
+          created_at?: string
+          current_stage_id?: string | null
+          description?: string | null
+          form_data?: Json | null
+          id?: string
+          project_id?: string | null
+          requested_by?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          workflow_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intake_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intake_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intake_requests_current_stage_id_fkey"
+            columns: ["current_stage_id"]
+            isOneToOne: false
+            referencedRelation: "intake_workflow_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intake_requests_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intake_requests_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "intake_workflows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      intake_workflow_stages: {
+        Row: {
+          approver_role: string | null
+          approver_user_id: string | null
+          auto_advance: boolean
+          created_at: string
+          id: string
+          name: string
+          notify_on_enter: boolean
+          required_fields: Json | null
+          sla_hours: number | null
+          sort_order: number
+          stage_type: string
+          workflow_id: string
+        }
+        Insert: {
+          approver_role?: string | null
+          approver_user_id?: string | null
+          auto_advance?: boolean
+          created_at?: string
+          id?: string
+          name: string
+          notify_on_enter?: boolean
+          required_fields?: Json | null
+          sla_hours?: number | null
+          sort_order?: number
+          stage_type?: string
+          workflow_id: string
+        }
+        Update: {
+          approver_role?: string | null
+          approver_user_id?: string | null
+          auto_advance?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          notify_on_enter?: boolean
+          required_fields?: Json | null
+          sla_hours?: number | null
+          sort_order?: number
+          stage_type?: string
+          workflow_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intake_workflow_stages_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "intake_workflows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      intake_workflows: {
+        Row: {
+          auto_create_project: boolean
+          company_id: string
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          project_template_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          auto_create_project?: boolean
+          company_id: string
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          project_template_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          auto_create_project?: boolean
+          company_id?: string
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          project_template_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intake_workflows_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intake_workflows_project_template_id_fkey"
+            columns: ["project_template_id"]
+            isOneToOne: false
+            referencedRelation: "project_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invitations: {
         Row: {
           accepted_at: string | null

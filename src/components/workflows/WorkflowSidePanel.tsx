@@ -263,10 +263,10 @@ export function WorkflowSidePanel({ stage, onUpdate, onClose }: WorkflowSidePane
         <TabsContent value="templates" className="flex-1 overflow-y-auto p-4 space-y-4">
           <div className="space-y-1.5">
             <Label className="text-xs">Project Template</Label>
-            <Select value={linkedTemplateId} onValueChange={setLinkedTemplateId}>
+            <Select value={linkedTemplateId || '__none__'} onValueChange={v => setLinkedTemplateId(v === '__none__' ? '' : v)}>
               <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Επιλέξτε template..." /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Κανένα</SelectItem>
+                <SelectItem value="__none__">Κανένα</SelectItem>
                 {projectTemplates.map(t => (
                   <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                 ))}

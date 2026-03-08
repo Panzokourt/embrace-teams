@@ -975,6 +975,9 @@ export default function MyWork() {
         </div>
       </div>
 
+      {/* Pending Workflow Approvals */}
+      <PendingApprovalsCard />
+
       {/* Leave Approvals (admin/manager) */}
       {(isAdmin || isManager) && pendingApprovals.length > 0 && (
         <Card className="border-border/50 border-warning/30">

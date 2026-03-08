@@ -376,6 +376,7 @@ export function ProjectsTableView({
               disabled={!canManage}
             />
           </div>
+          <WorkflowStageBadge projectId={project.id} />
         </div>
       </TableCell>
 

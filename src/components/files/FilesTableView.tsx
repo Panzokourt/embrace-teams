@@ -763,9 +763,15 @@ export function FilesTableView({
               </tr>
             </thead>
             <TableBody>
-              {sortedFiles.map(renderFileRow)}
+              {pagedFiles.map(renderFileRow)}
             </TableBody>
           </Table>
+        </div>
+      )}
+      
+      {sortedFiles.length > 0 && (
+        <div className="px-4 bg-card/50 rounded-b-lg border-x border-b">
+          <PaginationControls pagination={pagination} />
         </div>
       )}
     </div>

@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { User, FolderKanban, CheckSquare, FileText, Send, Loader2, Mic, MicOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useVoiceRecognition } from "@/hooks/useVoiceRecognition";
+import QuickActionsMenu from "./QuickActionsMenu";
 
 interface MentionResult {
   id: string;
@@ -25,9 +26,11 @@ interface MentionInputProps {
   onSend: () => void;
   disabled?: boolean;
   placeholder?: string;
+  onSendMessage?: (text: string) => void;
+  onFileUpload?: (file: File) => void;
 }
 
-export default function MentionInput({ value, onChange, onSend, disabled, placeholder }: MentionInputProps) {
+export default function MentionInput({ value, onChange, onSend, disabled, placeholder, onSendMessage, onFileUpload }: MentionInputProps) {
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionQuery, setMentionQuery] = useState("");
   const [mentionResults, setMentionResults] = useState<MentionResult[]>([]);
@@ -143,6 +146,13 @@ export default function MentionInput({ value, onChange, onSend, disabled, placeh
 
   return (
     <div className="flex gap-2 items-end relative">
+      {onSendMessage && onFileUpload && (
+        <QuickActionsMenu
+          disabled={disabled}
+          onSendMessage={onSendMessage}
+          onFileUpload={onFileUpload}
+        />
+      )}
       <Popover open={mentionOpen} onOpenChange={setMentionOpen}>
         <PopoverAnchor asChild>
           <textarea

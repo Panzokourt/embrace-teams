@@ -10,6 +10,7 @@ import MentionInput from "./MentionInput";
 import ConversationSidebar from "./ConversationSidebar";
 import { parseAndRenderContent } from "./ActionRenderer";
 import { useLocation } from "react-router-dom";
+import { sanitizeStorageFileName } from "@/utils/storageKeys";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -404,6 +405,23 @@ export default function SecretaryChat({ mode, registerSendHandler }: SecretaryCh
             onChange={setInput}
             onSend={() => sendMessage(input)}
             disabled={loading}
+            onSendMessage={(text) => sendMessage(text)}
+            onFileUpload={async (file) => {
+              if (!user) return;
+              try {
+                const safeName = sanitizeStorageFileName(file.name);
+                const path = `${user.id}/${Date.now()}_${safeName}`;
+                const { error } = await supabase.storage
+                  .from("project-files")
+                  .upload(path, file);
+                if (error) throw error;
+                toast.success(`Αρχείο "${file.name}" ανέβηκε`);
+                sendMessage(`Ανέβασα αρχείο: ${file.name}`);
+              } catch (err) {
+                console.error("File upload error:", err);
+                toast.error("Σφάλμα κατά το ανέβασμα αρχείου");
+              }
+            }}
           />
         </div>
       </div>

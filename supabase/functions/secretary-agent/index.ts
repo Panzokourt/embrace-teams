@@ -1156,10 +1156,6 @@ serve(async (req) => {
       .order("created_at", { ascending: false })
       .limit(5);
 
-    const profile = profileRes.data;
-    const companyRole = companyRoleRes.data;
-    const companyId = companyRole?.company_id || "";
-
     const overdueCount = overdueRes.count || 0;
     const behindScheduleCount = (behindScheduleRes.data || []).length;
     const todayEventsCount = todayEventsRes.count || 0;

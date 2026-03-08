@@ -227,8 +227,8 @@ export function WorkflowNode({
               </span>
             )
           )}
-          {stage.notify_on_enter && <Bell className="h-3 w-3" title="Ειδοποίηση εισόδου" />}
-          {stage.auto_advance && <Zap className="h-3 w-3" title="Αυτόματη προώθηση" />}
+          {stage.notify_on_enter && <span title="Ειδοποίηση εισόδου"><Bell className="h-3 w-3" /></span>}
+          {stage.auto_advance && <span title="Αυτόματη προώθηση"><Zap className="h-3 w-3" /></span>}
           {(stage.required_fields as string[])?.length > 0 && (
             <span>{(stage.required_fields as string[]).length} πεδία</span>
           )}

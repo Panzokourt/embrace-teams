@@ -32,6 +32,7 @@ const quickActions: QuickAction[] = [
   { icon: Clock, label: "Log Time", prompt: "Θέλω να καταχωρήσω χρόνο εργασίας", color: "text-orange-500" },
   { icon: Brain, label: "Brain Analysis", prompt: "Τρέξε ανάλυση Brain", color: "text-pink-500" },
   { icon: ShieldAlert, label: "Risk Radar", prompt: "Τρέξε Risk Radar analysis", color: "text-red-500" },
+  { icon: GitBranch, label: "New Request", prompt: "Θέλω να υποβάλω ένα νέο intake request", color: "text-cyan-500" },
 ];
 
 interface QuickActionsMenuProps {

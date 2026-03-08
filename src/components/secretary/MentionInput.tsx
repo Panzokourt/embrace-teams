@@ -30,7 +30,7 @@ interface MentionInputProps {
   onFileUpload?: (file: File) => void;
 }
 
-export default function MentionInput({ value, onChange, onSend, disabled, placeholder }: MentionInputProps) {
+export default function MentionInput({ value, onChange, onSend, disabled, placeholder, onSendMessage, onFileUpload }: MentionInputProps) {
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionQuery, setMentionQuery] = useState("");
   const [mentionResults, setMentionResults] = useState<MentionResult[]>([]);

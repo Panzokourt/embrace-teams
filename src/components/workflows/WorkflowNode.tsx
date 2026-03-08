@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clock, Bell, Zap, Trash2, GripVertical } from 'lucide-react';
+import { Clock, Bell, Zap, Trash2, GripVertical, Users, FileText, Layout } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { IntakeWorkflowStage } from '@/hooks/useIntakeWorkflows';
 
@@ -96,10 +96,7 @@ export function WorkflowNode({
   if (specialType) {
     const isStart = specialType === 'start';
     return (
-      <div
-        className="absolute"
-        style={{ left: x, top: y, transform: 'translate(-50%, -50%)' }}
-      >
+      <div className="absolute" style={{ left: x, top: y, transform: 'translate(-50%, -50%)' }}>
         <div
           className={cn(
             "w-16 h-16 rounded-full flex items-center justify-center text-xs font-semibold cursor-pointer border-2 transition-all",
@@ -113,14 +110,12 @@ export function WorkflowNode({
         >
           {specialLabel || (isStart ? 'Αρχή' : 'Τέλος')}
         </div>
-        {/* Output handle for start */}
         {isStart && (
           <div
             className="absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-emerald-500 border-2 border-background cursor-crosshair hover:scale-125 transition-transform"
             onMouseDown={(e) => { e.stopPropagation(); onConnectionStart?.(e); }}
           />
         )}
-        {/* Input handle for end */}
         {!isStart && (
           <div
             className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-destructive border-2 border-background"
@@ -133,12 +128,13 @@ export function WorkflowNode({
 
   if (!stage) return null;
   const typeConf = stageTypeConfig[stage.stage_type] || stageTypeConfig.internal;
+  const roles = (stage as any).responsible_roles as string[] || [];
+  const fieldSetType = (stage as any).field_set_type as string | null;
+  const linkedTemplateId = (stage as any).linked_template_id as string | null;
+  const slaUnit = (stage as any).sla_unit || 'hours';
 
   return (
-    <div
-      className="absolute"
-      style={{ left: x, top: y, transform: 'translate(-50%, -50%)' }}
-    >
+    <div className="absolute" style={{ left: x, top: y, transform: 'translate(-50%, -50%)' }}>
       <div
         className={cn(
           "relative w-56 rounded-2xl border bg-card p-4 shadow-soft transition-all group cursor-pointer",
@@ -155,13 +151,13 @@ export function WorkflowNode({
           <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
         </div>
 
-        {/* Input handle (left) */}
+        {/* Input handle */}
         <div
           className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-muted-foreground/50 border-2 border-background hover:bg-foreground transition-colors"
           onMouseUp={(e) => { e.stopPropagation(); onConnectionEnd?.(); }}
         />
 
-        {/* Output handle (right) */}
+        {/* Output handle */}
         <div
           className="absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-muted-foreground/50 border-2 border-background cursor-crosshair hover:bg-foreground hover:scale-125 transition-all"
           onMouseDown={(e) => { e.stopPropagation(); onConnectionStart?.(e); }}
@@ -214,7 +210,7 @@ export function WorkflowNode({
                 onChange={e => setTempSla(e.target.value)}
                 onBlur={commitSla}
                 onKeyDown={e => { if (e.key === 'Enter') commitSla(); if (e.key === 'Escape') setEditingSla(false); }}
-              />ώρες
+              />{slaUnit === 'days' ? 'ημ.' : 'ώρ.'}
             </span>
           ) : (
             stage.sla_hours && (
@@ -223,7 +219,7 @@ export function WorkflowNode({
                 onDoubleClick={(e) => { e.stopPropagation(); startEditSla(); }}
                 title="Διπλό κλικ για αλλαγή SLA"
               >
-                <Clock className="h-3 w-3" />{stage.sla_hours}ώρες
+                <Clock className="h-3 w-3" />{stage.sla_hours}{slaUnit === 'days' ? 'ημ.' : 'ώρ.'}
               </span>
             )
           )}
@@ -233,6 +229,27 @@ export function WorkflowNode({
             <span>{(stage.required_fields as string[]).length} πεδία</span>
           )}
         </div>
+
+        {/* Badges row for roles, field set, template */}
+        {(roles.length > 0 || fieldSetType || linkedTemplateId) && (
+          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+            {roles.length > 0 && (
+              <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground" title={roles.join(', ')}>
+                <Users className="h-3 w-3" />{roles.length}
+              </span>
+            )}
+            {fieldSetType && (
+              <span className="flex items-center gap-0.5 text-[10px] text-primary/70" title={`Brief: ${fieldSetType}`}>
+                <FileText className="h-3 w-3" />
+              </span>
+            )}
+            {linkedTemplateId && (
+              <span className="flex items-center gap-0.5 text-[10px] text-purple-500" title="Συνδεδεμένο template">
+                <Layout className="h-3 w-3" />
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

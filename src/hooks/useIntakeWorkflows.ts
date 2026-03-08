@@ -37,6 +37,15 @@ export interface IntakeWorkflowStage {
   on_enter_actions: unknown[];
   on_exit_actions: unknown[];
   created_at: string;
+  // Extended fields
+  responsible_roles: string[];
+  min_approvals: number;
+  sla_unit: string;
+  sla_reason: string | null;
+  field_set_type: string | null;
+  custom_fields: unknown[];
+  notification_config: Record<string, unknown>;
+  linked_template_id: string | null;
 }
 
 export interface IntakeWorkflowConnection {

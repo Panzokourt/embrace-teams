@@ -345,7 +345,7 @@ export function WorkflowBuilder({ workflow, onBack, onUpdate }: WorkflowBuilderP
         connectionId={selectedConn?.id || null}
         label={selectedConn?.label || ''}
         condition={(selectedConn?.condition as any) || {}}
-        onSave={(id, label, condition) => updateConnection(id, { label, condition })}
+        onSave={(id, label, condition) => updateConnection(id, { label, condition: condition as Record<string, unknown> })}
         onDelete={(id) => { deleteConnection(id); setSelectedConnectionId(null); }}
       />
 

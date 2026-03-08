@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { User, FolderKanban, CheckSquare, FileText, Send, Loader2, Mic, MicOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useVoiceRecognition } from "@/hooks/useVoiceRecognition";
+import QuickActionsMenu from "./QuickActionsMenu";
 
 interface MentionResult {
   id: string;

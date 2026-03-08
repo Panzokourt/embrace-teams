@@ -26,6 +26,7 @@ import {
   Clock,
   Loader2,
   Megaphone,
+  GitBranch,
   Palette,
   FolderInput,
   Timer,

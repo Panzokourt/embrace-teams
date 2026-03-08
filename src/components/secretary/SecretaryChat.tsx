@@ -23,6 +23,8 @@ const defaultQuickActions = [
   { label: "📅 Νέο Meeting", prompt: "Θέλω να δημιουργήσω ένα νέο meeting" },
   { label: "⏱ Log Time", prompt: "Θέλω να καταχωρήσω χρόνο εργασίας" },
   { label: "☀️ Daily Briefing", prompt: "Τι έχω σήμερα;" },
+  { label: "🧠 Brain Analysis", prompt: "Τρέξε ανάλυση Brain" },
+  { label: "💡 Insights", prompt: "Δείξε μου τα τελευταία Brain insights" },
 ];
 
 function getContextualQuickActions(pathname: string) {

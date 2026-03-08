@@ -146,6 +146,13 @@ export default function MentionInput({ value, onChange, onSend, disabled, placeh
 
   return (
     <div className="flex gap-2 items-end relative">
+      {onSendMessage && onFileUpload && (
+        <QuickActionsMenu
+          disabled={disabled}
+          onSendMessage={onSendMessage}
+          onFileUpload={onFileUpload}
+        />
+      )}
       <Popover open={mentionOpen} onOpenChange={setMentionOpen}>
         <PopoverAnchor asChild>
           <textarea

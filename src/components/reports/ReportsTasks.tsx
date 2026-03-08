@@ -7,6 +7,10 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 import { AlertTriangle, CheckCircle2, Clock, ListTodo } from 'lucide-react';
 import { differenceInDays, parseISO, isAfter, isBefore, addDays } from 'date-fns';
 import { formatters } from '@/utils/exportUtils';
+import { usePagination } from '@/hooks/usePagination';
+import { PaginationControls } from '@/components/shared/PaginationControls';
+
+const PAGE_SIZE = 15;
 
 const STATUS_COLORS: Record<string, string> = {
   todo: '#94a3b8',
@@ -49,14 +53,13 @@ export function ReportsTasks({ data }: Props) {
     const total = data.tasks.length;
     const inProgress = data.tasks.filter(t => t.status === 'in_progress').length;
     const done = data.tasks.filter(t => t.status === 'done').length;
-    const overdue = data.tasks.filter(t => 
+    const overdue = data.tasks.filter(t =>
       t.due_date && t.status !== 'done' && isBefore(parseISO(t.due_date), today)
     ).length;
     return { total, inProgress, done, overdue };
   }, [data.tasks]);
 
   const criticalTasks = useMemo(() => {
-    const sevenDaysFromNow = addDays(today, 7);
     return data.tasks
       .filter(t => t.due_date && t.status !== 'done')
       .map(t => {
@@ -98,6 +101,12 @@ export function ReportsTasks({ data }: Props) {
     if (urgency === 'critical') return <Badge className="bg-orange-500 text-white">Κρίσιμο</Badge>;
     return <Badge variant="secondary">Σύντομα</Badge>;
   };
+
+  // Pagination for critical tasks
+  const pagination = usePagination(PAGE_SIZE);
+  const totalCritical = criticalTasks.length;
+  if (pagination.totalCount !== totalCritical) pagination.setTotalCount(totalCritical);
+  const pagedCritical = criticalTasks.slice(pagination.from, pagination.to + 1);
 
   return (
     <div className="space-y-6">
@@ -156,9 +165,10 @@ export function ReportsTasks({ data }: Props) {
             <CardTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-destructive" />
               Κρίσιμες Προθεσμίες
+              <span className="text-sm font-normal text-muted-foreground ml-1">({totalCritical})</span>
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -170,7 +180,7 @@ export function ReportsTasks({ data }: Props) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {criticalTasks.slice(0, 15).map((t: any) => (
+                {pagedCritical.map((t: any) => (
                   <TableRow key={t.id}>
                     <TableCell className="font-medium">{t.title}</TableCell>
                     <TableCell>{t.projectName}</TableCell>
@@ -181,6 +191,9 @@ export function ReportsTasks({ data }: Props) {
                 ))}
               </TableBody>
             </Table>
+            <div className="px-4">
+              <PaginationControls pagination={pagination} />
+            </div>
           </CardContent>
         </Card>
       )}

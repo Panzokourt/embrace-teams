@@ -15,6 +15,8 @@ import { EditDeleteActions } from '@/components/dialogs/EditDeleteActions';
 import { toast } from 'sonner';
 import { Plus, Loader2, Search } from 'lucide-react';
 import { format } from 'date-fns';
+import { usePagination } from '@/hooks/usePagination';
+import { PaginationControls } from '@/components/shared/PaginationControls';
 
 const EXPENSE_TYPES = [
   { value: 'vendor', label: 'Vendor' },
@@ -32,6 +34,8 @@ const APPROVAL_COLORS: Record<string, string> = {
   paid: 'bg-primary/10 text-primary',
 };
 
+const PAGE_SIZE = 25;
+
 export default function ExpensesManager() {
   const { isAdmin, isManager } = useAuth();
   const { logCreate, logUpdate, logDelete } = useActivityLogger();
@@ -44,6 +48,8 @@ export default function ExpensesManager() {
   const [editing, setEditing] = useState<any>(null);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
+
+  const pagination = usePagination(PAGE_SIZE);
 
   const [form, setForm] = useState({
     description: '', project_id: '', client_id: '', amount: '',
@@ -139,6 +145,12 @@ export default function ExpensesManager() {
     return true;
   });
 
+  if (pagination.totalCount !== filtered.length) {
+    pagination.setTotalCount(filtered.length);
+  }
+
+  const pagedExpenses = filtered.slice(pagination.from, pagination.to + 1);
+
   if (loading) return <div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
   return (
@@ -147,9 +159,9 @@ export default function ExpensesManager() {
         <div className="flex gap-3 flex-1">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Αναζήτηση..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+            <Input placeholder="Αναζήτηση..." value={search} onChange={e => { setSearch(e.target.value); pagination.reset(); }} className="pl-9" />
           </div>
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <Select value={typeFilter} onValueChange={v => { setTypeFilter(v); pagination.reset(); }}>
             <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Όλα</SelectItem>
@@ -273,7 +285,7 @@ export default function ExpensesManager() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map(exp => (
+              {pagedExpenses.map(exp => (
                 <TableRow key={exp.id}>
                   <TableCell>
                     <div>
@@ -303,6 +315,9 @@ export default function ExpensesManager() {
               ))}
             </TableBody>
           </Table>
+          <div className="px-4">
+            <PaginationControls pagination={pagination} />
+          </div>
         </Card>
       )}
     </div>

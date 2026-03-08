@@ -42,6 +42,10 @@ import { type ColumnConfig } from '@/components/shared/ColumnVisibilityToggle';
 import { exportToCSV, exportToExcel, formatters } from '@/utils/exportUtils';
 import { cn } from '@/lib/utils';
 import type { FileFolder } from './FolderTree';
+import { usePagination } from '@/hooks/usePagination';
+import { PaginationControls } from '@/components/shared/PaginationControls';
+
+const PAGE_SIZE = 25;
 
 export interface FileAttachment {
   id: string;
@@ -143,6 +147,8 @@ export function FilesTableView({
     defaultColumns: DEFAULT_COLUMNS,
   });
 
+  const pagination = usePagination(PAGE_SIZE);
+
   // Filter files by selected folder and search query
   const filteredFiles = useMemo(() => {
     let result = files;
@@ -195,13 +201,22 @@ export function FilesTableView({
     });
   }, [filteredFiles, sortField, sortDirection, folders]);
 
+  // Update pagination total count
+  if (pagination.totalCount !== sortedFiles.length) {
+    pagination.setTotalCount(sortedFiles.length);
+  }
+
+  const pagedFiles = useMemo(() => {
+    return sortedFiles.slice(pagination.from, pagination.to + 1);
+  }, [sortedFiles, pagination.from, pagination.to]);
+
   // Group files by folder
   const groupedFiles = useMemo(() => {
     if (groupBy !== 'status') return new Map();
 
     const groups = new Map<string, { label: React.ReactNode; files: FileAttachment[] }>();
     
-    sortedFiles.forEach(file => {
+    pagedFiles.forEach(file => {
       const folder = folders.find(f => f.id === file.folder_id);
       const key = folder?.id || 'no-folder';
       const label = folder ? (
@@ -230,6 +245,7 @@ export function FilesTableView({
       setSortField(field);
       setSortDirection('asc');
     }
+    pagination.reset();
   };
 
   const getSortIcon = (field: SortField) => {
@@ -552,7 +568,7 @@ export function FilesTableView({
           <Input
             placeholder="Αναζήτηση με όνομα ή τύπο..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => { setSearchQuery(e.target.value); pagination.reset(); }}
             className="pl-9 pr-9"
           />
           {searchQuery && (
@@ -747,9 +763,15 @@ export function FilesTableView({
               </tr>
             </thead>
             <TableBody>
-              {sortedFiles.map(renderFileRow)}
+              {pagedFiles.map(renderFileRow)}
             </TableBody>
           </Table>
+        </div>
+      )}
+      
+      {sortedFiles.length > 0 && (
+        <div className="px-4 bg-card/50 rounded-b-lg border-x border-b">
+          <PaginationControls pagination={pagination} />
         </div>
       )}
     </div>

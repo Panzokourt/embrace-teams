@@ -15,6 +15,8 @@ import { EditDeleteActions } from '@/components/dialogs/EditDeleteActions';
 import { toast } from 'sonner';
 import { Plus, Loader2, Search, CheckCircle2 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
+import { usePagination } from '@/hooks/usePagination';
+import { PaginationControls } from '@/components/shared/PaginationControls';
 
 const STATUS_COLORS: Record<string, string> = {
   unpaid: 'bg-amber-500/10 text-amber-500',
@@ -28,6 +30,8 @@ const STATUS_LABELS: Record<string, string> = {
   unpaid: 'Απλήρωτο', partially_paid: 'Μερικώς', paid: 'Πληρωμένο', overdue: 'Εκπρόθεσμο', cancelled: 'Ακυρωμένο',
 };
 
+const PAGE_SIZE = 25;
+
 export default function InvoicesManager() {
   const { isAdmin, isManager } = useAuth();
   const { logCreate, logUpdate, logDelete } = useActivityLogger();
@@ -40,6 +44,8 @@ export default function InvoicesManager() {
   const [editing, setEditing] = useState<any>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+
+  const pagination = usePagination(PAGE_SIZE);
 
   const [form, setForm] = useState({
     invoice_number: '', project_id: '', client_id: '', amount: '',
@@ -152,6 +158,12 @@ export default function InvoicesManager() {
     return true;
   });
 
+  if (pagination.totalCount !== filtered.length) {
+    pagination.setTotalCount(filtered.length);
+  }
+
+  const pagedInvoices = filtered.slice(pagination.from, pagination.to + 1);
+
   if (loading) return <div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
   return (
@@ -160,9 +172,9 @@ export default function InvoicesManager() {
         <div className="flex gap-3 flex-1">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Αναζήτηση..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+            <Input placeholder="Αναζήτηση..." value={search} onChange={e => { setSearch(e.target.value); pagination.reset(); }} className="pl-9" />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={v => { setStatusFilter(v); pagination.reset(); }}>
             <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Όλα</SelectItem>
@@ -286,7 +298,7 @@ export default function InvoicesManager() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map(inv => {
+              {pagedInvoices.map(inv => {
                 const status = inv.status || (inv.paid ? 'paid' : 'unpaid');
                 const agingDays = !inv.paid && inv.due_date ? differenceInDays(new Date(), new Date(inv.due_date)) : null;
                 return (
@@ -328,6 +340,9 @@ export default function InvoicesManager() {
               })}
             </TableBody>
           </Table>
+          <div className="px-4">
+            <PaginationControls pagination={pagination} />
+          </div>
         </Card>
       )}
     </div>

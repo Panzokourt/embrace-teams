@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
@@ -5,6 +6,10 @@ import { format, parseISO, differenceInDays } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { ReportsData } from '@/hooks/useReportsData';
+import { usePagination } from '@/hooks/usePagination';
+import { PaginationControls } from '@/components/shared/PaginationControls';
+
+const PAGE_SIZE = 15;
 
 export function ReportsFinancial({ data }: { data: ReportsData }) {
   const totalRevenue = data.invoices.filter(i => i.status === 'paid').reduce((s, i) => s + (i.amount || 0), 0);
@@ -48,6 +53,12 @@ export function ReportsFinancial({ data }: { data: ReportsData }) {
     { name: '31-60 ημ.', value: aging['60'] },
     { name: '60+ ημ.', value: aging['90'] },
   ];
+
+  // Pagination for invoices table
+  const pagination = usePagination(PAGE_SIZE);
+  const totalInvoices = data.invoices.length;
+  if (pagination.totalCount !== totalInvoices) pagination.setTotalCount(totalInvoices);
+  const pagedInvoices = data.invoices.slice(pagination.from, pagination.to + 1);
 
   return (
     <div className="space-y-6 print:space-y-4">
@@ -107,7 +118,7 @@ export function ReportsFinancial({ data }: { data: ReportsData }) {
 
       <Card>
         <CardHeader><CardTitle className="text-base">Τελευταία Τιμολόγια</CardTitle></CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
@@ -119,7 +130,7 @@ export function ReportsFinancial({ data }: { data: ReportsData }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.invoices.slice(0, 10).map(inv => (
+              {pagedInvoices.map(inv => (
                 <TableRow key={inv.id}>
                   <TableCell className="font-medium">{inv.invoice_number}</TableCell>
                   <TableCell>{inv.clients?.name || '-'}</TableCell>
@@ -134,6 +145,9 @@ export function ReportsFinancial({ data }: { data: ReportsData }) {
               ))}
             </TableBody>
           </Table>
+          <div className="px-4">
+            <PaginationControls pagination={pagination} />
+          </div>
         </CardContent>
       </Card>
     </div>

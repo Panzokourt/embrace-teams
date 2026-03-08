@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,6 +7,10 @@ import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { X, Calendar } from 'lucide-react';
 import type { LeaveRequest } from '@/hooks/useLeaveManagement';
+import { usePagination } from '@/hooks/usePagination';
+import { PaginationControls } from '@/components/shared/PaginationControls';
+
+const PAGE_SIZE = 15;
 
 const statusLabels: Record<string, string> = {
   pending: 'Εκκρεμεί',
@@ -28,6 +33,14 @@ interface LeaveRequestsListProps {
 }
 
 export function LeaveRequestsList({ requests, onCancel, showUser }: LeaveRequestsListProps) {
+  const pagination = usePagination(PAGE_SIZE);
+
+  if (pagination.totalCount !== requests.length) {
+    pagination.setTotalCount(requests.length);
+  }
+
+  const pagedRequests = requests.slice(pagination.from, pagination.to + 1);
+
   if (requests.length === 0) {
     return (
       <Card>
@@ -42,9 +55,12 @@ export function LeaveRequestsList({ requests, onCancel, showUser }: LeaveRequest
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Αιτήσεις Αδειών</CardTitle>
+        <CardTitle className="text-lg flex items-center gap-2">
+          Αιτήσεις Αδειών
+          <span className="text-sm font-normal text-muted-foreground">({requests.length})</span>
+        </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-0">
         <Table>
           <TableHeader>
             <TableRow>
@@ -58,7 +74,7 @@ export function LeaveRequestsList({ requests, onCancel, showUser }: LeaveRequest
             </TableRow>
           </TableHeader>
           <TableBody>
-            {requests.map(r => (
+            {pagedRequests.map(r => (
               <TableRow key={r.id}>
                 {showUser && (
                   <TableCell className="font-medium">
@@ -97,6 +113,9 @@ export function LeaveRequestsList({ requests, onCancel, showUser }: LeaveRequest
             ))}
           </TableBody>
         </Table>
+        <div className="px-4">
+          <PaginationControls pagination={pagination} />
+        </div>
       </CardContent>
     </Card>
   );

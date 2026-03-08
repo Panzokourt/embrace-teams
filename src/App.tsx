@@ -47,6 +47,7 @@ import PricingPage from "@/pages/PricingPage";
 import ServiceDetailPage from "@/pages/ServiceDetailPage";
 import Brain from "@/pages/Brain";
 import Secretary from "@/pages/Secretary";
+import Workflows from "@/pages/Workflows";
 
 function RedirectUserToEmployee() {
   const { id } = useParams();

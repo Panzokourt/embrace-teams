@@ -269,10 +269,10 @@ export function WorkflowStageDialog({ open, onOpenChange, stage, onSave, nextSor
           <TabsContent value="fields" className="overflow-y-auto flex-1 min-h-0 space-y-4 pr-1">
             <div className="space-y-1.5">
               <Label>Field Set (Πρότυπο)</Label>
-              <Select value={fieldSetType} onValueChange={applyFieldSet}>
+            <Select value={fieldSetType || '__none__'} onValueChange={v => applyFieldSet(v === '__none__' ? '' : v)}>
                 <SelectTrigger><SelectValue placeholder="Επιλέξτε πρότυπο πεδίων..." /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Κανένα</SelectItem>
+                  <SelectItem value="__none__">Κανένα</SelectItem>
                   {briefDefinitions.map(d => (
                     <SelectItem key={d.type} value={d.type}>{d.label}</SelectItem>
                   ))}

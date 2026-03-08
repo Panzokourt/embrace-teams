@@ -2600,15 +2600,23 @@ export type Database = {
           approver_user_id: string | null
           auto_advance: boolean
           created_at: string
+          custom_fields: Json | null
+          field_set_type: string | null
           id: string
+          linked_template_id: string | null
+          min_approvals: number | null
           name: string
+          notification_config: Json | null
           notify_on_enter: boolean
           on_enter_actions: Json | null
           on_exit_actions: Json | null
           position_x: number | null
           position_y: number | null
           required_fields: Json | null
+          responsible_roles: string[] | null
           sla_hours: number | null
+          sla_reason: string | null
+          sla_unit: string | null
           sort_order: number
           stage_type: string
           workflow_id: string
@@ -2618,15 +2626,23 @@ export type Database = {
           approver_user_id?: string | null
           auto_advance?: boolean
           created_at?: string
+          custom_fields?: Json | null
+          field_set_type?: string | null
           id?: string
+          linked_template_id?: string | null
+          min_approvals?: number | null
           name: string
+          notification_config?: Json | null
           notify_on_enter?: boolean
           on_enter_actions?: Json | null
           on_exit_actions?: Json | null
           position_x?: number | null
           position_y?: number | null
           required_fields?: Json | null
+          responsible_roles?: string[] | null
           sla_hours?: number | null
+          sla_reason?: string | null
+          sla_unit?: string | null
           sort_order?: number
           stage_type?: string
           workflow_id: string
@@ -2636,20 +2652,35 @@ export type Database = {
           approver_user_id?: string | null
           auto_advance?: boolean
           created_at?: string
+          custom_fields?: Json | null
+          field_set_type?: string | null
           id?: string
+          linked_template_id?: string | null
+          min_approvals?: number | null
           name?: string
+          notification_config?: Json | null
           notify_on_enter?: boolean
           on_enter_actions?: Json | null
           on_exit_actions?: Json | null
           position_x?: number | null
           position_y?: number | null
           required_fields?: Json | null
+          responsible_roles?: string[] | null
           sla_hours?: number | null
+          sla_reason?: string | null
+          sla_unit?: string | null
           sort_order?: number
           stage_type?: string
           workflow_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "intake_workflow_stages_linked_template_id_fkey"
+            columns: ["linked_template_id"]
+            isOneToOne: false
+            referencedRelation: "project_templates"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "intake_workflow_stages_workflow_id_fkey"
             columns: ["workflow_id"]

@@ -14,6 +14,9 @@ export interface IntakeWorkflow {
   created_by: string;
   created_at: string;
   updated_at: string;
+  version: number;
+  published_version: number;
+  is_draft: boolean;
   stages?: IntakeWorkflowStage[];
 }
 
@@ -29,6 +32,21 @@ export interface IntakeWorkflowStage {
   sla_hours: number | null;
   notify_on_enter: boolean;
   auto_advance: boolean;
+  position_x: number;
+  position_y: number;
+  on_enter_actions: unknown[];
+  on_exit_actions: unknown[];
+  created_at: string;
+}
+
+export interface IntakeWorkflowConnection {
+  id: string;
+  workflow_id: string;
+  from_stage_id: string | null;
+  to_stage_id: string | null;
+  label: string | null;
+  condition: Record<string, unknown>;
+  sort_order: number;
   created_at: string;
 }
 
@@ -58,6 +76,7 @@ export interface IntakeRequestHistory {
   created_at: string;
 }
 
+// ─── Workflows Hook ───
 export function useIntakeWorkflows() {
   const { company, user } = useAuth();
   const companyId = company?.id;
@@ -72,12 +91,8 @@ export function useIntakeWorkflows() {
       .select('*')
       .eq('company_id', companyId)
       .order('created_at', { ascending: false });
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } else {
-      setWorkflows((data as unknown as IntakeWorkflow[]) || []);
-    }
+    if (error) toast({ title: 'Σφάλμα', description: error.message, variant: 'destructive' });
+    else setWorkflows((data as unknown as IntakeWorkflow[]) || []);
     setLoading(false);
   }, [companyId]);
 
@@ -88,41 +103,22 @@ export function useIntakeWorkflows() {
     const { data, error } = await supabase
       .from('intake_workflows')
       .insert({ company_id: companyId, name, description: description || null, created_by: user.id } as any)
-      .select()
-      .single();
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      return null;
-    }
+      .select().single();
+    if (error) { toast({ title: 'Σφάλμα', description: error.message, variant: 'destructive' }); return null; }
     await fetchWorkflows();
     return data as unknown as IntakeWorkflow;
   };
 
   const updateWorkflow = async (id: string, updates: Partial<IntakeWorkflow>) => {
-    const { error } = await supabase
-      .from('intake_workflows')
-      .update(updates as any)
-      .eq('id', id);
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      return false;
-    }
+    const { error } = await supabase.from('intake_workflows').update(updates as any).eq('id', id);
+    if (error) { toast({ title: 'Σφάλμα', description: error.message, variant: 'destructive' }); return false; }
     await fetchWorkflows();
     return true;
   };
 
   const deleteWorkflow = async (id: string) => {
-    const { error } = await supabase
-      .from('intake_workflows')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      return false;
-    }
+    const { error } = await supabase.from('intake_workflows').delete().eq('id', id);
+    if (error) { toast({ title: 'Σφάλμα', description: error.message, variant: 'destructive' }); return false; }
     await fetchWorkflows();
     return true;
   };
@@ -130,6 +126,7 @@ export function useIntakeWorkflows() {
   return { workflows, loading, fetchWorkflows, createWorkflow, updateWorkflow, deleteWorkflow };
 }
 
+// ─── Stages Hook ───
 export function useWorkflowStages(workflowId: string | null) {
   const [stages, setStages] = useState<IntakeWorkflowStage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -142,7 +139,6 @@ export function useWorkflowStages(workflowId: string | null) {
       .select('*')
       .eq('workflow_id', workflowId)
       .order('sort_order', { ascending: true });
-
     if (!error) setStages((data as unknown as IntakeWorkflowStage[]) || []);
     setLoading(false);
   }, [workflowId]);
@@ -154,41 +150,22 @@ export function useWorkflowStages(workflowId: string | null) {
     const { data, error } = await supabase
       .from('intake_workflow_stages')
       .insert({ ...stage, workflow_id: workflowId } as any)
-      .select()
-      .single();
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      return null;
-    }
+      .select().single();
+    if (error) { toast({ title: 'Σφάλμα', description: error.message, variant: 'destructive' }); return null; }
     await fetchStages();
     return data as unknown as IntakeWorkflowStage;
   };
 
   const updateStage = async (id: string, updates: Partial<IntakeWorkflowStage>) => {
-    const { error } = await supabase
-      .from('intake_workflow_stages')
-      .update(updates as any)
-      .eq('id', id);
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      return false;
-    }
+    const { error } = await supabase.from('intake_workflow_stages').update(updates as any).eq('id', id);
+    if (error) { toast({ title: 'Σφάλμα', description: error.message, variant: 'destructive' }); return false; }
     await fetchStages();
     return true;
   };
 
   const deleteStage = async (id: string) => {
-    const { error } = await supabase
-      .from('intake_workflow_stages')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      return false;
-    }
+    const { error } = await supabase.from('intake_workflow_stages').delete().eq('id', id);
+    if (error) { toast({ title: 'Σφάλμα', description: error.message, variant: 'destructive' }); return false; }
     await fetchStages();
     return true;
   };
@@ -204,6 +181,51 @@ export function useWorkflowStages(workflowId: string | null) {
   return { stages, loading, fetchStages, addStage, updateStage, deleteStage, reorderStages };
 }
 
+// ─── Connections Hook ───
+export function useWorkflowConnections(workflowId: string | null) {
+  const [connections, setConnections] = useState<IntakeWorkflowConnection[]>([]);
+
+  const fetchConnections = useCallback(async () => {
+    if (!workflowId) { setConnections([]); return; }
+    const { data } = await supabase
+      .from('intake_workflow_connections')
+      .select('*')
+      .eq('workflow_id', workflowId)
+      .order('sort_order', { ascending: true });
+    setConnections((data as unknown as IntakeWorkflowConnection[]) || []);
+  }, [workflowId]);
+
+  useEffect(() => { fetchConnections(); }, [fetchConnections]);
+
+  const addConnection = async (conn: Partial<IntakeWorkflowConnection>) => {
+    if (!workflowId) return null;
+    const { data, error } = await supabase
+      .from('intake_workflow_connections')
+      .insert({ ...conn, workflow_id: workflowId } as any)
+      .select().single();
+    if (error) { toast({ title: 'Σφάλμα', description: error.message, variant: 'destructive' }); return null; }
+    await fetchConnections();
+    return data as unknown as IntakeWorkflowConnection;
+  };
+
+  const updateConnection = async (id: string, updates: Partial<IntakeWorkflowConnection>) => {
+    const { error } = await supabase.from('intake_workflow_connections').update(updates as any).eq('id', id);
+    if (error) { toast({ title: 'Σφάλμα', description: error.message, variant: 'destructive' }); return false; }
+    await fetchConnections();
+    return true;
+  };
+
+  const deleteConnection = async (id: string) => {
+    const { error } = await supabase.from('intake_workflow_connections').delete().eq('id', id);
+    if (error) { toast({ title: 'Σφάλμα', description: error.message, variant: 'destructive' }); return false; }
+    await fetchConnections();
+    return true;
+  };
+
+  return { connections, fetchConnections, addConnection, updateConnection, deleteConnection };
+}
+
+// ─── Requests Hook ───
 export function useIntakeRequests() {
   const { company, user } = useAuth();
   const companyId = company?.id;
@@ -218,7 +240,6 @@ export function useIntakeRequests() {
       .select('*')
       .eq('company_id', companyId)
       .order('created_at', { ascending: false });
-
     if (!error) setRequests((data as unknown as IntakeRequest[]) || []);
     setLoading(false);
   }, [companyId]);
@@ -230,27 +251,15 @@ export function useIntakeRequests() {
     const { data, error } = await supabase
       .from('intake_requests')
       .insert({ ...req, company_id: companyId, requested_by: user.id } as any)
-      .select()
-      .single();
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      return null;
-    }
+      .select().single();
+    if (error) { toast({ title: 'Σφάλμα', description: error.message, variant: 'destructive' }); return null; }
     await fetchRequests();
     return data as unknown as IntakeRequest;
   };
 
   const updateRequest = async (id: string, updates: Partial<IntakeRequest>) => {
-    const { error } = await supabase
-      .from('intake_requests')
-      .update(updates as any)
-      .eq('id', id);
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      return false;
-    }
+    const { error } = await supabase.from('intake_requests').update(updates as any).eq('id', id);
+    if (error) { toast({ title: 'Σφάλμα', description: error.message, variant: 'destructive' }); return false; }
     await fetchRequests();
     return true;
   };
@@ -260,13 +269,8 @@ export function useIntakeRequests() {
     const { data, error } = await supabase
       .from('intake_request_history')
       .insert({ ...entry, actor_id: user.id } as any)
-      .select()
-      .single();
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      return null;
-    }
+      .select().single();
+    if (error) { toast({ title: 'Σφάλμα', description: error.message, variant: 'destructive' }); return null; }
     return data as unknown as IntakeRequestHistory;
   };
 

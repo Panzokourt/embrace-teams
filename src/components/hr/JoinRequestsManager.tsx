@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -9,6 +9,8 @@ import { toast } from 'sonner';
 import { CheckCircle, XCircle, Loader2, UserPlus, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
+import { usePagination } from '@/hooks/usePagination';
+import { PaginationControls } from '@/components/shared/PaginationControls';
 
 interface JoinRequest {
   id: string;
@@ -22,6 +24,8 @@ interface JoinRequest {
   user_name: string;
 }
 
+const PAGE_SIZE = 20;
+
 export function JoinRequestsManager() {
   const { company, isOwner, isCompanyAdmin } = useAuth();
   const [requests, setRequests] = useState<JoinRequest[]>([]);
@@ -29,6 +33,7 @@ export function JoinRequestsManager() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const canManage = isOwner || isCompanyAdmin;
+  const pagination = usePagination(PAGE_SIZE);
 
   useEffect(() => {
     if (!company?.id) return;
@@ -47,7 +52,6 @@ export function JoinRequestsManager() {
 
       if (error) throw error;
 
-      // Fetch profile info for each request
       const userIds = (data || []).map(r => r.user_id);
       const { data: profiles } = await supabase
         .from('profiles')
@@ -56,11 +60,13 @@ export function JoinRequestsManager() {
 
       const profileMap = new Map((profiles || []).map(p => [p.id, p]));
 
-      setRequests((data || []).map(r => ({
+      const mapped = (data || []).map(r => ({
         ...r,
         user_email: profileMap.get(r.user_id)?.email || '',
         user_name: profileMap.get(r.user_id)?.full_name || '',
-      })));
+      }));
+      setRequests(mapped);
+      pagination.setTotalCount(mapped.length);
     } catch (error: any) {
       console.error('Error fetching join requests:', error);
     } finally {
@@ -77,48 +83,33 @@ export function JoinRequestsManager() {
       });
       if (error) throw error;
       const result = data as any;
-      if (!result.success) {
-        toast.error(result.error || 'Σφάλμα έγκρισης');
-        return;
-      }
+      if (!result.success) { toast.error(result.error || 'Σφάλμα έγκρισης'); return; }
       toast.success('Το αίτημα εγκρίθηκε');
       fetchRequests();
     } catch (error: any) {
       toast.error(error.message);
-    } finally {
-      setActionLoading(null);
-    }
+    } finally { setActionLoading(null); }
   };
 
   const handleReject = async (requestId: string) => {
     setActionLoading(requestId);
     try {
-      const { data, error } = await supabase.rpc('reject_join_request', {
-        _request_id: requestId
-      });
+      const { data, error } = await supabase.rpc('reject_join_request', { _request_id: requestId });
       if (error) throw error;
       const result = data as any;
-      if (!result.success) {
-        toast.error(result.error || 'Σφάλμα απόρριψης');
-        return;
-      }
+      if (!result.success) { toast.error(result.error || 'Σφάλμα απόρριψης'); return; }
       toast.success('Το αίτημα απορρίφθηκε');
       fetchRequests();
     } catch (error: any) {
       toast.error(error.message);
-    } finally {
-      setActionLoading(null);
-    }
+    } finally { setActionLoading(null); }
   };
 
   const pendingCount = requests.filter(r => r.status === 'pending').length;
+  const pagedRequests = requests.slice(pagination.from, pagination.to + 1);
 
   if (loading) {
-    return (
-      <div className="flex justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-      </div>
-    );
+    return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   }
 
   return (
@@ -127,9 +118,7 @@ export function JoinRequestsManager() {
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-semibold">Αιτήματα Ένταξης</h2>
           {pendingCount > 0 && (
-            <Badge variant="destructive" className="text-xs">
-              {pendingCount} εκκρεμή
-            </Badge>
+            <Badge variant="destructive" className="text-xs">{pendingCount} εκκρεμή</Badge>
           )}
         </div>
       </div>
@@ -157,14 +146,10 @@ export function JoinRequestsManager() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {requests.map((req) => (
+              {pagedRequests.map((req) => (
                 <TableRow key={req.id}>
-                  <TableCell className="font-medium">
-                    {req.user_name || '—'}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {req.user_email}
-                  </TableCell>
+                  <TableCell className="font-medium">{req.user_name || '—'}</TableCell>
+                  <TableCell className="text-muted-foreground">{req.user_email}</TableCell>
                   <TableCell className="text-muted-foreground">
                     {format(new Date(req.created_at), 'dd MMM yyyy, HH:mm', { locale: el })}
                   </TableCell>
@@ -189,26 +174,12 @@ export function JoinRequestsManager() {
                     <TableCell className="text-right">
                       {req.status === 'pending' && (
                         <div className="flex gap-2 justify-end">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-green-600 hover:bg-green-50"
-                            onClick={() => handleApprove(req.id)}
-                            disabled={actionLoading === req.id}
-                          >
-                            {actionLoading === req.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <><CheckCircle className="h-4 w-4 mr-1" />Έγκριση</>
-                            )}
+                          <Button size="sm" variant="outline" className="text-green-600 hover:bg-green-50"
+                            onClick={() => handleApprove(req.id)} disabled={actionLoading === req.id}>
+                            {actionLoading === req.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <><CheckCircle className="h-4 w-4 mr-1" />Έγκριση</>}
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-red-600 hover:bg-red-50"
-                            onClick={() => handleReject(req.id)}
-                            disabled={actionLoading === req.id}
-                          >
+                          <Button size="sm" variant="outline" className="text-red-600 hover:bg-red-50"
+                            onClick={() => handleReject(req.id)} disabled={actionLoading === req.id}>
                             <XCircle className="h-4 w-4 mr-1" />Απόρριψη
                           </Button>
                         </div>
@@ -219,20 +190,21 @@ export function JoinRequestsManager() {
               ))}
             </TableBody>
           </Table>
+          <div className="px-4">
+            <PaginationControls pagination={pagination} />
+          </div>
         </Card>
       )}
     </div>
   );
 }
 
-// Export a hook to get pending count for badge display
 export function useJoinRequestsCount() {
   const { company, isOwner, isCompanyAdmin } = useAuth();
   const [count, setCount] = useState(0);
 
   useEffect(() => {
     if (!company?.id || (!isOwner && !isCompanyAdmin)) return;
-
     const fetchCount = async () => {
       const { count: pendingCount } = await supabase
         .from('join_requests')
@@ -241,7 +213,6 @@ export function useJoinRequestsCount() {
         .eq('status', 'pending');
       setCount(pendingCount || 0);
     };
-
     fetchCount();
   }, [company?.id, isOwner, isCompanyAdmin]);
 

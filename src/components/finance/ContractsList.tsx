@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Search, FileText, ExternalLink } from 'lucide-react';
+import { Loader2, Search, FileText } from 'lucide-react';
 import { format } from 'date-fns';
-import { el } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
+import { usePagination } from '@/hooks/usePagination';
+import { PaginationControls } from '@/components/shared/PaginationControls';
 
 interface Contract {
   id: string;
@@ -33,12 +33,16 @@ const STATUS_COLORS: Record<string, string> = {
   renewed: 'bg-foreground/10 text-foreground',
 };
 
+const PAGE_SIZE = 25;
+
 export default function ContractsList() {
   const navigate = useNavigate();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+
+  const pagination = usePagination(PAGE_SIZE);
 
   useEffect(() => { fetchContracts(); }, []);
 
@@ -62,6 +66,14 @@ export default function ContractsList() {
     return true;
   });
 
+  // Sync pagination count when filter changes
+  if (pagination.totalCount !== filtered.length) {
+    pagination.setTotalCount(filtered.length);
+    pagination.reset();
+  }
+
+  const pagedContracts = filtered.slice(pagination.from, pagination.to + 1);
+
   if (loading) return <div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
   return (
@@ -69,9 +81,9 @@ export default function ContractsList() {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Αναζήτηση..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+          <Input placeholder="Αναζήτηση..." value={search} onChange={e => { setSearch(e.target.value); pagination.reset(); }} className="pl-9" />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select value={statusFilter} onValueChange={v => { setStatusFilter(v); pagination.reset(); }}>
           <SelectTrigger className="w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Όλα</SelectItem>
@@ -100,7 +112,7 @@ export default function ContractsList() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map(c => (
+              {pagedContracts.map(c => (
                 <TableRow key={c.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/projects/${c.project_id}`)}>
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -126,6 +138,9 @@ export default function ContractsList() {
               ))}
             </TableBody>
           </Table>
+          <div className="px-4">
+            <PaginationControls pagination={pagination} />
+          </div>
         </Card>
       )}
     </div>

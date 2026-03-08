@@ -6,6 +6,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Search, UserPlus, ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { OrgPosition } from './types';
+import { usePagination } from '@/hooks/usePagination';
+import { PaginationControls } from '@/components/shared/PaginationControls';
+
+const PAGE_SIZE = 25;
 
 interface OrgListViewProps {
   positions: OrgPosition[];
@@ -24,9 +28,12 @@ export function OrgListView({ positions, onNodeClick }: OrgListViewProps) {
   const [sortKey, setSortKey] = useState<SortKey>('level');
   const [sortAsc, setSortAsc] = useState(true);
 
+  const pagination = usePagination(PAGE_SIZE);
+
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
     else { setSortKey(key); setSortAsc(true); }
+    pagination.reset();
   };
 
   const filtered = useMemo(() => {
@@ -53,6 +60,9 @@ export function OrgListView({ positions, onNodeClick }: OrgListViewProps) {
     return items;
   }, [positions, search, sortKey, sortAsc]);
 
+  if (pagination.totalCount !== filtered.length) pagination.setTotalCount(filtered.length);
+  const pagedItems = filtered.slice(pagination.from, pagination.to + 1);
+
   const SortBtn = ({ label, k }: { label: string; k: SortKey }) => (
     <Button variant="ghost" size="sm" className="h-auto p-0 font-medium hover:bg-transparent" onClick={() => toggleSort(k)}>
       {label}
@@ -67,7 +77,7 @@ export function OrgListView({ positions, onNodeClick }: OrgListViewProps) {
         <Input
           placeholder="Αναζήτηση ατόμου, θέσης, τμήματος..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); pagination.reset(); }}
           className="pl-9"
         />
       </div>
@@ -84,7 +94,7 @@ export function OrgListView({ positions, onNodeClick }: OrgListViewProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map(pos => (
+            {pagedItems.map(pos => (
               <TableRow
                 key={pos.id}
                 className="cursor-pointer hover:bg-muted/50"
@@ -125,7 +135,7 @@ export function OrgListView({ positions, onNodeClick }: OrgListViewProps) {
                 </TableCell>
               </TableRow>
             ))}
-            {filtered.length === 0 && (
+            {pagedItems.length === 0 && (
               <TableRow>
                 <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
                   Δεν βρέθηκαν αποτελέσματα
@@ -134,6 +144,9 @@ export function OrgListView({ positions, onNodeClick }: OrgListViewProps) {
             )}
           </TableBody>
         </Table>
+        <div className="px-4">
+          <PaginationControls pagination={pagination} />
+        </div>
       </div>
     </div>
   );

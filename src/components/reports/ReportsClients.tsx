@@ -1,7 +1,12 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { ReportsData } from '@/hooks/useReportsData';
+import { usePagination } from '@/hooks/usePagination';
+import { PaginationControls } from '@/components/shared/PaginationControls';
+
+const PAGE_SIZE = 15;
 
 export function ReportsClients({ data }: { data: ReportsData }) {
   const clientStats = data.clients.map(c => {
@@ -31,10 +36,16 @@ export function ReportsClients({ data }: { data: ReportsData }) {
     Κέρδος: c.profit,
   }));
 
+  // Pagination
+  const pagination = usePagination(PAGE_SIZE);
+  const total = clientStats.length;
+  if (pagination.totalCount !== total) pagination.setTotalCount(total);
+  const pagedStats = clientStats.slice(pagination.from, pagination.to + 1);
+
   return (
     <div className="space-y-6 print:space-y-4">
       <Card>
-        <CardHeader><CardTitle className="text-base">Έσοδα & Κέρδος ανά Πελάτη</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Έσοδα & Κέρδος ανά Πελάτη (Top 10)</CardTitle></CardHeader>
         <CardContent>
           <div className="h-[320px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -53,7 +64,7 @@ export function ReportsClients({ data }: { data: ReportsData }) {
 
       <Card>
         <CardHeader><CardTitle className="text-base">Αναλυτικά ανά Πελάτη</CardTitle></CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
@@ -67,7 +78,7 @@ export function ReportsClients({ data }: { data: ReportsData }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {clientStats.map(c => (
+              {pagedStats.map(c => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.name}</TableCell>
                   <TableCell className="text-right">{c.projects}</TableCell>
@@ -82,6 +93,9 @@ export function ReportsClients({ data }: { data: ReportsData }) {
               ))}
             </TableBody>
           </Table>
+          <div className="px-4">
+            <PaginationControls pagination={pagination} />
+          </div>
         </CardContent>
       </Card>
     </div>

@@ -11,6 +11,10 @@ import { format, parseISO } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { usePagination } from '@/hooks/usePagination';
+import { PaginationControls } from '@/components/shared/PaginationControls';
+
+const PAGE_SIZE = 25;
 
 interface TimeEntriesListViewProps {
   entries: TimeEntry[];
@@ -25,6 +29,10 @@ export function TimeEntriesListView({ entries, users, showUserColumn, onDelete, 
   const [editValues, setEditValues] = useState<{ start: string; end: string; description: string }>({
     start: '', end: '', description: ''
   });
+
+  const pagination = usePagination(PAGE_SIZE);
+  if (pagination.totalCount !== entries.length) pagination.setTotalCount(entries.length);
+  const pagedEntries = entries.slice(pagination.from, pagination.to + 1);
 
   const startEdit = (entry: TimeEntry) => {
     setEditingId(entry.id);
@@ -50,20 +58,11 @@ export function TimeEntriesListView({ entries, users, showUserColumn, onDelete, 
 
     const { error } = await supabase
       .from('time_entries')
-      .update({
-        start_time: newStart,
-        end_time: newEnd,
-        duration_minutes: durationMinutes,
-        description: editValues.description || null,
-      })
+      .update({ start_time: newStart, end_time: newEnd, duration_minutes: durationMinutes, description: editValues.description || null })
       .eq('id', entry.id);
 
-    if (error) {
-      toast.error('Σφάλμα αποθήκευσης');
-    } else {
-      toast.success('Ενημερώθηκε');
-      onRefresh();
-    }
+    if (error) { toast.error('Σφάλμα αποθήκευσης'); }
+    else { toast.success('Ενημερώθηκε'); onRefresh(); }
     setEditingId(null);
   };
 
@@ -83,15 +82,14 @@ export function TimeEntriesListView({ entries, users, showUserColumn, onDelete, 
           </TableRow>
         </TableHeader>
         <TableBody>
-          {entries.length === 0 ? (
+          {pagedEntries.length === 0 ? (
             <TableRow>
               <TableCell colSpan={showUserColumn ? 8 : 7} className="text-center text-muted-foreground py-12">
                 Δεν βρέθηκαν καταχωρήσεις
               </TableCell>
             </TableRow>
-          ) : entries.map(entry => {
+          ) : pagedEntries.map(entry => {
             const isEditing = editingId === entry.id;
-
             return (
               <TableRow key={entry.id}>
                 <TableCell className="text-sm">
@@ -100,19 +98,9 @@ export function TimeEntriesListView({ entries, users, showUserColumn, onDelete, 
                 <TableCell className="text-sm font-mono">
                   {isEditing ? (
                     <div className="flex items-center gap-1">
-                      <Input
-                        type="time"
-                        value={editValues.start}
-                        onChange={e => setEditValues(v => ({ ...v, start: e.target.value }))}
-                        className="h-7 w-24 text-xs"
-                      />
+                      <Input type="time" value={editValues.start} onChange={e => setEditValues(v => ({ ...v, start: e.target.value }))} className="h-7 w-24 text-xs" />
                       <span>→</span>
-                      <Input
-                        type="time"
-                        value={editValues.end}
-                        onChange={e => setEditValues(v => ({ ...v, end: e.target.value }))}
-                        className="h-7 w-24 text-xs"
-                      />
+                      <Input type="time" value={editValues.end} onChange={e => setEditValues(v => ({ ...v, end: e.target.value }))} className="h-7 w-24 text-xs" />
                     </div>
                   ) : (
                     <>
@@ -138,12 +126,7 @@ export function TimeEntriesListView({ entries, users, showUserColumn, onDelete, 
                 )}
                 <TableCell className="text-sm text-muted-foreground max-w-[200px]">
                   {isEditing ? (
-                    <Input
-                      value={editValues.description}
-                      onChange={e => setEditValues(v => ({ ...v, description: e.target.value }))}
-                      className="h-7 text-xs"
-                      placeholder="Σημειώσεις..."
-                    />
+                    <Input value={editValues.description} onChange={e => setEditValues(v => ({ ...v, description: e.target.value }))} className="h-7 text-xs" placeholder="Σημειώσεις..." />
                   ) : (
                     <span className="truncate block">{entry.description || '—'}</span>
                   )}
@@ -178,6 +161,9 @@ export function TimeEntriesListView({ entries, users, showUserColumn, onDelete, 
           })}
         </TableBody>
       </Table>
+      <div className="px-4">
+        <PaginationControls pagination={pagination} />
+      </div>
     </div>
   );
 }

@@ -345,6 +345,9 @@ export default function ProjectDetailPage() {
                   <DollarSign className="h-3.5 w-3.5" /> Οικονομικά
                 </TabsTrigger>
               )}
+              <TabsTrigger value="workflow" className="text-xs gap-1">
+                <GitBranch className="h-3.5 w-3.5" /> Ροή
+              </TabsTrigger>
               <TabsTrigger value="comments" className="text-xs gap-1">
                 <MessageSquare className="h-3.5 w-3.5" /> Σχόλια
               </TabsTrigger>

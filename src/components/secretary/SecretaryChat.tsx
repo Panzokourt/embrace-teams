@@ -10,6 +10,7 @@ import MentionInput from "./MentionInput";
 import ConversationSidebar from "./ConversationSidebar";
 import { parseAndRenderContent } from "./ActionRenderer";
 import { useLocation } from "react-router-dom";
+import { sanitizeStorageFileName } from "@/utils/storageKeys";
 
 interface ChatMessage {
   role: "user" | "assistant";

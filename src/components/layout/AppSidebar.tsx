@@ -459,6 +459,7 @@ export default function AppSidebar({
                 <SidebarLink to="/backlog" icon={<FileStack className="h-[18px] w-[18px]" />} label="Backlog" active={location.pathname === '/backlog'} collapsed={false} onClick={() => { onItemClick?.(); }} />
                 <SidebarLink to="/blueprints" icon={<FileStack className="h-[18px] w-[18px]" />} label="Templates" active={location.pathname === '/blueprints'} collapsed={false} onClick={() => { onItemClick?.(); }} />
                 <SidebarLink to="/files" icon={<FileArchive className="h-[18px] w-[18px]" />} label="Files" active={location.pathname === '/files'} collapsed={false} onClick={() => { onItemClick?.(); }} />
+                <SidebarLink to="/workflows" icon={<GitBranch className="h-[18px] w-[18px]" />} label="Workflows" active={location.pathname === '/workflows'} collapsed={false} onClick={() => { onItemClick?.(); }} />
               </>
             ) : (
               categoryNavItems[flyoutCategory || activeCategory]?.filter(canAccess).map((item) => {

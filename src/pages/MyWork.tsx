@@ -529,7 +529,7 @@ export default function MyWork() {
 
     setTodayTasks(todayFiltered);
     setWeekTasks(weekFiltered);
-    setUpcomingTasks(upcomingFiltered.slice(0, 20));
+    setUpcomingTasks(upcomingFiltered);
     setBacklogTasks(backlogFiltered);
 
     const activeProjects = (projects.data || []).map((p: any) => p.project).filter((p: any) => p && p.status === 'active') as MyProject[];

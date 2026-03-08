@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,14 +16,72 @@ interface ChatMessage {
   content: string;
 }
 
-const quickActions = [
+const defaultQuickActions = [
   { label: "📋 Tasks μου", prompt: "Δείξε μου τα tasks μου" },
   { label: "📝 Νέο Brief", prompt: "Θέλω να δημιουργήσω ένα νέο brief" },
-  { label: "📁 Αρχεία", prompt: "Αναζήτησε αρχεία" },
-  { label: "🏖 Άδεια", prompt: "Θέλω να κάνω αίτημα άδειας" },
-  { label: "📊 Projects", prompt: "Δείξε μου τα projects" },
-  { label: "👥 Ομάδα", prompt: "Δείξε μου τα μέλη της ομάδας" },
+  { label: "🚀 Νέο Project", prompt: "Θέλω να δημιουργήσω ένα νέο project" },
+  { label: "📅 Νέο Meeting", prompt: "Θέλω να δημιουργήσω ένα νέο meeting" },
+  { label: "⏱ Log Time", prompt: "Θέλω να καταχωρήσω χρόνο εργασίας" },
+  { label: "☀️ Daily Briefing", prompt: "Τι έχω σήμερα;" },
 ];
+
+function getContextualQuickActions(pathname: string) {
+  // Project detail page
+  const projectMatch = pathname.match(/^\/projects\/([^/]+)$/);
+  if (projectMatch) {
+    const pid = projectMatch[1];
+    return [
+      { label: "📋 Tasks project", prompt: `Δείξε μου τα tasks αυτού του project (project_id: ${pid})` },
+      { label: "➕ Νέο Task", prompt: `Θέλω να δημιουργήσω task σε αυτό το project (project_id: ${pid})` },
+      { label: "👥 Πρόσθεσε μέλος", prompt: `Θέλω να προσθέσω μέλος στο project (project_id: ${pid})` },
+      { label: "📊 Αναφορά", prompt: `Δημιούργησε αναφορά για αυτό το project (project_id: ${pid})` },
+      { label: "🔄 Αλλαγή Status", prompt: `Θέλω να αλλάξω το status αυτού του project (project_id: ${pid})` },
+      { label: "⏱ Log Time", prompt: `Θέλω να καταχωρήσω χρόνο για αυτό το project (project_id: ${pid})` },
+    ];
+  }
+  // Tasks page
+  if (pathname === "/tasks") {
+    return [
+      { label: "📋 Tasks μου", prompt: "Δείξε μου τα tasks μου" },
+      { label: "➕ Νέο Task", prompt: "Θέλω να δημιουργήσω ένα νέο task" },
+      { label: "⚠️ Overdue", prompt: "Δείξε μου τα overdue tasks" },
+      { label: "📊 Tasks Report", prompt: "Δημιούργησε CSV αναφορά tasks" },
+    ];
+  }
+  // Calendar page
+  if (pathname === "/calendar") {
+    return [
+      { label: "📅 Νέο Meeting", prompt: "Θέλω να δημιουργήσω ένα νέο meeting" },
+      { label: "☀️ Σημερινά events", prompt: "Τι events έχω σήμερα;" },
+      { label: "📋 Tasks μου", prompt: "Δείξε μου τα tasks μου" },
+    ];
+  }
+  // Timesheets page
+  if (pathname === "/timesheets") {
+    return [
+      { label: "⏱ Log Time", prompt: "Θέλω να καταχωρήσω χρόνο εργασίας" },
+      { label: "📋 Tasks μου", prompt: "Δείξε μου τα tasks μου" },
+      { label: "📊 Projects", prompt: "Δείξε μου τα projects" },
+    ];
+  }
+  // Chat page
+  if (pathname === "/chat") {
+    return [
+      { label: "💬 Στείλε μήνυμα", prompt: "Θέλω να στείλω μήνυμα σε κανάλι" },
+      { label: "📋 Tasks μου", prompt: "Δείξε μου τα tasks μου" },
+      { label: "☀️ Daily Briefing", prompt: "Τι έχω σήμερα;" },
+    ];
+  }
+  // Clients page
+  if (pathname === "/clients" || pathname.match(/^\/clients\/[^/]+$/)) {
+    return [
+      { label: "👤 Νέος Πελάτης", prompt: "Θέλω να δημιουργήσω νέο πελάτη" },
+      { label: "🔍 Αναζήτηση", prompt: "Αναζήτησε πελάτη" },
+      { label: "🚀 Νέο Project", prompt: "Θέλω να δημιουργήσω ένα νέο project" },
+    ];
+  }
+  return defaultQuickActions;
+}
 
 interface SecretaryChatProps {
   mode: "full" | "panel";
@@ -39,6 +97,8 @@ export default function SecretaryChat({ mode, registerSendHandler }: SecretaryCh
   const [sidebarKey, setSidebarKey] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
+
+  const quickActions = useMemo(() => getContextualQuickActions(location.pathname), [location.pathname]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -157,6 +217,7 @@ export default function SecretaryChat({ mode, registerSendHandler }: SecretaryCh
           },
           body: JSON.stringify({
             messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
+            current_page: location.pathname,
           }),
         }
       );
@@ -248,7 +309,7 @@ export default function SecretaryChat({ mode, registerSendHandler }: SecretaryCh
                   Γεια{firstName ? ` ${firstName}` : ""}! 👋
                 </h2>
                 <p className="text-muted-foreground max-w-md">
-                  Είμαι ο Secretary, ο AI βοηθός σου. Μπορώ να δημιουργήσω tasks, briefs, να αναζητήσω αρχεία, να κάνω αίτημα άδειας και πολλά ακόμα.
+                  Είμαι ο Secretary, ο AI βοηθός σου. Μπορώ να δημιουργήσω projects, tasks, meetings, briefs, να καταχωρήσω χρόνο, να αναζητήσω αρχεία και πολλά ακόμα.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 justify-center max-w-lg">

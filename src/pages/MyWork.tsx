@@ -433,6 +433,14 @@ export default function MyWork() {
   const [selectedBriefType, setSelectedBriefType] = useState<string | null>(null);
   const [backlogOpen, setBacklogOpen] = useState(true);
 
+  const todayPagination = usePagination(10);
+  const backlogPagination = usePagination(10);
+  const weekPagination = usePagination(12);
+  const upcomingPagination = usePagination(10);
+  const projectsPagination = usePagination(5);
+  const leaveBalancePagination = usePagination(5);
+  const leaveApprovalsPagination = usePagination(6);
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),

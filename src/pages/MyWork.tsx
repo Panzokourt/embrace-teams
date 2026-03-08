@@ -922,26 +922,37 @@ export default function MyWork() {
               <CardTitle className="text-base font-semibold">Tasks Σήμερα</CardTitle>
               <Link to="/work?tab=tasks" className="text-xs text-primary hover:underline flex items-center gap-1">Δες όλα <ArrowRight className="h-3 w-3" /></Link>
             </CardHeader>
-            <CardContent className="p-0 overflow-x-auto">
+            <CardContent className="p-0">
               <DroppableContainer id="today-drop">
                 {orderedTodayTasks.length === 0 ? (
                   <p className="text-sm text-muted-foreground px-6 py-4">Κανένα task για σήμερα 🎉</p>
                 ) : (
-                  <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
-                    <table className="w-full text-sm">
-                      <TaskTableHeader draggable />
-                      <tbody>
-                        {orderedTodayTasks.map(task => (
-                          <SortableTaskRow
-                            key={task.id} task={task} today={today} draggable
-                            onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
-                            activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
-                            onFlagToggle={toggleFlagPriority}
-                          />
-                        ))}
-                      </tbody>
-                    </table>
-                  </SortableContext>
+                  <>
+                    <ScrollArea className="max-h-[32rem]">
+                      <div className="overflow-x-auto">
+                        <SortableContext items={pagedTodayTasks.map(task => task.id)} strategy={verticalListSortingStrategy}>
+                          <table className="w-full text-sm">
+                            <TaskTableHeader draggable />
+                            <tbody>
+                              {pagedTodayTasks.map(task => (
+                                <SortableTaskRow
+                                  key={task.id} task={task} today={today} draggable
+                                  onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
+                                  activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
+                                  onFlagToggle={toggleFlagPriority}
+                                />
+                              ))}
+                            </tbody>
+                          </table>
+                        </SortableContext>
+                      </div>
+                    </ScrollArea>
+                    {orderedTodayTasks.length > todayPagination.pageSize && (
+                      <div className="px-4 md:px-6 border-t border-border/50">
+                        <PaginationControls pagination={todayPagination} />
+                      </div>
+                    )}
+                  </>
                 )}
               </DroppableContainer>
             </CardContent>

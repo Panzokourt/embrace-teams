@@ -958,6 +958,124 @@ async function executeTool(
         };
       }
 
+      // ── BRAIN TOOL EXECUTORS ──
+
+      case "run_brain_analysis": {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const resp = await fetch(`${supabaseUrl}/functions/v1/brain-analyze`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+            ...(args.focus ? {} : {}),
+          },
+          body: JSON.stringify({ focus: args.focus || null }),
+        });
+        if (!resp.ok) {
+          const errText = await resp.text();
+          return { error: `Brain analysis failed: ${errText}` };
+        }
+        const brainResult = await resp.json();
+        // Fetch the latest insights generated
+        const { data: newInsights } = await supabase
+          .from("brain_insights")
+          .select("id, title, body, category, priority, neuro_tactic")
+          .eq("company_id", companyId)
+          .eq("is_dismissed", false)
+          .order("created_at", { ascending: false })
+          .limit(5);
+        return {
+          success: true,
+          message: "Brain analysis completed",
+          insights_generated: (newInsights || []).length,
+          top_insights: (newInsights || []).map((i: any) => ({
+            id: i.id,
+            title: i.title,
+            category: i.category,
+            priority: i.priority,
+            summary: i.body?.substring(0, 200),
+            neuro_tactic: i.neuro_tactic,
+          })),
+        };
+      }
+
+      case "get_brain_insights": {
+        let q = supabase
+          .from("brain_insights")
+          .select("id, title, body, category, priority, evidence, neuro_tactic, neuro_rationale, created_at, is_actioned")
+          .eq("company_id", companyId)
+          .eq("is_dismissed", false)
+          .order("created_at", { ascending: false })
+          .limit(args.limit || 10);
+        if (args.category) q = q.eq("category", args.category);
+        if (args.priority) q = q.eq("priority", args.priority);
+        const { data, error } = await q;
+        if (error) throw error;
+        // If entity_id filter, do client-side filtering on evidence JSONB
+        let insights = data || [];
+        if (args.entity_id) {
+          insights = insights.filter((i: any) => {
+            const ev = i.evidence;
+            if (!ev) return false;
+            const evStr = JSON.stringify(ev);
+            return evStr.includes(args.entity_id);
+          });
+        }
+        return { insights, count: insights.length };
+      }
+
+      case "action_brain_insight": {
+        // Fetch the insight first
+        const { data: insight, error: insError } = await supabase
+          .from("brain_insights")
+          .select("id, title, body, category, evidence")
+          .eq("id", args.insight_id)
+          .single();
+        if (insError || !insight) return { error: "Insight not found" };
+
+        if (args.action_type === "dismiss") {
+          await supabase.from("brain_insights").update({ is_dismissed: true }).eq("id", args.insight_id);
+          return { success: true, message: "Insight dismissed" };
+        }
+
+        if (args.action_type === "note") {
+          await supabase.from("brain_insights").update({ is_actioned: true }).eq("id", args.insight_id);
+          return { success: true, message: `Note recorded for insight: ${insight.title}` };
+        }
+
+        if (args.action_type === "create_project") {
+          const { data: proj, error: projErr } = await supabase.from("projects").insert({
+            name: insight.title,
+            description: insight.body,
+            status: "lead",
+            company_id: companyId,
+          }).select("id, name, status").single();
+          if (projErr) throw projErr;
+          await supabase.from("project_user_access").insert({ project_id: proj.id, user_id: userId, role: "project_lead" }).select().maybeSingle();
+          await supabase.from("brain_insights").update({ is_actioned: true }).eq("id", args.insight_id);
+          return { success: true, project: proj, message: `Project "${proj.name}" created from insight` };
+        }
+
+        if (args.action_type === "create_task") {
+          if (!args.project_id) return { error: "project_id is required for create_task" };
+          const taskTitle = args.task_title || insight.title;
+          const { data: task, error: taskErr } = await supabase.from("tasks").insert({
+            project_id: args.project_id,
+            title: taskTitle,
+            description: insight.body,
+            status: "todo",
+            priority: "high",
+            company_id: companyId,
+            assigned_to: userId,
+          }).select("id, title, status").single();
+          if (taskErr) throw taskErr;
+          await supabase.from("brain_insights").update({ is_actioned: true }).eq("id", args.insight_id);
+          return { success: true, task, message: `Task "${task.title}" created from insight` };
+        }
+
+        return { error: "Unknown action_type" };
+      }
+
       default:
         return { error: `Unknown tool: ${toolName}` };
     }

@@ -1,66 +1,86 @@
 
 
-# Org Chart — Full Rebuild Plan
+# Plan: Secretary Level 1 — New Tools, Context Awareness, Proactive Suggestions & Daily Briefing
 
-## Πρόβλημα
+## Overview
 
-Το τρέχον οργανόγραμμα είναι ένα static rendered tree μέσα σε ScrollArea με βασικό zoom (CSS scale). Δεν υποστηρίζει pan/drag-to-move, δεν έχει infinite canvas, τα nodes δεν είναι clickable για detail, δεν υπάρχουν views (by department, by person), και τα templates δεν αξιοποιούν το υπάρχον προσωπικό.
+Expand the Secretary agent with 6 new tools, pass the user's current page for contextual behavior, add proactive suggestions based on data analysis, and generate a daily briefing on first interaction.
 
-## Λύση
+## Changes
 
-Πλήρες rebuild του OrgChart σε **infinite canvas** στυλ Miro με pan+zoom, πολλαπλά views, clickable nodes με detail panel, και smart templates.
+### 1. Edge Function: New Tools (`supabase/functions/secretary-agent/index.ts`)
 
-## Τεχνική Προσέγγιση
+Add 6 new tool definitions and their executors:
 
-### 1. Infinite Canvas Engine (χωρίς εξωτερική βιβλιοθήκη)
-- Custom React canvas με `transform: translate(x, y) scale(z)` σε ένα wrapper div
-- **Mouse wheel** → zoom (centered on cursor)
-- **Middle-click drag** ή **Space+drag** → pan (hand tool)
-- **Touch**: pinch-to-zoom, two-finger pan
-- Mini-map στο corner (optional, phase 2)
-- Fit-to-screen button, zoom controls
+| Tool | Description | Key params |
+|---|---|---|
+| `create_project` | Create a new project | `name`, `client_id`, `budget`, `start_date`, `end_date`, `status`, `description` |
+| `update_project_status` | Change project status | `project_id`, `status` (enum: tender/active/completed/cancelled/lead/proposal/negotiation/won/lost) |
+| `assign_team_member` | Add user to project team | `project_id`, `user_id`, `role` (optional) |
+| `create_calendar_event` | Create a meeting/event | `title`, `start_time`, `end_time`, `event_type`, `attendee_ids[]`, `project_id`, `description`, `location`, `video_link` |
+| `log_time_entry` | Log time for a project/task | `project_id`, `task_id`, `duration_minutes`, `description`, `start_time` |
+| `send_chat_message` | Send message to a chat channel | `channel_id`, `content` |
 
-### 2. Views (3 modes)
-- **Hierarchy View** (default): Κλασικό tree ανά reporting line — αυτό που υπάρχει τώρα αλλά σε canvas
-- **Department View**: Grouped κάρτες ανά department σε columns/clusters, κάθε cluster δείχνει τα μέλη
-- **List View**: Compact table/list με sorting, φιλτράρισμα, search — γρήγορη εύρεση ατόμου
+Also add a new `get_daily_briefing` tool that fetches today's tasks, overdue tasks, today's calendar events, and project risk indicators in one call.
 
-Toggle μεταξύ views μέσω tabs στο header.
+### 2. Context Awareness
 
-### 3. Interactive Nodes
-- **Click** σε node → slide-in panel (sheet) δεξιά με:
-  - Profile info (avatar, name, email, phone)
-  - Position & department
-  - Direct reports count
-  - Link to Employee Profile (`/hr/employee/:id`)
-  - Quick actions (edit, reassign, add subordinate)
-- **Hover** → subtle highlight + tooltip με title
-- **Vacant positions** → dashed border, prominent "Κενή θέση" badge, click to assign
-- Connector lines μεταξύ nodes: animated SVG paths αντί για div borders
+**Frontend (`SecretaryChat.tsx`)**: Pass `location.pathname` in the request body alongside messages:
+```typescript
+body: JSON.stringify({
+  messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+  current_page: location.pathname,
+})
+```
 
-### 4. Smart Templates & Auto-build
-- Βελτίωση του Wizard: αφού επιλεγεί template, **auto-match** υπάρχοντα profiles σε positions βάσει `job_title` ή `department`
-- **Gap Analysis panel**: Μετά τη δημιουργία, δείχνει πόσες θέσεις είναι κενές, ποια departments λείπουν, ποια levels δεν έχουν κάλυψη
-- Wizard step: "Αντιστοίχιση Προσωπικού" — drag-drop ή auto-suggest
+**Backend**: Extract `current_page` from the request and inject it into the system prompt:
+```
+Ο χρήστης βρίσκεται στη σελίδα: ${currentPage}
+Προσάρμοσε τις προτάσεις σου ανάλογα (π.χ. αν είναι σε /projects/:id, πρότεινε ενέργειες για αυτό το project).
+```
 
-### 5. SVG Connector Lines
-- Αντικατάσταση CSS div lines με SVG `<path>` elements (bezier curves)
-- Animated flow direction (subtle dash animation)
-- Color-coded κατά department
+Also add contextual quick actions in the frontend based on the current route (e.g., on `/projects/:id` show "Πρόσθεσε task σε αυτό το project").
 
-## Αρχεία
+### 3. Proactive Suggestions
 
-| Αρχείο | Αλλαγή |
+In the backend context-building phase, add queries for:
+- **Overdue tasks**: tasks with `due_date < today` and `status != done`
+- **Projects behind schedule**: projects with `end_date < today` and status `active`
+
+Inject these counts into the system prompt as a "proactive alerts" section:
+```
+Proactive Alerts:
+- Υπάρχουν 3 overdue tasks
+- 1 project έχει ξεπεράσει το deadline
+Αν ο χρήστης ρωτήσει γενικά ή ξεκινάει νέα συνομιλία, ανέφερε αυτά τα alerts.
+```
+
+### 4. Daily Briefing
+
+When the conversation starts (messages array has only 1 user message and it's a greeting or first message of the day), the system prompt instructs the AI to proactively include a daily briefing:
+
+```
+Αν είναι η πρώτη συνομιλία της ημέρας, ξεκίνα με ένα σύντομο Daily Briefing:
+- Πόσα tasks έχει σήμερα ο χρήστης
+- Overdue tasks
+- Σημερινά meetings/events
+- Projects σε κρίσιμη κατάσταση
+```
+
+Add a `get_daily_briefing` tool that fetches all this data in one call so the AI can present it structured.
+
+### 5. Frontend Quick Actions Update
+
+Update `quickActions` in `SecretaryChat.tsx` to include new actions and make them contextual:
+- Add: "🚀 Νέο Project", "📅 Νέο Meeting", "⏱ Log Time"
+- When on a project page, show project-specific quick actions
+
+## Files to Edit
+
+| File | Change |
 |---|---|
-| `src/pages/OrgChart.tsx` | **Rewrite** — Infinite canvas, views, SVG connectors, detail panel |
-| `src/components/org-chart/OrgChartCanvas.tsx` | **New** — Pan+zoom canvas wrapper |
-| `src/components/org-chart/OrgNodeCard.tsx` | **New** — Redesigned node card (clickable, expandable) |
-| `src/components/org-chart/OrgDetailPanel.tsx` | **New** — Slide-in sheet for node details |
-| `src/components/org-chart/OrgDepartmentView.tsx` | **New** — Department-grouped view |
-| `src/components/org-chart/OrgListView.tsx` | **New** — Table/list view |
-| `src/components/org-chart/OrgConnectors.tsx` | **New** — SVG connector line renderer |
-| `src/components/org-chart/OrgChartWizard.tsx` | **Update** — Add auto-match step + gap analysis |
-| `src/components/org-chart/DraggableOrgNode.tsx` | **Remove** — Replaced by new OrgNodeCard |
+| `supabase/functions/secretary-agent/index.ts` | Add 7 tool definitions + executors, accept `current_page`, enrich system prompt with context/alerts, add overdue/calendar queries to context building |
+| `src/components/secretary/SecretaryChat.tsx` | Pass `location.pathname` in request body, add contextual quick actions based on route |
 
-Δεν χρειάζονται DB changes — το schema `org_chart_positions` καλύπτει ήδη hierarchy, department, user_id, color, level, sort_order.
+No database changes needed — all tables already exist.
 

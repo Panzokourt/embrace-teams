@@ -26,6 +26,8 @@ interface MentionInputProps {
   onSend: () => void;
   disabled?: boolean;
   placeholder?: string;
+  onSendMessage?: (text: string) => void;
+  onFileUpload?: (file: File) => void;
 }
 
 export default function MentionInput({ value, onChange, onSend, disabled, placeholder }: MentionInputProps) {

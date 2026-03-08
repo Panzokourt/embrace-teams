@@ -279,10 +279,10 @@ export function WorkflowSidePanel({ stage, onUpdate, onClose }: WorkflowSidePane
 
           <div className="space-y-1.5">
             <Label className="text-xs">Brief Type (Προ-φόρμα)</Label>
-            <Select value={linkedBriefType} onValueChange={setLinkedBriefType}>
+            <Select value={linkedBriefType || '__none__'} onValueChange={v => setLinkedBriefType(v === '__none__' ? '' : v)}>
               <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Επιλέξτε brief type..." /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Κανένα</SelectItem>
+                <SelectItem value="__none__">Κανένα</SelectItem>
                 {briefDefinitions.map(d => (
                   <SelectItem key={d.type} value={d.type}>{d.label}</SelectItem>
                 ))}

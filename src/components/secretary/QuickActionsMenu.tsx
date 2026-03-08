@@ -11,6 +11,7 @@ import {
   Clock,
   Brain,
   ShieldAlert,
+  GitBranch,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 

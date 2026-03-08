@@ -299,6 +299,121 @@ const toolDefinitions = [
       },
     },
   },
+  // ── NEW TOOLS ──
+  {
+    type: "function",
+    function: {
+      name: "create_project",
+      description: "Create a new project",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Project name" },
+          client_id: { type: "string", description: "Client ID" },
+          description: { type: "string", description: "Project description" },
+          budget: { type: "number", description: "Budget amount" },
+          start_date: { type: "string", description: "Start date YYYY-MM-DD" },
+          end_date: { type: "string", description: "End date YYYY-MM-DD" },
+          status: { type: "string", enum: ["lead", "proposal", "negotiation", "tender", "active", "completed", "cancelled", "won", "lost"], description: "Project status" },
+        },
+        required: ["name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_project_status",
+      description: "Change the status of an existing project",
+      parameters: {
+        type: "object",
+        properties: {
+          project_id: { type: "string", description: "The project ID" },
+          status: { type: "string", enum: ["lead", "proposal", "negotiation", "tender", "active", "completed", "cancelled", "won", "lost"], description: "New status" },
+        },
+        required: ["project_id", "status"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "assign_team_member",
+      description: "Add a user to a project team",
+      parameters: {
+        type: "object",
+        properties: {
+          project_id: { type: "string", description: "The project ID" },
+          user_id: { type: "string", description: "The user ID to add" },
+          role: { type: "string", description: "Role in the project (e.g. project_lead, member)" },
+        },
+        required: ["project_id", "user_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_calendar_event",
+      description: "Create a calendar meeting or event",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Event title" },
+          start_time: { type: "string", description: "Start datetime ISO 8601" },
+          end_time: { type: "string", description: "End datetime ISO 8601" },
+          event_type: { type: "string", enum: ["meeting", "deadline", "reminder", "other"], description: "Event type" },
+          description: { type: "string", description: "Event description" },
+          location: { type: "string", description: "Location" },
+          video_link: { type: "string", description: "Video call link" },
+          project_id: { type: "string", description: "Related project ID" },
+          attendee_ids: { type: "array", items: { type: "string" }, description: "Array of user IDs to invite" },
+        },
+        required: ["title", "start_time", "end_time"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "log_time_entry",
+      description: "Log a time entry for a project/task",
+      parameters: {
+        type: "object",
+        properties: {
+          project_id: { type: "string", description: "The project ID" },
+          task_id: { type: "string", description: "Optional task ID" },
+          duration_minutes: { type: "number", description: "Duration in minutes" },
+          description: { type: "string", description: "Description of work done" },
+          start_time: { type: "string", description: "Start datetime ISO 8601 (defaults to now minus duration)" },
+        },
+        required: ["project_id", "duration_minutes"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "send_chat_message",
+      description: "Send a message to a chat channel",
+      parameters: {
+        type: "object",
+        properties: {
+          channel_id: { type: "string", description: "The chat channel ID" },
+          content: { type: "string", description: "Message content" },
+        },
+        required: ["channel_id", "content"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_daily_briefing",
+      description: "Get a daily briefing with today's tasks, overdue tasks, calendar events, and project alerts",
+      parameters: { type: "object", properties: {} },
+    },
+  },
 ];
 
 // ── Tool execution ────────────────────────────────────────────────
@@ -613,6 +728,188 @@ async function executeTool(
         };
       }
 
+      // ── NEW TOOL EXECUTORS ──
+
+      case "create_project": {
+        const { data, error } = await supabase.from("projects").insert({
+          name: args.name,
+          description: args.description || null,
+          client_id: args.client_id || null,
+          budget: args.budget || null,
+          start_date: args.start_date || null,
+          end_date: args.end_date || null,
+          status: args.status || "active",
+          company_id: companyId,
+        }).select("id, name, status, budget").single();
+        if (error) throw error;
+        // Also add the creator to the project team
+        await supabase.from("project_user_access").insert({
+          project_id: data.id,
+          user_id: userId,
+          role: "project_lead",
+        }).select().maybeSingle();
+        return { success: true, project: data };
+      }
+
+      case "update_project_status": {
+        const { data, error } = await supabase
+          .from("projects")
+          .update({ status: args.status })
+          .eq("id", args.project_id)
+          .select("id, name, status")
+          .single();
+        if (error) throw error;
+        return { success: true, project: data };
+      }
+
+      case "assign_team_member": {
+        const { data, error } = await supabase.from("project_user_access").insert({
+          project_id: args.project_id,
+          user_id: args.user_id,
+          role: args.role || "member",
+        }).select("id, project_id, user_id, role").single();
+        if (error) {
+          if (error.code === "23505") return { success: true, message: "Ο χρήστης είναι ήδη μέλος του project" };
+          throw error;
+        }
+        return { success: true, assignment: data };
+      }
+
+      case "create_calendar_event": {
+        const { data, error } = await supabase.from("calendar_events").insert({
+          title: args.title,
+          start_time: args.start_time,
+          end_time: args.end_time,
+          event_type: args.event_type || "meeting",
+          description: args.description || null,
+          location: args.location || null,
+          video_link: args.video_link || null,
+          project_id: args.project_id || null,
+          company_id: companyId,
+          created_by: userId,
+        }).select("id, title, start_time, end_time, event_type").single();
+        if (error) throw error;
+        // Add attendees if provided
+        if (args.attendee_ids && args.attendee_ids.length > 0) {
+          const attendeeRows = args.attendee_ids.map((uid: string) => ({
+            event_id: data.id,
+            user_id: uid,
+            status: "pending",
+          }));
+          await supabase.from("calendar_event_attendees").insert(attendeeRows);
+        }
+        return { success: true, event: data, attendees_added: args.attendee_ids?.length || 0 };
+      }
+
+      case "log_time_entry": {
+        const endTime = new Date();
+        const startTime = args.start_time
+          ? new Date(args.start_time)
+          : new Date(endTime.getTime() - args.duration_minutes * 60000);
+        
+        const { data, error } = await supabase.from("time_entries").insert({
+          user_id: userId,
+          project_id: args.project_id,
+          task_id: args.task_id || null,
+          start_time: startTime.toISOString(),
+          end_time: endTime.toISOString(),
+          duration_minutes: args.duration_minutes,
+          description: args.description || null,
+          is_running: false,
+        }).select("id, duration_minutes, description").single();
+        if (error) throw error;
+        // Update task actual_hours if task_id provided
+        if (args.task_id) {
+          const { data: entries } = await supabase
+            .from("time_entries")
+            .select("duration_minutes")
+            .eq("task_id", args.task_id)
+            .eq("is_running", false);
+          const totalMinutes = (entries || []).reduce((s: number, e: any) => s + (e.duration_minutes || 0), 0);
+          const totalHours = Math.round((totalMinutes / 60) * 100) / 100;
+          await supabase.from("tasks").update({ actual_hours: totalHours }).eq("id", args.task_id);
+        }
+        return { success: true, time_entry: data };
+      }
+
+      case "send_chat_message": {
+        const { data, error } = await supabase.from("chat_messages").insert({
+          channel_id: args.channel_id,
+          user_id: userId,
+          content: args.content,
+          message_type: "text",
+        }).select("id, content, created_at").single();
+        if (error) throw error;
+        // Update channel last_message_at
+        await supabase.from("chat_channels").update({ last_message_at: new Date().toISOString() }).eq("id", args.channel_id);
+        return { success: true, message: data };
+      }
+
+      case "get_daily_briefing": {
+        const today = new Date().toISOString().split("T")[0];
+        const todayStart = `${today}T00:00:00.000Z`;
+        const todayEnd = `${today}T23:59:59.999Z`;
+
+        const [myTasksRes, overdueRes, eventsRes, projectsRes, chatChannelsRes] = await Promise.all([
+          // Today's tasks (due today)
+          supabase.from("tasks")
+            .select("id, title, status, priority, due_date, project_id, projects(name)")
+            .eq("assigned_to", userId)
+            .eq("due_date", today)
+            .neq("status", "done")
+            .neq("status", "cancelled"),
+          // Overdue tasks
+          supabase.from("tasks")
+            .select("id, title, status, priority, due_date, project_id, projects(name)")
+            .eq("assigned_to", userId)
+            .lt("due_date", today)
+            .neq("status", "done")
+            .neq("status", "cancelled")
+            .order("due_date", { ascending: true }),
+          // Today's calendar events
+          supabase.from("calendar_events")
+            .select("id, title, start_time, end_time, event_type, location, video_link, project_id")
+            .eq("company_id", companyId)
+            .gte("start_time", todayStart)
+            .lte("start_time", todayEnd)
+            .order("start_time", { ascending: true }),
+          // Projects behind schedule (active with end_date passed)
+          supabase.from("projects")
+            .select("id, name, status, end_date")
+            .eq("company_id", companyId)
+            .eq("status", "active")
+            .lt("end_date", today),
+          // Chat channels with recent activity
+          supabase.from("chat_channels")
+            .select("id, name, type")
+            .eq("company_id", companyId)
+            .order("last_message_at", { ascending: false })
+            .limit(10),
+        ]);
+
+        // Get all open tasks count
+        const { count: openTasksCount } = await supabase
+          .from("tasks")
+          .select("id", { count: "exact", head: true })
+          .eq("assigned_to", userId)
+          .neq("status", "done")
+          .neq("status", "cancelled");
+
+        return {
+          today: today,
+          tasks_today: myTasksRes.data || [],
+          tasks_today_count: (myTasksRes.data || []).length,
+          overdue_tasks: overdueRes.data || [],
+          overdue_count: (overdueRes.data || []).length,
+          events_today: eventsRes.data || [],
+          events_count: (eventsRes.data || []).length,
+          projects_behind_schedule: projectsRes.data || [],
+          projects_at_risk_count: (projectsRes.data || []).length,
+          total_open_tasks: openTasksCount || 0,
+          chat_channels: chatChannelsRes.data || [],
+        };
+      }
+
       default:
         return { error: `Unknown tool: ${toolName}` };
     }
@@ -654,36 +951,71 @@ serve(async (req) => {
     }
     const userId = claimsData.claims.sub;
 
-    const { messages } = await req.json();
+    const { messages, current_page } = await req.json();
 
     // Fetch user context in parallel
-    const [profileRes, companyRoleRes, projectsRes, tasksRes, clientsRes, leaveTypesRes] = await Promise.all([
+    const today = new Date().toISOString().split("T")[0];
+    const todayStart = `${today}T00:00:00.000Z`;
+    const todayEnd = `${today}T23:59:59.999Z`;
+
+    const [profileRes, companyRoleRes, projectsRes, tasksRes, clientsRes, leaveTypesRes, overdueRes, behindScheduleRes, todayEventsRes] = await Promise.all([
       supabase.from("profiles").select("id, full_name, email, job_title, department").eq("id", userId).single(),
       supabase.from("user_company_roles").select("company_id, role, access_scope").eq("user_id", userId).limit(1).single(),
       supabase.from("projects").select("id, name, status").order("created_at", { ascending: false }).limit(30),
-      supabase.from("tasks").select("id, title, status, priority, project_id").eq("assigned_to", userId).neq("status", "done").order("created_at", { ascending: false }).limit(30),
+      supabase.from("tasks").select("id, title, status, priority, project_id, due_date").eq("assigned_to", userId).neq("status", "done").order("created_at", { ascending: false }).limit(30),
       supabase.from("clients").select("id, name").order("name").limit(30),
       supabase.from("leave_types").select("id, name, code").limit(20),
+      // Proactive: overdue tasks
+      supabase.from("tasks").select("id", { count: "exact", head: true }).eq("assigned_to", userId).lt("due_date", today).neq("status", "done").neq("status", "cancelled"),
+      // Proactive: projects behind schedule
+      supabase.from("projects").select("id, name", { count: "exact" }).eq("status", "active").lt("end_date", today).limit(10),
+      // Today's events count
+      supabase.from("calendar_events").select("id, title, start_time", { count: "exact" }).gte("start_time", todayStart).lte("start_time", todayEnd).limit(10),
     ]);
 
     const profile = profileRes.data;
     const companyRole = companyRoleRes.data;
     const companyId = companyRole?.company_id || "";
 
+    const overdueCount = overdueRes.count || 0;
+    const behindScheduleCount = (behindScheduleRes.data || []).length;
+    const todayEventsCount = todayEventsRes.count || 0;
+
     // Build context string
     const contextParts = [
       `Χρήστης: ${profile?.full_name || "Unknown"} (${profile?.email})`,
       `Θέση: ${profile?.job_title || "N/A"}`,
       `Ρόλος: ${companyRole?.role || "member"}`,
+      `Σημερινή ημερομηνία: ${today}`,
       `\nΕνεργά Projects (${(projectsRes.data || []).length}):`,
       ...(projectsRes.data || []).map((p: any) => `- ${p.name} (id: ${p.id}, status: ${p.status})`),
       `\nΤα tasks μου (${(tasksRes.data || []).length}):`,
-      ...(tasksRes.data || []).map((t: any) => `- ${t.title} [${t.status}/${t.priority}] (id: ${t.id})`),
+      ...(tasksRes.data || []).map((t: any) => `- ${t.title} [${t.status}/${t.priority}] (id: ${t.id}, due: ${t.due_date || "N/A"})`),
       `\nΠελάτες (${(clientsRes.data || []).length}):`,
       ...(clientsRes.data || []).map((c: any) => `- ${c.name} (id: ${c.id})`),
       `\nΤύποι αδειών:`,
       ...(leaveTypesRes.data || []).map((lt: any) => `- ${lt.name} (id: ${lt.id}, code: ${lt.code})`),
     ];
+
+    // Build proactive alerts
+    const alertParts: string[] = [];
+    if (overdueCount > 0) alertParts.push(`- ⚠️ Υπάρχουν ${overdueCount} overdue tasks`);
+    if (behindScheduleCount > 0) alertParts.push(`- ⚠️ ${behindScheduleCount} project(s) έχουν ξεπεράσει το deadline`);
+    if (todayEventsCount > 0) alertParts.push(`- 📅 ${todayEventsCount} event(s) σήμερα`);
+
+    // Build context awareness
+    let pageContext = "";
+    if (current_page) {
+      pageContext = `\nΟ χρήστης βρίσκεται στη σελίδα: ${current_page}
+Προσάρμοσε τις προτάσεις σου ανάλογα:
+- Αν είναι σε /projects/:id → πρότεινε ενέργειες για αυτό το project (tasks, team, status update)
+- Αν είναι σε /tasks → πρότεινε δημιουργία/ενημέρωση tasks
+- Αν είναι σε /clients/:id → πρότεινε ενέργειες για τον πελάτη
+- Αν είναι σε /calendar → πρότεινε δημιουργία events
+- Αν είναι σε /timesheets → πρότεινε καταχώρηση χρόνου
+- Αν είναι σε /chat → πρότεινε αποστολή μηνυμάτων
+- Αν είναι σε /dashboard → προσφέρε γενική επισκόπηση`;
+    }
 
     const systemPrompt = `Είσαι ο Secretary, ο AI βοηθός μιας εταιρείας επικοινωνίας/marketing.
 Μπορείς να εκτελείς ενέργειες στο σύστημα χρησιμοποιώντας τα tools σου.
@@ -691,8 +1023,11 @@ serve(async (req) => {
 Κανόνες:
 - ΠΡΙΝ εκτελέσεις κάποιο tool, ρώτα τον χρήστη βήμα-βήμα για ΟΛΕΣ τις σημαντικές παραμέτρους
 - Για create_task: ρώτα project (δώσε επιλογές), τίτλο, περιγραφή, προτεραιότητα, deadline, υπεύθυνο
+- Για create_project: ρώτα όνομα, πελάτη, budget, ημερομηνίες, περιγραφή
 - Για create_brief: ρώτα τύπο, τίτλο, project, πελάτη
 - Για create_client: ρώτα όνομα, email, τηλέφωνο, διεύθυνση
+- Για create_calendar_event: ρώτα τίτλο, ημερομηνία/ώρα, τύπο, τοποθεσία/link, συμμετέχοντες
+- Για log_time_entry: ρώτα project, task, διάρκεια, περιγραφή
 - Για request_leave: ρώτα τύπο, ημερομηνίες, αιτία
 - ΠΑΝΤΑ δείξε preview/σύνοψη πριν εκτελέσεις, με κουμπί επιβεβαίωσης
 - Μετά την εκτέλεση, δείξε σύνοψη αποτελέσματος
@@ -711,6 +1046,15 @@ Download αρχείων:
 :::download
 {"filename":"report.csv","content_type":"text/csv","data":"base64_encoded_content"}
 :::
+
+Daily Briefing:
+Αν είναι η πρώτη αλληλεπίδραση (μόνο 1 μήνυμα χρήστη) ή ο χρήστης χαιρετά ή ρωτά "τι έχω σήμερα", κάλεσε το tool get_daily_briefing και παρουσίασε ένα structured briefing:
+- 📋 Tasks σήμερα / Overdue tasks
+- 📅 Σημερινά meetings
+- ⚠️ Projects σε κίνδυνο
+- 💡 Προτεινόμενες ενέργειες
+${alertParts.length > 0 ? `\nProactive Alerts:\n${alertParts.join("\n")}\nΑν ο χρήστης ξεκινάει νέα συνομιλία ή ρωτάει γενικά, ανέφερε αυτά τα alerts φυσικά στη συνομιλία.` : ""}
+${pageContext}
 
 Γλώσσα: Μιλάς πάντα ελληνικά εκτός αν σε ρωτήσουν σε άλλη γλώσσα.
 Αν δεν μπορείς να κάνεις κάτι, εξήγησε γιατί.

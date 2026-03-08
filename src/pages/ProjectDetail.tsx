@@ -586,6 +586,9 @@ export default function ProjectDetailPage() {
                 />
               </TabsContent>
             )}
+            <TabsContent value="workflow">
+              <ProjectWorkflowTracker projectId={project.id} />
+            </TabsContent>
             <TabsContent value="comments">
               <Card>
                 <CardContent className="pt-6">

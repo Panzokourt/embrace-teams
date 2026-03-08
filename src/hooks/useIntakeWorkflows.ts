@@ -59,7 +59,8 @@ export interface IntakeRequestHistory {
 }
 
 export function useIntakeWorkflows() {
-  const { companyId, user } = useAuth();
+  const { company, user } = useAuth();
+  const companyId = company?.id;
   const [workflows, setWorkflows] = useState<IntakeWorkflow[]>([]);
   const [loading, setLoading] = useState(true);
 

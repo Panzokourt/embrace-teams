@@ -414,6 +414,54 @@ const toolDefinitions = [
       parameters: { type: "object", properties: {} },
     },
   },
+  // ── BRAIN TOOLS ──
+  {
+    type: "function",
+    function: {
+      name: "run_brain_analysis",
+      description: "Trigger an AI Brain analysis to generate fresh strategic insights about clients, projects, market, and team",
+      parameters: {
+        type: "object",
+        properties: {
+          focus: { type: "string", enum: ["client", "project", "market", "team"], description: "Optional focus area for the analysis" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_brain_insights",
+      description: "Fetch recent Brain insights with optional filters by category, priority, or entity",
+      parameters: {
+        type: "object",
+        properties: {
+          category: { type: "string", enum: ["strategic", "sales", "productivity", "market", "alert", "neuro"], description: "Filter by insight category" },
+          priority: { type: "string", enum: ["high", "medium", "low"], description: "Filter by priority" },
+          limit: { type: "number", description: "Max results (default 10)" },
+          entity_id: { type: "string", description: "Filter insights related to a specific client/project ID" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "action_brain_insight",
+      description: "Take action on a Brain insight: create a project or task from it, dismiss it, or add a note",
+      parameters: {
+        type: "object",
+        properties: {
+          insight_id: { type: "string", description: "The Brain insight ID" },
+          action_type: { type: "string", enum: ["create_project", "create_task", "dismiss", "note"], description: "What action to take" },
+          project_id: { type: "string", description: "Project ID (for create_task)" },
+          task_title: { type: "string", description: "Task title override (for create_task)" },
+          note: { type: "string", description: "Note text (for note action)" },
+        },
+        required: ["insight_id", "action_type"],
+      },
+    },
+  },
 ];
 
 // ── Tool execution ────────────────────────────────────────────────
@@ -910,6 +958,124 @@ async function executeTool(
         };
       }
 
+      // ── BRAIN TOOL EXECUTORS ──
+
+      case "run_brain_analysis": {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const resp = await fetch(`${supabaseUrl}/functions/v1/brain-analyze`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+            ...(args.focus ? {} : {}),
+          },
+          body: JSON.stringify({ focus: args.focus || null }),
+        });
+        if (!resp.ok) {
+          const errText = await resp.text();
+          return { error: `Brain analysis failed: ${errText}` };
+        }
+        const brainResult = await resp.json();
+        // Fetch the latest insights generated
+        const { data: newInsights } = await supabase
+          .from("brain_insights")
+          .select("id, title, body, category, priority, neuro_tactic")
+          .eq("company_id", companyId)
+          .eq("is_dismissed", false)
+          .order("created_at", { ascending: false })
+          .limit(5);
+        return {
+          success: true,
+          message: "Brain analysis completed",
+          insights_generated: (newInsights || []).length,
+          top_insights: (newInsights || []).map((i: any) => ({
+            id: i.id,
+            title: i.title,
+            category: i.category,
+            priority: i.priority,
+            summary: i.body?.substring(0, 200),
+            neuro_tactic: i.neuro_tactic,
+          })),
+        };
+      }
+
+      case "get_brain_insights": {
+        let q = supabase
+          .from("brain_insights")
+          .select("id, title, body, category, priority, evidence, neuro_tactic, neuro_rationale, created_at, is_actioned")
+          .eq("company_id", companyId)
+          .eq("is_dismissed", false)
+          .order("created_at", { ascending: false })
+          .limit(args.limit || 10);
+        if (args.category) q = q.eq("category", args.category);
+        if (args.priority) q = q.eq("priority", args.priority);
+        const { data, error } = await q;
+        if (error) throw error;
+        // If entity_id filter, do client-side filtering on evidence JSONB
+        let insights = data || [];
+        if (args.entity_id) {
+          insights = insights.filter((i: any) => {
+            const ev = i.evidence;
+            if (!ev) return false;
+            const evStr = JSON.stringify(ev);
+            return evStr.includes(args.entity_id);
+          });
+        }
+        return { insights, count: insights.length };
+      }
+
+      case "action_brain_insight": {
+        // Fetch the insight first
+        const { data: insight, error: insError } = await supabase
+          .from("brain_insights")
+          .select("id, title, body, category, evidence")
+          .eq("id", args.insight_id)
+          .single();
+        if (insError || !insight) return { error: "Insight not found" };
+
+        if (args.action_type === "dismiss") {
+          await supabase.from("brain_insights").update({ is_dismissed: true }).eq("id", args.insight_id);
+          return { success: true, message: "Insight dismissed" };
+        }
+
+        if (args.action_type === "note") {
+          await supabase.from("brain_insights").update({ is_actioned: true }).eq("id", args.insight_id);
+          return { success: true, message: `Note recorded for insight: ${insight.title}` };
+        }
+
+        if (args.action_type === "create_project") {
+          const { data: proj, error: projErr } = await supabase.from("projects").insert({
+            name: insight.title,
+            description: insight.body,
+            status: "lead",
+            company_id: companyId,
+          }).select("id, name, status").single();
+          if (projErr) throw projErr;
+          await supabase.from("project_user_access").insert({ project_id: proj.id, user_id: userId, role: "project_lead" }).select().maybeSingle();
+          await supabase.from("brain_insights").update({ is_actioned: true }).eq("id", args.insight_id);
+          return { success: true, project: proj, message: `Project "${proj.name}" created from insight` };
+        }
+
+        if (args.action_type === "create_task") {
+          if (!args.project_id) return { error: "project_id is required for create_task" };
+          const taskTitle = args.task_title || insight.title;
+          const { data: task, error: taskErr } = await supabase.from("tasks").insert({
+            project_id: args.project_id,
+            title: taskTitle,
+            description: insight.body,
+            status: "todo",
+            priority: "high",
+            company_id: companyId,
+            assigned_to: userId,
+          }).select("id, title, status").single();
+          if (taskErr) throw taskErr;
+          await supabase.from("brain_insights").update({ is_actioned: true }).eq("id", args.insight_id);
+          return { success: true, task, message: `Task "${task.title}" created from insight` };
+        }
+
+        return { error: "Unknown action_type" };
+      }
+
       default:
         return { error: `Unknown tool: ${toolName}` };
     }
@@ -977,6 +1143,19 @@ serve(async (req) => {
     const companyRole = companyRoleRes.data;
     const companyId = companyRole?.company_id || "";
 
+    // Fetch Brain alerts (high-priority insights from last 48h)
+    const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    const { data: brainAlerts } = await supabase
+      .from("brain_insights")
+      .select("id, title, category, priority, body")
+      .eq("company_id", companyId)
+      .eq("is_dismissed", false)
+      .eq("is_actioned", false)
+      .eq("priority", "high")
+      .gte("created_at", twoDaysAgo)
+      .order("created_at", { ascending: false })
+      .limit(5);
+
     const overdueCount = overdueRes.count || 0;
     const behindScheduleCount = (behindScheduleRes.data || []).length;
     const todayEventsCount = todayEventsRes.count || 0;
@@ -1003,6 +1182,16 @@ serve(async (req) => {
     if (behindScheduleCount > 0) alertParts.push(`- ⚠️ ${behindScheduleCount} project(s) έχουν ξεπεράσει το deadline`);
     if (todayEventsCount > 0) alertParts.push(`- 📅 ${todayEventsCount} event(s) σήμερα`);
 
+    // Brain alerts
+    const brainAlertParts: string[] = [];
+    if (brainAlerts && brainAlerts.length > 0) {
+      brainAlertParts.push(`\nBrain Alerts (τελευταία 48h):`);
+      for (const ba of brainAlerts) {
+        brainAlertParts.push(`- [${ba.priority}/${ba.category}] ${ba.title} (id: ${ba.id})`);
+      }
+      brainAlertParts.push(`Αν σχετίζονται με αυτά που ρωτά ο χρήστης, ανέφερέ τα και πρότεινε "Θες να φτιάξω project/task γι' αυτό;"`);
+    }
+
     // Build context awareness
     let pageContext = "";
     if (current_page) {
@@ -1014,7 +1203,8 @@ serve(async (req) => {
 - Αν είναι σε /calendar → πρότεινε δημιουργία events
 - Αν είναι σε /timesheets → πρότεινε καταχώρηση χρόνου
 - Αν είναι σε /chat → πρότεινε αποστολή μηνυμάτων
-- Αν είναι σε /dashboard → προσφέρε γενική επισκόπηση`;
+- Αν είναι σε /dashboard → προσφέρε γενική επισκόπηση
+- Αν είναι σε /brain → πρότεινε ανάλυση Brain ή εμφάνιση insights`;
     }
 
     const systemPrompt = `Είσαι ο Secretary, ο AI βοηθός μιας εταιρείας επικοινωνίας/marketing.
@@ -1054,7 +1244,15 @@ Daily Briefing:
 - ⚠️ Projects σε κίνδυνο
 - 💡 Προτεινόμενες ενέργειες
 ${alertParts.length > 0 ? `\nProactive Alerts:\n${alertParts.join("\n")}\nΑν ο χρήστης ξεκινάει νέα συνομιλία ή ρωτάει γενικά, ανέφερε αυτά τα alerts φυσικά στη συνομιλία.` : ""}
+${brainAlertParts.length > 0 ? brainAlertParts.join("\n") : ""}
 ${pageContext}
+
+Brain Integration:
+- Μπορείς να τρέξεις AI ανάλυση Brain (run_brain_analysis) για fresh insights
+- Μπορείς να δεις υπάρχοντα Brain insights (get_brain_insights)
+- Μπορείς να μετατρέψεις insight σε project/task (action_brain_insight)
+- Όταν παρουσιάζεις insight, πρότεινε actionable βήματα: "Θες να φτιάξω project/task γι' αυτό;"
+- Αν ο χρήστης ρωτά "τι ρίσκα βλέπεις", "ανάλυσε τον πελάτη Χ", "τι λέει το Brain" → χρησιμοποίησε τα Brain tools
 
 Γλώσσα: Μιλάς πάντα ελληνικά εκτός αν σε ρωτήσουν σε άλλη γλώσσα.
 Αν δεν μπορείς να κάνεις κάτι, εξήγησε γιατί.

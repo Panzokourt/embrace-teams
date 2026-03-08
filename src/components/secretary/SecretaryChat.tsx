@@ -23,6 +23,8 @@ const defaultQuickActions = [
   { label: "📅 Νέο Meeting", prompt: "Θέλω να δημιουργήσω ένα νέο meeting" },
   { label: "⏱ Log Time", prompt: "Θέλω να καταχωρήσω χρόνο εργασίας" },
   { label: "☀️ Daily Briefing", prompt: "Τι έχω σήμερα;" },
+  { label: "🧠 Brain Analysis", prompt: "Τρέξε ανάλυση Brain" },
+  { label: "💡 Insights", prompt: "Δείξε μου τα τελευταία Brain insights" },
 ];
 
 function getContextualQuickActions(pathname: string) {
@@ -70,6 +72,16 @@ function getContextualQuickActions(pathname: string) {
       { label: "💬 Στείλε μήνυμα", prompt: "Θέλω να στείλω μήνυμα σε κανάλι" },
       { label: "📋 Tasks μου", prompt: "Δείξε μου τα tasks μου" },
       { label: "☀️ Daily Briefing", prompt: "Τι έχω σήμερα;" },
+    ];
+  }
+  // Brain page
+  if (pathname === "/brain") {
+    return [
+      { label: "🧠 Τρέξε Ανάλυση", prompt: "Τρέξε ανάλυση Brain" },
+      { label: "💡 Insights", prompt: "Δείξε μου τα τελευταία Brain insights" },
+      { label: "🔴 High Priority", prompt: "Δείξε μου τα high priority Brain insights" },
+      { label: "📈 Market Insights", prompt: "Δείξε μου τα market insights από το Brain" },
+      { label: "🧪 Neuro Tactics", prompt: "Δείξε μου τα neuromarketing insights" },
     ];
   }
   // Clients page

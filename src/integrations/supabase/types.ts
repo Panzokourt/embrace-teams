@@ -2539,6 +2539,61 @@ export type Database = {
           },
         ]
       }
+      intake_workflow_connections: {
+        Row: {
+          condition: Json | null
+          created_at: string | null
+          from_stage_id: string | null
+          id: string
+          label: string | null
+          sort_order: number | null
+          to_stage_id: string | null
+          workflow_id: string
+        }
+        Insert: {
+          condition?: Json | null
+          created_at?: string | null
+          from_stage_id?: string | null
+          id?: string
+          label?: string | null
+          sort_order?: number | null
+          to_stage_id?: string | null
+          workflow_id: string
+        }
+        Update: {
+          condition?: Json | null
+          created_at?: string | null
+          from_stage_id?: string | null
+          id?: string
+          label?: string | null
+          sort_order?: number | null
+          to_stage_id?: string | null
+          workflow_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intake_workflow_connections_from_stage_id_fkey"
+            columns: ["from_stage_id"]
+            isOneToOne: false
+            referencedRelation: "intake_workflow_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intake_workflow_connections_to_stage_id_fkey"
+            columns: ["to_stage_id"]
+            isOneToOne: false
+            referencedRelation: "intake_workflow_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intake_workflow_connections_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "intake_workflows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       intake_workflow_stages: {
         Row: {
           approver_role: string | null
@@ -2548,6 +2603,10 @@ export type Database = {
           id: string
           name: string
           notify_on_enter: boolean
+          on_enter_actions: Json | null
+          on_exit_actions: Json | null
+          position_x: number | null
+          position_y: number | null
           required_fields: Json | null
           sla_hours: number | null
           sort_order: number
@@ -2562,6 +2621,10 @@ export type Database = {
           id?: string
           name: string
           notify_on_enter?: boolean
+          on_enter_actions?: Json | null
+          on_exit_actions?: Json | null
+          position_x?: number | null
+          position_y?: number | null
           required_fields?: Json | null
           sla_hours?: number | null
           sort_order?: number
@@ -2576,6 +2639,10 @@ export type Database = {
           id?: string
           name?: string
           notify_on_enter?: boolean
+          on_enter_actions?: Json | null
+          on_exit_actions?: Json | null
+          position_x?: number | null
+          position_y?: number | null
           required_fields?: Json | null
           sla_hours?: number | null
           sort_order?: number
@@ -2601,9 +2668,12 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean
+          is_draft: boolean | null
           name: string
           project_template_id: string | null
+          published_version: number | null
           updated_at: string
+          version: number | null
         }
         Insert: {
           auto_create_project?: boolean
@@ -2613,9 +2683,12 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          is_draft?: boolean | null
           name: string
           project_template_id?: string | null
+          published_version?: number | null
           updated_at?: string
+          version?: number | null
         }
         Update: {
           auto_create_project?: boolean
@@ -2625,9 +2698,12 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          is_draft?: boolean | null
           name?: string
           project_template_id?: string | null
+          published_version?: number | null
           updated_at?: string
+          version?: number | null
         }
         Relationships: [
           {

@@ -40,7 +40,7 @@ export default function Workflows() {
 
   if (editingWorkflow) {
     return (
-      <div className="p-6 max-w-6xl mx-auto">
+      <div className="p-4 h-[calc(100vh-3.5rem)]">
         <WorkflowBuilder
           workflow={editingWorkflow}
           onBack={() => setEditingWorkflow(null)}
@@ -64,33 +64,33 @@ export default function Workflows() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <PageHeader icon={GitBranch} title="Workflows" subtitle="Manage intake workflows and requests">
+      <PageHeader icon={GitBranch} title="Ροές Εργασίας" subtitle="Διαχείριση workflows και αιτημάτων">
         <Button onClick={() => setRequestDialogOpen(true)} className="gap-1.5">
-          <Inbox className="h-4 w-4" /> New Request
+          <Inbox className="h-4 w-4" /> Νέο Αίτημα
         </Button>
       </PageHeader>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="workflows" className="gap-1.5"><GitBranch className="h-3.5 w-3.5" /> Workflows</TabsTrigger>
-          <TabsTrigger value="requests" className="gap-1.5"><Inbox className="h-3.5 w-3.5" /> Requests</TabsTrigger>
+          <TabsTrigger value="workflows" className="gap-1.5"><GitBranch className="h-3.5 w-3.5" /> Ροές</TabsTrigger>
+          <TabsTrigger value="requests" className="gap-1.5"><Inbox className="h-3.5 w-3.5" /> Αιτήματα</TabsTrigger>
         </TabsList>
 
         <TabsContent value="workflows" className="space-y-4 mt-4">
           <div className="flex justify-end">
             <Button size="sm" onClick={() => setNewDialogOpen(true)} className="gap-1.5">
-              <Plus className="h-3.5 w-3.5" /> New Workflow
+              <Plus className="h-3.5 w-3.5" /> Νέα Ροή
             </Button>
           </div>
 
           {loading ? (
-            <p className="text-sm text-muted-foreground text-center py-8">Loading...</p>
+            <p className="text-sm text-muted-foreground text-center py-8">Φόρτωση...</p>
           ) : workflows.length === 0 ? (
             <Card className="p-8 text-center border-dashed">
               <GitBranch className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-              <p className="text-sm text-muted-foreground mb-3">No workflows yet. Create your first intake workflow.</p>
+              <p className="text-sm text-muted-foreground mb-3">Δεν υπάρχουν ροές. Δημιουργήστε την πρώτη σας ροή εργασίας.</p>
               <Button size="sm" onClick={() => setNewDialogOpen(true)} className="gap-1.5">
-                <Plus className="h-3.5 w-3.5" /> Create Workflow
+                <Plus className="h-3.5 w-3.5" /> Δημιουργία Ροής
               </Button>
             </Card>
           ) : (
@@ -114,20 +114,23 @@ export default function Workflows() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={e => { e.stopPropagation(); setEditingWorkflow(wf); }}>
-                          <Pencil className="h-3.5 w-3.5 mr-2" /> Edit
+                          <Pencil className="h-3.5 w-3.5 mr-2" /> Επεξεργασία
                         </DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive" onClick={e => { e.stopPropagation(); deleteWorkflow(wf.id); }}>
-                          <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+                          <Trash2 className="h-3.5 w-3.5 mr-2" /> Διαγραφή
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
                   <div className="flex items-center gap-2 mt-3">
-                    <Badge variant="outline" className={wf.is_active ? 'bg-emerald-500/15 text-emerald-400' : 'bg-muted text-muted-foreground'}>
-                      {wf.is_active ? 'Active' : 'Inactive'}
+                    <Badge variant="outline" className={wf.is_active ? 'bg-emerald-500/15 text-emerald-500' : 'bg-muted text-muted-foreground'}>
+                      {wf.is_active ? 'Ενεργή' : 'Ανενεργή'}
                     </Badge>
+                    {wf.version > 1 && (
+                      <Badge variant="outline" className="text-[10px]">v{wf.version}</Badge>
+                    )}
                     {wf.auto_create_project && (
-                      <Badge variant="outline" className="bg-purple-500/15 text-purple-400 text-[10px]">Auto-project</Badge>
+                      <Badge variant="outline" className="bg-purple-500/15 text-purple-500 text-[10px]">Αυτόματο project</Badge>
                     )}
                   </div>
                 </Card>
@@ -145,28 +148,28 @@ export default function Workflows() {
         </TabsContent>
       </Tabs>
 
-      {/* New workflow dialog */}
+      {/* Dialog νέας ροής */}
       <Dialog open={newDialogOpen} onOpenChange={setNewDialogOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>New Workflow</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Νέα Ροή Εργασίας</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label>Name</Label>
-              <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="e.g. Project Request Pipeline" />
+              <Label>Όνομα</Label>
+              <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="π.χ. Pipeline Αιτημάτων" />
             </div>
             <div className="space-y-1.5">
-              <Label>Description</Label>
-              <Textarea value={newDesc} onChange={e => setNewDesc(e.target.value)} rows={2} placeholder="Optional" />
+              <Label>Περιγραφή</Label>
+              <Textarea value={newDesc} onChange={e => setNewDesc(e.target.value)} rows={2} placeholder="Προαιρετικά" />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setNewDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreate} disabled={!newName.trim()}>Create</Button>
+            <Button variant="outline" onClick={() => setNewDialogOpen(false)}>Ακύρωση</Button>
+            <Button onClick={handleCreate} disabled={!newName.trim()}>Δημιουργία</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Intake request dialog */}
+      {/* Dialog αιτήματος */}
       <IntakeRequestDialog
         open={requestDialogOpen}
         onOpenChange={setRequestDialogOpen}

@@ -9,21 +9,22 @@ import { Checkbox } from '@/components/ui/checkbox';
 import type { IntakeWorkflowStage } from '@/hooks/useIntakeWorkflows';
 
 const STAGE_TYPES = [
-  { value: 'request', label: 'Request' },
-  { value: 'review', label: 'Review' },
-  { value: 'approval', label: 'Approval' },
-  { value: 'kickoff', label: 'Kickoff' },
+  { value: 'request', label: 'Αίτημα' },
+  { value: 'review', label: 'Αξιολόγηση' },
+  { value: 'approval', label: 'Έγκριση' },
+  { value: 'kickoff', label: 'Εκκίνηση' },
+  { value: 'internal', label: 'Εσωτερικό βήμα' },
 ];
 
 const AVAILABLE_FIELDS = [
-  { id: 'title', label: 'Title' },
-  { id: 'description', label: 'Description' },
-  { id: 'client', label: 'Client' },
-  { id: 'budget', label: 'Budget' },
-  { id: 'urgency', label: 'Urgency' },
-  { id: 'deadline', label: 'Deadline' },
-  { id: 'attachments', label: 'Attachments' },
-  { id: 'category', label: 'Category' },
+  { id: 'title', label: 'Τίτλος' },
+  { id: 'description', label: 'Περιγραφή' },
+  { id: 'client', label: 'Πελάτης' },
+  { id: 'budget', label: 'Προϋπολογισμός' },
+  { id: 'urgency', label: 'Επείγον' },
+  { id: 'deadline', label: 'Προθεσμία' },
+  { id: 'attachments', label: 'Αρχεία' },
+  { id: 'category', label: 'Κατηγορία' },
 ];
 
 interface WorkflowStageDialogProps {
@@ -85,15 +86,15 @@ export function WorkflowStageDialog({ open, onOpenChange, stage, onSave, nextSor
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{stage ? 'Edit Stage' : 'Add Stage'}</DialogTitle>
+          <DialogTitle>{stage ? 'Επεξεργασία Κόμβου' : 'Νέος Κόμβος'}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label>Stage Name</Label>
-            <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Manager Review" />
+            <Label>Όνομα</Label>
+            <Input value={name} onChange={e => setName(e.target.value)} placeholder="π.χ. Αξιολόγηση Διευθυντή" />
           </div>
           <div className="space-y-1.5">
-            <Label>Type</Label>
+            <Label>Τύπος</Label>
             <Select value={stageType} onValueChange={setStageType}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -102,11 +103,11 @@ export function WorkflowStageDialog({ open, onOpenChange, stage, onSave, nextSor
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label>SLA (hours)</Label>
-            <Input type="number" value={slaHours} onChange={e => setSlaHours(e.target.value)} placeholder="Optional" />
+            <Label>SLA (ώρες)</Label>
+            <Input type="number" value={slaHours} onChange={e => setSlaHours(e.target.value)} placeholder="Προαιρετικό" />
           </div>
           <div className="space-y-2">
-            <Label>Required Fields</Label>
+            <Label>Υποχρεωτικά πεδία</Label>
             <div className="grid grid-cols-2 gap-2">
               {AVAILABLE_FIELDS.map(f => (
                 <label key={f.id} className="flex items-center gap-2 text-sm cursor-pointer">
@@ -117,17 +118,17 @@ export function WorkflowStageDialog({ open, onOpenChange, stage, onSave, nextSor
             </div>
           </div>
           <div className="flex items-center justify-between">
-            <Label>Notify on enter</Label>
+            <Label>Ειδοποίηση εισόδου</Label>
             <Switch checked={notifyOnEnter} onCheckedChange={setNotifyOnEnter} />
           </div>
           <div className="flex items-center justify-between">
-            <Label>Auto-advance</Label>
+            <Label>Αυτόματη προώθηση</Label>
             <Switch checked={autoAdvance} onCheckedChange={setAutoAdvance} />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSave} disabled={!name.trim()}>Save</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Ακύρωση</Button>
+          <Button onClick={handleSave} disabled={!name.trim()}>Αποθήκευση</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

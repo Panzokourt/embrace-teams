@@ -46,6 +46,7 @@ import { ChatProvider } from "@/contexts/ChatContext";
 import PricingPage from "@/pages/PricingPage";
 import ServiceDetailPage from "@/pages/ServiceDetailPage";
 import Brain from "@/pages/Brain";
+import Secretary from "@/pages/Secretary";
 
 function RedirectUserToEmployee() {
   const { id } = useParams();

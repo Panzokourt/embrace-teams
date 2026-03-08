@@ -15,6 +15,7 @@ import { ProjectMediaPlan } from '@/components/projects/ProjectMediaPlan';
 import { ProjectTeamManager } from '@/components/projects/ProjectTeamManager';
 import { FileExplorer } from '@/components/files/FileExplorer';
 import { ProjectCommentsAndHistory } from '@/components/projects/ProjectCommentsAndHistory';
+import { ProjectWorkflowTracker } from '@/components/projects/ProjectWorkflowTracker';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -25,6 +26,7 @@ import {
   Clock,
   Loader2,
   Megaphone,
+  GitBranch,
   Palette,
   FolderInput,
   Timer,
@@ -344,6 +346,9 @@ export default function ProjectDetailPage() {
                   <DollarSign className="h-3.5 w-3.5" /> Οικονομικά
                 </TabsTrigger>
               )}
+              <TabsTrigger value="workflow" className="text-xs gap-1">
+                <GitBranch className="h-3.5 w-3.5" /> Ροή
+              </TabsTrigger>
               <TabsTrigger value="comments" className="text-xs gap-1">
                 <MessageSquare className="h-3.5 w-3.5" /> Σχόλια
               </TabsTrigger>
@@ -581,6 +586,9 @@ export default function ProjectDetailPage() {
                 />
               </TabsContent>
             )}
+            <TabsContent value="workflow">
+              <ProjectWorkflowTracker projectId={project.id} />
+            </TabsContent>
             <TabsContent value="comments">
               <Card>
                 <CardContent className="pt-6">

@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { WorkflowStageBadge } from '@/components/projects/WorkflowStageBadge';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -375,6 +376,7 @@ export function ProjectsTableView({
               disabled={!canManage}
             />
           </div>
+          <WorkflowStageBadge projectId={project.id} />
         </div>
       </TableCell>
 

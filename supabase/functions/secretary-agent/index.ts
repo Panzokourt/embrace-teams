@@ -414,6 +414,54 @@ const toolDefinitions = [
       parameters: { type: "object", properties: {} },
     },
   },
+  // ── BRAIN TOOLS ──
+  {
+    type: "function",
+    function: {
+      name: "run_brain_analysis",
+      description: "Trigger an AI Brain analysis to generate fresh strategic insights about clients, projects, market, and team",
+      parameters: {
+        type: "object",
+        properties: {
+          focus: { type: "string", enum: ["client", "project", "market", "team"], description: "Optional focus area for the analysis" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_brain_insights",
+      description: "Fetch recent Brain insights with optional filters by category, priority, or entity",
+      parameters: {
+        type: "object",
+        properties: {
+          category: { type: "string", enum: ["strategic", "sales", "productivity", "market", "alert", "neuro"], description: "Filter by insight category" },
+          priority: { type: "string", enum: ["high", "medium", "low"], description: "Filter by priority" },
+          limit: { type: "number", description: "Max results (default 10)" },
+          entity_id: { type: "string", description: "Filter insights related to a specific client/project ID" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "action_brain_insight",
+      description: "Take action on a Brain insight: create a project or task from it, dismiss it, or add a note",
+      parameters: {
+        type: "object",
+        properties: {
+          insight_id: { type: "string", description: "The Brain insight ID" },
+          action_type: { type: "string", enum: ["create_project", "create_task", "dismiss", "note"], description: "What action to take" },
+          project_id: { type: "string", description: "Project ID (for create_task)" },
+          task_title: { type: "string", description: "Task title override (for create_task)" },
+          note: { type: "string", description: "Note text (for note action)" },
+        },
+        required: ["insight_id", "action_type"],
+      },
+    },
+  },
 ];
 
 // ── Tool execution ────────────────────────────────────────────────

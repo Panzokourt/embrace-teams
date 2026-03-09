@@ -20,19 +20,19 @@ export function XPBadge({ userId, size = 'sm', showXP = false, className }: XPBa
   if (size === 'sm') {
     return (
       <span
-        className={cn(
-          'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold',
-          'border-border/50 bg-card',
-          glowClass,
-          className
+        className={cn("inline-flex items-center gap-1 rounded-full border px-2 text-[10px] font-bold border-border/50 bg-card py-[7px]",
+
+
+        glowClass,
+        className
         )}
-        title={`Level ${level} — ${levelTitle} — ${totalXP} XP`}
-      >
-        <Zap className={cn('h-3 w-3', colorClass)} />
+        title={`Level ${level} — ${levelTitle} — ${totalXP} XP`}>
+        
+        <Zap className={cn("h-3 w-3 bg-primary text-inherit", colorClass)} />
         <span className={colorClass}>{level}</span>
         {showXP && <span className="text-muted-foreground font-normal ml-0.5">{totalXP}</span>}
-      </span>
-    );
+      </span>);
+
   }
 
   return (
@@ -43,8 +43,8 @@ export function XPBadge({ userId, size = 'sm', showXP = false, className }: XPBa
         glowClass,
         className
       )}
-      title={`Level ${level} — ${levelTitle}`}
-    >
+      title={`Level ${level} — ${levelTitle}`}>
+      
       <div className={cn(
         'flex items-center justify-center w-8 h-8 rounded-full border-2',
         level >= 20 ? 'border-amber-400 bg-amber-400/10' :
@@ -59,6 +59,6 @@ export function XPBadge({ userId, size = 'sm', showXP = false, className }: XPBa
         <span className={cn('text-xs font-bold', colorClass)}>{levelTitle}</span>
         <span className="text-[10px] text-muted-foreground">{totalXP} XP</span>
       </div>
-    </div>
-  );
+    </div>);
+
 }

@@ -34,35 +34,35 @@ export default function CompanySwitcher({ compact, iconOnly }: CompanySwitcherPr
               "gap-1.5 h-8 max-w-[200px] shrink-0",
               compact && "max-w-[140px] px-1.5",
               iconOnly && "h-9 w-9 p-0 max-w-none"
-            )}
-          >
-            {company?.logo_url ? (
-              <img src={company.logo_url} alt="" className="h-4 w-4 rounded-sm object-contain shrink-0" />
-            ) : (
-              <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
-            )}
+            )}>
+            
+            {company?.logo_url ?
+            <img src={company.logo_url} alt="" className="h-4 w-4 rounded-sm object-contain shrink-0" /> :
+
+            <Building2 className="h-4 w-4 shrink-0 text-muted-foreground bg-success" />
+            }
             {!iconOnly && <span className="truncate text-xs font-medium">{company?.name || 'Εταιρεία'}</span>}
             {!iconOnly && <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-[220px]">
-          {allCompanies.map((c) => (
-            <DropdownMenuItem
-              key={c.id}
-              onClick={() => handleSwitch(c.id)}
-              className="gap-2 cursor-pointer"
-            >
-              {c.logo_url ? (
-                <img src={c.logo_url} alt="" className="h-4 w-4 rounded-sm object-contain shrink-0" />
-              ) : (
-                <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
-              )}
+          {allCompanies.map((c) =>
+          <DropdownMenuItem
+            key={c.id}
+            onClick={() => handleSwitch(c.id)}
+            className="gap-2 cursor-pointer">
+            
+              {c.logo_url ?
+            <img src={c.logo_url} alt="" className="h-4 w-4 rounded-sm object-contain shrink-0" /> :
+
+            <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+            }
               <span className="truncate text-sm">{c.name}</span>
-              {c.id === company?.id && (
-                <Check className="h-3.5 w-3.5 ml-auto shrink-0 text-primary" />
-              )}
+              {c.id === company?.id &&
+            <Check className="h-3.5 w-3.5 ml-auto shrink-0 text-primary" />
+            }
             </DropdownMenuItem>
-          ))}
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setCreateOpen(true)} className="gap-2 cursor-pointer text-muted-foreground">
             <Plus className="h-4 w-4 shrink-0" />
@@ -72,6 +72,6 @@ export default function CompanySwitcher({ compact, iconOnly }: CompanySwitcherPr
       </DropdownMenu>
 
       <CreateCompanyDialog open={createOpen} onOpenChange={setCreateOpen} />
-    </>
-  );
+    </>);
+
 }

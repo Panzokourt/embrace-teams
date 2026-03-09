@@ -64,14 +64,14 @@ export function UnifiedViewToggle({
   return (
     <div className={cn("flex items-center gap-1 p-1 rounded-lg bg-secondary shadow-md opacity-85", className)}>
       <Button
-        variant={viewMode === 'card' ? 'default' : 'ghost'}
+        variant={viewMode === 'gantt' ? 'default' : 'ghost'}
         size="sm"
         className="h-8 px-3"
-        onClick={() => handleChange('card')}
-        title="Προβολή καρτών">
+        onClick={() => handleChange('gantt')}
+        title="Προβολή Gantt">
 
-        <LayoutGrid className="h-4 w-4 mr-1.5" />
-        Cards
+        <GanttChartSquare className="h-4 w-4 mr-1.5" />
+        Gantt
       </Button>
       <Button
         variant={viewMode === 'table' ? 'default' : 'ghost'}

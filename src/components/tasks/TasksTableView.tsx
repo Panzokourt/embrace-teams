@@ -88,6 +88,7 @@ interface TasksTableViewProps {
   onDelete: (taskId: string) => void;
   onInlineUpdate: (taskId: string, field: string, value: string | number | null) => Promise<void>;
   onCreateSubtask?: (parentTaskId: string) => void;
+  onInlineCreateSubtask?: (parentTaskId: string, title: string) => Promise<void>;
   onBulkUpdate?: (taskIds: string[], field: string, value: string | null) => Promise<void>;
   canManage: boolean;
   showProject?: boolean;

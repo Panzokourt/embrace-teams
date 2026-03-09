@@ -74,33 +74,21 @@ interface MyProject {
 
 
 
+import { STATUS_COLORS, PRIORITY_COLORS } from '@/components/shared/mondayStyleConfig';
+
 const TASK_SELECT = 'id, title, status, priority, due_date, start_date, estimated_hours, actual_hours, progress, task_type, task_category, project_id, description, assigned_to, internal_reviewer, project:projects(name)';
 
 // ── Helpers ────────────────────────────────────────
 function getStatusLabel(s: string) {
-  switch (s) {
-    case 'todo': return 'To Do';
-    case 'in_progress': return 'In Progress';
-    case 'in_review': return 'In Review';
-    case 'review': return 'Review';
-    case 'completed': return 'Done';
-    default: return s;
-  }
+  return STATUS_COLORS[s]?.label || s;
 }
-function getStatusVariant(s: string): 'default' | 'secondary' | 'destructive' | 'outline' {
-  switch (s) {
-    case 'in_progress': return 'default';
-    case 'in_review': case 'review': return 'secondary';
-    case 'completed': return 'outline';
-    default: return 'outline';
-  }
+function getStatusStyle(s: string): React.CSSProperties {
+  const c = STATUS_COLORS[s];
+  return c ? { backgroundColor: c.bg, color: c.text } : {};
 }
-function getPriorityColor(p: string) {
-  switch (p) {
-    case 'high': case 'urgent': return 'destructive' as const;
-    case 'medium': return 'secondary' as const;
-    default: return 'outline' as const;
-  }
+function getPriorityStyle(p: string): React.CSSProperties {
+  const c = PRIORITY_COLORS[p];
+  return c ? { backgroundColor: c.bg, color: c.text } : {};
 }
 function getOrderKey(userId: string) {
   return `my-work-task-order-${userId}-${format(new Date(), 'yyyy-MM-dd')}`;

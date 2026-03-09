@@ -223,7 +223,7 @@ function BacklogTaskRow({
         <p className="text-sm font-medium text-foreground hover:text-primary truncate">{task.title}</p>
         <p className="text-xs text-muted-foreground truncate">{(task.project as any)?.name || '-'}</p>
       </div>
-      <Badge variant={getPriorityColor(task.priority)} className="text-[10px] shrink-0 hidden sm:flex">{task.priority}</Badge>
+      <span className="text-[10px] font-medium rounded-full px-2 py-0.5 shrink-0 hidden sm:flex" style={getPriorityStyle(task.priority)}>{PRIORITY_COLORS[task.priority]?.label || task.priority}</span>
       {!activeTimer?.is_running || activeTimer.task_id !== task.id ? (
         <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-primary shrink-0" onClick={() => startTimer(task.id, task.project_id)}>
           <Play className="h-3.5 w-3.5" />

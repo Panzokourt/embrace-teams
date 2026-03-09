@@ -1,15 +1,13 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Input } from '@/components/ui/input';
 import { EnhancedInlineEditCell } from '@/components/shared/EnhancedInlineEditCell';
 import { TableToolbar } from '@/components/shared/TableToolbar';
 import { EditDeleteActions } from '@/components/dialogs/EditDeleteActions';
@@ -19,20 +17,24 @@ import { ProjectBulkActions } from '@/components/projects/ProjectBulkActions';
 import { useTableViews, GroupByField } from '@/hooks/useTableViews';
 import { exportToCSV, exportToExcel, formatters } from '@/utils/exportUtils';
 import { Checkbox } from '@/components/ui/checkbox';
-import { 
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-  CheckCircle2,
-  ExternalLink
-} from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { 
+  ArrowUpDown, ArrowUp, ArrowDown, CheckCircle2, ExternalLink, User, X as XIcon,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { WorkflowStageBadge } from '@/components/projects/WorkflowStageBadge';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { sectorToCategory } from '@/hooks/useProjectCategories';
 
 type ProjectStatus = 'lead' | 'proposal' | 'negotiation' | 'won' | 'active' | 'completed' | 'cancelled' | 'lost' | 'tender';
+
+interface Profile {
+  id: string;
+  full_name: string | null;
+  email: string;
+  avatar_url?: string | null;
+}
 
 interface Project {
   id: string;
@@ -46,18 +48,22 @@ interface Project {
   end_date: string | null;
   progress?: number | null;
   created_at: string;
-  client?: { name: string } | null;
+  client?: { name: string; sector?: string | null } | null;
   taskStats?: { total: number; completed: number };
+  project_lead_id?: string | null;
+  account_manager_id?: string | null;
 }
 
 interface Client {
   id: string;
   name: string;
+  sector?: string | null;
 }
 
 interface ProjectsTableViewProps {
   projects: Project[];
   clients: Client[];
+  users: Profile[];
   onEdit: (project: Project) => void;
   onDelete: (projectId: string) => void;
   onInlineUpdate: (projectId: string, field: string, value: string | number | null) => Promise<void>;
@@ -78,6 +84,7 @@ const DEFAULT_COLUMNS = [
   { id: 'select', label: '', visible: true, locked: true },
   { id: 'name', label: 'Όνομα', visible: true, locked: true },
   { id: 'client', label: 'Πελάτης', visible: true },
+  { id: 'assignees', label: 'Υπεύθυνοι', visible: true },
   { id: 'status', label: 'Κατάσταση', visible: true },
   { id: 'progress', label: 'Πρόοδος', visible: true },
   { id: 'budget', label: 'Προϋπολογισμός', visible: true },
@@ -91,6 +98,8 @@ const DEFAULT_COLUMNS = [
 const GROUP_OPTIONS = [
   { value: 'none' as GroupByField, label: 'Χωρίς ομαδοποίηση' },
   { value: 'status' as GroupByField, label: 'Κατάσταση' },
+  { value: 'assignee' as GroupByField, label: 'Πελάτης' },
+  { value: 'project' as GroupByField, label: 'Κατηγορία' },
 ];
 
 type SortDirection = 'asc' | 'desc' | null;
@@ -99,6 +108,7 @@ type SortField = 'name' | 'status' | 'budget' | 'start_date' | 'progress';
 export function ProjectsTableView({
   projects,
   clients,
+  users,
   onEdit,
   onDelete,
   onInlineUpdate,
@@ -106,18 +116,9 @@ export function ProjectsTableView({
 }: ProjectsTableViewProps) {
   const navigate = useNavigate();
   const {
-    columns,
-    setColumns,
-    columnWidths,
-    setColumnWidth,
-    groupBy,
-    setGroupBy,
-    savedViews,
-    currentViewId,
-    saveView,
-    loadView,
-    deleteView,
-    resetToDefault,
+    columns, setColumns, columnWidths, setColumnWidth,
+    groupBy, setGroupBy, savedViews, currentViewId,
+    saveView, loadView, deleteView, resetToDefault,
   } = useTableViews({ storageKey: 'projects_table', defaultColumns: DEFAULT_COLUMNS });
 
   const [sortField, setSortField] = useState<SortField | null>(null);
@@ -125,68 +126,38 @@ export function ProjectsTableView({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const lastSelectedIndex = useRef<number | null>(null);
 
-  // Sort projects
   const sortedProjects = useMemo(() => {
     if (!sortField || !sortDirection) return projects;
-    
     return [...projects].sort((a, b) => {
       let aVal: any, bVal: any;
-      
       switch (sortField) {
-        case 'name':
-          aVal = a.name.toLowerCase();
-          bVal = b.name.toLowerCase();
-          break;
+        case 'name': aVal = a.name.toLowerCase(); bVal = b.name.toLowerCase(); break;
         case 'status':
           const statusOrder: Record<string, number> = { tender: 0, active: 1, completed: 2, cancelled: 3 };
-          aVal = statusOrder[a.status] ?? 99;
-          bVal = statusOrder[b.status] ?? 99;
-          break;
-        case 'budget':
-          aVal = a.budget ?? 0;
-          bVal = b.budget ?? 0;
-          break;
-        case 'start_date':
-          aVal = a.start_date ? new Date(a.start_date).getTime() : Infinity;
-          bVal = b.start_date ? new Date(b.start_date).getTime() : Infinity;
-          break;
-        case 'progress':
-          aVal = a.progress ?? 0;
-          bVal = b.progress ?? 0;
-          break;
-        default:
-          return 0;
+          aVal = statusOrder[a.status] ?? 99; bVal = statusOrder[b.status] ?? 99; break;
+        case 'budget': aVal = a.budget ?? 0; bVal = b.budget ?? 0; break;
+        case 'start_date': aVal = a.start_date ? new Date(a.start_date).getTime() : Infinity; bVal = b.start_date ? new Date(b.start_date).getTime() : Infinity; break;
+        case 'progress': aVal = a.progress ?? 0; bVal = b.progress ?? 0; break;
+        default: return 0;
       }
-      
       if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
       if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
   }, [projects, sortField, sortDirection]);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setSelectedIds(new Set());
-        lastSelectedIndex.current = null;
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'a' && canManage) {
-        e.preventDefault();
-        setSelectedIds(new Set(sortedProjects.map(p => p.id)));
-      }
+      if (e.key === 'Escape') { setSelectedIds(new Set()); lastSelectedIndex.current = null; }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'a' && canManage) { e.preventDefault(); setSelectedIds(new Set(sortedProjects.map(p => p.id))); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [sortedProjects, canManage]);
 
-  // Group projects
   const groupedProjects = useMemo(() => {
-    if (groupBy === 'none') {
-      return [{ key: 'all', label: 'Όλα τα Έργα', projects: sortedProjects }];
-    }
-
-    const groups: Map<string, { label: string; projects: Project[]; badge?: React.ReactNode }> = new Map();
+    if (groupBy === 'none') return [{ key: 'all', label: 'Όλα τα Έργα', projects: sortedProjects }];
+    const groups = new Map<string, { label: string; projects: Project[]; badge?: React.ReactNode }>();
 
     sortedProjects.forEach(project => {
       let groupKey: string;
@@ -198,30 +169,31 @@ export function ProjectsTableView({
         const statusOption = STATUS_OPTIONS.find(s => s.value === project.status);
         groupLabel = statusOption?.label || project.status;
         badge = (
-          <Badge 
-            variant="outline" 
-            className="text-xs"
-            style={{ borderColor: statusOption?.color, color: statusOption?.color }}
-          >
+          <Badge variant="outline" className="text-xs" style={{ borderColor: statusOption?.color, color: statusOption?.color }}>
             {statusOption?.label}
           </Badge>
         );
+      } else if (groupBy === 'assignee') {
+        // Group by client
+        groupKey = project.client_id || '_none';
+        groupLabel = project.client?.name || 'Χωρίς Πελάτη';
+      } else if (groupBy === 'project') {
+        // Group by client sector (category)
+        const sector = project.client?.sector || null;
+        const cat = sectorToCategory(sector);
+        groupKey = cat || '_none';
+        groupLabel = cat || 'Χωρίς Κατηγορία';
       } else {
         groupKey = 'all';
         groupLabel = 'Όλα';
       }
 
-      if (!groups.has(groupKey)) {
-        groups.set(groupKey, { label: groupLabel, projects: [], badge });
-      }
+      if (!groups.has(groupKey)) groups.set(groupKey, { label: groupLabel, projects: [], badge });
       groups.get(groupKey)!.projects.push(project);
     });
 
     return Array.from(groups.entries()).map(([key, value]) => ({
-      key,
-      label: value.label,
-      projects: value.projects,
-      badge: value.badge,
+      key, label: value.label, projects: value.projects, badge: value.badge,
     }));
   }, [sortedProjects, groupBy]);
 
@@ -230,10 +202,7 @@ export function ProjectsTableView({
       if (sortDirection === 'asc') setSortDirection('desc');
       else if (sortDirection === 'desc') { setSortField(null); setSortDirection(null); }
       else setSortDirection('asc');
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
+    } else { setSortField(field); setSortDirection('asc'); }
   };
 
   const getSortIcon = (field: SortField) => {
@@ -242,57 +211,35 @@ export function ProjectsTableView({
     return <ArrowDown className="h-3 w-3" />;
   };
 
-  const isColumnVisible = (columnId: string) => 
-    columns.find(c => c.id === columnId)?.visible ?? true;
-
+  const isColumnVisible = (columnId: string) => columns.find(c => c.id === columnId)?.visible ?? true;
   const getColumnWidth = (columnId: string) => columnWidths[columnId];
 
-  const clientOptions = clients.map(c => ({
-    value: c.id,
-    label: c.name
-  }));
-
+  const clientOptions = clients.map(c => ({ value: c.id, label: c.name }));
   const visibleColumnCount = columns.filter(c => c.visible).length;
 
   const handleRowSelect = (projectId: string, index: number, e: React.MouseEvent) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
-      
       if (e.shiftKey && lastSelectedIndex.current !== null) {
-        // Range select
         const start = Math.min(lastSelectedIndex.current, index);
         const end = Math.max(lastSelectedIndex.current, index);
-        for (let i = start; i <= end; i++) {
-          next.add(sortedProjects[i].id);
-        }
+        for (let i = start; i <= end; i++) next.add(sortedProjects[i].id);
       } else if (e.metaKey || e.ctrlKey) {
-        // Toggle individual
-        if (next.has(projectId)) next.delete(projectId);
-        else next.add(projectId);
+        if (next.has(projectId)) next.delete(projectId); else next.add(projectId);
       } else {
-        // Single select
-        if (next.has(projectId) && next.size === 1) {
-          next.delete(projectId);
-        } else {
-          next.clear();
-          next.add(projectId);
-        }
+        if (next.has(projectId) && next.size === 1) next.delete(projectId);
+        else { next.clear(); next.add(projectId); }
       }
-      
       lastSelectedIndex.current = index;
       return next;
     });
   };
 
   const handleSelectAll = () => {
-    if (selectedIds.size === sortedProjects.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(sortedProjects.map(p => p.id)));
-    }
+    if (selectedIds.size === sortedProjects.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(sortedProjects.map(p => p.id)));
   };
 
-  // Export functions
   const handleExportCSV = useCallback(() => {
     const exportColumns = [
       { key: 'name', label: 'Όνομα' },
@@ -323,184 +270,241 @@ export function ProjectsTableView({
     toast.success('Εξαγωγή Excel ολοκληρώθηκε!');
   }, [projects]);
 
-  const renderProjectRow = (project: Project, flatIndex: number) => (
-    <TableRow 
-      key={project.id} 
-      className={cn(
-        "group hover:bg-muted/50 cursor-pointer",
-        selectedIds.has(project.id) && "bg-primary/5"
-      )}
-      onClick={(e) => {
-        const target = e.target as HTMLElement;
-        if (target.closest('button, input, select, [role="checkbox"], [data-inline-edit]')) return;
-        if (e.metaKey || e.ctrlKey || e.shiftKey) {
-          handleRowSelect(project.id, flatIndex, e);
-          return;
-        }
-        navigate(`/projects/${project.id}`);
-      }}
-    >
-      {/* Checkbox */}
-      {canManage && (
-        <TableCell className="w-[40px]" onClick={(e) => e.stopPropagation()}>
-          <Checkbox
-            checked={selectedIds.has(project.id)}
-            onCheckedChange={() => {
-              setSelectedIds(prev => {
-                const next = new Set(prev);
-                next.has(project.id) ? next.delete(project.id) : next.add(project.id);
-                return next;
-              });
-            }}
-          />
-        </TableCell>
-      )}
+  // Helper to get assignees for a project (lead + manager)
+  const getProjectAssignees = (project: Project) => {
+    const assignees: Profile[] = [];
+    if (project.project_lead_id) {
+      const lead = users.find(u => u.id === project.project_lead_id);
+      if (lead) assignees.push(lead);
+    }
+    if (project.account_manager_id && project.account_manager_id !== project.project_lead_id) {
+      const mgr = users.find(u => u.id === project.account_manager_id);
+      if (mgr) assignees.push(mgr);
+    }
+    return assignees;
+  };
 
-      {/* Name */}
-      <TableCell className="font-medium" style={{ width: getColumnWidth('name') }}>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 shrink-0 text-muted-foreground hover:text-primary"
-            onClick={() => navigate(`/projects/${project.id}`)}
-            title="Άνοιγμα έργου"
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-          </Button>
-          <div onClick={(e) => e.stopPropagation()} className="flex-1 min-w-0">
-            <EnhancedInlineEditCell
-              value={project.name}
-              onSave={(val) => onInlineUpdate(project.id, 'name', val)}
-              type="text"
-              disabled={!canManage}
+  const renderProjectRow = (project: Project, flatIndex: number) => {
+    const assignees = getProjectAssignees(project);
+
+    return (
+      <TableRow 
+        key={project.id} 
+        className={cn(
+          "group hover:bg-muted/50 cursor-pointer",
+          selectedIds.has(project.id) && "bg-primary/5"
+        )}
+        onClick={(e) => {
+          const target = e.target as HTMLElement;
+          if (target.closest('button, input, select, [role="checkbox"], [data-inline-edit]')) return;
+          if (e.metaKey || e.ctrlKey || e.shiftKey) { handleRowSelect(project.id, flatIndex, e); return; }
+          navigate(`/projects/${project.id}`);
+        }}
+      >
+        {canManage && (
+          <TableCell className="w-[40px]" onClick={(e) => e.stopPropagation()}>
+            <Checkbox
+              checked={selectedIds.has(project.id)}
+              onCheckedChange={() => {
+                setSelectedIds(prev => {
+                  const next = new Set(prev);
+                  next.has(project.id) ? next.delete(project.id) : next.add(project.id);
+                  return next;
+                });
+              }}
             />
-          </div>
-          <WorkflowStageBadge projectId={project.id} />
-        </div>
-      </TableCell>
+          </TableCell>
+        )}
 
-      {/* Client */}
-      {isColumnVisible('client') && (
-        <TableCell style={{ width: getColumnWidth('client') }} onClick={(e) => e.stopPropagation()}>
-          <EnhancedInlineEditCell
-            value={project.client_id}
-            onSave={(val) => onInlineUpdate(project.id, 'client_id', val)}
-            type="select"
-            options={clientOptions}
-            displayValue={project.client?.name}
-            placeholder="Κανένας"
-            disabled={!canManage}
-          />
-        </TableCell>
-      )}
-
-      {/* Status */}
-      {isColumnVisible('status') && (
-        <TableCell style={{ width: getColumnWidth('status') }} onClick={(e) => e.stopPropagation()}>
-          <EnhancedInlineEditCell
-            value={project.status}
-            onSave={(val) => onInlineUpdate(project.id, 'status', val)}
-            type="select"
-            options={STATUS_OPTIONS}
-            disabled={!canManage}
-          />
-        </TableCell>
-      )}
-
-      {/* Progress */}
-      {isColumnVisible('progress') && (
-        <TableCell style={{ width: getColumnWidth('progress') }} onClick={(e) => e.stopPropagation()}>
-          <EnhancedInlineEditCell
-            value={project.progress ?? 0}
-            onSave={(val) => onInlineUpdate(project.id, 'progress', val)}
-            type="progress"
-            disabled={!canManage}
-          />
-        </TableCell>
-      )}
-
-      {/* Budget */}
-      {isColumnVisible('budget') && (
-        <TableCell style={{ width: getColumnWidth('budget') }} onClick={(e) => e.stopPropagation()}>
-          <EnhancedInlineEditCell
-            value={project.budget}
-            onSave={(val) => onInlineUpdate(project.id, 'budget', val)}
-            type="number"
-            displayValue={`€${project.budget?.toLocaleString('el-GR') || 0}`}
-            disabled={!canManage}
-          />
-        </TableCell>
-      )}
-
-      {/* Agency Fee */}
-      {isColumnVisible('agency_fee') && (
-        <TableCell style={{ width: getColumnWidth('agency_fee') }} onClick={(e) => e.stopPropagation()}>
-          <EnhancedInlineEditCell
-            value={project.agency_fee_percentage}
-            onSave={(val) => onInlineUpdate(project.id, 'agency_fee_percentage', val)}
-            type="number"
-            displayValue={`${project.agency_fee_percentage}%`}
-            disabled={!canManage}
-          />
-        </TableCell>
-      )}
-
-      {/* Start Date */}
-      {isColumnVisible('start_date') && (
-        <TableCell style={{ width: getColumnWidth('start_date') }} onClick={(e) => e.stopPropagation()}>
-          <EnhancedInlineEditCell
-            value={project.start_date}
-            onSave={(val) => onInlineUpdate(project.id, 'start_date', val)}
-            type="date"
-            disabled={!canManage}
-          />
-        </TableCell>
-      )}
-
-      {/* End Date */}
-      {isColumnVisible('end_date') && (
-        <TableCell style={{ width: getColumnWidth('end_date') }} onClick={(e) => e.stopPropagation()}>
-          <EnhancedInlineEditCell
-            value={project.end_date}
-            onSave={(val) => onInlineUpdate(project.id, 'end_date', val)}
-            type="date"
-            disabled={!canManage}
-          />
-        </TableCell>
-      )}
-
-      {/* Tasks */}
-      {isColumnVisible('tasks') && (
-        <TableCell style={{ width: getColumnWidth('tasks') }}>
-          {project.taskStats && (
-            <div className="flex items-center gap-2 text-sm">
-              <CheckCircle2 className="h-3 w-3 text-success" />
-              <span>{project.taskStats.completed}/{project.taskStats.total}</span>
+        {/* Name */}
+        <TableCell className="font-medium" style={{ width: getColumnWidth('name') }}>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-primary" onClick={() => navigate(`/projects/${project.id}`)} title="Άνοιγμα έργου">
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Button>
+            <div onClick={(e) => e.stopPropagation()} className="flex-1 min-w-0">
+              <EnhancedInlineEditCell value={project.name} onSave={(val) => onInlineUpdate(project.id, 'name', val)} type="text" disabled={!canManage} />
             </div>
+            <WorkflowStageBadge projectId={project.id} />
+          </div>
+        </TableCell>
+
+        {/* Client */}
+        {isColumnVisible('client') && (
+          <TableCell style={{ width: getColumnWidth('client') }} onClick={(e) => e.stopPropagation()}>
+            <EnhancedInlineEditCell value={project.client_id} onSave={(val) => onInlineUpdate(project.id, 'client_id', val)} type="select" options={clientOptions} displayValue={project.client?.name} placeholder="Κανένας" disabled={!canManage} />
+          </TableCell>
+        )}
+
+        {/* Assignees */}
+        {isColumnVisible('assignees') && (
+          <TableCell style={{ width: getColumnWidth('assignees') }}>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="flex items-center gap-0 hover:bg-muted rounded-md p-1 transition-colors -mx-1 w-full min-h-[28px]">
+                  {assignees.length > 0 ? (
+                    <div className="flex items-center -space-x-1.5">
+                      {assignees.map(a => (
+                        <div key={a.id} className="relative group/avatar">
+                          <Avatar className="h-6 w-6 border-2 border-background" title={a.full_name || ''}>
+                            {a.avatar_url && <AvatarImage src={a.avatar_url} />}
+                            <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                              {(a.full_name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          {canManage && (
+                            <button
+                              className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-destructive text-destructive-foreground items-center justify-center text-[8px] hidden group-hover/avatar:flex z-10"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                // Determine which field this is
+                                const field = a.id === project.project_lead_id ? 'project_lead_id' : 'account_manager_id';
+                                await onInlineUpdate(project.id, field, null);
+                              }}
+                            >✕</button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="h-6 w-6 rounded-full border border-dashed border-muted-foreground/40 flex items-center justify-center">
+                      <User className="h-3 w-3 text-muted-foreground/60" />
+                    </div>
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-2" align="start">
+                <div className="space-y-2">
+                  {/* Current assignees */}
+                  {assignees.length > 0 && (
+                    <div className="space-y-1">
+                      {assignees.map(a => {
+                        const role = a.id === project.project_lead_id ? 'Project Lead' : 'Account Manager';
+                        return (
+                          <div key={a.id} className="flex items-center gap-2 p-1.5 bg-muted/50 rounded-md">
+                            <Avatar className="h-6 w-6">
+                              {a.avatar_url && <AvatarImage src={a.avatar_url} />}
+                              <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                                {(a.full_name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm truncate block">{a.full_name || 'Χωρίς όνομα'}</span>
+                              <span className="text-[10px] text-muted-foreground">{role}</span>
+                            </div>
+                            {canManage && (
+                              <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={async () => {
+                                const field = a.id === project.project_lead_id ? 'project_lead_id' : 'account_manager_id';
+                                await onInlineUpdate(project.id, field, null);
+                              }}>
+                                <XIcon className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Add assignees */}
+                  {canManage && (
+                    <>
+                      {!project.project_lead_id && (
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-muted-foreground font-medium px-1">Project Lead</span>
+                          <AssigneeSelector
+                            users={users}
+                            excludeIds={assignees.map(a => a.id)}
+                            onSelect={async (userId) => { await onInlineUpdate(project.id, 'project_lead_id', userId); }}
+                          />
+                        </div>
+                      )}
+                      {!project.account_manager_id && (
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-muted-foreground font-medium px-1">Account Manager</span>
+                          <AssigneeSelector
+                            users={users}
+                            excludeIds={assignees.map(a => a.id)}
+                            onSelect={async (userId) => { await onInlineUpdate(project.id, 'account_manager_id', userId); }}
+                          />
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </TableCell>
+        )}
+
+        {/* Status */}
+        {isColumnVisible('status') && (
+          <TableCell style={{ width: getColumnWidth('status') }} onClick={(e) => e.stopPropagation()}>
+            <EnhancedInlineEditCell value={project.status} onSave={(val) => onInlineUpdate(project.id, 'status', val)} type="select" options={STATUS_OPTIONS} disabled={!canManage} />
+          </TableCell>
+        )}
+
+        {/* Progress */}
+        {isColumnVisible('progress') && (
+          <TableCell style={{ width: getColumnWidth('progress') }} onClick={(e) => e.stopPropagation()}>
+            <EnhancedInlineEditCell value={project.progress ?? 0} onSave={(val) => onInlineUpdate(project.id, 'progress', val)} type="progress" disabled={!canManage} />
+          </TableCell>
+        )}
+
+        {/* Budget */}
+        {isColumnVisible('budget') && (
+          <TableCell style={{ width: getColumnWidth('budget') }} onClick={(e) => e.stopPropagation()}>
+            <EnhancedInlineEditCell value={project.budget} onSave={(val) => onInlineUpdate(project.id, 'budget', val)} type="number" displayValue={`€${project.budget?.toLocaleString('el-GR') || 0}`} disabled={!canManage} />
+          </TableCell>
+        )}
+
+        {/* Agency Fee */}
+        {isColumnVisible('agency_fee') && (
+          <TableCell style={{ width: getColumnWidth('agency_fee') }} onClick={(e) => e.stopPropagation()}>
+            <EnhancedInlineEditCell value={project.agency_fee_percentage} onSave={(val) => onInlineUpdate(project.id, 'agency_fee_percentage', val)} type="number" displayValue={`${project.agency_fee_percentage}%`} disabled={!canManage} />
+          </TableCell>
+        )}
+
+        {/* Start Date */}
+        {isColumnVisible('start_date') && (
+          <TableCell style={{ width: getColumnWidth('start_date') }} onClick={(e) => e.stopPropagation()}>
+            <EnhancedInlineEditCell value={project.start_date} onSave={(val) => onInlineUpdate(project.id, 'start_date', val)} type="date" disabled={!canManage} />
+          </TableCell>
+        )}
+
+        {/* End Date */}
+        {isColumnVisible('end_date') && (
+          <TableCell style={{ width: getColumnWidth('end_date') }} onClick={(e) => e.stopPropagation()}>
+            <EnhancedInlineEditCell value={project.end_date} onSave={(val) => onInlineUpdate(project.id, 'end_date', val)} type="date" disabled={!canManage} />
+          </TableCell>
+        )}
+
+        {/* Tasks */}
+        {isColumnVisible('tasks') && (
+          <TableCell style={{ width: getColumnWidth('tasks') }}>
+            {project.taskStats && (
+              <div className="flex items-center gap-2 text-sm">
+                <CheckCircle2 className="h-3 w-3 text-success" />
+                <span>{project.taskStats.completed}/{project.taskStats.total}</span>
+              </div>
+            )}
+          </TableCell>
+        )}
+
+        {/* Actions */}
+        <TableCell onClick={(e) => e.stopPropagation()}>
+          {canManage && (
+            <EditDeleteActions onEdit={() => onEdit(project)} onDelete={() => onDelete(project.id)} itemName={project.name} />
           )}
         </TableCell>
-      )}
+      </TableRow>
+    );
+  };
 
-      {/* Actions */}
-      <TableCell onClick={(e) => e.stopPropagation()}>
-        {canManage && (
-          <EditDeleteActions
-            onEdit={() => onEdit(project)}
-            onDelete={() => onDelete(project.id)}
-            itemName={project.name}
-          />
-        )}
-      </TableCell>
-    </TableRow>
-  );
-
-  // Build flat index for shift-select
   let flatIndex = 0;
 
   return (
     <div className="space-y-4">
-      {/* Bulk Actions */}
       {canManage && (
         <ProjectBulkActions
           selectedIds={selectedIds}
@@ -509,7 +513,6 @@ export function ProjectsTableView({
         />
       )}
 
-      {/* Toolbar */}
       <TableToolbar
         columns={columns}
         onColumnsChange={setColumns}
@@ -518,10 +521,7 @@ export function ProjectsTableView({
         onSaveView={(name) => saveView(name, sortField, sortDirection)}
         onLoadView={(id) => {
           const view = loadView(id);
-          if (view) {
-            setSortField(view.sortField as SortField | null);
-            setSortDirection(view.sortDirection);
-          }
+          if (view) { setSortField(view.sortField as SortField | null); setSortDirection(view.sortDirection); }
         }}
         onDeleteView={deleteView}
         onResetToDefault={resetToDefault}
@@ -532,125 +532,61 @@ export function ProjectsTableView({
         groupOptions={GROUP_OPTIONS}
       />
 
-      {/* Table */}
       <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
               {canManage && (
                 <TableHead className="w-[40px]">
-                  <Checkbox
-                    checked={selectedIds.size > 0 && selectedIds.size === sortedProjects.length}
-                    onCheckedChange={handleSelectAll}
-                  />
+                  <Checkbox checked={selectedIds.size > 0 && selectedIds.size === sortedProjects.length} onCheckedChange={handleSelectAll} />
                 </TableHead>
               )}
-              <ResizableTableHeader 
-                width={getColumnWidth('name')}
-                onWidthChange={(w) => setColumnWidth('name', w)}
-                minWidth={150}
-                className="cursor-pointer select-none"
-                onClick={() => toggleSort('name')}
-              >
-                <div className="flex items-center gap-1">
-                  Όνομα {getSortIcon('name')}
-                </div>
+              <ResizableTableHeader width={getColumnWidth('name')} onWidthChange={(w) => setColumnWidth('name', w)} minWidth={150} className="cursor-pointer select-none" onClick={() => toggleSort('name')}>
+                <div className="flex items-center gap-1">Όνομα {getSortIcon('name')}</div>
               </ResizableTableHeader>
               
               {isColumnVisible('client') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('client')}
-                  onWidthChange={(w) => setColumnWidth('client', w)}
-                  minWidth={100}
-                >
-                  Πελάτης
-                </ResizableTableHeader>
+                <ResizableTableHeader width={getColumnWidth('client')} onWidthChange={(w) => setColumnWidth('client', w)} minWidth={100}>Πελάτης</ResizableTableHeader>
+              )}
+
+              {isColumnVisible('assignees') && (
+                <ResizableTableHeader width={getColumnWidth('assignees')} onWidthChange={(w) => setColumnWidth('assignees', w)} minWidth={80}>Υπεύθυνοι</ResizableTableHeader>
               )}
               
               {isColumnVisible('status') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('status')}
-                  onWidthChange={(w) => setColumnWidth('status', w)}
-                  minWidth={100}
-                  className="cursor-pointer select-none"
-                  onClick={() => toggleSort('status')}
-                >
-                  <div className="flex items-center gap-1">
-                    Κατάσταση {getSortIcon('status')}
-                  </div>
+                <ResizableTableHeader width={getColumnWidth('status')} onWidthChange={(w) => setColumnWidth('status', w)} minWidth={100} className="cursor-pointer select-none" onClick={() => toggleSort('status')}>
+                  <div className="flex items-center gap-1">Κατάσταση {getSortIcon('status')}</div>
                 </ResizableTableHeader>
               )}
               
               {isColumnVisible('progress') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('progress')}
-                  onWidthChange={(w) => setColumnWidth('progress', w)}
-                  minWidth={80}
-                  className="cursor-pointer select-none"
-                  onClick={() => toggleSort('progress')}
-                >
-                  <div className="flex items-center gap-1">
-                    Πρόοδος {getSortIcon('progress')}
-                  </div>
+                <ResizableTableHeader width={getColumnWidth('progress')} onWidthChange={(w) => setColumnWidth('progress', w)} minWidth={80} className="cursor-pointer select-none" onClick={() => toggleSort('progress')}>
+                  <div className="flex items-center gap-1">Πρόοδος {getSortIcon('progress')}</div>
                 </ResizableTableHeader>
               )}
               
               {isColumnVisible('budget') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('budget')}
-                  onWidthChange={(w) => setColumnWidth('budget', w)}
-                  minWidth={100}
-                  className="cursor-pointer select-none"
-                  onClick={() => toggleSort('budget')}
-                >
-                  <div className="flex items-center gap-1">
-                    Προϋπολογισμός {getSortIcon('budget')}
-                  </div>
+                <ResizableTableHeader width={getColumnWidth('budget')} onWidthChange={(w) => setColumnWidth('budget', w)} minWidth={100} className="cursor-pointer select-none" onClick={() => toggleSort('budget')}>
+                  <div className="flex items-center gap-1">Προϋπολογισμός {getSortIcon('budget')}</div>
                 </ResizableTableHeader>
               )}
               
               {isColumnVisible('agency_fee') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('agency_fee')}
-                  onWidthChange={(w) => setColumnWidth('agency_fee', w)}
-                  minWidth={80}
-                >
-                  Agency Fee
-                </ResizableTableHeader>
+                <ResizableTableHeader width={getColumnWidth('agency_fee')} onWidthChange={(w) => setColumnWidth('agency_fee', w)} minWidth={80}>Agency Fee</ResizableTableHeader>
               )}
               
               {isColumnVisible('start_date') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('start_date')}
-                  onWidthChange={(w) => setColumnWidth('start_date', w)}
-                  minWidth={90}
-                  className="cursor-pointer select-none"
-                  onClick={() => toggleSort('start_date')}
-                >
-                  <div className="flex items-center gap-1">
-                    Έναρξη {getSortIcon('start_date')}
-                  </div>
+                <ResizableTableHeader width={getColumnWidth('start_date')} onWidthChange={(w) => setColumnWidth('start_date', w)} minWidth={90} className="cursor-pointer select-none" onClick={() => toggleSort('start_date')}>
+                  <div className="flex items-center gap-1">Έναρξη {getSortIcon('start_date')}</div>
                 </ResizableTableHeader>
               )}
               
               {isColumnVisible('end_date') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('end_date')}
-                  onWidthChange={(w) => setColumnWidth('end_date', w)}
-                  minWidth={90}
-                >
-                  Λήξη
-                </ResizableTableHeader>
+                <ResizableTableHeader width={getColumnWidth('end_date')} onWidthChange={(w) => setColumnWidth('end_date', w)} minWidth={90}>Λήξη</ResizableTableHeader>
               )}
               
               {isColumnVisible('tasks') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('tasks')}
-                  onWidthChange={(w) => setColumnWidth('tasks', w)}
-                  minWidth={80}
-                >
-                  Tasks
-                </ResizableTableHeader>
+                <ResizableTableHeader width={getColumnWidth('tasks')} onWidthChange={(w) => setColumnWidth('tasks', w)} minWidth={80}>Tasks</ResizableTableHeader>
               )}
               
               <TableHead className="w-[80px]">Ενέργειες</TableHead>
@@ -668,10 +604,7 @@ export function ProjectsTableView({
             ) : (
               groupedProjects.map(group => {
                 const startIdx = flatIndex;
-                const rows = group.projects.map((project, idx) => {
-                  const row = renderProjectRow(project, startIdx + idx);
-                  return row;
-                });
+                const rows = group.projects.map((project, idx) => renderProjectRow(project, startIdx + idx));
                 flatIndex += group.projects.length;
                 return (
                   <GroupedTableSection
@@ -689,6 +622,32 @@ export function ProjectsTableView({
             )}
           </TableBody>
         </Table>
+      </div>
+    </div>
+  );
+}
+
+// Small helper component for the popover user selector
+function AssigneeSelector({ users, excludeIds, onSelect }: { users: Profile[]; excludeIds: string[]; onSelect: (userId: string) => Promise<void> }) {
+  const [search, setSearch] = useState('');
+  const filtered = users.filter(u => !excludeIds.includes(u.id) && (u.full_name || u.email).toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <div className="space-y-1">
+      <Input placeholder="Αναζήτηση..." className="h-7 text-xs" value={search} onChange={e => setSearch(e.target.value)} />
+      <div className="max-h-32 overflow-y-auto space-y-0.5">
+        {filtered.map(u => (
+          <button key={u.id} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-muted transition-colors" onClick={async () => { await onSelect(u.id); }}>
+            <Avatar className="h-5 w-5">
+              {u.avatar_url && <AvatarImage src={u.avatar_url} />}
+              <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                {(u.full_name || u.email).split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <span className="truncate">{u.full_name || u.email}</span>
+          </button>
+        ))}
+        {filtered.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">Κανένα αποτέλεσμα</p>}
       </div>
     </div>
   );

@@ -1,685 +1,349 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-  DropdownMenuCheckboxItem,
-} from '@/components/ui/dropdown-menu';
-import {
-  Package,
-  Circle,
-  Loader2,
-  CheckCircle2,
-  AlertCircle,
-  ChevronLeft,
-  ChevronRight,
-  CalendarDays,
-  BarChart2,
-  Filter,
-  Building2,
-  Handshake,
-  GanttChartSquare,
+  ChevronLeft, ChevronRight, CalendarDays, GanttChartSquare, Filter,
 } from 'lucide-react';
-import { format, addWeeks, addMonths, startOfWeek, startOfMonth, eachWeekOfInterval, eachMonthOfInterval, isBefore, isAfter, parseISO, differenceInCalendarDays } from 'date-fns';
+import {
+  format, addWeeks, addMonths, eachWeekOfInterval, eachMonthOfInterval,
+  isBefore, isAfter, parseISO,
+} from 'date-fns';
 import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { useIsMobile } from '@/hooks/use-mobile';
 
-// ─── Types ─────────────────────────────────────────────────────────────────
+type ProjectStatus = 'lead' | 'proposal' | 'negotiation' | 'won' | 'active' | 'completed' | 'cancelled' | 'lost' | 'tender';
 
-type TaskStatus = 'todo' | 'in_progress' | 'review' | 'completed' | 'internal_review' | 'client_review';
-
-interface GanttTask {
-  id: string;
-  title: string;
-  status: TaskStatus;
-  priority: string | null;
-  start_date: string | null;
-  due_date: string | null;
-  deliverable_id: string | null;
-  progress: number | null;
-  assignee: { full_name: string | null } | null;
-}
-
-interface GanttDeliverable {
+interface GanttProject {
   id: string;
   name: string;
-  due_date: string | null;
-  completed: boolean | null;
-  tasks: GanttTask[];
+  status: ProjectStatus;
+  start_date: string | null;
+  end_date: string | null;
+  progress?: number | null;
+  client?: { name: string; sector?: string | null } | null;
+  client_id: string | null;
 }
 
 interface ProjectGanttViewProps {
-  projectId: string;
-  projectStartDate?: string | null;
-  projectEndDate?: string | null;
+  projects: GanttProject[];
+  onProjectUpdated?: () => void;
 }
 
 type Granularity = 'weeks' | 'months';
 
-// ─── Status helpers ────────────────────────────────────────────────────────
-
-const STATUS_CONFIG: Record<TaskStatus, { label: string; barClass: string; icon: React.ReactNode }> = {
-  todo: {
-    label: 'Προς Εκτέλεση',
-    barClass: 'bg-muted-foreground/40',
-    icon: <Circle className="h-3 w-3" />,
-  },
-  in_progress: {
-    label: 'Σε Εξέλιξη',
-    barClass: 'bg-primary',
-    icon: <Loader2 className="h-3 w-3" />,
-  },
-  review: {
-    label: 'Αναθεώρηση',
-    barClass: 'bg-warning',
-    icon: <AlertCircle className="h-3 w-3" />,
-  },
-  internal_review: {
-    label: 'Εσωτερική Έγκριση',
-    barClass: 'bg-violet-500',
-    icon: <Building2 className="h-3 w-3" />,
-  },
-  client_review: {
-    label: 'Έγκριση Πελάτη',
-    barClass: 'bg-orange-500',
-    icon: <Handshake className="h-3 w-3" />,
-  },
-  completed: {
-    label: 'Ολοκληρώθηκε',
-    barClass: 'bg-success',
-    icon: <CheckCircle2 className="h-3 w-3" />,
-  },
+const STATUS_CONFIG: Record<string, { label: string; barColor: string }> = {
+  lead: { label: 'Lead', barColor: 'hsl(210 80% 55%)' },
+  proposal: { label: 'Πρόταση', barColor: 'hsl(45 93% 47%)' },
+  negotiation: { label: 'Διαπραγμάτευση', barColor: 'hsl(30 80% 55%)' },
+  won: { label: 'Κερδήθηκε', barColor: 'hsl(142 71% 45%)' },
+  active: { label: 'Ενεργό', barColor: 'hsl(142 71% 45%)' },
+  completed: { label: 'Ολοκληρωμένο', barColor: '#888' },
+  cancelled: { label: 'Ακυρωμένο', barColor: '#ef4444' },
+  lost: { label: 'Χάθηκε', barColor: '#ef4444' },
+  tender: { label: 'Διαγωνισμός', barColor: 'hsl(45 93% 47%)' },
 };
 
-const ALL_STATUSES: TaskStatus[] = ['todo', 'in_progress', 'review', 'internal_review', 'client_review', 'completed'];
+const STATUS_OPTIONS = Object.entries(STATUS_CONFIG).map(([v, c]) => ({ value: v, label: c.label }));
 
-// ─── Bar position calculation ───────────────────────────────────────────────
-
-function getBarPosition(
-  itemStart: Date | null,
-  itemEnd: Date | null,
-  timelineStart: Date,
-  timelineEnd: Date,
-) {
-  const totalMs = timelineEnd.getTime() - timelineStart.getTime();
+function getBarPosition(start: Date | null, end: Date | null, tlStart: Date, tlEnd: Date) {
+  const totalMs = tlEnd.getTime() - tlStart.getTime();
   if (totalMs <= 0) return null;
-
-  const start = itemStart ?? itemEnd;
-  const end = itemEnd ?? itemStart;
-  if (!start || !end) return null;
-
-  const clampedStart = isBefore(start, timelineStart) ? timelineStart : start;
-  const clampedEnd = isAfter(end, timelineEnd) ? timelineEnd : end;
-
-  const leftPct = ((clampedStart.getTime() - timelineStart.getTime()) / totalMs) * 100;
-  const widthPct = Math.max(0.3, ((clampedEnd.getTime() - clampedStart.getTime()) / totalMs) * 100);
-
-  return { leftPct, widthPct, isMilestone: !itemStart && !!itemEnd };
+  const s = start ?? end;
+  const e = end ?? start;
+  if (!s || !e) return null;
+  const cs = isBefore(s, tlStart) ? tlStart : s;
+  const ce = isAfter(e, tlEnd) ? tlEnd : e;
+  const leftPct = ((cs.getTime() - tlStart.getTime()) / totalMs) * 100;
+  const widthPct = Math.max(0.5, ((ce.getTime() - cs.getTime()) / totalMs) * 100);
+  return { leftPct, widthPct };
 }
 
-// ─── Today line position ────────────────────────────────────────────────────
-
-function getTodayPosition(timelineStart: Date, timelineEnd: Date) {
-  const today = new Date();
-  if (isBefore(today, timelineStart) || isAfter(today, timelineEnd)) return null;
-  const totalMs = timelineEnd.getTime() - timelineStart.getTime();
-  return ((today.getTime() - timelineStart.getTime()) / totalMs) * 100;
-}
-
-// ─── Main component ────────────────────────────────────────────────────────
-
-export function ProjectGanttView({ projectId, projectStartDate, projectEndDate }: ProjectGanttViewProps) {
+export function ProjectGanttView({ projects, onProjectUpdated }: ProjectGanttViewProps) {
   const navigate = useNavigate();
-  const isMobile = useIsMobile();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [granularity, setGranularity] = useState<Granularity>('months');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [clientFilter, setClientFilter] = useState<string>('all');
+  const [editingProject, setEditingProject] = useState<GanttProject | null>(null);
+  const [editStartDate, setEditStartDate] = useState<Date | undefined>();
+  const [editEndDate, setEditEndDate] = useState<Date | undefined>();
+  const [editStatus, setEditStatus] = useState<string>('');
 
-  const [loading, setLoading] = useState(true);
-  const [deliverables, setDeliverables] = useState<GanttDeliverable[]>([]);
-  const [unassignedTasks, setUnassignedTasks] = useState<GanttTask[]>([]);
-  const [granularity, setGranularity] = useState<Granularity>('weeks');
-  const [activeStatuses, setActiveStatuses] = useState<Set<TaskStatus>>(new Set(ALL_STATUSES));
+  const clientOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    projects.forEach(p => { if (p.client?.name && p.client_id) map.set(p.client_id, p.client.name); });
+    return Array.from(map.entries()).map(([v, l]) => ({ value: v, label: l }));
+  }, [projects]);
 
-  // ── Derived timeline range ──────────────────────────────────────────────
-  const [timelineStart, setTimelineStart] = useState<Date>(new Date());
-  const [timelineEnd, setTimelineEnd] = useState<Date>(new Date());
+  const filteredProjects = useMemo(() => {
+    return projects.filter(p => {
+      if (statusFilter !== 'all' && p.status !== statusFilter) return false;
+      if (clientFilter !== 'all' && p.client_id !== clientFilter) return false;
+      return true;
+    });
+  }, [projects, statusFilter, clientFilter]);
 
-  // ── Fetch data ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      const [tasksRes, delivRes] = await Promise.all([
-        supabase
-          .from('tasks')
-          .select('id, title, status, priority, start_date, due_date, deliverable_id, progress, assigned_to, profiles:assigned_to(full_name)')
-          .eq('project_id', projectId),
-        supabase
-          .from('deliverables')
-          .select('id, name, due_date, completed')
-          .eq('project_id', projectId),
-      ]);
+  const projectsWithDates = useMemo(() =>
+    filteredProjects.filter(p => p.start_date || p.end_date),
+    [filteredProjects]
+  );
 
-      const rawTasks: GanttTask[] = (tasksRes.data ?? []).map((t: any) => ({
-        ...t,
-        assignee: t.profiles ?? null,
-      }));
-
-      const rawDeliverables = delivRes.data ?? [];
-
-      // Group tasks by deliverable
-      const delivMap = new Map<string, GanttTask[]>();
-      const unassigned: GanttTask[] = [];
-      for (const task of rawTasks) {
-        if (task.deliverable_id) {
-          const arr = delivMap.get(task.deliverable_id) ?? [];
-          arr.push(task);
-          delivMap.set(task.deliverable_id, arr);
-        } else {
-          unassigned.push(task);
-        }
-      }
-
-      const grouped: GanttDeliverable[] = rawDeliverables.map((d: any) => ({
-        ...d,
-        tasks: delivMap.get(d.id) ?? [],
-      }));
-
-      setDeliverables(grouped);
-      setUnassignedTasks(unassigned);
-
-      // Compute timeline range
-      const allDates: Date[] = [];
-      if (projectStartDate) allDates.push(parseISO(projectStartDate));
-      if (projectEndDate) allDates.push(parseISO(projectEndDate));
-      for (const d of rawDeliverables) {
-        if (d.due_date) allDates.push(parseISO(d.due_date));
-      }
-      for (const t of rawTasks) {
-        if (t.start_date) allDates.push(parseISO(t.start_date));
-        if (t.due_date) allDates.push(parseISO(t.due_date));
-      }
-
-      const today = new Date();
-      if (allDates.length === 0) {
-        setTimelineStart(addMonths(today, -1));
-        setTimelineEnd(addMonths(today, 3));
-      } else {
-        const minDate = allDates.reduce((a, b) => (isBefore(a, b) ? a : b));
-        const maxDate = allDates.reduce((a, b) => (isAfter(a, b) ? a : b));
-        setTimelineStart(addWeeks(minDate, -1));
-        setTimelineEnd(addWeeks(maxDate, 2));
-      }
-
-      setLoading(false);
+  const groupedByClient = useMemo(() => {
+    const map = new Map<string, { name: string; projects: GanttProject[] }>();
+    for (const p of projectsWithDates) {
+      const key = p.client_id || '_none';
+      if (!map.has(key)) map.set(key, { name: p.client?.name || 'Χωρίς Πελάτη', projects: [] });
+      map.get(key)!.projects.push(p);
     }
+    return Array.from(map.values());
+  }, [projectsWithDates]);
 
-    fetchData();
-  }, [projectId, projectStartDate, projectEndDate]);
-
-  // ── Scroll to today ─────────────────────────────────────────────────────
-  const scrollToToday = useCallback(() => {
-    if (!scrollRef.current) return;
-    const todayPct = getTodayPosition(timelineStart, timelineEnd);
-    if (todayPct === null) return;
-    const scrollWidth = scrollRef.current.scrollWidth;
-    const clientWidth = scrollRef.current.clientWidth;
-    scrollRef.current.scrollLeft = (todayPct / 100) * scrollWidth - clientWidth / 2;
-  }, [timelineStart, timelineEnd]);
-
-  useEffect(() => {
-    if (!loading) {
-      setTimeout(scrollToToday, 100);
+  const { timelineStart, timelineEnd } = useMemo(() => {
+    const allDates: Date[] = [];
+    for (const p of projectsWithDates) {
+      if (p.start_date) allDates.push(parseISO(p.start_date));
+      if (p.end_date) allDates.push(parseISO(p.end_date));
     }
-  }, [loading, scrollToToday]);
+    const today = new Date();
+    if (allDates.length === 0) return { timelineStart: addMonths(today, -1), timelineEnd: addMonths(today, 6) };
+    const min = allDates.reduce((a, b) => (isBefore(a, b) ? a : b));
+    const max = allDates.reduce((a, b) => (isAfter(a, b) ? a : b));
+    return { timelineStart: addWeeks(min, -2), timelineEnd: addWeeks(max, 4) };
+  }, [projectsWithDates]);
 
-  // ── Column ticks ────────────────────────────────────────────────────────
   const ticks = granularity === 'weeks'
     ? eachWeekOfInterval({ start: timelineStart, end: timelineEnd }, { weekStartsOn: 1 })
     : eachMonthOfInterval({ start: timelineStart, end: timelineEnd });
 
-  const todayPct = getTodayPosition(timelineStart, timelineEnd);
+  const todayPct = (() => {
+    const today = new Date();
+    if (isBefore(today, timelineStart) || isAfter(today, timelineEnd)) return null;
+    const totalMs = timelineEnd.getTime() - timelineStart.getTime();
+    return ((today.getTime() - timelineStart.getTime()) / totalMs) * 100;
+  })();
 
-  const LABEL_WIDTH = 240;
+  const scrollToToday = useCallback(() => {
+    if (!scrollRef.current || todayPct === null) return;
+    const sw = scrollRef.current.scrollWidth;
+    const cw = scrollRef.current.clientWidth;
+    scrollRef.current.scrollLeft = (todayPct / 100) * sw - cw / 2;
+  }, [todayPct]);
 
-  // ── Status filter toggle ────────────────────────────────────────────────
-  function toggleStatus(s: TaskStatus) {
-    setActiveStatuses(prev => {
-      const next = new Set(prev);
-      if (next.has(s)) next.delete(s);
-      else next.add(s);
-      return next;
-    });
-  }
+  useEffect(() => { setTimeout(scrollToToday, 100); }, [scrollToToday]);
 
-  // ── Scroll helpers ───────────────────────────────────────────────────────
-  function scrollBy(delta: number) {
-    scrollRef.current?.scrollBy({ left: delta, behavior: 'smooth' });
-  }
+  const handleBarClick = (project: GanttProject, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingProject(project);
+    setEditStartDate(project.start_date ? parseISO(project.start_date) : undefined);
+    setEditEndDate(project.end_date ? parseISO(project.end_date) : undefined);
+    setEditStatus(project.status);
+  };
 
-  // ── Filter tasks by active statuses ─────────────────────────────────────
-  function filterTasks(tasks: GanttTask[]) {
-    return tasks.filter(t => activeStatuses.has(t.status));
-  }
+  const handleSaveEdit = async () => {
+    if (!editingProject) return;
+    const updates: Record<string, any> = {};
+    if (editStartDate) updates.start_date = format(editStartDate, 'yyyy-MM-dd');
+    if (editEndDate) updates.end_date = format(editEndDate, 'yyyy-MM-dd');
+    if (editStatus && editStatus !== editingProject.status) updates.status = editStatus;
+    if (Object.keys(updates).length === 0) { setEditingProject(null); return; }
+    const { error } = await supabase.from('projects').update(updates).eq('id', editingProject.id);
+    if (error) { toast.error('Σφάλμα ενημέρωσης'); return; }
+    toast.success('Έργο ενημερώθηκε');
+    setEditingProject(null);
+    onProjectUpdated?.();
+  };
 
-  // ── Loading state ────────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div className="space-y-3 p-4">
-        {[...Array(5)].map((_, i) => (
-          <div key={i} className="flex gap-4">
-            <Skeleton className="h-8 w-48 shrink-0" />
-            <Skeleton className="h-8 flex-1" style={{ marginLeft: `${Math.random() * 20}%`, width: `${20 + Math.random() * 40}%`, flex: 'none' }} />
-          </div>
-        ))}
-      </div>
-    );
-  }
+  const hasActiveFilters = statusFilter !== 'all' || clientFilter !== 'all';
+  const LABEL_WIDTH = 260;
 
-  const hasItems = deliverables.length > 0 || unassignedTasks.length > 0;
-  const allTasks = [...deliverables.flatMap(d => d.tasks), ...unassignedTasks];
-  const hasDateInfo = allTasks.some(t => t.start_date || t.due_date) || deliverables.some(d => d.due_date);
-
-  // ── Empty state ──────────────────────────────────────────────────────────
-  if (!hasItems || !hasDateInfo) {
+  if (projectsWithDates.length === 0 && projects.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center space-y-3">
-        <div className="p-4 rounded-full bg-muted">
-          <GanttChartSquare className="h-8 w-8 text-muted-foreground" />
-        </div>
+        <div className="p-4 rounded-full bg-muted"><GanttChartSquare className="h-8 w-8 text-muted-foreground" /></div>
         <p className="text-lg font-medium">Δεν υπάρχουν ημερομηνίες</p>
-        <p className="text-sm text-muted-foreground max-w-sm">
-          Προσθέστε start date ή due date στα tasks και deliverables για να εμφανιστεί το Timeline.
-        </p>
+        <p className="text-sm text-muted-foreground max-w-sm">Προσθέστε ημερομηνίες στα έργα για να εμφανιστεί το Gantt.</p>
       </div>
     );
   }
-
-  // ── Mobile fallback ─────────────────────────────────────────────────────
-  if (isMobile) {
-    const sorted = allTasks
-      .filter(t => t.due_date || t.start_date)
-      .sort((a, b) => {
-        const da = a.due_date ?? a.start_date ?? '';
-        const db = b.due_date ?? b.start_date ?? '';
-        return da.localeCompare(db);
-      });
-    return (
-      <div className="space-y-2 p-2">
-        <p className="text-xs text-muted-foreground text-center mb-3">Tasks ταξινομημένα κατά ημερομηνία</p>
-        {sorted.map(task => (
-          <div
-            key={task.id}
-            className="flex items-center gap-3 p-3 rounded-lg border bg-card cursor-pointer hover:bg-muted/50"
-            onClick={() => navigate(`/tasks/${task.id}`)}
-          >
-            <span className={cn('w-2 h-2 rounded-full shrink-0', STATUS_CONFIG[task.status]?.barClass ?? 'bg-muted')} />
-            <span className="flex-1 text-sm font-medium truncate">{task.title}</span>
-            {task.due_date && (
-              <span className="text-xs text-muted-foreground">{format(parseISO(task.due_date), 'd MMM', { locale: el })}</span>
-            )}
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  // ── Gantt row renderer ──────────────────────────────────────────────────
-  function renderTaskRow(task: GanttTask, indent = false) {
-    const filtered = activeStatuses.has(task.status);
-    if (!filtered) return null;
-
-    const start = task.start_date ? parseISO(task.start_date) : null;
-    const end = task.due_date ? parseISO(task.due_date) : null;
-    const pos = getBarPosition(start, end, timelineStart, timelineEnd);
-    const cfg = STATUS_CONFIG[task.status] ?? STATUS_CONFIG.todo;
-    const isOverdue = end && isBefore(end, new Date()) && task.status !== 'completed';
-
-    return (
-      <div key={task.id} className="flex items-center h-10 border-b border-border/40 hover:bg-muted/20 group">
-        {/* Label */}
-        <div
-          className="shrink-0 flex items-center gap-2 px-3 cursor-pointer hover:text-primary"
-          style={{ width: LABEL_WIDTH }}
-          onClick={() => navigate(`/tasks/${task.id}`)}
-        >
-          {indent && <span className="text-muted-foreground/40 text-xs ml-2">└</span>}
-          <span className={cn('shrink-0 text-muted-foreground', isOverdue && 'text-destructive')}>{cfg.icon}</span>
-          <span className={cn(
-            'text-xs truncate',
-            task.status === 'completed' && 'line-through text-muted-foreground',
-            isOverdue && 'text-destructive',
-          )}>
-            {task.title}
-          </span>
-        </div>
-
-        {/* Bar area */}
-        <div className="relative flex-1 h-full">
-          {/* Grid lines */}
-          {ticks.map((tick, i) => {
-            const leftPct = ((tick.getTime() - timelineStart.getTime()) / (timelineEnd.getTime() - timelineStart.getTime())) * 100;
-            return (
-              <div
-                key={i}
-                className="absolute top-0 bottom-0 w-px bg-border/30"
-                style={{ left: `${leftPct}%` }}
-              />
-            );
-          })}
-
-          {/* Today line */}
-          {todayPct !== null && (
-            <div
-              className="absolute top-0 bottom-0 w-0.5 bg-destructive/60 z-10"
-              style={{ left: `${todayPct}%` }}
-            />
-          )}
-
-          {/* Bar or Milestone */}
-          {pos && (
-            <TooltipProvider delayDuration={200}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  {pos.isMilestone ? (
-                    // Diamond milestone marker
-                    <div
-                      className={cn(
-                        'absolute top-1/2 -translate-y-1/2 w-3 h-3 rotate-45 cursor-pointer z-20',
-                        isOverdue ? 'bg-destructive' : cfg.barClass,
-                      )}
-                      style={{ left: `calc(${pos.leftPct}% - 6px)` }}
-                    />
-                  ) : (
-                    <div
-                      className={cn(
-                        'absolute top-1/2 -translate-y-1/2 rounded-sm cursor-pointer transition-opacity hover:opacity-80 z-20',
-                        isOverdue ? 'bg-destructive' : cfg.barClass,
-                      )}
-                      style={{
-                        left: `${pos.leftPct}%`,
-                        width: `${pos.widthPct}%`,
-                        height: '16px',
-                        minWidth: '4px',
-                      }}
-                    />
-                  )}
-                </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-xs">
-                  <div className="space-y-1.5">
-                    <p className="font-semibold text-sm">{task.title}</p>
-                    <div className="flex items-center gap-1.5">
-                      <span className={cn('w-2 h-2 rounded-full', isOverdue ? 'bg-destructive' : cfg.barClass)} />
-                      <span className="text-xs">{cfg.label}</span>
-                      {isOverdue && <Badge variant="destructive" className="text-[10px] px-1 py-0">Εκπρόθεσμο</Badge>}
-                    </div>
-                    {(task.start_date || task.due_date) && (
-                      <p className="text-xs text-muted-foreground">
-                        {task.start_date ? format(parseISO(task.start_date), 'd MMM yyyy', { locale: el }) : '?'}
-                        {' → '}
-                        {task.due_date ? format(parseISO(task.due_date), 'd MMM yyyy', { locale: el }) : '?'}
-                        {task.start_date && task.due_date && (
-                          <span className="ml-1">({differenceInCalendarDays(parseISO(task.due_date), parseISO(task.start_date))} ημ.)</span>
-                        )}
-                      </p>
-                    )}
-                    {task.assignee?.full_name && (
-                      <p className="text-xs text-muted-foreground">👤 {task.assignee.full_name}</p>
-                    )}
-                    {task.progress !== null && task.progress !== undefined && (
-                      <p className="text-xs text-muted-foreground">📊 {task.progress}%</p>
-                    )}
-                  </div>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  function renderDeliverableRow(deliv: GanttDeliverable) {
-    const end = deliv.due_date ? parseISO(deliv.due_date) : null;
-    const pos = end ? getBarPosition(null, end, timelineStart, timelineEnd) : null;
-    const isCompleted = deliv.completed;
-
-    // Compute span from first task start to deliverable due_date
-    const taskStarts = deliv.tasks.filter(t => t.start_date).map(t => parseISO(t.start_date!));
-    const spanStart = taskStarts.length > 0 ? taskStarts.reduce((a, b) => (isBefore(a, b) ? a : b)) : null;
-    const spanPos = spanStart && end ? getBarPosition(spanStart, end, timelineStart, timelineEnd) : pos;
-
-    return (
-      <div key={deliv.id}>
-        {/* Deliverable header row */}
-        <div className="flex items-center h-10 border-b border-border/60 bg-muted/30">
-          <div className="shrink-0 flex items-center gap-2 px-3" style={{ width: LABEL_WIDTH }}>
-            <Package className={cn('h-3.5 w-3.5 shrink-0', isCompleted ? 'text-success' : 'text-primary')} />
-            <span className={cn('text-xs font-semibold truncate', isCompleted && 'line-through text-muted-foreground')}>
-              {deliv.name}
-            </span>
-            {isCompleted && <CheckCircle2 className="h-3 w-3 text-success shrink-0" />}
-          </div>
-
-          {/* Deliverable bar area */}
-          <div className="relative flex-1 h-full">
-            {ticks.map((tick, i) => {
-              const leftPct = ((tick.getTime() - timelineStart.getTime()) / (timelineEnd.getTime() - timelineStart.getTime())) * 100;
-              return <div key={i} className="absolute top-0 bottom-0 w-px bg-border/30" style={{ left: `${leftPct}%` }} />;
-            })}
-            {todayPct !== null && (
-              <div className="absolute top-0 bottom-0 w-0.5 bg-destructive/60 z-10" style={{ left: `${todayPct}%` }} />
-            )}
-            {spanPos && (
-              <TooltipProvider delayDuration={200}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div
-                      className={cn(
-                        'absolute top-1/2 -translate-y-1/2 rounded-sm z-20 cursor-default',
-                        isCompleted ? 'bg-success/60' : 'bg-primary/70',
-                        spanPos.isMilestone ? 'w-2.5 h-2.5 rotate-45' : '',
-                      )}
-                      style={spanPos.isMilestone
-                        ? { left: `calc(${spanPos.leftPct}% - 5px)` }
-                        : { left: `${spanPos.leftPct}%`, width: `${spanPos.widthPct}%`, height: '6px', minWidth: '4px' }
-                      }
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    <p className="font-semibold text-sm">{deliv.name}</p>
-                    {deliv.due_date && (
-                      <p className="text-xs text-muted-foreground">
-                        Deadline: {format(parseISO(deliv.due_date), 'd MMM yyyy', { locale: el })}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                      {deliv.tasks.length} tasks
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
-        </div>
-
-        {/* Task rows */}
-        {filterTasks(deliv.tasks).map(task => renderTaskRow(task, true))}
-      </div>
-    );
-  }
-
-  const filteredUnassigned = filterTasks(unassignedTasks);
 
   return (
-    <div className="space-y-4">
-      {/* ── Controls ───────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-2">
-        {/* Granularity toggle */}
-        <div className="flex items-center rounded-lg border bg-background overflow-hidden">
-          <button
-            className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors',
-              granularity === 'weeks' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
-            )}
-            onClick={() => setGranularity('weeks')}
-          >
-            <CalendarDays className="h-3.5 w-3.5" />
-            Εβδομάδες
-          </button>
-          <button
-            className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors',
-              granularity === 'months' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
-            )}
-            onClick={() => setGranularity('months')}
-          >
-            <BarChart2 className="h-3.5 w-3.5" />
-            Μήνες
-          </button>
+    <div className="rounded-xl border bg-card overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b bg-muted/30 flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => scrollRef.current?.scrollBy({ left: -200, behavior: 'smooth' })}><ChevronLeft className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={scrollToToday}><CalendarDays className="h-3.5 w-3.5 mr-1" />Σήμερα</Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => scrollRef.current?.scrollBy({ left: 200, behavior: 'smooth' })}><ChevronRight className="h-4 w-4" /></Button>
         </div>
-
-        {/* Status filter */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
-              <Filter className="h-3.5 w-3.5" />
-              Status
-              {activeStatuses.size < ALL_STATUSES.length && (
-                <Badge className="h-4 px-1 text-[10px]">{activeStatuses.size}</Badge>
-              )}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-52">
-            {ALL_STATUSES.map(s => (
-              <DropdownMenuCheckboxItem
-                key={s}
-                checked={activeStatuses.has(s)}
-                onCheckedChange={() => toggleStatus(s)}
-                className="text-xs"
-              >
-                <span className={cn('w-2 h-2 rounded-full mr-2 inline-block', STATUS_CONFIG[s].barClass)} />
-                {STATUS_CONFIG[s].label}
-              </DropdownMenuCheckboxItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* Spacer */}
-        <div className="flex-1" />
-
-        {/* Navigation */}
-        <div className="flex items-center gap-1">
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => scrollBy(-300)}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={scrollToToday}>
-            Σήμερα
-          </Button>
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => scrollBy(300)}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Filter className={cn("h-3.5 w-3.5", hasActiveFilters ? "text-primary" : "text-muted-foreground")} />
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-7 w-[130px] text-xs"><SelectValue placeholder="Κατάσταση" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Όλες</SelectItem>
+              {STATUS_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          {clientOptions.length > 1 && (
+            <Select value={clientFilter} onValueChange={setClientFilter}>
+              <SelectTrigger className="h-7 w-[140px] text-xs"><SelectValue placeholder="Πελάτης" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Όλοι</SelectItem>
+                {clientOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setStatusFilter('all'); setClientFilter('all'); }}>Καθαρισμός</Button>
+          )}
+        </div>
+        <div className="flex items-center gap-1 bg-secondary rounded-lg p-0.5">
+          <Button variant={granularity === 'weeks' ? 'default' : 'ghost'} size="sm" className="h-6 px-2.5 text-xs" onClick={() => setGranularity('weeks')}>Εβδομάδες</Button>
+          <Button variant={granularity === 'months' ? 'default' : 'ghost'} size="sm" className="h-6 px-2.5 text-xs" onClick={() => setGranularity('months')}>Μήνες</Button>
         </div>
       </div>
 
-      {/* ── Gantt chart ─────────────────────────────────────────────────── */}
-      <div className="border rounded-lg overflow-hidden bg-card">
-        <div ref={scrollRef} className="overflow-x-auto">
-          {/* Minimum width so bars are meaningful */}
-          <div style={{ minWidth: Math.max(800, ticks.length * (granularity === 'weeks' ? 80 : 120)) }}>
-            {/* ── Header row ─────────────────────────────────────────── */}
-            <div className="flex items-stretch border-b bg-muted/50 sticky top-0 z-30">
-              {/* Label column header */}
-              <div
-                className="shrink-0 flex items-center px-3 py-2 border-r text-xs font-semibold text-muted-foreground uppercase tracking-wide"
-                style={{ width: LABEL_WIDTH }}
-              >
-                Εργασία / Παραδοτέο
-              </div>
-              {/* Tick headers */}
-              <div className="relative flex-1 flex">
-                {ticks.map((tick, i) => {
-                  const nextTick = ticks[i + 1];
-                  const leftPct = ((tick.getTime() - timelineStart.getTime()) / (timelineEnd.getTime() - timelineStart.getTime())) * 100;
-                  const widthPct = nextTick
-                    ? ((nextTick.getTime() - tick.getTime()) / (timelineEnd.getTime() - timelineStart.getTime())) * 100
-                    : 100 - leftPct;
+      {projectsWithDates.length === 0 ? (
+        <div className="py-12 text-center text-sm text-muted-foreground">
+          {hasActiveFilters ? 'Κανένα έργο δεν ταιριάζει στα φίλτρα ή δεν έχει ημερομηνίες.' : 'Κανένα έργο με ημερομηνίες.'}
+        </div>
+      ) : (
+        <div className="flex overflow-hidden">
+          <div className="shrink-0 border-r bg-card" style={{ width: LABEL_WIDTH }}>
+            <div className="h-10 flex items-center px-3 border-b bg-muted/40 text-xs font-semibold text-muted-foreground">Έργο</div>
+            {groupedByClient.map(group => (
+              <div key={group.name}>
+                <div className="h-8 flex items-center px-3 border-b bg-muted/20">
+                  <span className="text-xs font-semibold text-foreground truncate">{group.name}</span>
+                  <Badge variant="secondary" className="ml-2 text-[10px] h-4">{group.projects.length}</Badge>
+                </div>
+                {group.projects.map(project => {
+                  const isOverdue = project.end_date && isBefore(parseISO(project.end_date), new Date()) && project.status !== 'completed';
                   return (
-                    <div
-                      key={i}
-                      className="absolute top-0 bottom-0 flex items-center px-2 border-r border-border/40 overflow-hidden"
-                      style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
-                    >
-                      <span className="text-[10px] font-medium text-muted-foreground whitespace-nowrap">
-                        {granularity === 'weeks'
-                          ? format(tick, 'd MMM', { locale: el })
-                          : format(tick, 'MMM yyyy', { locale: el })
-                        }
+                    <div key={project.id} className="h-9 flex items-center gap-2 px-3 border-b border-border/30 cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => navigate(`/projects/${project.id}`)}>
+                      <span className={cn('text-xs truncate flex-1', project.status === 'completed' && 'line-through text-muted-foreground', isOverdue && 'text-destructive')}>{project.name}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex-1 overflow-x-auto" ref={scrollRef}>
+            <div style={{ minWidth: Math.max(ticks.length * (granularity === 'weeks' ? 80 : 120), 600) }}>
+              <div className="h-10 flex items-end border-b bg-muted/40 relative">
+                {ticks.map((tick, i) => {
+                  const leftPct = ((tick.getTime() - timelineStart.getTime()) / (timelineEnd.getTime() - timelineStart.getTime())) * 100;
+                  return (
+                    <div key={i} className="absolute top-0 bottom-0 flex items-center border-l border-border/30" style={{ left: `${leftPct}%` }}>
+                      <span className="text-[10px] text-muted-foreground px-1.5 whitespace-nowrap">
+                        {granularity === 'weeks' ? format(tick, 'd MMM', { locale: el }) : format(tick, 'MMM yyyy', { locale: el })}
                       </span>
                     </div>
                   );
                 })}
-                {/* Today indicator in header */}
-                {todayPct !== null && (
-                  <div
-                    className="absolute top-0 bottom-0 w-0.5 bg-destructive z-20"
-                    style={{ left: `${todayPct}%` }}
-                  />
-                )}
               </div>
-            </div>
 
-            {/* ── Body rows ──────────────────────────────────────────── */}
-            {deliverables.map(d => renderDeliverableRow(d))}
-
-            {/* Unassigned tasks */}
-            {filteredUnassigned.length > 0 && (
-              <>
-                <div className="flex items-center h-10 border-b border-border/60 bg-muted/20">
-                  <div className="shrink-0 flex items-center gap-2 px-3" style={{ width: LABEL_WIDTH }}>
-                    <Circle className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-xs font-semibold text-muted-foreground">Χωρίς Παραδοτέο</span>
-                  </div>
-                  <div className="relative flex-1 h-full">
+              {groupedByClient.map(group => (
+                <div key={group.name}>
+                  <div className="h-8 relative border-b bg-muted/10">
                     {ticks.map((tick, i) => {
                       const leftPct = ((tick.getTime() - timelineStart.getTime()) / (timelineEnd.getTime() - timelineStart.getTime())) * 100;
-                      return <div key={i} className="absolute top-0 bottom-0 w-px bg-border/30" style={{ left: `${leftPct}%` }} />;
+                      return <div key={i} className="absolute top-0 bottom-0 w-px bg-border/20" style={{ left: `${leftPct}%` }} />;
                     })}
-                    {todayPct !== null && (
-                      <div className="absolute top-0 bottom-0 w-0.5 bg-destructive/60" style={{ left: `${todayPct}%` }} />
-                    )}
                   </div>
-                </div>
-                {filteredUnassigned.map(task => renderTaskRow(task, false))}
-              </>
-            )}
-          </div>
-        </div>
+                  {group.projects.map(project => {
+                    const start = project.start_date ? parseISO(project.start_date) : null;
+                    const end = project.end_date ? parseISO(project.end_date) : null;
+                    const pos = getBarPosition(start, end, timelineStart, timelineEnd);
+                    const cfg = STATUS_CONFIG[project.status] || STATUS_CONFIG.active;
+                    const isOverdue = end && isBefore(end, new Date()) && project.status !== 'completed';
+                    const progress = project.progress ?? 0;
 
-        {/* Legend */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3 py-2 border-t bg-muted/30">
-          {ALL_STATUSES.map(s => (
-            <div key={s} className="flex items-center gap-1.5">
-              <span className={cn('w-3 h-3 rounded-sm', STATUS_CONFIG[s].barClass)} />
-              <span className="text-[10px] text-muted-foreground">{STATUS_CONFIG[s].label}</span>
+                    return (
+                      <div key={project.id} className="h-9 relative border-b border-border/20">
+                        {ticks.map((tick, i) => {
+                          const leftPct = ((tick.getTime() - timelineStart.getTime()) / (timelineEnd.getTime() - timelineStart.getTime())) * 100;
+                          return <div key={i} className="absolute top-0 bottom-0 w-px bg-border/20" style={{ left: `${leftPct}%` }} />;
+                        })}
+                        {todayPct !== null && <div className="absolute top-0 bottom-0 w-0.5 bg-destructive/50 z-10" style={{ left: `${todayPct}%` }} />}
+                        {pos && (
+                          <Popover open={editingProject?.id === project.id} onOpenChange={(open) => { if (!open) setEditingProject(null); }}>
+                            <TooltipProvider delayDuration={200}>
+                              <Tooltip>
+                                <PopoverTrigger asChild>
+                                  <TooltipTrigger asChild>
+                                    <div
+                                      className="absolute top-1.5 h-6 rounded-md cursor-pointer z-20 transition-all hover:brightness-110 hover:shadow-md overflow-hidden"
+                                      style={{ left: `${pos.leftPct}%`, width: `${Math.max(pos.widthPct, 1)}%`, backgroundColor: isOverdue ? '#ef4444' : cfg.barColor, opacity: 0.85 }}
+                                      onClick={(e) => handleBarClick(project, e)}
+                                    >
+                                      {progress > 0 && <div className="absolute inset-0 opacity-30 bg-background" style={{ width: `${100 - progress}%`, right: 0, left: 'auto' }} />}
+                                      <div className="px-1.5 flex items-center h-full">
+                                        <span className="text-[10px] font-medium text-white truncate drop-shadow-sm">{pos.widthPct > 3 ? project.name : ''}</span>
+                                      </div>
+                                    </div>
+                                  </TooltipTrigger>
+                                </PopoverTrigger>
+                                <TooltipContent side="top" className="text-xs max-w-xs">
+                                  <div className="space-y-1">
+                                    <p className="font-semibold">{project.name}</p>
+                                    {project.client?.name && <p className="text-muted-foreground">{project.client.name}</p>}
+                                    <p>{cfg.label} · {progress}%</p>
+                                    <p>{start ? format(start, 'd MMM yyyy', { locale: el }) : '—'} → {end ? format(end, 'd MMM yyyy', { locale: el }) : '—'}</p>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            <PopoverContent className="w-72 p-3" align="start" side="bottom">
+                              <div className="space-y-3">
+                                <p className="text-sm font-semibold truncate">{project.name}</p>
+                                <div className="space-y-2">
+                                  <label className="text-xs text-muted-foreground">Κατάσταση</label>
+                                  <Select value={editStatus} onValueChange={setEditStatus}>
+                                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                    <SelectContent>{STATUS_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="space-y-1">
+                                    <label className="text-xs text-muted-foreground">Έναρξη</label>
+                                    <Popover>
+                                      <PopoverTrigger asChild><Button variant="outline" size="sm" className="w-full h-8 text-xs justify-start">{editStartDate ? format(editStartDate, 'd MMM', { locale: el }) : 'Επιλογή'}</Button></PopoverTrigger>
+                                      <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={editStartDate} onSelect={setEditStartDate} initialFocus /></PopoverContent>
+                                    </Popover>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <label className="text-xs text-muted-foreground">Λήξη</label>
+                                    <Popover>
+                                      <PopoverTrigger asChild><Button variant="outline" size="sm" className="w-full h-8 text-xs justify-start">{editEndDate ? format(editEndDate, 'd MMM', { locale: el }) : 'Επιλογή'}</Button></PopoverTrigger>
+                                      <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={editEndDate} onSelect={setEditEndDate} initialFocus /></PopoverContent>
+                                    </Popover>
+                                  </div>
+                                </div>
+                                <div className="flex justify-end gap-2">
+                                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setEditingProject(null)}>Ακύρωση</Button>
+                                  <Button size="sm" className="h-7 text-xs" onClick={handleSaveEdit}>Αποθήκευση</Button>
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
-          ))}
-          <div className="flex items-center gap-1.5">
-            <span className="w-0.5 h-4 bg-destructive/60 inline-block" />
-            <span className="text-[10px] text-muted-foreground">Σήμερα</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rotate-45 bg-muted-foreground/50 inline-block" />
-            <span className="text-[10px] text-muted-foreground">Milestone</span>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

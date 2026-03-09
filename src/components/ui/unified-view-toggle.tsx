@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { GanttChartSquare, List, Columns } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type UnifiedViewMode = 'gantt' | 'table' | 'kanban';
+export type UnifiedViewMode = 'card' | 'gantt' | 'table' | 'kanban';
 
 interface UnifiedViewToggleProps {
   viewMode?: UnifiedViewMode;

@@ -181,6 +181,8 @@ export function TasksTableView({
   onCreateSubtask,
   onInlineCreateSubtask,
   onBulkUpdate,
+  onAssigneeAdd,
+  onAssigneeRemove,
   canManage,
   showProject = true
 }: TasksTableViewProps) {

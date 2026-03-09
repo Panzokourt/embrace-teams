@@ -717,7 +717,7 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
         breadcrumbs={[{ label: 'Εργασία', href: '/work' }, { label: 'Έργα' }]}
         actions={
           <div className="flex items-center gap-3">
-            <UnifiedViewToggle viewMode={viewMode} onViewModeChange={setViewMode} />
+            <UnifiedViewToggle viewMode={viewMode} onViewModeChange={setViewMode} showCards />
             {canManage && (
               <Button className="shadow-soft" onClick={() => setDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />

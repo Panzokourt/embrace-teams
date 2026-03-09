@@ -1225,7 +1225,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
         </Card>
       ) : (
         <>
-          {viewMode === 'card' && renderCardView()}
+          {viewMode === 'gantt' && <TaskGanttView tasks={filteredTasks} />}
           {viewMode === 'table' && renderTableView()}
           {viewMode === 'kanban' && renderKanbanView()}
         </>

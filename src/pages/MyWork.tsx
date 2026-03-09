@@ -1149,16 +1149,27 @@ export default function MyWork() {
               <CardTitle className="text-base font-semibold">Άδειες</CardTitle>
               <Link to="/hr?tab=leaves" className="text-xs text-primary hover:underline">Δες όλα</Link>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="p-0">
               {balances.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Δεν υπάρχουν δεδομένα αδειών</p>
+                <p className="text-sm text-muted-foreground px-6 py-4">Δεν υπάρχουν δεδομένα αδειών</p>
               ) : (
-                balances.slice(0, 3).map(b => (
-                  <div key={b.id} className="flex items-center justify-between text-sm">
-                    <span className="text-foreground">{b.leave_type?.name || 'Άδεια'}</span>
-                    <span className="text-muted-foreground font-mono text-xs">{b.used_days}/{b.entitled_days + b.carried_over} ημέρες</span>
-                  </div>
-                ))
+                <>
+                  <ScrollArea className="max-h-56">
+                    <div className="space-y-2 px-6 py-4">
+                      {pagedBalances.map(b => (
+                        <div key={b.id} className="flex items-center justify-between text-sm">
+                          <span className="text-foreground">{b.leave_type?.name || 'Άδεια'}</span>
+                          <span className="text-muted-foreground font-mono text-xs">{b.used_days}/{b.entitled_days + b.carried_over} ημέρες</span>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                  {balances.length > leaveBalancePagination.pageSize && (
+                    <div className="px-4 border-t border-border/50">
+                      <PaginationControls pagination={leaveBalancePagination} />
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>

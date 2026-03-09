@@ -300,7 +300,7 @@ export default function AppSidebar({
           <TooltipTrigger asChild>
             <button
             onClick={() => {navigate('/secretary');handleNavClick();}}
-            className={cn("flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 bg-blue-400 hover:bg-blue-300",
+            className={cn("flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 border border-primary bg-primary-foreground",
 
             isMobile ?
             "text-muted-foreground hover:text-foreground hover:bg-muted/60" :

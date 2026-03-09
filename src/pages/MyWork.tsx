@@ -448,7 +448,7 @@ function AttentionPanel({
                       <p className="text-sm font-medium text-foreground hover:text-primary">{task.title}</p>
                       <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
                     </div>
-                    <Badge variant={getPriorityColor(task.priority)} className="text-[10px]">{task.priority}</Badge>
+                    <span className="text-[10px] font-medium rounded-full px-2 py-0.5" style={getPriorityStyle(task.priority)}>{PRIORITY_COLORS[task.priority]?.label || task.priority}</span>
                     <div className="flex gap-1.5">
                       <Button size="icon" variant="ghost" className="h-7 w-7 text-success hover:text-success" onClick={() => onApproveClient(task)}><Check className="h-4 w-4" /></Button>
                       <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onRejectClient(task)}><X className="h-4 w-4" /></Button>

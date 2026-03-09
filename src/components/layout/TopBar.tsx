@@ -122,6 +122,40 @@ export default function TopBar({ onPanelToggle, rightPanelOpen, onMobileMenuTogg
       {/* Work Day Clock — hidden on mobile */}
       {!isMobile && <WorkDayClock compact={isNarrow} />}
 
+      {/* Active Timer Indicator */}
+      {activeTimer?.is_running && (
+        <>
+          <div className="w-px h-5 bg-border/50 shrink-0" />
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Timer className="h-3.5 w-3.5 text-primary animate-pulse shrink-0" />
+            <button
+              onClick={() => activeTimer.task_id && navigate(`/tasks/${activeTimer.task_id}`)}
+              className="text-xs font-mono font-semibold text-primary hover:underline cursor-pointer"
+            >
+              {formatElapsed(elapsed)}
+            </button>
+            {!isNarrow && (
+              <span className="text-[10px] text-muted-foreground truncate max-w-[100px]">
+                {(activeTimer as any)?.task?.title || ''}
+              </span>
+            )}
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-destructive hover:bg-destructive/10"
+                  onClick={(e) => { e.stopPropagation(); stopTimer(); }}
+                >
+                  <Square className="h-3 w-3 fill-current" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Σταμάτημα Timer</TooltipContent>
+            </Tooltip>
+          </div>
+        </>
+      )}
+
       {!isMobile && <div className="w-px h-5 bg-border/50 shrink-0" />}
 
       {/* Search */}

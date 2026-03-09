@@ -600,6 +600,7 @@ export default function TaskDetailPage() {
                       <p className="text-lg font-semibold">{task.actual_hours ? `${task.actual_hours}h` : '—'}</p>
                     </div>
                   </div>
+                  <TaskTimeEntriesTable taskId={task.id} />
                 </div>
               </TabsContent>
 

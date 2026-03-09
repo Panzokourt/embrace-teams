@@ -4354,6 +4354,7 @@ export type Database = {
           probability: number | null
           progress: number | null
           project_lead_id: string | null
+          sidebar_sort_order: number | null
           source: string | null
           start_date: string | null
           status: Database["public"]["Enums"]["project_status"]
@@ -4379,6 +4380,7 @@ export type Database = {
           probability?: number | null
           progress?: number | null
           project_lead_id?: string | null
+          sidebar_sort_order?: number | null
           source?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["project_status"]
@@ -4404,6 +4406,7 @@ export type Database = {
           probability?: number | null
           progress?: number | null
           project_lead_id?: string | null
+          sidebar_sort_order?: number | null
           source?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["project_status"]

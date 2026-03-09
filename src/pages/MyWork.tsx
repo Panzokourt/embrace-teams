@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { usePagination } from '@/hooks/usePagination';
 import { useTimeTracking } from '@/hooks/useTimeTracking';
 import { useLeaveManagement } from '@/hooks/useLeaveManagement';
 import { useXPEngine } from '@/hooks/useXPEngine';
@@ -14,6 +15,8 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { PaginationControls } from '@/components/shared/PaginationControls';
 import { toast } from 'sonner';
 import { briefDefinitions } from '@/components/blueprints/briefDefinitions';
 import { BriefFormDialog } from '@/components/blueprints/BriefFormDialog';
@@ -280,6 +283,47 @@ function AttentionPanel({
   const [overdueOpen, setOverdueOpen] = useState(true);
   const [highOpen, setHighOpen] = useState(true);
 
+  const overduePagination = usePagination(6);
+  const highPriorityPagination = usePagination(6);
+  const internalReviewPagination = usePagination(6);
+  const approvalPagination = usePagination(6);
+
+  useEffect(() => {
+    overduePagination.setTotalCount(overdueTasks.length);
+  }, [overdueTasks.length, overduePagination]);
+
+  useEffect(() => {
+    highPriorityPagination.setTotalCount(highPriorityTasks.length);
+  }, [highPriorityTasks.length, highPriorityPagination]);
+
+  useEffect(() => {
+    internalReviewPagination.setTotalCount(internalReviewTasks.length);
+  }, [internalReviewTasks.length, internalReviewPagination]);
+
+  useEffect(() => {
+    approvalPagination.setTotalCount(approvalTasks.length);
+  }, [approvalTasks.length, approvalPagination]);
+
+  const pagedOverdueTasks = useMemo(
+    () => overdueTasks.slice(overduePagination.from, overduePagination.to + 1),
+    [overdueTasks, overduePagination.from, overduePagination.to],
+  );
+
+  const pagedHighPriorityTasks = useMemo(
+    () => highPriorityTasks.slice(highPriorityPagination.from, highPriorityPagination.to + 1),
+    [highPriorityTasks, highPriorityPagination.from, highPriorityPagination.to],
+  );
+
+  const pagedInternalReviewTasks = useMemo(
+    () => internalReviewTasks.slice(internalReviewPagination.from, internalReviewPagination.to + 1),
+    [internalReviewTasks, internalReviewPagination.from, internalReviewPagination.to],
+  );
+
+  const pagedApprovalTasks = useMemo(
+    () => approvalTasks.slice(approvalPagination.from, approvalPagination.to + 1),
+    [approvalTasks, approvalPagination.from, approvalPagination.to],
+  );
+
   const SectionHeader = ({ emoji, label, count, open, onToggle }: { emoji: string; label: string; count: number; open: boolean; onToggle: () => void }) => (
     <button
       onClick={onToggle}
@@ -332,9 +376,18 @@ function AttentionPanel({
           <>
             <SectionHeader emoji="🔴" label="Εκπρόθεσμα" count={overdueTasks.length} open={overdueOpen} onToggle={() => setOverdueOpen(v => !v)} />
             {overdueOpen && (
-              <div className="divide-y divide-border/50">
-                {overdueTasks.map(task => <TaskMiniRow key={task.id} task={task} isOverdue />)}
-              </div>
+              <>
+                <ScrollArea className="max-h-64">
+                  <div className="divide-y divide-border/50">
+                    {pagedOverdueTasks.map(task => <TaskMiniRow key={task.id} task={task} isOverdue />)}
+                  </div>
+                </ScrollArea>
+                {overdueTasks.length > overduePagination.pageSize && (
+                  <div className="px-4 md:px-6 border-t border-border/50">
+                    <PaginationControls pagination={overduePagination} />
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
@@ -344,9 +397,18 @@ function AttentionPanel({
           <>
             <SectionHeader emoji="🟠" label="Υψηλή Προτεραιότητα" count={highPriorityTasks.length} open={highOpen} onToggle={() => setHighOpen(v => !v)} />
             {highOpen && (
-              <div className="divide-y divide-border/50">
-                {highPriorityTasks.map(task => <TaskMiniRow key={task.id} task={task} />)}
-              </div>
+              <>
+                <ScrollArea className="max-h-64">
+                  <div className="divide-y divide-border/50">
+                    {pagedHighPriorityTasks.map(task => <TaskMiniRow key={task.id} task={task} />)}
+                  </div>
+                </ScrollArea>
+                {highPriorityTasks.length > highPriorityPagination.pageSize && (
+                  <div className="px-4 md:px-6 border-t border-border/50">
+                    <PaginationControls pagination={highPriorityPagination} />
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
@@ -357,23 +419,30 @@ function AttentionPanel({
             <div className="px-4 md:px-6 py-2 bg-muted/20 border-b border-border/50">
               <span className="text-xs font-semibold">🏢 Εσωτερική Έγκριση ({internalReviewTasks.length})</span>
             </div>
-            <div className="divide-y divide-border/50">
-              {internalReviewTasks.map(task => (
-                <div key={task.id} className="flex items-center gap-3 px-4 md:px-6 py-3">
-                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onOpenTask(task)}>
-                    <p className="text-sm font-medium text-foreground hover:text-primary">{task.title}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
-                      {(task as any).assignee?.full_name && <span className="text-xs text-muted-foreground">· {(task as any).assignee.full_name}</span>}
+            <ScrollArea className="max-h-64">
+              <div className="divide-y divide-border/50">
+                {pagedInternalReviewTasks.map(task => (
+                  <div key={task.id} className="flex items-center gap-3 px-4 md:px-6 py-3">
+                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onOpenTask(task)}>
+                      <p className="text-sm font-medium text-foreground hover:text-primary">{task.title}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
+                        {(task as any).assignee?.full_name && <span className="text-xs text-muted-foreground">· {(task as any).assignee.full_name}</span>}
+                      </div>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-success hover:text-success" onClick={() => onApproveInternal(task)}><Check className="h-4 w-4" /></Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onRejectInternal(task)}><X className="h-4 w-4" /></Button>
                     </div>
                   </div>
-                  <div className="flex gap-1.5">
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-success hover:text-success" onClick={() => onApproveInternal(task)}><Check className="h-4 w-4" /></Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onRejectInternal(task)}><X className="h-4 w-4" /></Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </ScrollArea>
+            {internalReviewTasks.length > internalReviewPagination.pageSize && (
+              <div className="px-4 md:px-6 border-t border-border/50">
+                <PaginationControls pagination={internalReviewPagination} />
+              </div>
+            )}
           </>
         )}
 
@@ -383,21 +452,28 @@ function AttentionPanel({
             <div className="px-4 md:px-6 py-2 bg-muted/20 border-b border-border/50">
               <span className="text-xs font-semibold">🤝 Έγκριση Πελάτη ({approvalTasks.length})</span>
             </div>
-            <div className="divide-y divide-border/50">
-              {approvalTasks.map(task => (
-                <div key={task.id} className="flex items-center gap-3 px-4 md:px-6 py-3">
-                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onOpenTask(task)}>
-                    <p className="text-sm font-medium text-foreground hover:text-primary">{task.title}</p>
-                    <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
+            <ScrollArea className="max-h-64">
+              <div className="divide-y divide-border/50">
+                {pagedApprovalTasks.map(task => (
+                  <div key={task.id} className="flex items-center gap-3 px-4 md:px-6 py-3">
+                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onOpenTask(task)}>
+                      <p className="text-sm font-medium text-foreground hover:text-primary">{task.title}</p>
+                      <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
+                    </div>
+                    <Badge variant={getPriorityColor(task.priority)} className="text-[10px]">{task.priority}</Badge>
+                    <div className="flex gap-1.5">
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-success hover:text-success" onClick={() => onApproveClient(task)}><Check className="h-4 w-4" /></Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onRejectClient(task)}><X className="h-4 w-4" /></Button>
+                    </div>
                   </div>
-                  <Badge variant={getPriorityColor(task.priority)} className="text-[10px]">{task.priority}</Badge>
-                  <div className="flex gap-1.5">
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-success hover:text-success" onClick={() => onApproveClient(task)}><Check className="h-4 w-4" /></Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onRejectClient(task)}><X className="h-4 w-4" /></Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </ScrollArea>
+            {approvalTasks.length > approvalPagination.pageSize && (
+              <div className="px-4 md:px-6 border-t border-border/50">
+                <PaginationControls pagination={approvalPagination} />
+              </div>
+            )}
           </>
         )}
       </CardContent>
@@ -429,6 +505,14 @@ export default function MyWork() {
   const [selectedTask, setSelectedTask] = useState<TaskWithProject | null>(null);
   const [selectedBriefType, setSelectedBriefType] = useState<string | null>(null);
   const [backlogOpen, setBacklogOpen] = useState(true);
+
+  const todayPagination = usePagination(10);
+  const backlogPagination = usePagination(10);
+  const weekPagination = usePagination(12);
+  const upcomingPagination = usePagination(10);
+  const projectsPagination = usePagination(5);
+  const leaveBalancePagination = usePagination(5);
+  const leaveApprovalsPagination = usePagination(6);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -518,7 +602,7 @@ export default function MyWork() {
 
     setTodayTasks(todayFiltered);
     setWeekTasks(weekFiltered);
-    setUpcomingTasks(upcomingFiltered.slice(0, 20));
+    setUpcomingTasks(upcomingFiltered);
     setBacklogTasks(backlogFiltered);
 
     const activeProjects = (projects.data || []).map((p: any) => p.project).filter((p: any) => p && p.status === 'active') as MyProject[];
@@ -677,7 +761,64 @@ export default function MyWork() {
   const briefIcons: Record<string, any> = { Palette, Monitor, FileText, Globe, Calendar, MessageSquare };
   const selectedDef = selectedBriefType ? getBriefDefinition(selectedBriefType) : null;
 
-  const backlogIds = useMemo(() => backlogTasks.map(t => t.id), [backlogTasks]);
+  const pagedTodayTasks = useMemo(
+    () => orderedTodayTasks.slice(todayPagination.from, todayPagination.to + 1),
+    [orderedTodayTasks, todayPagination.from, todayPagination.to],
+  );
+  const pagedBacklogTasks = useMemo(
+    () => backlogTasks.slice(backlogPagination.from, backlogPagination.to + 1),
+    [backlogTasks, backlogPagination.from, backlogPagination.to],
+  );
+  const pagedWeekEntries = useMemo(
+    () => Object.entries(weekTasksByDay).slice(weekPagination.from, weekPagination.to + 1),
+    [weekTasksByDay, weekPagination.from, weekPagination.to],
+  );
+  const pagedUpcomingTasks = useMemo(
+    () => upcomingTasks.slice(upcomingPagination.from, upcomingPagination.to + 1),
+    [upcomingTasks, upcomingPagination.from, upcomingPagination.to],
+  );
+  const pagedProjects = useMemo(
+    () => myProjects.slice(projectsPagination.from, projectsPagination.to + 1),
+    [myProjects, projectsPagination.from, projectsPagination.to],
+  );
+  const pagedBalances = useMemo(
+    () => balances.slice(leaveBalancePagination.from, leaveBalancePagination.to + 1),
+    [balances, leaveBalancePagination.from, leaveBalancePagination.to],
+  );
+  const pagedLeaveApprovals = useMemo(
+    () => pendingApprovals.slice(leaveApprovalsPagination.from, leaveApprovalsPagination.to + 1),
+    [pendingApprovals, leaveApprovalsPagination.from, leaveApprovalsPagination.to],
+  );
+
+  const backlogIds = useMemo(() => pagedBacklogTasks.map(t => t.id), [pagedBacklogTasks]);
+
+  useEffect(() => {
+    todayPagination.setTotalCount(orderedTodayTasks.length);
+  }, [orderedTodayTasks.length, todayPagination]);
+
+  useEffect(() => {
+    backlogPagination.setTotalCount(backlogTasks.length);
+  }, [backlogTasks.length, backlogPagination]);
+
+  useEffect(() => {
+    weekPagination.setTotalCount(Object.keys(weekTasksByDay).length);
+  }, [weekTasksByDay, weekPagination]);
+
+  useEffect(() => {
+    upcomingPagination.setTotalCount(upcomingTasks.length);
+  }, [upcomingTasks.length, upcomingPagination]);
+
+  useEffect(() => {
+    projectsPagination.setTotalCount(myProjects.length);
+  }, [myProjects.length, projectsPagination]);
+
+  useEffect(() => {
+    leaveBalancePagination.setTotalCount(balances.length);
+  }, [balances.length, leaveBalancePagination]);
+
+  useEffect(() => {
+    leaveApprovalsPagination.setTotalCount(pendingApprovals.length);
+  }, [pendingApprovals.length, leaveApprovalsPagination]);
 
   if (loading) {
     return (
@@ -781,26 +922,37 @@ export default function MyWork() {
               <CardTitle className="text-base font-semibold">Tasks Σήμερα</CardTitle>
               <Link to="/work?tab=tasks" className="text-xs text-primary hover:underline flex items-center gap-1">Δες όλα <ArrowRight className="h-3 w-3" /></Link>
             </CardHeader>
-            <CardContent className="p-0 overflow-x-auto">
+            <CardContent className="p-0">
               <DroppableContainer id="today-drop">
                 {orderedTodayTasks.length === 0 ? (
                   <p className="text-sm text-muted-foreground px-6 py-4">Κανένα task για σήμερα 🎉</p>
                 ) : (
-                  <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
-                    <table className="w-full text-sm">
-                      <TaskTableHeader draggable />
-                      <tbody>
-                        {orderedTodayTasks.map(task => (
-                          <SortableTaskRow
-                            key={task.id} task={task} today={today} draggable
-                            onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
-                            activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
-                            onFlagToggle={toggleFlagPriority}
-                          />
-                        ))}
-                      </tbody>
-                    </table>
-                  </SortableContext>
+                  <>
+                    <ScrollArea className="max-h-[32rem]">
+                      <div className="overflow-x-auto">
+                        <SortableContext items={pagedTodayTasks.map(task => task.id)} strategy={verticalListSortingStrategy}>
+                          <table className="w-full text-sm">
+                            <TaskTableHeader draggable />
+                            <tbody>
+                              {pagedTodayTasks.map(task => (
+                                <SortableTaskRow
+                                  key={task.id} task={task} today={today} draggable
+                                  onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
+                                  activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
+                                  onFlagToggle={toggleFlagPriority}
+                                />
+                              ))}
+                            </tbody>
+                          </table>
+                        </SortableContext>
+                      </div>
+                    </ScrollArea>
+                    {orderedTodayTasks.length > todayPagination.pageSize && (
+                      <div className="px-4 md:px-6 border-t border-border/50">
+                        <PaginationControls pagination={todayPagination} />
+                      </div>
+                    )}
+                  </>
                 )}
               </DroppableContainer>
             </CardContent>
@@ -824,16 +976,25 @@ export default function MyWork() {
                   {backlogTasks.length === 0 ? (
                     <p className="text-sm text-muted-foreground px-4 py-4">Κανένα task χωρίς ημερομηνία</p>
                   ) : (
-                    <SortableContext items={backlogIds} strategy={verticalListSortingStrategy}>
-                      {backlogTasks.map(task => (
-                        <BacklogTaskRow
-                          key={task.id} task={task} today={today}
-                          onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
-                          activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
-                          onFlagToggle={toggleFlagPriority}
-                        />
-                      ))}
-                    </SortableContext>
+                    <>
+                      <ScrollArea className="max-h-[32rem]">
+                        <SortableContext items={backlogIds} strategy={verticalListSortingStrategy}>
+                          {pagedBacklogTasks.map(task => (
+                            <BacklogTaskRow
+                              key={task.id} task={task} today={today}
+                              onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
+                              activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
+                              onFlagToggle={toggleFlagPriority}
+                            />
+                          ))}
+                        </SortableContext>
+                      </ScrollArea>
+                      {backlogTasks.length > backlogPagination.pageSize && (
+                        <div className="px-4 border-t border-border/50">
+                          <PaginationControls pagination={backlogPagination} />
+                        </div>
+                      )}
+                    </>
                   )}
                 </DroppableContainer>
               </CardContent>
@@ -846,14 +1007,49 @@ export default function MyWork() {
       {Object.keys(weekTasksByDay).length > 0 && (
         <Card className="border-border/50">
           <CardHeader className="pb-3"><CardTitle className="text-base font-semibold">Αυτή την εβδομάδα</CardTitle></CardHeader>
-          <CardContent className="p-0 overflow-x-auto">
-            {Object.entries(weekTasksByDay).map(([day, tasks]) => (
-              <div key={day}>
-                <div className="px-4 md:px-6 py-2 bg-muted/30"><p className="text-xs font-medium text-muted-foreground capitalize">{day}</p></div>
+          <CardContent className="p-0">
+            <ScrollArea className="max-h-[32rem]">
+              <div className="overflow-x-auto">
+                {pagedWeekEntries.map(([day, tasks]) => (
+                  <div key={day}>
+                    <div className="px-4 md:px-6 py-2 bg-muted/30"><p className="text-xs font-medium text-muted-foreground capitalize">{day}</p></div>
+                    <table className="w-full text-sm">
+                      <TaskTableHeader />
+                      <tbody>
+                        {tasks.map(task => (
+                          <SortableTaskRow
+                            key={task.id} task={task} today={today} showDate
+                            onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
+                            activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
+                            onFlagToggle={toggleFlagPriority}
+                          />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+            {Object.keys(weekTasksByDay).length > weekPagination.pageSize && (
+              <div className="px-4 md:px-6 border-t border-border/50">
+                <PaginationControls pagination={weekPagination} />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Upcoming */}
+      {upcomingTasks.length > 0 && (
+        <Card className="border-border/50">
+          <CardHeader className="pb-3"><CardTitle className="text-base font-semibold">Επερχόμενα</CardTitle></CardHeader>
+          <CardContent className="p-0">
+            <ScrollArea className="max-h-[32rem]">
+              <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <TaskTableHeader />
                   <tbody>
-                    {tasks.map(task => (
+                    {pagedUpcomingTasks.map(task => (
                       <SortableTaskRow
                         key={task.id} task={task} today={today} showDate
                         onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
@@ -864,29 +1060,12 @@ export default function MyWork() {
                   </tbody>
                 </table>
               </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Upcoming */}
-      {upcomingTasks.length > 0 && (
-        <Card className="border-border/50">
-          <CardHeader className="pb-3"><CardTitle className="text-base font-semibold">Επερχόμενα</CardTitle></CardHeader>
-          <CardContent className="p-0 overflow-x-auto">
-            <table className="w-full text-sm">
-              <TaskTableHeader />
-              <tbody>
-                {upcomingTasks.map(task => (
-                  <SortableTaskRow
-                    key={task.id} task={task} today={today} showDate
-                    onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
-                    activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
-                    onFlagToggle={toggleFlagPriority}
-                  />
-                ))}
-              </tbody>
-            </table>
+            </ScrollArea>
+            {upcomingTasks.length > upcomingPagination.pageSize && (
+              <div className="px-4 md:px-6 border-t border-border/50">
+                <PaginationControls pagination={upcomingPagination} />
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -895,23 +1074,34 @@ export default function MyWork() {
         {/* My Projects */}
         <Card className="border-border/50">
           <CardHeader className="pb-3"><CardTitle className="text-base font-semibold">Τα Έργα μου</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="p-0">
             {myProjects.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Κανένα ενεργό έργο</p>
+              <p className="text-sm text-muted-foreground px-6 py-4">Κανένα ενεργό έργο</p>
             ) : (
-              myProjects.slice(0, 5).map(project => (
-                <Link key={project.id} to={`/projects/${project.id}`} className="flex items-center gap-3 group">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground group-hover:text-primary truncate">{project.name}</p>
-                    {project.client && <p className="text-xs text-muted-foreground truncate">{(project.client as any)?.name}</p>}
+              <>
+                <ScrollArea className="max-h-72">
+                  <div className="space-y-3 px-6 py-4">
+                    {pagedProjects.map(project => (
+                      <Link key={project.id} to={`/projects/${project.id}`} className="flex items-center gap-3 group">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground group-hover:text-primary truncate">{project.name}</p>
+                          {project.client && <p className="text-xs text-muted-foreground truncate">{(project.client as any)?.name}</p>}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Progress value={project.progress || 0} className="w-16 h-1.5" />
+                          <span className="text-xs text-muted-foreground w-8 text-right">{project.progress || 0}%</span>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </Link>
+                    ))}
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Progress value={project.progress || 0} className="w-16 h-1.5" />
-                    <span className="text-xs text-muted-foreground w-8 text-right">{project.progress || 0}%</span>
+                </ScrollArea>
+                {myProjects.length > projectsPagination.pageSize && (
+                  <div className="px-4 md:px-6 border-t border-border/50">
+                    <PaginationControls pagination={projectsPagination} />
                   </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                </Link>
-              ))
+                )}
+              </>
             )}
           </CardContent>
         </Card>
@@ -959,16 +1149,27 @@ export default function MyWork() {
               <CardTitle className="text-base font-semibold">Άδειες</CardTitle>
               <Link to="/hr?tab=leaves" className="text-xs text-primary hover:underline">Δες όλα</Link>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="p-0">
               {balances.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Δεν υπάρχουν δεδομένα αδειών</p>
+                <p className="text-sm text-muted-foreground px-6 py-4">Δεν υπάρχουν δεδομένα αδειών</p>
               ) : (
-                balances.slice(0, 3).map(b => (
-                  <div key={b.id} className="flex items-center justify-between text-sm">
-                    <span className="text-foreground">{b.leave_type?.name || 'Άδεια'}</span>
-                    <span className="text-muted-foreground font-mono text-xs">{b.used_days}/{b.entitled_days + b.carried_over} ημέρες</span>
-                  </div>
-                ))
+                <>
+                  <ScrollArea className="max-h-56">
+                    <div className="space-y-2 px-6 py-4">
+                      {pagedBalances.map(b => (
+                        <div key={b.id} className="flex items-center justify-between text-sm">
+                          <span className="text-foreground">{b.leave_type?.name || 'Άδεια'}</span>
+                          <span className="text-muted-foreground font-mono text-xs">{b.used_days}/{b.entitled_days + b.carried_over} ημέρες</span>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                  {balances.length > leaveBalancePagination.pageSize && (
+                    <div className="px-4 border-t border-border/50">
+                      <PaginationControls pagination={leaveBalancePagination} />
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
@@ -988,20 +1189,27 @@ export default function MyWork() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="divide-y divide-border/50">
-              {pendingApprovals.slice(0, 5).map(req => (
-                <div key={req.id} className="flex items-center gap-3 px-4 md:px-6 py-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground">{req.user?.full_name || 'Χρήστης'}</p>
-                    <p className="text-xs text-muted-foreground">{format(new Date(req.start_date), 'd/MM')} - {format(new Date(req.end_date), 'd/MM')} · {req.days_count} ημ.</p>
+            <ScrollArea className="max-h-72">
+              <div className="divide-y divide-border/50">
+                {pagedLeaveApprovals.map(req => (
+                  <div key={req.id} className="flex items-center gap-3 px-4 md:px-6 py-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground">{req.user?.full_name || 'Χρήστης'}</p>
+                      <p className="text-xs text-muted-foreground">{format(new Date(req.start_date), 'd/MM')} - {format(new Date(req.end_date), 'd/MM')} · {req.days_count} ημ.</p>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-success hover:text-success" onClick={() => approveRequest(req.id)}><Check className="h-4 w-4" /></Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => rejectRequest(req.id)}><X className="h-4 w-4" /></Button>
+                    </div>
                   </div>
-                  <div className="flex gap-1.5">
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-success hover:text-success" onClick={() => approveRequest(req.id)}><Check className="h-4 w-4" /></Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => rejectRequest(req.id)}><X className="h-4 w-4" /></Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </ScrollArea>
+            {pendingApprovals.length > leaveApprovalsPagination.pageSize && (
+              <div className="px-4 md:px-6 border-t border-border/50">
+                <PaginationControls pagination={leaveApprovalsPagination} />
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

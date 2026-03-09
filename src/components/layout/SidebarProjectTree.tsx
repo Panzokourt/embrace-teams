@@ -64,6 +64,18 @@ interface ProjectItem {
 
 type TreeMode = 'manual' | 'auto';
 
+function getStatusColor(status: string): string {
+  switch (status) {
+    case 'active': return 'bg-emerald-500';
+    case 'completed': return 'bg-blue-500';
+    case 'on_hold': case 'paused': return 'bg-amber-500';
+    case 'cancelled': return 'bg-red-500';
+    case 'lead': return 'bg-purple-500';
+    case 'proposal': return 'bg-cyan-500';
+    default: return 'bg-muted-foreground/40';
+  }
+}
+
 /* ───────── Sortable Project (manual mode) ───────── */
 
 function SortableProject({ project, isActive }: { project: ProjectItem; isActive: boolean }) {
@@ -99,7 +111,7 @@ function SortableProject({ project, isActive }: { project: ProjectItem; isActive
       >
         <GripVertical className="h-3 w-3" />
       </span>
-      <FileText className="h-3 w-3 shrink-0" />
+      <span className={cn("h-2 w-2 rounded-full shrink-0", getStatusColor(project.status))} />
       <span className="truncate">{project.name}</span>
     </button>
   );
@@ -190,7 +202,7 @@ function ProjectLink({ project, isActive }: { project: ProjectItem; isActive: bo
           : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
       )}
     >
-      <FileText className="h-3 w-3 shrink-0" />
+      <span className={cn("h-2 w-2 rounded-full shrink-0", getStatusColor(project.status))} />
       <span className="truncate">{project.name}</span>
     </button>
   );

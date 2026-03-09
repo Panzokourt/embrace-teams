@@ -46,6 +46,12 @@ import { toast } from 'sonner';
 
 type TaskStatus = 'todo' | 'in_progress' | 'review' | 'internal_review' | 'client_review' | 'completed';
 
+interface TaskAssignee {
+  user_id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+}
+
 interface Task {
   id: string;
   title: string;
@@ -67,6 +73,7 @@ interface Task {
   is_ai_generated: boolean | null;
   created_by: string | null;
   assignee?: { full_name: string | null; avatar_url?: string | null } | null;
+  assignees?: TaskAssignee[];
   project?: { name: string } | null;
 }
 
@@ -92,6 +99,8 @@ interface TasksTableViewProps {
   onCreateSubtask?: (parentTaskId: string) => void;
   onInlineCreateSubtask?: (parentTaskId: string, title: string) => Promise<void>;
   onBulkUpdate?: (taskIds: string[], field: string, value: string | null) => Promise<void>;
+  onAssigneeAdd?: (taskId: string, userId: string) => Promise<void>;
+  onAssigneeRemove?: (taskId: string, userId: string) => Promise<void>;
   canManage: boolean;
   showProject?: boolean;
 }

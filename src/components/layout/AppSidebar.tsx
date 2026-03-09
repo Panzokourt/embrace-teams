@@ -307,7 +307,7 @@ export default function AppSidebar({
             "text-white/50 hover:text-white hover:bg-white/10"
             )}>
             
-              <Zap className="h-[18px] w-[18px]" />
+              <Zap className="h-[18px] w-[18px] text-primary" />
             </button>
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={8}>AI Secretary</TooltipContent>

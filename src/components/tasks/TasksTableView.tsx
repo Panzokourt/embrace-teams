@@ -501,7 +501,7 @@ export function TasksTableView({
               
               {hasChildren || level === 0 ? (
                 <button 
-                  onClick={() => hasChildren ? toggleExpand(task.id) : canManage && onCreateSubtask && setAddingSubtaskTo(task.id)}
+                  onClick={() => hasChildren ? toggleExpand(task.id) : canManage && (onInlineCreateSubtask || onCreateSubtask) && setAddingSubtaskTo(task.id)}
                   className={cn(
                     "p-0.5 rounded transition-colors",
                     hasChildren ? "hover:bg-muted" : "opacity-0 group-hover:opacity-100 hover:bg-muted text-muted-foreground"

@@ -51,6 +51,7 @@ import {
 import { format, isPast, isToday } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { STATUS_COLORS, PRIORITY_COLORS } from '@/components/shared/mondayStyleConfig';
 import {
   DndContext,
   DragOverlay,

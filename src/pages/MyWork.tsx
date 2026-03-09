@@ -1216,11 +1216,11 @@ export default function MyWork() {
                   <tbody className="divide-y divide-border/50">
                     <tr>
                       <td className="py-2.5 pr-4 text-muted-foreground whitespace-nowrap w-28">Status</td>
-                      <td className="py-2.5"><Badge variant={getStatusVariant(selectedTask.status)}>{getStatusLabel(selectedTask.status)}</Badge></td>
+                      <td className="py-2.5"><span className="text-xs font-medium rounded-full px-2.5 py-1" style={getStatusStyle(selectedTask.status)}>{getStatusLabel(selectedTask.status)}</span></td>
                     </tr>
                     <tr>
                       <td className="py-2.5 pr-4 text-muted-foreground whitespace-nowrap">Priority</td>
-                      <td className="py-2.5"><Badge variant={getPriorityColor(selectedTask.priority)}>{selectedTask.priority}</Badge></td>
+                      <td className="py-2.5"><span className="text-xs font-medium rounded-full px-2.5 py-1" style={getPriorityStyle(selectedTask.priority)}>{PRIORITY_COLORS[selectedTask.priority]?.label || selectedTask.priority}</span></td>
                     </tr>
                     <tr>
                       <td className="py-2.5 pr-4 text-muted-foreground whitespace-nowrap">Έναρξη</td>

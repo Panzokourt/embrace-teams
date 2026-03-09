@@ -1021,7 +1021,7 @@ export function TasksTableView({
                     </TableRow>
                   }
                 >
-                  {group(task, i) => renderTaskRow(task, 0, iaskRow(task))}
+                  {group.tasks.map((task, i) => renderTaskRow(task, 0, i))}
                 </GroupedTableSection>
               ))
             )}

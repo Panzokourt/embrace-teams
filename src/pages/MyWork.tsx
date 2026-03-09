@@ -1189,20 +1189,27 @@ export default function MyWork() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="divide-y divide-border/50">
-              {pendingApprovals.slice(0, 5).map(req => (
-                <div key={req.id} className="flex items-center gap-3 px-4 md:px-6 py-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground">{req.user?.full_name || 'Χρήστης'}</p>
-                    <p className="text-xs text-muted-foreground">{format(new Date(req.start_date), 'd/MM')} - {format(new Date(req.end_date), 'd/MM')} · {req.days_count} ημ.</p>
+            <ScrollArea className="max-h-72">
+              <div className="divide-y divide-border/50">
+                {pagedLeaveApprovals.map(req => (
+                  <div key={req.id} className="flex items-center gap-3 px-4 md:px-6 py-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground">{req.user?.full_name || 'Χρήστης'}</p>
+                      <p className="text-xs text-muted-foreground">{format(new Date(req.start_date), 'd/MM')} - {format(new Date(req.end_date), 'd/MM')} · {req.days_count} ημ.</p>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-success hover:text-success" onClick={() => approveRequest(req.id)}><Check className="h-4 w-4" /></Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => rejectRequest(req.id)}><X className="h-4 w-4" /></Button>
+                    </div>
                   </div>
-                  <div className="flex gap-1.5">
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-success hover:text-success" onClick={() => approveRequest(req.id)}><Check className="h-4 w-4" /></Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => rejectRequest(req.id)}><X className="h-4 w-4" /></Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </ScrollArea>
+            {pendingApprovals.length > leaveApprovalsPagination.pageSize && (
+              <div className="px-4 md:px-6 border-t border-border/50">
+                <PaginationControls pagination={leaveApprovalsPagination} />
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

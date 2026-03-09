@@ -879,3 +879,72 @@ function TaskAssigneeManager({ taskId, profiles }: { taskId: string; profiles: P
     </div>
   );
 }
+
+/* ——— Time Entries Table for Task ——— */
+function TaskTimeEntriesTable({ taskId }: { taskId: string }) {
+  const [entries, setEntries] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchEntries = async () => {
+      setLoading(true);
+      const { data: entriesData } = await supabase
+        .from('time_entries')
+        .select('id, start_time, end_time, duration_minutes, description, user_id')
+        .eq('task_id', taskId)
+        .eq('is_running', false)
+        .order('start_time', { ascending: false });
+
+      if (entriesData && entriesData.length > 0) {
+        const userIds = [...new Set(entriesData.map(e => e.user_id))];
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', userIds);
+        const profileMap = new Map((profilesData || []).map(p => [p.id, p.full_name]));
+        setEntries(entriesData.map(e => ({ ...e, user_name: profileMap.get(e.user_id) || '—' })));
+      } else {
+        setEntries([]);
+      }
+      setLoading(false);
+    };
+    fetchEntries();
+  }, [taskId]);
+
+  if (loading) return <div className="text-xs text-muted-foreground py-4 text-center">Φόρτωση...</div>;
+  if (entries.length === 0) return <div className="text-xs text-muted-foreground py-4 text-center border-t pt-4">Δεν υπάρχουν καταγραφές χρόνου.</div>;
+
+  return (
+    <div className="border-t pt-4">
+      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Αναλυτική Καταγραφή</h4>
+      <div className="rounded-lg border overflow-hidden">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="bg-muted/40 border-b">
+              <th className="px-3 py-2 text-left font-medium text-muted-foreground">Ημ/νία</th>
+              <th className="px-3 py-2 text-left font-medium text-muted-foreground">Διάρκεια</th>
+              <th className="px-3 py-2 text-left font-medium text-muted-foreground">Χρήστης</th>
+              <th className="px-3 py-2 text-left font-medium text-muted-foreground">Σημείωση</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map((entry, i) => (
+              <tr key={entry.id} className={cn("border-b border-border/30 last:border-0", i % 2 === 0 && "bg-muted/20")}>
+                <td className="px-3 py-2 whitespace-nowrap">
+                  {format(new Date(entry.start_time), 'd MMM yyyy, HH:mm', { locale: el })}
+                </td>
+                <td className="px-3 py-2 font-mono font-medium">
+                  {entry.duration_minutes >= 60
+                    ? `${Math.floor(entry.duration_minutes / 60)}ω ${entry.duration_minutes % 60}λ`
+                    : `${entry.duration_minutes}λ`}
+                </td>
+                <td className="px-3 py-2">{entry.user_name}</td>
+                <td className="px-3 py-2 text-muted-foreground truncate max-w-[200px]">{entry.description || '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

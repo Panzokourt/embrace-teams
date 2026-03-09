@@ -114,6 +114,8 @@ export default function TaskDetailPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [task, setTask] = useState<TaskData | null>(null);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
   const [subtasks, setSubtasks] = useState<TaskData[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);

@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { EnhancedInlineEditCell } from '@/components/shared/EnhancedInlineEditCell';
 import { TableToolbar } from '@/components/shared/TableToolbar';
 import { BulkActionsDialog } from '@/components/shared/BulkActionsDialog';

@@ -16,7 +16,7 @@ interface UnifiedViewToggleProps {
 
 export function usePersistedViewMode(
 storageKey: string,
-defaultMode: UnifiedViewMode = 'card')
+defaultMode: UnifiedViewMode = 'table')
 : [UnifiedViewMode, (mode: UnifiedViewMode) => void] {
   const [viewMode, setViewMode] = useState<UnifiedViewMode>(() => {
     if (typeof window !== 'undefined') {

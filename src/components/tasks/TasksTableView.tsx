@@ -595,29 +595,37 @@ export function TasksTableView({
             </TableCell>
           )}
 
-          {/* Status */}
+          {/* Status - Monday.com colored cell */}
           {isColumnVisible('status') && (
-            <TableCell style={{ width: getColumnWidth('status') }}>
-              <EnhancedInlineEditCell
+            <TableCell style={{ width: getColumnWidth('status') }} className="p-1">
+              <MondayStatusCell
                 value={task.status}
+                options={Object.entries(STATUS_COLORS).map(([value, c]) => ({
+                  value,
+                  label: c.label,
+                  bg: c.bg,
+                  text: c.text,
+                }))}
                 onSave={(val) => onInlineUpdate(task.id, 'status', val)}
-                type="select"
-                options={STATUS_OPTIONS}
                 disabled={!canManage}
               />
             </TableCell>
           )}
 
-          {/* Priority */}
+          {/* Priority - Monday.com colored cell */}
           {isColumnVisible('priority') && (
-            <TableCell style={{ width: getColumnWidth('priority') }}>
-              <EnhancedInlineEditCell
+            <TableCell style={{ width: getColumnWidth('priority') }} className="p-1">
+              <MondayStatusCell
                 value={task.priority}
+                options={Object.entries(PRIORITY_COLORS).map(([value, c]) => ({
+                  value,
+                  label: c.label,
+                  bg: c.bg,
+                  text: c.text,
+                }))}
                 onSave={(val) => onInlineUpdate(task.id, 'priority', val)}
-                type="select"
-                options={PRIORITY_OPTIONS}
-                placeholder="Καμία"
                 disabled={!canManage}
+                placeholder="Καμία"
               />
             </TableCell>
           )}

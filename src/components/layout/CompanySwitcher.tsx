@@ -39,7 +39,7 @@ export default function CompanySwitcher({ compact, iconOnly }: CompanySwitcherPr
             {company?.logo_url ?
             <img src={company.logo_url} alt="" className="h-4 w-4 rounded-sm object-contain shrink-0" /> :
 
-            <Building2 className="h-4 w-4 shrink-0 text-muted-foreground bg-success" />
+            <Building2 className="h-4 w-4 shrink-0 text-muted-foreground bg-inherit" />
             }
             {!iconOnly && <span className="truncate text-xs font-medium">{company?.name || 'Εταιρεία'}</span>}
             {!iconOnly && <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />}

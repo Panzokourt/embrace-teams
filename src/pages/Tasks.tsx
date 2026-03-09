@@ -78,6 +78,12 @@ interface Profile {
   avatar_url?: string | null;
 }
 
+interface TaskAssignee {
+  user_id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+}
+
 interface Task {
   id: string;
   title: string;
@@ -100,6 +106,7 @@ interface Task {
   created_by: string | null;
   project?: { name: string } | null;
   assignee?: { full_name: string | null; avatar_url?: string | null } | null;
+  assignees?: TaskAssignee[];
 }
 
 const statusConfig: Record<TaskStatus, { icon: React.ReactNode; label: string; className: string }> = {

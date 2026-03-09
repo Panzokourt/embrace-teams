@@ -37,6 +37,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TaskTimer } from '@/components/time-tracking/TaskTimer';
+import { MondayStatusCell } from '@/components/shared/MondayStatusCell';
+import { STATUS_COLORS, PRIORITY_COLORS, GROUP_COLORS } from '@/components/shared/mondayStyleConfig';
 import { format, isPast, isToday, isTomorrow, parseISO } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { toast } from 'sonner';

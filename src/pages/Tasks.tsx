@@ -568,27 +568,28 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
 
   const TaskCard = ({ task, isDragOverlay = false }: { task: Task; isDragOverlay?: boolean }) => {
     const isOverdue = task.due_date && isPast(new Date(task.due_date)) && !isToday(new Date(task.due_date)) && task.status !== 'completed';
+    const priorityColor = PRIORITY_COLORS[task.priority || ''];
 
     return (
       <div 
         className={cn(
-          "group bg-card rounded-xl border border-border/50 p-4 transition-all duration-200 ease-apple cursor-pointer",
-          "hover:shadow-soft hover:border-border hover:-translate-y-0.5",
-          isOverdue && "border-destructive/30 bg-destructive/[0.02]",
-          isDragOverlay && "shadow-soft-xl rotate-1 scale-105"
+          "group bg-card rounded-lg border border-border/50 p-3.5 transition-all duration-200 cursor-pointer",
+          "hover:shadow-md hover:border-border hover:-translate-y-0.5",
+          isOverdue && "border-destructive/30",
+          isDragOverlay && "shadow-lg rotate-1 scale-105"
         )}
         onClick={() => !isDragOverlay && navigate(`/tasks/${task.id}`)}
       >
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-2.5">
           <GripVertical className="h-4 w-4 text-muted-foreground/30 mt-0.5 flex-shrink-0 cursor-grab transition-colors group-hover:text-muted-foreground/50" />
           <div className="flex-1 min-w-0">
             <div className="flex items-start gap-2">
-              <span className="transition-transform duration-200 group-hover:scale-110 mt-0.5">
+              <span className="mt-0.5">
                 {statusConfig[task.status].icon}
               </span>
               <div className="flex-1 min-w-0">
                 <p className={cn(
-                  "font-medium text-sm text-foreground/90 group-hover:text-foreground transition-colors",
+                  "font-medium text-sm leading-snug",
                   task.status === 'completed' && "line-through text-muted-foreground"
                 )}>
                   {task.title}
@@ -608,7 +609,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-2 mt-3 pt-2 border-t border-border/30">
+            <div className="flex items-center gap-2 mt-2.5 flex-wrap">
               {task.assignee && (
                 <Avatar className="h-5 w-5">
                   <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
@@ -616,14 +617,22 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
                   </AvatarFallback>
                 </Avatar>
               )}
+              {priorityColor && (
+                <span
+                  className="text-[10px] font-semibold rounded px-1.5 py-0.5"
+                  style={{ backgroundColor: priorityColor.bg, color: priorityColor.text }}
+                >
+                  {priorityColor.label.slice(0, 2).toUpperCase()}
+                </span>
+              )}
               {task.due_date && (
                 <div className={cn(
                   "flex items-center gap-1 text-xs",
-                  isOverdue ? "text-destructive" : "text-muted-foreground/60"
+                  isOverdue ? "text-destructive font-medium" : "text-muted-foreground/60"
                 )}>
                   <Calendar className="h-3 w-3" />
                   {format(new Date(task.due_date), 'd MMM', { locale: el })}
-                  {isOverdue && <span className="font-medium">(Overdue)</span>}
+                  {isOverdue && <span>(Overdue)</span>}
                 </div>
               )}
             </div>

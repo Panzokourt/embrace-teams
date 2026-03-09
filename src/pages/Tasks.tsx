@@ -684,6 +684,39 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
     { id: 'completed' as TaskStatus, label: 'Ολοκληρώθηκε', icon: <CheckCircle2 className="h-5 w-5 text-success" /> },
   ];
 
+  const handleAssigneeAdd = async (taskId: string, userId: string) => {
+    try {
+      const { error } = await supabase.from('task_assignees').insert({ task_id: taskId, user_id: userId });
+      if (error) throw error;
+      const profile = users.find(u => u.id === userId);
+      setTasks(prev => prev.map(t => {
+        if (t.id !== taskId) return t;
+        const existing = t.assignees || [];
+        if (existing.some(a => a.user_id === userId)) return t;
+        return { ...t, assignees: [...existing, { user_id: userId, full_name: profile?.full_name || null, avatar_url: profile?.avatar_url || null }] };
+      }));
+      toast.success('Προστέθηκε!');
+    } catch (error) {
+      console.error('Error adding assignee:', error);
+      toast.error('Σφάλμα');
+    }
+  };
+
+  const handleAssigneeRemove = async (taskId: string, userId: string) => {
+    try {
+      const { error } = await supabase.from('task_assignees').delete().eq('task_id', taskId).eq('user_id', userId);
+      if (error) throw error;
+      setTasks(prev => prev.map(t => {
+        if (t.id !== taskId) return t;
+        return { ...t, assignees: (t.assignees || []).filter(a => a.user_id !== userId) };
+      }));
+      toast.success('Αφαιρέθηκε!');
+    } catch (error) {
+      console.error('Error removing assignee:', error);
+      toast.error('Σφάλμα');
+    }
+  };
+
   const renderTableView = () => (
     <TasksTableView
       tasks={filteredTasks}
@@ -694,6 +727,8 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
       onInlineUpdate={handleInlineUpdate}
       onInlineCreateSubtask={handleInlineCreateSubtask}
       onBulkUpdate={handleBulkUpdate}
+      onAssigneeAdd={handleAssigneeAdd}
+      onAssigneeRemove={handleAssigneeRemove}
       canManage={canManage}
       showProject={!projectId}
     />

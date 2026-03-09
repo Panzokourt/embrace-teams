@@ -40,6 +40,7 @@ export default function TopBar({ onPanelToggle, rightPanelOpen, onMobileMenuTogg
   const { enterFocus } = useFocusMode();
   const { user } = useAuth();
   const { layoutState } = useLayout();
+  const { activeTimer, elapsed, formatElapsed, stopTimer } = useTimeTracking();
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);

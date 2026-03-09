@@ -26,7 +26,7 @@ interface GanttProject {
   status: ProjectStatus;
   start_date: string | null;
   end_date: string | null;
-  progress: number | null;
+  progress?: number | null;
   client?: { name: string; sector?: string | null } | null;
   client_id: string | null;
 }

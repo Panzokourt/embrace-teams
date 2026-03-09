@@ -111,7 +111,7 @@ function SortableProject({ project, isActive }: { project: ProjectItem; isActive
       >
         <GripVertical className="h-3 w-3" />
       </span>
-      <FileText className="h-3 w-3 shrink-0" />
+      <span className={cn("h-2 w-2 rounded-full shrink-0", getStatusColor(project.status))} />
       <span className="truncate">{project.name}</span>
     </button>
   );

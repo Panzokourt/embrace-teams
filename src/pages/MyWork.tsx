@@ -1007,25 +1007,34 @@ export default function MyWork() {
       {Object.keys(weekTasksByDay).length > 0 && (
         <Card className="border-border/50">
           <CardHeader className="pb-3"><CardTitle className="text-base font-semibold">Αυτή την εβδομάδα</CardTitle></CardHeader>
-          <CardContent className="p-0 overflow-x-auto">
-            {Object.entries(weekTasksByDay).map(([day, tasks]) => (
-              <div key={day}>
-                <div className="px-4 md:px-6 py-2 bg-muted/30"><p className="text-xs font-medium text-muted-foreground capitalize">{day}</p></div>
-                <table className="w-full text-sm">
-                  <TaskTableHeader />
-                  <tbody>
-                    {tasks.map(task => (
-                      <SortableTaskRow
-                        key={task.id} task={task} today={today} showDate
-                        onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
-                        activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
-                        onFlagToggle={toggleFlagPriority}
-                      />
-                    ))}
-                  </tbody>
-                </table>
+          <CardContent className="p-0">
+            <ScrollArea className="max-h-[32rem]">
+              <div className="overflow-x-auto">
+                {pagedWeekEntries.map(([day, tasks]) => (
+                  <div key={day}>
+                    <div className="px-4 md:px-6 py-2 bg-muted/30"><p className="text-xs font-medium text-muted-foreground capitalize">{day}</p></div>
+                    <table className="w-full text-sm">
+                      <TaskTableHeader />
+                      <tbody>
+                        {tasks.map(task => (
+                          <SortableTaskRow
+                            key={task.id} task={task} today={today} showDate
+                            onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
+                            activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
+                            onFlagToggle={toggleFlagPriority}
+                          />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
               </div>
-            ))}
+            </ScrollArea>
+            {Object.keys(weekTasksByDay).length > weekPagination.pageSize && (
+              <div className="px-4 md:px-6 border-t border-border/50">
+                <PaginationControls pagination={weekPagination} />
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/select';
 import { UnifiedViewToggle, usePersistedViewMode, type UnifiedViewMode } from '@/components/ui/unified-view-toggle';
 import { TasksTableView } from '@/components/tasks/TasksTableView';
+import { TaskGanttView } from '@/components/tasks/TaskGanttView';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { toast } from 'sonner';
 import { 

@@ -554,19 +554,33 @@ export function TasksTableView({
             </div>
           </TableCell>
 
-          {/* Assignee */}
+          {/* Assignees */}
           {isColumnVisible('assignee') && (
             <TableCell style={{ width: getColumnWidth('assignee') }}>
               <Popover>
                 <PopoverTrigger asChild>
-                  <button className="flex items-center gap-1 hover:bg-muted rounded-md p-1 transition-colors -mx-1" title={task.assignee?.full_name || 'Κανένας'}>
-                    {task.assigned_to ? (
-                      <Avatar className="h-6 w-6">
-                        {task.assignee?.avatar_url && <AvatarImage src={task.assignee.avatar_url} />}
-                        <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
-                          {(task.assignee?.full_name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
+                  <button className="flex items-center gap-0 hover:bg-muted rounded-md p-1 transition-colors -mx-1 w-full min-h-[28px]">
+                    {(task.assignees && task.assignees.length > 0) ? (
+                      <div className="flex items-center -space-x-1.5">
+                        {task.assignees.map(a => (
+                          <div key={a.user_id} className="relative group/avatar">
+                            <Avatar className="h-6 w-6 border-2 border-background" title={a.full_name || ''}>
+                              {a.avatar_url && <AvatarImage src={a.avatar_url} />}
+                              <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                                {(a.full_name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            {canManage && onAssigneeRemove && (
+                              <button
+                                className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-destructive text-destructive-foreground items-center justify-center text-[8px] hidden group-hover/avatar:flex z-10"
+                                onClick={async (e) => { e.stopPropagation(); await onAssigneeRemove(task.id, a.user_id); }}
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     ) : (
                       <div className="h-6 w-6 rounded-full border border-dashed border-muted-foreground/40 flex items-center justify-center">
                         <User className="h-3 w-3 text-muted-foreground/60" />
@@ -576,25 +590,27 @@ export function TasksTableView({
                 </PopoverTrigger>
                 <PopoverContent className="w-56 p-2" align="start">
                   <div className="space-y-2">
-                    {task.assigned_to && (
-                      <div className="flex items-center gap-2 p-1.5 bg-muted/50 rounded-md">
-                        <Avatar className="h-7 w-7">
-                          {task.assignee?.avatar_url && <AvatarImage src={task.assignee.avatar_url} />}
-                          <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                            {(task.assignee?.full_name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{task.assignee?.full_name || 'Χωρίς όνομα'}</p>
-                        </div>
-                        {canManage && (
-                          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={async () => { await onInlineUpdate(task.id, 'assigned_to', null); }}>
-                            <XIcon className="h-3 w-3" />
-                          </Button>
-                        )}
+                    {(task.assignees && task.assignees.length > 0) && (
+                      <div className="space-y-1">
+                        {task.assignees.map(a => (
+                          <div key={a.user_id} className="flex items-center gap-2 p-1.5 bg-muted/50 rounded-md">
+                            <Avatar className="h-6 w-6">
+                              {a.avatar_url && <AvatarImage src={a.avatar_url} />}
+                              <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                                {(a.full_name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-sm truncate flex-1">{a.full_name || 'Χωρίς όνομα'}</span>
+                            {canManage && onAssigneeRemove && (
+                              <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={async () => { await onAssigneeRemove(task.id, a.user_id); }}>
+                                <XIcon className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     )}
-                    {canManage && (
+                    {canManage && onAssigneeAdd && (
                       <>
                         <Input
                           placeholder="Αναζήτηση..."
@@ -611,13 +627,13 @@ export function TasksTableView({
                           }}
                         />
                         <div className="max-h-40 overflow-y-auto space-y-0.5" data-user-list>
-                          {users.filter(u => u.id !== task.assigned_to).map(u => (
+                          {users.filter(u => !(task.assignees || []).some(a => a.user_id === u.id)).map(u => (
                             <button
                               key={u.id}
                               data-user-item
                               data-user-name={u.full_name || u.email}
                               className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-muted transition-colors"
-                              onClick={async () => { await onInlineUpdate(task.id, 'assigned_to', u.id); }}
+                              onClick={async () => { await onAssigneeAdd(task.id, u.id); }}
                             >
                               <Avatar className="h-5 w-5">
                                 {u.avatar_url && <AvatarImage src={u.avatar_url} />}

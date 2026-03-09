@@ -628,9 +628,6 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
       </div>
     );
   };
-      </div>
-    );
-  };
 
   const columns = [
     { id: 'todo' as TaskStatus, label: 'Προς Υλοποίηση', icon: <Circle className="h-5 w-5 text-muted-foreground" /> },
@@ -640,66 +637,6 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
     { id: 'client_review' as TaskStatus, label: 'Έγκριση Πελάτη', icon: <AlertCircle className="h-5 w-5 text-orange-500" /> },
     { id: 'completed' as TaskStatus, label: 'Ολοκληρώθηκε', icon: <CheckCircle2 className="h-5 w-5 text-success" /> },
   ];
-
-  const renderCardView = () => (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {filteredTasks.map(task => (
-        <Card 
-          key={task.id} 
-          className="hover:shadow-lg transition-shadow cursor-pointer"
-          onClick={() => navigate(`/tasks/${task.id}`)}
-        >
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex-1 min-w-0">
-                <h3 className={cn(
-                  "font-semibold mb-1",
-                  task.status === 'completed' && "line-through text-muted-foreground"
-                )}>{task.title}</h3>
-                {task.project && (
-                  <p className="text-sm text-muted-foreground">{task.project.name}</p>
-                )}
-              </div>
-              {getStatusBadge(task.status)}
-            </div>
-            {task.description && (
-              <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{task.description}</p>
-            )}
-            <div className="flex items-center justify-between text-sm">
-              {task.assignee ? (
-                <div className="flex items-center gap-2">
-                  <Avatar className="h-6 w-6">
-                    <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                      {getInitials(task.assignee.full_name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="text-muted-foreground">{task.assignee.full_name}</span>
-                </div>
-              ) : (
-                <span className="text-muted-foreground">Χωρίς ανάθεση</span>
-              )}
-              {task.due_date && (
-                <span className="flex items-center gap-1 text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  {format(new Date(task.due_date), 'd MMM', { locale: el })}
-                </span>
-              )}
-            </div>
-            {canManage && (
-              <div className="flex gap-2 mt-4 pt-3 border-t" onClick={(e) => e.stopPropagation()}>
-                <Button variant="outline" size="sm" onClick={() => handleEdit(task)}>
-                  <Pencil className="h-3 w-3 mr-1" /> Επεξεργασία
-                </Button>
-                <Button variant="outline" size="sm" className="text-destructive" onClick={() => handleDelete(task.id)}>
-                  <Trash2 className="h-3 w-3 mr-1" /> Διαγραφή
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
 
   const renderTableView = () => (
     <TasksTableView

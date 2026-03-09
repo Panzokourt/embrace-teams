@@ -508,27 +508,29 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
     }
   };
 
-  // Create subtask
-  const handleCreateSubtask = (parentTaskId: string) => {
+  // Inline subtask creation
+  const handleInlineCreateSubtask = async (parentTaskId: string, title: string) => {
     const parentTask = tasks.find(t => t.id === parentTaskId);
     if (!parentTask) return;
-    
-    setEditingTask(null);
-    setFormData({
-      title: '',
-      description: '',
-      project_id: parentTask.project_id,
-      status: 'todo',
-      priority: 'medium',
-      due_date: '',
-      start_date: '',
-      assigned_to: '',
-      estimated_hours: '',
-      task_type: 'task',
-      task_category: '',
-    });
-    // Store parent task id for subtask creation - we'll add this to the dialog
-    setDialogOpen(true);
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .insert({
+          title,
+          project_id: parentTask.project_id,
+          parent_task_id: parentTaskId,
+          status: 'todo',
+          priority: 'medium',
+        })
+        .select('*, project:projects(name)')
+        .single();
+      if (error) throw error;
+      setTasks(prev => [...prev, { ...data, assignee: null } as Task]);
+      toast.success('Subtask δημιουργήθηκε!');
+    } catch (error) {
+      console.error('Error creating subtask:', error);
+      toast.error('Σφάλμα κατά τη δημιουργία subtask');
+    }
   };
 
   const handleInlineUpdate = async (taskId: string, field: string, value: string | number | null) => {

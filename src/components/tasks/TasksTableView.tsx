@@ -139,7 +139,7 @@ const CATEGORY_OPTIONS = [
 const DEFAULT_COLUMNS = [
   { id: 'select', label: 'Επιλογή', visible: true, locked: true },
   { id: 'title', label: 'Τίτλος', visible: true, locked: true },
-  { id: 'assignee', label: 'Υπεύθυνος', visible: true },
+  { id: 'assignee', label: 'Υπεύθυνοι', visible: true },
   { id: 'project', label: 'Έργο', visible: true },
   { id: 'start_date', label: 'Έναρξη', visible: false },
   { id: 'due_date', label: 'Προθεσμία', visible: true },

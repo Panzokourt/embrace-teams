@@ -18,8 +18,10 @@ import { useTableViews, GroupByField } from '@/hooks/useTableViews';
 import { exportToCSV, exportToExcel, formatters } from '@/utils/exportUtils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
 import { 
-  ArrowUpDown, ArrowUp, ArrowDown, CheckCircle2, ExternalLink, User, X as XIcon,
+  ArrowUpDown, ArrowUp, ArrowDown, CheckCircle2, User, X as XIcon,
+  ChevronDown, ChevronRight, Package, ListChecks,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { WorkflowStageBadge } from '@/components/projects/WorkflowStageBadge';
@@ -60,6 +62,26 @@ interface Client {
   sector?: string | null;
 }
 
+interface Deliverable {
+  id: string;
+  name: string;
+  description: string | null;
+  due_date: string | null;
+  completed: boolean | null;
+  budget: number | null;
+  cost: number | null;
+  project_id: string;
+}
+
+interface Task {
+  id: string;
+  title: string;
+  status: string;
+  priority: string | null;
+  due_date: string | null;
+  deliverable_id: string | null;
+}
+
 interface ProjectsTableViewProps {
   projects: Project[];
   clients: Client[];
@@ -79,6 +101,14 @@ const STATUS_OPTIONS = [
   { value: 'cancelled', label: 'Ακυρωμένο', color: 'hsl(var(--destructive))' },
   { value: 'lost', label: 'Χάθηκε', color: 'hsl(var(--destructive))' },
 ];
+
+const TASK_STATUS_COLORS: Record<string, string> = {
+  pending: 'bg-muted text-muted-foreground',
+  in_progress: 'bg-primary/10 text-primary',
+  review: 'bg-warning/10 text-warning',
+  completed: 'bg-success/10 text-success',
+  cancelled: 'bg-destructive/10 text-destructive',
+};
 
 const DEFAULT_COLUMNS = [
   { id: 'select', label: '', visible: true, locked: true },
@@ -125,6 +155,79 @@ export function ProjectsTableView({
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const lastSelectedIndex = useRef<number | null>(null);
+
+  // Expand state
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const [expandedDeliverables, setExpandedDeliverables] = useState<Set<string>>(new Set());
+  const [projectDeliverables, setProjectDeliverables] = useState<Record<string, Deliverable[]>>({});
+  const [deliverableTasks, setDeliverableTasks] = useState<Record<string, Task[]>>({});
+  const [loadingDeliverables, setLoadingDeliverables] = useState<Set<string>>(new Set());
+  const [loadingTasks, setLoadingTasks] = useState<Set<string>>(new Set());
+
+  const toggleProjectExpand = useCallback(async (projectId: string) => {
+    setExpandedProjects(prev => {
+      const next = new Set(prev);
+      if (next.has(projectId)) {
+        next.delete(projectId);
+      } else {
+        next.add(projectId);
+        // Fetch deliverables if not loaded
+        if (!projectDeliverables[projectId]) {
+          fetchDeliverables(projectId);
+        }
+      }
+      return next;
+    });
+  }, [projectDeliverables]);
+
+  const fetchDeliverables = async (projectId: string) => {
+    setLoadingDeliverables(prev => new Set(prev).add(projectId));
+    try {
+      const { data, error } = await supabase
+        .from('deliverables')
+        .select('id, name, description, due_date, completed, budget, cost, project_id')
+        .eq('project_id', projectId)
+        .order('created_at');
+      if (error) throw error;
+      setProjectDeliverables(prev => ({ ...prev, [projectId]: data || [] }));
+    } catch (err) {
+      console.error('Error fetching deliverables:', err);
+    } finally {
+      setLoadingDeliverables(prev => { const n = new Set(prev); n.delete(projectId); return n; });
+    }
+  };
+
+  const toggleDeliverableExpand = useCallback(async (deliverableId: string) => {
+    setExpandedDeliverables(prev => {
+      const next = new Set(prev);
+      if (next.has(deliverableId)) {
+        next.delete(deliverableId);
+      } else {
+        next.add(deliverableId);
+        if (!deliverableTasks[deliverableId]) {
+          fetchTasksForDeliverable(deliverableId);
+        }
+      }
+      return next;
+    });
+  }, [deliverableTasks]);
+
+  const fetchTasksForDeliverable = async (deliverableId: string) => {
+    setLoadingTasks(prev => new Set(prev).add(deliverableId));
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('id, title, status, priority, due_date, deliverable_id')
+        .eq('deliverable_id', deliverableId)
+        .order('created_at');
+      if (error) throw error;
+      setDeliverableTasks(prev => ({ ...prev, [deliverableId]: data || [] }));
+    } catch (err) {
+      console.error('Error fetching tasks:', err);
+    } finally {
+      setLoadingTasks(prev => { const n = new Set(prev); n.delete(deliverableId); return n; });
+    }
+  };
 
   const sortedProjects = useMemo(() => {
     if (!sortField || !sortDirection) return projects;
@@ -174,11 +277,9 @@ export function ProjectsTableView({
           </Badge>
         );
       } else if (groupBy === 'assignee') {
-        // Group by client
         groupKey = project.client_id || '_none';
         groupLabel = project.client?.name || 'Χωρίς Πελάτη';
       } else if (groupBy === 'project') {
-        // Group by client sector (category)
         const sector = project.client?.sector || null;
         const cat = sectorToCategory(sector);
         groupKey = cat || '_none';
@@ -270,7 +371,6 @@ export function ProjectsTableView({
     toast.success('Εξαγωγή Excel ολοκληρώθηκε!');
   }, [projects]);
 
-  // Helper to get assignees for a project (lead + manager)
   const getProjectAssignees = (project: Project) => {
     const assignees: Profile[] = [];
     if (project.project_lead_id) {
@@ -284,220 +384,333 @@ export function ProjectsTableView({
     return assignees;
   };
 
-  const renderProjectRow = (project: Project, flatIndex: number) => {
-    const assignees = getProjectAssignees(project);
-
+  const renderTaskRow = (task: Task, colSpan: number) => {
+    const statusLabel: Record<string, string> = {
+      pending: 'Εκκρεμεί', in_progress: 'Σε εξέλιξη', review: 'Αναθεώρηση',
+      completed: 'Ολοκληρωμένο', cancelled: 'Ακυρωμένο',
+    };
     return (
-      <TableRow 
-        key={project.id} 
-        className={cn(
-          "group hover:bg-muted/50 cursor-pointer",
-          selectedIds.has(project.id) && "bg-primary/5"
-        )}
-        onClick={(e) => {
-          const target = e.target as HTMLElement;
-          if (target.closest('button, input, select, [role="checkbox"], [data-inline-edit]')) return;
-          if (e.metaKey || e.ctrlKey || e.shiftKey) { handleRowSelect(project.id, flatIndex, e); return; }
-          navigate(`/projects/${project.id}`);
-        }}
+      <TableRow
+        key={task.id}
+        className="hover:bg-muted/30 cursor-pointer bg-muted/5"
+        onClick={() => navigate(`/tasks/${task.id}`)}
       >
-        {canManage && (
-          <TableCell className="w-[40px]" onClick={(e) => e.stopPropagation()}>
-            <Checkbox
-              checked={selectedIds.has(project.id)}
-              onCheckedChange={() => {
-                setSelectedIds(prev => {
-                  const next = new Set(prev);
-                  next.has(project.id) ? next.delete(project.id) : next.add(project.id);
-                  return next;
-                });
-              }}
-            />
-          </TableCell>
-        )}
-
-        {/* Name */}
-        <TableCell className="font-medium" style={{ width: getColumnWidth('name') }}>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-primary" onClick={() => navigate(`/projects/${project.id}`)} title="Άνοιγμα έργου">
-              <ExternalLink className="h-3.5 w-3.5" />
-            </Button>
-            <div onClick={(e) => e.stopPropagation()} className="flex-1 min-w-0">
-              <EnhancedInlineEditCell value={project.name} onSave={(val) => onInlineUpdate(project.id, 'name', val)} type="text" disabled={!canManage} />
-            </div>
-            <WorkflowStageBadge projectId={project.id} />
+        <TableCell colSpan={colSpan} className="py-1.5">
+          <div className="flex items-center gap-2 pl-16">
+            <ListChecks className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <span className="text-sm">{task.title}</span>
+            <Badge variant="outline" className={cn('text-[10px] ml-auto', TASK_STATUS_COLORS[task.status] || '')}>
+              {statusLabel[task.status] || task.status}
+            </Badge>
+            {task.due_date && (
+              <span className="text-[10px] text-muted-foreground">
+                {format(new Date(task.due_date), 'dd/MM/yy')}
+              </span>
+            )}
           </div>
         </TableCell>
+      </TableRow>
+    );
+  };
 
-        {/* Client */}
-        {isColumnVisible('client') && (
-          <TableCell style={{ width: getColumnWidth('client') }} onClick={(e) => e.stopPropagation()}>
-            <EnhancedInlineEditCell value={project.client_id} onSave={(val) => onInlineUpdate(project.id, 'client_id', val)} type="select" options={clientOptions} displayValue={project.client?.name} placeholder="Κανένας" disabled={!canManage} />
+  const renderDeliverableRow = (deliverable: Deliverable, colSpan: number) => {
+    const isExpanded = expandedDeliverables.has(deliverable.id);
+    const tasks = deliverableTasks[deliverable.id] || [];
+    const isLoading = loadingTasks.has(deliverable.id);
+
+    return (
+      <React.Fragment key={deliverable.id}>
+        <TableRow
+          className="hover:bg-muted/30 cursor-pointer bg-muted/10"
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleDeliverableExpand(deliverable.id);
+          }}
+        >
+          <TableCell colSpan={colSpan} className="py-1.5">
+            <div className="flex items-center gap-2 pl-8">
+              <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={(e) => { e.stopPropagation(); toggleDeliverableExpand(deliverable.id); }}>
+                {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              </Button>
+              <Package className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <span className="text-sm font-medium">{deliverable.name}</span>
+              {deliverable.completed && (
+                <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+              )}
+              {deliverable.due_date && (
+                <span className="text-[10px] text-muted-foreground ml-auto">
+                  {format(new Date(deliverable.due_date), 'dd/MM/yy')}
+                </span>
+              )}
+              {deliverable.budget != null && (
+                <span className="text-[10px] text-muted-foreground">
+                  €{deliverable.budget.toLocaleString('el-GR')}
+                </span>
+              )}
+            </div>
           </TableCell>
+        </TableRow>
+        {isExpanded && (
+          isLoading ? (
+            <TableRow>
+              <TableCell colSpan={colSpan} className="py-2">
+                <div className="pl-16 text-xs text-muted-foreground">Φόρτωση tasks...</div>
+              </TableCell>
+            </TableRow>
+          ) : tasks.length > 0 ? (
+            tasks.map(task => renderTaskRow(task, colSpan))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={colSpan} className="py-2">
+                <div className="pl-16 text-xs text-muted-foreground">Δεν υπάρχουν tasks</div>
+              </TableCell>
+            </TableRow>
+          )
         )}
+      </React.Fragment>
+    );
+  };
 
-        {/* Assignees */}
-        {isColumnVisible('assignees') && (
-          <TableCell style={{ width: getColumnWidth('assignees') }}>
-            <Popover>
-              <PopoverTrigger asChild>
-                <button className="flex items-center gap-0 hover:bg-muted rounded-md p-1 transition-colors -mx-1 w-full min-h-[28px]">
-                  {assignees.length > 0 ? (
-                    <div className="flex items-center -space-x-1.5">
-                      {assignees.map(a => (
-                        <div key={a.id} className="relative group/avatar">
-                          <Avatar className="h-6 w-6 border-2 border-background" title={a.full_name || ''}>
-                            {a.avatar_url && <AvatarImage src={a.avatar_url} />}
-                            <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
-                              {(a.full_name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          {canManage && (
-                            <button
-                              className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-destructive text-destructive-foreground items-center justify-center text-[8px] hidden group-hover/avatar:flex z-10"
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                // Determine which field this is
-                                const field = a.id === project.project_lead_id ? 'project_lead_id' : 'account_manager_id';
-                                await onInlineUpdate(project.id, field, null);
-                              }}
-                            >✕</button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="h-6 w-6 rounded-full border border-dashed border-muted-foreground/40 flex items-center justify-center">
-                      <User className="h-3 w-3 text-muted-foreground/60" />
-                    </div>
-                  )}
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-64 p-2" align="start">
-                <div className="space-y-2">
-                  {/* Current assignees */}
-                  {assignees.length > 0 && (
-                    <div className="space-y-1">
-                      {assignees.map(a => {
-                        const role = a.id === project.project_lead_id ? 'Project Lead' : 'Account Manager';
-                        return (
-                          <div key={a.id} className="flex items-center gap-2 p-1.5 bg-muted/50 rounded-md">
-                            <Avatar className="h-6 w-6">
+  const renderProjectRow = (project: Project, flatIndex: number) => {
+    const assignees = getProjectAssignees(project);
+    const isExpanded = expandedProjects.has(project.id);
+    const deliverables = projectDeliverables[project.id] || [];
+    const isLoadingDel = loadingDeliverables.has(project.id);
+    const totalColSpan = visibleColumnCount + (canManage ? 1 : 0);
+
+    return (
+      <React.Fragment key={project.id}>
+        <TableRow 
+          className={cn(
+            "group hover:bg-muted/50 cursor-pointer",
+            selectedIds.has(project.id) && "bg-primary/5"
+          )}
+          onClick={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('button, input, select, [role="checkbox"], [data-inline-edit]')) return;
+            if (e.metaKey || e.ctrlKey || e.shiftKey) { handleRowSelect(project.id, flatIndex, e); return; }
+            navigate(`/projects/${project.id}`);
+          }}
+        >
+          {canManage && (
+            <TableCell className="w-[40px]" onClick={(e) => e.stopPropagation()}>
+              <Checkbox
+                checked={selectedIds.has(project.id)}
+                onCheckedChange={() => {
+                  setSelectedIds(prev => {
+                    const next = new Set(prev);
+                    next.has(project.id) ? next.delete(project.id) : next.add(project.id);
+                    return next;
+                  });
+                }}
+              />
+            </TableCell>
+          )}
+
+          {/* Name */}
+          <TableCell className="font-medium" style={{ width: getColumnWidth('name') }}>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 shrink-0"
+                onClick={(e) => { e.stopPropagation(); toggleProjectExpand(project.id); }}
+              >
+                {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              </Button>
+              <div onClick={(e) => e.stopPropagation()} className="flex-1 min-w-0">
+                <EnhancedInlineEditCell value={project.name} onSave={(val) => onInlineUpdate(project.id, 'name', val)} type="text" disabled={!canManage} />
+              </div>
+              <WorkflowStageBadge projectId={project.id} />
+            </div>
+          </TableCell>
+
+          {/* Client */}
+          {isColumnVisible('client') && (
+            <TableCell style={{ width: getColumnWidth('client') }} onClick={(e) => e.stopPropagation()}>
+              <EnhancedInlineEditCell value={project.client_id} onSave={(val) => onInlineUpdate(project.id, 'client_id', val)} type="select" options={clientOptions} displayValue={project.client?.name} placeholder="Κανένας" disabled={!canManage} />
+            </TableCell>
+          )}
+
+          {/* Assignees */}
+          {isColumnVisible('assignees') && (
+            <TableCell style={{ width: getColumnWidth('assignees') }}>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button className="flex items-center gap-0 hover:bg-muted rounded-md p-1 transition-colors -mx-1 w-full min-h-[28px]">
+                    {assignees.length > 0 ? (
+                      <div className="flex items-center -space-x-1.5">
+                        {assignees.map(a => (
+                          <div key={a.id} className="relative group/avatar">
+                            <Avatar className="h-6 w-6 border-2 border-background" title={a.full_name || ''}>
                               {a.avatar_url && <AvatarImage src={a.avatar_url} />}
                               <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
                                 {(a.full_name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <span className="text-sm truncate block">{a.full_name || 'Χωρίς όνομα'}</span>
-                              <span className="text-[10px] text-muted-foreground">{role}</span>
-                            </div>
                             {canManage && (
-                              <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={async () => {
-                                const field = a.id === project.project_lead_id ? 'project_lead_id' : 'account_manager_id';
-                                await onInlineUpdate(project.id, field, null);
-                              }}>
-                                <XIcon className="h-3 w-3" />
-                              </Button>
+                              <button
+                                className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-destructive text-destructive-foreground items-center justify-center text-[8px] hidden group-hover/avatar:flex z-10"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  const field = a.id === project.project_lead_id ? 'project_lead_id' : 'account_manager_id';
+                                  await onInlineUpdate(project.id, field, null);
+                                }}
+                              >✕</button>
                             )}
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="h-6 w-6 rounded-full border border-dashed border-muted-foreground/40 flex items-center justify-center">
+                        <User className="h-3 w-3 text-muted-foreground/60" />
+                      </div>
+                    )}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-2" align="start">
+                  <div className="space-y-2">
+                    {assignees.length > 0 && (
+                      <div className="space-y-1">
+                        {assignees.map(a => {
+                          const role = a.id === project.project_lead_id ? 'Project Lead' : 'Account Manager';
+                          return (
+                            <div key={a.id} className="flex items-center gap-2 p-1.5 bg-muted/50 rounded-md">
+                              <Avatar className="h-6 w-6">
+                                {a.avatar_url && <AvatarImage src={a.avatar_url} />}
+                                <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                                  {(a.full_name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <span className="text-sm truncate block">{a.full_name || 'Χωρίς όνομα'}</span>
+                                <span className="text-[10px] text-muted-foreground">{role}</span>
+                              </div>
+                              {canManage && (
+                                <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={async () => {
+                                  const field = a.id === project.project_lead_id ? 'project_lead_id' : 'account_manager_id';
+                                  await onInlineUpdate(project.id, field, null);
+                                }}>
+                                  <XIcon className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
 
-                  {/* Add assignees */}
-                  {canManage && (
-                    <>
-                      {!project.project_lead_id && (
-                        <div className="space-y-1">
-                          <span className="text-[10px] text-muted-foreground font-medium px-1">Project Lead</span>
-                          <AssigneeSelector
-                            users={users}
-                            excludeIds={assignees.map(a => a.id)}
-                            onSelect={async (userId) => { await onInlineUpdate(project.id, 'project_lead_id', userId); }}
-                          />
-                        </div>
-                      )}
-                      {!project.account_manager_id && (
-                        <div className="space-y-1">
-                          <span className="text-[10px] text-muted-foreground font-medium px-1">Account Manager</span>
-                          <AssigneeSelector
-                            users={users}
-                            excludeIds={assignees.map(a => a.id)}
-                            onSelect={async (userId) => { await onInlineUpdate(project.id, 'account_manager_id', userId); }}
-                          />
-                        </div>
-                      )}
-                    </>
-                  )}
+                    {canManage && (
+                      <>
+                        {!project.project_lead_id && (
+                          <div className="space-y-1">
+                            <span className="text-[10px] text-muted-foreground font-medium px-1">Project Lead</span>
+                            <AssigneeSelector
+                              users={users}
+                              excludeIds={assignees.map(a => a.id)}
+                              onSelect={async (userId) => { await onInlineUpdate(project.id, 'project_lead_id', userId); }}
+                            />
+                          </div>
+                        )}
+                        {!project.account_manager_id && (
+                          <div className="space-y-1">
+                            <span className="text-[10px] text-muted-foreground font-medium px-1">Account Manager</span>
+                            <AssigneeSelector
+                              users={users}
+                              excludeIds={assignees.map(a => a.id)}
+                              onSelect={async (userId) => { await onInlineUpdate(project.id, 'account_manager_id', userId); }}
+                            />
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </TableCell>
+          )}
+
+          {/* Status */}
+          {isColumnVisible('status') && (
+            <TableCell style={{ width: getColumnWidth('status') }} onClick={(e) => e.stopPropagation()}>
+              <EnhancedInlineEditCell value={project.status} onSave={(val) => onInlineUpdate(project.id, 'status', val)} type="select" options={STATUS_OPTIONS} disabled={!canManage} />
+            </TableCell>
+          )}
+
+          {/* Progress */}
+          {isColumnVisible('progress') && (
+            <TableCell style={{ width: getColumnWidth('progress') }} onClick={(e) => e.stopPropagation()}>
+              <EnhancedInlineEditCell value={project.progress ?? 0} onSave={(val) => onInlineUpdate(project.id, 'progress', val)} type="progress" disabled={!canManage} />
+            </TableCell>
+          )}
+
+          {/* Budget */}
+          {isColumnVisible('budget') && (
+            <TableCell style={{ width: getColumnWidth('budget') }} onClick={(e) => e.stopPropagation()}>
+              <EnhancedInlineEditCell value={project.budget} onSave={(val) => onInlineUpdate(project.id, 'budget', val)} type="number" displayValue={`€${project.budget?.toLocaleString('el-GR') || 0}`} disabled={!canManage} />
+            </TableCell>
+          )}
+
+          {/* Agency Fee */}
+          {isColumnVisible('agency_fee') && (
+            <TableCell style={{ width: getColumnWidth('agency_fee') }} onClick={(e) => e.stopPropagation()}>
+              <EnhancedInlineEditCell value={project.agency_fee_percentage} onSave={(val) => onInlineUpdate(project.id, 'agency_fee_percentage', val)} type="number" displayValue={`${project.agency_fee_percentage}%`} disabled={!canManage} />
+            </TableCell>
+          )}
+
+          {/* Start Date */}
+          {isColumnVisible('start_date') && (
+            <TableCell style={{ width: getColumnWidth('start_date') }} onClick={(e) => e.stopPropagation()}>
+              <EnhancedInlineEditCell value={project.start_date} onSave={(val) => onInlineUpdate(project.id, 'start_date', val)} type="date" disabled={!canManage} />
+            </TableCell>
+          )}
+
+          {/* End Date */}
+          {isColumnVisible('end_date') && (
+            <TableCell style={{ width: getColumnWidth('end_date') }} onClick={(e) => e.stopPropagation()}>
+              <EnhancedInlineEditCell value={project.end_date} onSave={(val) => onInlineUpdate(project.id, 'end_date', val)} type="date" disabled={!canManage} />
+            </TableCell>
+          )}
+
+          {/* Tasks */}
+          {isColumnVisible('tasks') && (
+            <TableCell style={{ width: getColumnWidth('tasks') }}>
+              {project.taskStats && (
+                <div className="flex items-center gap-2 text-sm">
+                  <CheckCircle2 className="h-3 w-3 text-success" />
+                  <span>{project.taskStats.completed}/{project.taskStats.total}</span>
                 </div>
-              </PopoverContent>
-            </Popover>
-          </TableCell>
-        )}
+              )}
+            </TableCell>
+          )}
 
-        {/* Status */}
-        {isColumnVisible('status') && (
-          <TableCell style={{ width: getColumnWidth('status') }} onClick={(e) => e.stopPropagation()}>
-            <EnhancedInlineEditCell value={project.status} onSave={(val) => onInlineUpdate(project.id, 'status', val)} type="select" options={STATUS_OPTIONS} disabled={!canManage} />
-          </TableCell>
-        )}
-
-        {/* Progress */}
-        {isColumnVisible('progress') && (
-          <TableCell style={{ width: getColumnWidth('progress') }} onClick={(e) => e.stopPropagation()}>
-            <EnhancedInlineEditCell value={project.progress ?? 0} onSave={(val) => onInlineUpdate(project.id, 'progress', val)} type="progress" disabled={!canManage} />
-          </TableCell>
-        )}
-
-        {/* Budget */}
-        {isColumnVisible('budget') && (
-          <TableCell style={{ width: getColumnWidth('budget') }} onClick={(e) => e.stopPropagation()}>
-            <EnhancedInlineEditCell value={project.budget} onSave={(val) => onInlineUpdate(project.id, 'budget', val)} type="number" displayValue={`€${project.budget?.toLocaleString('el-GR') || 0}`} disabled={!canManage} />
-          </TableCell>
-        )}
-
-        {/* Agency Fee */}
-        {isColumnVisible('agency_fee') && (
-          <TableCell style={{ width: getColumnWidth('agency_fee') }} onClick={(e) => e.stopPropagation()}>
-            <EnhancedInlineEditCell value={project.agency_fee_percentage} onSave={(val) => onInlineUpdate(project.id, 'agency_fee_percentage', val)} type="number" displayValue={`${project.agency_fee_percentage}%`} disabled={!canManage} />
-          </TableCell>
-        )}
-
-        {/* Start Date */}
-        {isColumnVisible('start_date') && (
-          <TableCell style={{ width: getColumnWidth('start_date') }} onClick={(e) => e.stopPropagation()}>
-            <EnhancedInlineEditCell value={project.start_date} onSave={(val) => onInlineUpdate(project.id, 'start_date', val)} type="date" disabled={!canManage} />
-          </TableCell>
-        )}
-
-        {/* End Date */}
-        {isColumnVisible('end_date') && (
-          <TableCell style={{ width: getColumnWidth('end_date') }} onClick={(e) => e.stopPropagation()}>
-            <EnhancedInlineEditCell value={project.end_date} onSave={(val) => onInlineUpdate(project.id, 'end_date', val)} type="date" disabled={!canManage} />
-          </TableCell>
-        )}
-
-        {/* Tasks */}
-        {isColumnVisible('tasks') && (
-          <TableCell style={{ width: getColumnWidth('tasks') }}>
-            {project.taskStats && (
-              <div className="flex items-center gap-2 text-sm">
-                <CheckCircle2 className="h-3 w-3 text-success" />
-                <span>{project.taskStats.completed}/{project.taskStats.total}</span>
-              </div>
+          {/* Actions */}
+          <TableCell onClick={(e) => e.stopPropagation()}>
+            {canManage && (
+              <EditDeleteActions onEdit={() => onEdit(project)} onDelete={() => onDelete(project.id)} itemName={project.name} />
             )}
           </TableCell>
-        )}
+        </TableRow>
 
-        {/* Actions */}
-        <TableCell onClick={(e) => e.stopPropagation()}>
-          {canManage && (
-            <EditDeleteActions onEdit={() => onEdit(project)} onDelete={() => onDelete(project.id)} itemName={project.name} />
-          )}
-        </TableCell>
-      </TableRow>
+        {/* Expanded deliverables */}
+        {isExpanded && (
+          isLoadingDel ? (
+            <TableRow>
+              <TableCell colSpan={totalColSpan} className="py-2">
+                <div className="pl-10 text-xs text-muted-foreground">Φόρτωση παραδοτέων...</div>
+              </TableCell>
+            </TableRow>
+          ) : deliverables.length > 0 ? (
+            deliverables.map(del => renderDeliverableRow(del, totalColSpan))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={totalColSpan} className="py-2">
+                <div className="pl-10 text-xs text-muted-foreground">Δεν υπάρχουν παραδοτέα</div>
+              </TableCell>
+            </TableRow>
+          )
+        )}
+      </React.Fragment>
     );
   };
 

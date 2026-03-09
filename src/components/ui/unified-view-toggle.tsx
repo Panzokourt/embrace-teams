@@ -9,6 +9,8 @@ interface UnifiedViewToggleProps {
   viewMode?: UnifiedViewMode;
   onViewModeChange?: (mode: UnifiedViewMode) => void;
   showKanban?: boolean;
+  showGantt?: boolean;
+  showCards?: boolean;
   className?: string;
   storageKey?: string;
   defaultMode?: UnifiedViewMode;

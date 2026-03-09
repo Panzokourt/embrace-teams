@@ -801,6 +801,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
             <UnifiedViewToggle 
               viewMode={viewMode} 
               onViewModeChange={setViewMode}
+              showGantt
             />
 
             {canManage && (

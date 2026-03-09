@@ -21,7 +21,7 @@ defaultMode: UnifiedViewMode = 'table')
   const [viewMode, setViewMode] = useState<UnifiedViewMode>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(`viewMode_${storageKey}`);
-      if (saved && ['card', 'table', 'kanban'].includes(saved)) {
+      if (saved && ['gantt', 'table', 'kanban'].includes(saved)) {
         return saved as UnifiedViewMode;
       }
     }

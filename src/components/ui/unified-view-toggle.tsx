@@ -42,7 +42,7 @@ export function UnifiedViewToggle({
   showKanban = true,
   className,
   storageKey,
-  defaultMode = 'card'
+  defaultMode = 'table'
 }: UnifiedViewToggleProps) {
   const [internalViewMode, setInternalViewMode] = usePersistedViewMode(
     storageKey || 'default',

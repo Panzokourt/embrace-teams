@@ -377,11 +377,11 @@ function AttentionPanel({
             <SectionHeader emoji="🔴" label="Εκπρόθεσμα" count={overdueTasks.length} open={overdueOpen} onToggle={() => setOverdueOpen(v => !v)} />
             {overdueOpen && (
               <>
-                <ScrollArea className="max-h-64">
+                <div className="max-h-72 overflow-y-auto">
                   <div className="divide-y divide-border/50">
                     {pagedOverdueTasks.map(task => <TaskMiniRow key={task.id} task={task} isOverdue />)}
                   </div>
-                </ScrollArea>
+                </div>
                 {overdueTasks.length > overduePagination.pageSize && (
                   <div className="px-4 md:px-6 border-t border-border/50">
                     <PaginationControls pagination={overduePagination} />
@@ -398,11 +398,11 @@ function AttentionPanel({
             <SectionHeader emoji="🟠" label="Υψηλή Προτεραιότητα" count={highPriorityTasks.length} open={highOpen} onToggle={() => setHighOpen(v => !v)} />
             {highOpen && (
               <>
-                <ScrollArea className="max-h-64">
+                <div className="max-h-72 overflow-y-auto">
                   <div className="divide-y divide-border/50">
                     {pagedHighPriorityTasks.map(task => <TaskMiniRow key={task.id} task={task} />)}
                   </div>
-                </ScrollArea>
+                </div>
                 {highPriorityTasks.length > highPriorityPagination.pageSize && (
                   <div className="px-4 md:px-6 border-t border-border/50">
                     <PaginationControls pagination={highPriorityPagination} />
@@ -419,7 +419,7 @@ function AttentionPanel({
             <div className="px-4 md:px-6 py-2 bg-muted/20 border-b border-border/50">
               <span className="text-xs font-semibold">🏢 Εσωτερική Έγκριση ({internalReviewTasks.length})</span>
             </div>
-            <ScrollArea className="max-h-64">
+            <div className="max-h-72 overflow-y-auto">
               <div className="divide-y divide-border/50">
                 {pagedInternalReviewTasks.map(task => (
                   <div key={task.id} className="flex items-center gap-3 px-4 md:px-6 py-3">
@@ -437,7 +437,7 @@ function AttentionPanel({
                   </div>
                 ))}
               </div>
-            </ScrollArea>
+            </div>
             {internalReviewTasks.length > internalReviewPagination.pageSize && (
               <div className="px-4 md:px-6 border-t border-border/50">
                 <PaginationControls pagination={internalReviewPagination} />
@@ -452,7 +452,7 @@ function AttentionPanel({
             <div className="px-4 md:px-6 py-2 bg-muted/20 border-b border-border/50">
               <span className="text-xs font-semibold">🤝 Έγκριση Πελάτη ({approvalTasks.length})</span>
             </div>
-            <ScrollArea className="max-h-64">
+            <div className="max-h-72 overflow-y-auto">
               <div className="divide-y divide-border/50">
                 {pagedApprovalTasks.map(task => (
                   <div key={task.id} className="flex items-center gap-3 px-4 md:px-6 py-3">
@@ -468,7 +468,7 @@ function AttentionPanel({
                   </div>
                 ))}
               </div>
-            </ScrollArea>
+            </div>
             {approvalTasks.length > approvalPagination.pageSize && (
               <div className="px-4 md:px-6 border-t border-border/50">
                 <PaginationControls pagination={approvalPagination} />

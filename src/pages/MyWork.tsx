@@ -1074,23 +1074,34 @@ export default function MyWork() {
         {/* My Projects */}
         <Card className="border-border/50">
           <CardHeader className="pb-3"><CardTitle className="text-base font-semibold">Τα Έργα μου</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="p-0">
             {myProjects.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Κανένα ενεργό έργο</p>
+              <p className="text-sm text-muted-foreground px-6 py-4">Κανένα ενεργό έργο</p>
             ) : (
-              myProjects.slice(0, 5).map(project => (
-                <Link key={project.id} to={`/projects/${project.id}`} className="flex items-center gap-3 group">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground group-hover:text-primary truncate">{project.name}</p>
-                    {project.client && <p className="text-xs text-muted-foreground truncate">{(project.client as any)?.name}</p>}
+              <>
+                <ScrollArea className="max-h-72">
+                  <div className="space-y-3 px-6 py-4">
+                    {pagedProjects.map(project => (
+                      <Link key={project.id} to={`/projects/${project.id}`} className="flex items-center gap-3 group">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground group-hover:text-primary truncate">{project.name}</p>
+                          {project.client && <p className="text-xs text-muted-foreground truncate">{(project.client as any)?.name}</p>}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Progress value={project.progress || 0} className="w-16 h-1.5" />
+                          <span className="text-xs text-muted-foreground w-8 text-right">{project.progress || 0}%</span>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </Link>
+                    ))}
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Progress value={project.progress || 0} className="w-16 h-1.5" />
-                    <span className="text-xs text-muted-foreground w-8 text-right">{project.progress || 0}%</span>
+                </ScrollArea>
+                {myProjects.length > projectsPagination.pageSize && (
+                  <div className="px-4 md:px-6 border-t border-border/50">
+                    <PaginationControls pagination={projectsPagination} />
                   </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                </Link>
-              ))
+                )}
+              </>
             )}
           </CardContent>
         </Card>

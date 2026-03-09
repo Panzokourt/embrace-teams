@@ -168,6 +168,7 @@ export function TasksTableView({
   onDelete,
   onInlineUpdate,
   onCreateSubtask,
+  onInlineCreateSubtask,
   onBulkUpdate,
   canManage,
   showProject = true

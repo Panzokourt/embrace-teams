@@ -177,17 +177,19 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
       const { data, error } = await query;
       if (error) throw error;
       
-      // Fetch assignee names separately
-      const tasksWithAssignees = await Promise.all((data || []).map(async (task) => {
-        if (task.assigned_to) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('full_name')
-            .eq('id', task.assigned_to)
-            .single();
-          return { ...task, assignee: profile };
-        }
-        return { ...task, assignee: null };
+      // Batch fetch assignee profiles in a single query
+      const assigneeIds = [...new Set((data || []).filter(t => t.assigned_to).map(t => t.assigned_to as string))];
+      let profilesMap = new Map<string, { full_name: string | null; avatar_url: string | null }>();
+      if (assigneeIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url')
+          .in('id', assigneeIds);
+        profilesMap = new Map((profiles || []).map(p => [p.id, { full_name: p.full_name, avatar_url: p.avatar_url }]));
+      }
+      const tasksWithAssignees = (data || []).map(task => ({
+        ...task,
+        assignee: task.assigned_to ? profilesMap.get(task.assigned_to) || null : null,
       }));
       
       setTasks(tasksWithAssignees as Task[]);

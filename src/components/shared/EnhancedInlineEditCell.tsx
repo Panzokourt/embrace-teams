@@ -162,11 +162,11 @@ export function EnhancedInlineEditCell({
           <SelectValue placeholder={placeholder}>
             {selectedOption ? (
               <div className="flex items-center gap-2">
-                {type === 'avatar-select' && selectedOption.avatar && (
+                {type === 'avatar-select' && (
                   <Avatar className="h-5 w-5">
-                    <AvatarImage src={selectedOption.avatar} />
-                    <AvatarFallback className="text-[10px]">
-                      {selectedOption.label.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                    {selectedOption.avatar && <AvatarImage src={selectedOption.avatar} />}
+                    <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                      {selectedOption.label.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                 )}
@@ -188,11 +188,11 @@ export function EnhancedInlineEditCell({
           {options.map(option => (
             <SelectItem key={option.value} value={option.value}>
               <div className="flex items-center gap-2">
-                {type === 'avatar-select' && option.avatar && (
+                {type === 'avatar-select' && (
                   <Avatar className="h-5 w-5">
-                    <AvatarImage src={option.avatar} />
-                    <AvatarFallback className="text-[10px]">
-                      {option.label.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                    {option.avatar && <AvatarImage src={option.avatar} />}
+                    <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                      {option.label.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                 )}

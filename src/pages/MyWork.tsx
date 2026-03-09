@@ -175,10 +175,10 @@ function SortableTaskRow({
         </span>
       </td>
       <td className="py-2.5 px-2">
-        <Badge variant={getStatusVariant(task.status)} className="text-[10px]">{getStatusLabel(task.status)}</Badge>
+        <span className="text-[10px] font-medium rounded-full px-2 py-0.5" style={getStatusStyle(task.status)}>{getStatusLabel(task.status)}</span>
       </td>
       <td className="py-2.5 px-2 hidden sm:table-cell">
-        <Badge variant={getPriorityColor(task.priority)} className="text-[10px]">{task.priority}</Badge>
+        <span className="text-[10px] font-medium rounded-full px-2 py-0.5" style={getPriorityStyle(task.priority)}>{PRIORITY_COLORS[task.priority]?.label || task.priority}</span>
       </td>
       <td className="py-2.5 px-2 w-10">
         {!activeTimer?.is_running || activeTimer.task_id !== task.id ? (

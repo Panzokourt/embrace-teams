@@ -335,7 +335,7 @@ function AttentionPanel({
           )}
         </div>
       </div>
-      <Badge variant={getStatusVariant(task.status)} className="text-[10px] hidden sm:flex">{getStatusLabel(task.status)}</Badge>
+      <span className="text-[10px] font-medium rounded-full px-2 py-0.5 hidden sm:flex" style={getStatusStyle(task.status)}>{getStatusLabel(task.status)}</span>
       {!activeTimer?.is_running || activeTimer.task_id !== task.id ? (
         <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-primary shrink-0" onClick={() => startTimer(task.id, task.project_id)}>
           <Play className="h-3.5 w-3.5" />

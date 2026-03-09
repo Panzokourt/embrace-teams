@@ -30,6 +30,8 @@ import {
 import { format, parseISO } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { MondayStatusCell } from '@/components/shared/MondayStatusCell';
+import { STATUS_COLORS } from '@/components/shared/mondayStyleConfig';
 import type { Tables } from '@/integrations/supabase/types';
 
 type TaskStatus = 'todo' | 'in_progress' | 'review' | 'completed';

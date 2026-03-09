@@ -78,6 +78,12 @@ interface Profile {
   avatar_url?: string | null;
 }
 
+interface TaskAssignee {
+  user_id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+}
+
 interface Task {
   id: string;
   title: string;
@@ -100,6 +106,7 @@ interface Task {
   created_by: string | null;
   project?: { name: string } | null;
   assignee?: { full_name: string | null; avatar_url?: string | null } | null;
+  assignees?: TaskAssignee[];
 }
 
 const statusConfig: Record<TaskStatus, { icon: React.ReactNode; label: string; className: string }> = {
@@ -188,9 +195,48 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
           .in('id', assigneeIds);
         profilesMap = new Map((profiles || []).map(p => [p.id, { full_name: p.full_name, avatar_url: p.avatar_url }]));
       }
+      // Batch fetch task_assignees
+      const taskIds = (data || []).map(t => t.id);
+      let assigneesMap = new Map<string, TaskAssignee[]>();
+      if (taskIds.length > 0) {
+        const { data: taskAssignees } = await supabase
+          .from('task_assignees')
+          .select('task_id, user_id')
+          .in('task_id', taskIds);
+        
+        // Collect all unique user IDs from task_assignees
+        const allAssigneeIds = [...new Set([
+          ...assigneeIds,
+          ...(taskAssignees || []).map(ta => ta.user_id)
+        ])];
+        
+        // Re-fetch all needed profiles
+        if (allAssigneeIds.length > 0) {
+          const { data: allProfiles } = await supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url')
+            .in('id', allAssigneeIds);
+          profilesMap = new Map((allProfiles || []).map(p => [p.id, { full_name: p.full_name, avatar_url: p.avatar_url }]));
+        }
+        
+        // Group assignees by task
+        for (const ta of (taskAssignees || [])) {
+          const profile = profilesMap.get(ta.user_id);
+          const assignee: TaskAssignee = {
+            user_id: ta.user_id,
+            full_name: profile?.full_name || null,
+            avatar_url: profile?.avatar_url || null,
+          };
+          const existing = assigneesMap.get(ta.task_id) || [];
+          existing.push(assignee);
+          assigneesMap.set(ta.task_id, existing);
+        }
+      }
+
       const tasksWithAssignees = (data || []).map(task => ({
         ...task,
         assignee: task.assigned_to ? profilesMap.get(task.assigned_to) || null : null,
+        assignees: assigneesMap.get(task.id) || [],
       }));
       
       setTasks(tasksWithAssignees as Task[]);
@@ -638,6 +684,39 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
     { id: 'completed' as TaskStatus, label: 'Ολοκληρώθηκε', icon: <CheckCircle2 className="h-5 w-5 text-success" /> },
   ];
 
+  const handleAssigneeAdd = async (taskId: string, userId: string) => {
+    try {
+      const { error } = await supabase.from('task_assignees').insert({ task_id: taskId, user_id: userId });
+      if (error) throw error;
+      const profile = users.find(u => u.id === userId);
+      setTasks(prev => prev.map(t => {
+        if (t.id !== taskId) return t;
+        const existing = t.assignees || [];
+        if (existing.some(a => a.user_id === userId)) return t;
+        return { ...t, assignees: [...existing, { user_id: userId, full_name: profile?.full_name || null, avatar_url: profile?.avatar_url || null }] };
+      }));
+      toast.success('Προστέθηκε!');
+    } catch (error) {
+      console.error('Error adding assignee:', error);
+      toast.error('Σφάλμα');
+    }
+  };
+
+  const handleAssigneeRemove = async (taskId: string, userId: string) => {
+    try {
+      const { error } = await supabase.from('task_assignees').delete().eq('task_id', taskId).eq('user_id', userId);
+      if (error) throw error;
+      setTasks(prev => prev.map(t => {
+        if (t.id !== taskId) return t;
+        return { ...t, assignees: (t.assignees || []).filter(a => a.user_id !== userId) };
+      }));
+      toast.success('Αφαιρέθηκε!');
+    } catch (error) {
+      console.error('Error removing assignee:', error);
+      toast.error('Σφάλμα');
+    }
+  };
+
   const renderTableView = () => (
     <TasksTableView
       tasks={filteredTasks}
@@ -648,6 +727,8 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
       onInlineUpdate={handleInlineUpdate}
       onInlineCreateSubtask={handleInlineCreateSubtask}
       onBulkUpdate={handleBulkUpdate}
+      onAssigneeAdd={handleAssigneeAdd}
+      onAssigneeRemove={handleAssigneeRemove}
       canManage={canManage}
       showProject={!projectId}
     />

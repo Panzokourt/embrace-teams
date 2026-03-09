@@ -448,8 +448,12 @@ export function TasksTableView({
   };
 
   const handleAddSubtask = async (parentId: string) => {
-    if (!newSubtaskTitle.trim() || !onCreateSubtask) return;
-    onCreateSubtask(parentId);
+    if (!newSubtaskTitle.trim()) return;
+    if (onInlineCreateSubtask) {
+      await onInlineCreateSubtask(parentId, newSubtaskTitle.trim());
+    } else if (onCreateSubtask) {
+      onCreateSubtask(parentId);
+    }
     setAddingSubtaskTo(null);
     setNewSubtaskTitle('');
   };

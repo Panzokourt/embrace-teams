@@ -1043,20 +1043,29 @@ export default function MyWork() {
       {upcomingTasks.length > 0 && (
         <Card className="border-border/50">
           <CardHeader className="pb-3"><CardTitle className="text-base font-semibold">Επερχόμενα</CardTitle></CardHeader>
-          <CardContent className="p-0 overflow-x-auto">
-            <table className="w-full text-sm">
-              <TaskTableHeader />
-              <tbody>
-                {upcomingTasks.map(task => (
-                  <SortableTaskRow
-                    key={task.id} task={task} today={today} showDate
-                    onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
-                    activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
-                    onFlagToggle={toggleFlagPriority}
-                  />
-                ))}
-              </tbody>
-            </table>
+          <CardContent className="p-0">
+            <ScrollArea className="max-h-[32rem]">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <TaskTableHeader />
+                  <tbody>
+                    {pagedUpcomingTasks.map(task => (
+                      <SortableTaskRow
+                        key={task.id} task={task} today={today} showDate
+                        onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
+                        activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
+                        onFlagToggle={toggleFlagPriority}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </ScrollArea>
+            {upcomingTasks.length > upcomingPagination.pageSize && (
+              <div className="px-4 md:px-6 border-t border-border/50">
+                <PaginationControls pagination={upcomingPagination} />
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

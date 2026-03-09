@@ -460,19 +460,24 @@ export function TasksTableView({
 
   const visibleColumnCount = columns.filter(c => c.visible).length;
 
-  const renderTaskRow = (task: Task, level = 0) => {
+  const renderTaskRow = (task: Task, level = 0, rowIndex = 0) => {
     const children = childTasksMap.get(task.id) || [];
     const hasChildren = children.length > 0;
     const isExpanded = expandedTasks.has(task.id);
     const depCount = dependencyCountMap.get(task.id) || 0;
     const dueDateInfo = formatDueDate(task.due_date);
     const isSelected = selectedTasks.has(task.id);
+    const isStriped = rowIndex % 2 === 1;
 
     return (
       <>
         <TableRow 
           key={task.id} 
-          className={cn("group hover:bg-muted/50 cursor-pointer", isSelected && "bg-primary/5")}
+          className={cn(
+            "group cursor-pointer border-b border-border/60 hover:bg-muted/50",
+            isSelected && "bg-primary/5",
+            isStriped && !isSelected && "bg-muted/20"
+          )}
           onClick={(e) => {
             // Don't navigate if clicking on interactive elements
             const target = e.target as HTMLElement;

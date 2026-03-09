@@ -8,28 +8,28 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Tooltip,
   TooltipTrigger,
-  TooltipContent,
-} from '@/components/ui/tooltip';
+  TooltipContent } from
+'@/components/ui/tooltip';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+  DropdownMenuTrigger } from
+'@/components/ui/dropdown-menu';
 import {
   Popover,
   PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+  PopoverTrigger } from
+'@/components/ui/popover';
 import {
   LayoutDashboard, LayoutList, FileText, FolderKanban, CheckSquare, Users,
   DollarSign, Settings, LogOut, Zap, ChevronLeft, ChevronRight, UserCog, Building2,
   Moon, Sun, CalendarDays, FileArchive, Timer, FileStack, BarChart3,
   Plus, Palette, Monitor, Globe, Calendar, MessageSquare, BookUser,
-  Briefcase, Mail, Trophy, ShieldCheck, BookOpen, GitBranch,
-} from 'lucide-react';
+  Briefcase, Mail, Trophy, ShieldCheck, BookOpen, GitBranch } from
+'lucide-react';
 import { briefDefinitions, getBriefDefinition } from '@/components/blueprints/briefDefinitions';
 import { BriefFormDialog } from '@/components/blueprints/BriefFormDialog';
 import { PermissionType } from '@/contexts/AuthContext';
@@ -42,7 +42,7 @@ import CompanySwitcher from './CompanySwitcher';
 interface NavItem {
   title: string;
   href: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentType<{className?: string;}>;
   permission?: PermissionType;
   adminOnly?: boolean;
 }
@@ -51,67 +51,67 @@ type CategoryId = 'overview' | 'work' | 'clients' | 'communication' | 'revenue' 
 
 interface Category {
   id: CategoryId;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentType<{className?: string;}>;
   label: string;
   routePrefixes: string[];
 }
 
 const categories: Category[] = [
-  { id: 'overview', icon: LayoutDashboard, label: 'Overview', routePrefixes: ['/my-work', '/', '/dashboard'] },
-  { id: 'work', icon: Briefcase, label: 'Work', routePrefixes: ['/work', '/projects', '/tasks', '/calendar', '/files', '/blueprints', '/workflows', '/workflows'] },
-  { id: 'clients', icon: Building2, label: 'Clients', routePrefixes: ['/clients', '/contacts'] },
-  { id: 'communication', icon: MessageSquare, label: 'Communication', routePrefixes: ['/chat', '/inbox'] },
-  { id: 'revenue', icon: DollarSign, label: 'Revenue', routePrefixes: ['/financials', '/pricing'] },
-  { id: 'operations', icon: Users, label: 'Operations', routePrefixes: ['/hr', '/timesheets', '/knowledge', '/operations'] },
-  { id: 'intelligence', icon: BarChart3, label: 'Intelligence', routePrefixes: ['/reports', '/brain'] },
-  { id: 'governance', icon: ShieldCheck, label: 'Governance', routePrefixes: ['/governance'] },
-  { id: 'settings', icon: Settings, label: 'Settings', routePrefixes: ['/settings'] },
-];
+{ id: 'overview', icon: LayoutDashboard, label: 'Overview', routePrefixes: ['/my-work', '/', '/dashboard'] },
+{ id: 'work', icon: Briefcase, label: 'Work', routePrefixes: ['/work', '/projects', '/tasks', '/calendar', '/files', '/blueprints', '/workflows', '/workflows'] },
+{ id: 'clients', icon: Building2, label: 'Clients', routePrefixes: ['/clients', '/contacts'] },
+{ id: 'communication', icon: MessageSquare, label: 'Communication', routePrefixes: ['/chat', '/inbox'] },
+{ id: 'revenue', icon: DollarSign, label: 'Revenue', routePrefixes: ['/financials', '/pricing'] },
+{ id: 'operations', icon: Users, label: 'Operations', routePrefixes: ['/hr', '/timesheets', '/knowledge', '/operations'] },
+{ id: 'intelligence', icon: BarChart3, label: 'Intelligence', routePrefixes: ['/reports', '/brain'] },
+{ id: 'governance', icon: ShieldCheck, label: 'Governance', routePrefixes: ['/governance'] },
+{ id: 'settings', icon: Settings, label: 'Settings', routePrefixes: ['/settings'] }];
+
 
 const categoryNavItems: Record<CategoryId, NavItem[]> = {
   overview: [
-    { title: 'Executive', href: '/', icon: LayoutDashboard },
-    { title: 'Finance', href: '/dashboard/finance', icon: DollarSign },
-    { title: 'Operations', href: '/dashboard/operations', icon: Users },
-    { title: 'Sales & Pipeline', href: '/dashboard/sales', icon: BarChart3 },
-  ],
+  { title: 'Executive', href: '/', icon: LayoutDashboard },
+  { title: 'Finance', href: '/dashboard/finance', icon: DollarSign },
+  { title: 'Operations', href: '/dashboard/operations', icon: Users },
+  { title: 'Sales & Pipeline', href: '/dashboard/sales', icon: BarChart3 }],
+
   work: [],
   clients: [
-    { title: 'All Clients', href: '/clients', icon: Building2, permission: 'clients.view' },
-    { title: 'Contacts', href: '/contacts', icon: BookUser },
-  ],
+  { title: 'All Clients', href: '/clients', icon: Building2, permission: 'clients.view' },
+  { title: 'Contacts', href: '/contacts', icon: BookUser }],
+
   communication: [
-    { title: 'Chat', href: '/chat', icon: MessageSquare },
-    { title: 'Inbox', href: '/inbox', icon: Mail },
-  ],
+  { title: 'Chat', href: '/chat', icon: MessageSquare },
+  { title: 'Inbox', href: '/inbox', icon: Mail }],
+
   revenue: [
-    { title: 'Dashboard', href: '/financials?tab=dashboard', icon: LayoutDashboard, permission: 'financials.view' },
-    { title: 'Υπηρεσίες & Τιμολόγηση', href: '/pricing', icon: FileText, permission: 'financials.view' },
-    { title: 'Contracts', href: '/financials?tab=contracts', icon: FileText, permission: 'financials.view' },
-    { title: 'Invoices', href: '/financials?tab=invoices', icon: FileText, permission: 'financials.view' },
-    { title: 'Expenses', href: '/financials?tab=expenses', icon: DollarSign, permission: 'financials.view' },
-    { title: 'Profitability', href: '/financials?tab=reports', icon: BarChart3, permission: 'financials.view' },
-  ],
+  { title: 'Dashboard', href: '/financials?tab=dashboard', icon: LayoutDashboard, permission: 'financials.view' },
+  { title: 'Υπηρεσίες & Τιμολόγηση', href: '/pricing', icon: FileText, permission: 'financials.view' },
+  { title: 'Contracts', href: '/financials?tab=contracts', icon: FileText, permission: 'financials.view' },
+  { title: 'Invoices', href: '/financials?tab=invoices', icon: FileText, permission: 'financials.view' },
+  { title: 'Expenses', href: '/financials?tab=expenses', icon: DollarSign, permission: 'financials.view' },
+  { title: 'Profitability', href: '/financials?tab=reports', icon: BarChart3, permission: 'financials.view' }],
+
   operations: [
-    { title: 'Team & HR', href: '/hr', icon: UserCog },
-    { title: 'Timesheets', href: '/timesheets', icon: Timer },
-    { title: 'Knowledge Base', href: '/knowledge', icon: BookOpen },
-  ],
+  { title: 'Team & HR', href: '/hr', icon: UserCog },
+  { title: 'Timesheets', href: '/timesheets', icon: Timer },
+  { title: 'Knowledge Base', href: '/knowledge', icon: BookOpen }],
+
   intelligence: [
-    { title: 'Reports Hub', href: '/reports', icon: BarChart3, permission: 'financials.view' },
-    { title: 'Brain', href: '/brain', icon: Zap },
-  ],
+  { title: 'Reports Hub', href: '/reports', icon: BarChart3, permission: 'financials.view' },
+  { title: 'Brain', href: '/brain', icon: Zap }],
+
   governance: [
-    { title: 'Dashboard', href: '/governance', icon: ShieldCheck },
-    { title: 'Digital Assets', href: '/governance/assets', icon: Globe },
-    { title: 'Access Control', href: '/governance/access', icon: UserCog },
-    { title: 'Vault', href: '/governance/vault', icon: FileArchive },
-    { title: 'Compliance', href: '/governance/compliance', icon: FileText },
-  ],
+  { title: 'Dashboard', href: '/governance', icon: ShieldCheck },
+  { title: 'Digital Assets', href: '/governance/assets', icon: Globe },
+  { title: 'Access Control', href: '/governance/access', icon: UserCog },
+  { title: 'Vault', href: '/governance/vault', icon: FileArchive },
+  { title: 'Compliance', href: '/governance/compliance', icon: FileText }],
+
   settings: [
-    { title: 'General', href: '/settings', icon: Settings, permission: 'settings.company' },
-    { title: 'Organization', href: '/settings/organization', icon: Building2, permission: 'settings.company' },
-  ],
+  { title: 'General', href: '/settings', icon: Settings, permission: 'settings.company' },
+  { title: 'Organization', href: '/settings/organization', icon: Building2, permission: 'settings.company' }]
+
 };
 
 function detectCategory(pathname: string): CategoryId {
@@ -127,21 +127,21 @@ function detectCategory(pathname: string): CategoryId {
   return 'overview';
 }
 
-const briefIcons: Record<string, React.ComponentType<{ className?: string }>> = {
-  Palette, Monitor, FileText, Globe, Calendar, MessageSquare,
+const briefIcons: Record<string, React.ComponentType<{className?: string;}>> = {
+  Palette, Monitor, FileText, Globe, Calendar, MessageSquare
 };
 
 export default function AppSidebar({
   collapsed,
   onToggleCollapse,
   forceCollapsed,
-  isMobileSheet,
-}: {
-  collapsed: boolean;
-  onToggleCollapse: () => void;
-  forceCollapsed?: boolean;
-  isMobileSheet?: boolean;
-}) {
+  isMobileSheet
+
+
+
+
+
+}: {collapsed: boolean;onToggleCollapse: () => void;forceCollapsed?: boolean;isMobileSheet?: boolean;}) {
   const location = useLocation();
   const navigate = useNavigate();
   const { profile, roles, signOut, isAdmin, isManager, isClient, hasPermission, isSuperAdmin, isCompanyAdmin } = useAuth();
@@ -182,7 +182,7 @@ export default function AppSidebar({
 
   const handleCategoryClick = useCallback((catId: CategoryId) => {
     if (isEffectivelyCollapsed && !isMobileSheet) {
-      setFlyoutCategory(prev => prev === catId ? null : catId);
+      setFlyoutCategory((prev) => prev === catId ? null : catId);
       setActiveCategory(catId);
     } else {
       setActiveCategory(catId);
@@ -216,70 +216,70 @@ export default function AppSidebar({
   }, [flyoutCategory]);
 
   // ─── Dark Floated Icon Rail ───
-  const IconRail = ({ isMobile = false }: { isMobile?: boolean }) => (
-    <div
-      className={cn(
-        "flex flex-col items-center py-3 gap-1 shrink-0 w-12",
-        isMobile
-          ? "bg-card border-r border-border/30"
-          : "my-2 ml-2 rounded-2xl bg-[#1A1A1A] shadow-lg"
-      )}
-      style={!isMobile ? { height: 'calc(100% - 16px)' } : undefined}
-      onMouseEnter={handleFlyoutEnter}
-      onMouseLeave={handleFlyoutLeave}
-    >
+  const IconRail = ({ isMobile = false }: {isMobile?: boolean;}) =>
+  <div
+    className={cn(
+      "flex flex-col items-center py-3 gap-1 shrink-0 w-12",
+      isMobile ?
+      "bg-card border-r border-border/30" :
+      "my-2 ml-2 rounded-2xl bg-[#1A1A1A] shadow-lg"
+    )}
+    style={!isMobile ? { height: 'calc(100% - 16px)' } : undefined}
+    onMouseEnter={handleFlyoutEnter}
+    onMouseLeave={handleFlyoutLeave}>
+    
       {/* Logo */}
       <div className="mb-2 flex flex-col items-center gap-1">
         <img src={olsenyLogo} alt="Olseny" className="h-9 w-9 rounded-md" />
-        {isEffectivelyCollapsed && !isMobile && (
-          <Tooltip delayDuration={300}>
+        {isEffectivelyCollapsed && !isMobile &&
+      <Tooltip delayDuration={300}>
             <TooltipTrigger asChild>
               <button
-                onClick={onToggleCollapse}
-                className="flex items-center justify-center w-7 h-7 rounded-md text-white/50 hover:text-white hover:bg-white/10 transition-all duration-200"
-              >
+            onClick={onToggleCollapse}
+            className="flex items-center justify-center w-7 h-7 rounded-md text-white/50 hover:text-white hover:bg-white/10 transition-all duration-200">
+            
                 <ChevronRight className="h-3.5 w-3.5" />
               </button>
             </TooltipTrigger>
             <TooltipContent side="right" sideOffset={8}>Expand sidebar</TooltipContent>
           </Tooltip>
-        )}
+      }
       </div>
 
       {/* Category icons */}
       <div className="flex-1 flex flex-col items-center gap-0.5">
         {categories.map((cat) => {
-          const isActive = (isEffectivelyCollapsed ? flyoutCategory === cat.id : activeCategory === cat.id) ||
-            (!flyoutCategory && activeCategory === cat.id);
-          return (
-            <Tooltip key={cat.id} delayDuration={isEffectivelyCollapsed ? 600 : 300}>
+        const isActive = (isEffectivelyCollapsed ? flyoutCategory === cat.id : activeCategory === cat.id) ||
+        !flyoutCategory && activeCategory === cat.id;
+        return (
+          <Tooltip key={cat.id} delayDuration={isEffectivelyCollapsed ? 600 : 300}>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => handleCategoryClick(cat.id)}
-                  className={cn(
-                    "relative flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200",
-                    isMobile
-                      ? (isActive ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/60")
-                      : (isActive ? "bg-white/15 text-white" : "text-white/50 hover:text-white hover:bg-white/10")
-                  )}
-                >
-                  {isActive && !isMobile && (
-                    <span className="absolute left-0.5 top-1/2 -translate-y-1/2 w-[3px] h-3 rounded-full bg-primary" />
-                  )}
-                  {isActive && isMobile && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-full bg-primary" />
-                  )}
+                onClick={() => handleCategoryClick(cat.id)}
+                className={cn(
+                  "relative flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200",
+                  isMobile ?
+                  isActive ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/60" :
+                  isActive ? "bg-white/15 text-white" : "text-white/50 hover:text-white hover:bg-white/10"
+                )}>
+                
+                  {isActive && !isMobile &&
+                <span className="absolute left-0.5 top-1/2 -translate-y-1/2 w-[3px] h-3 rounded-full bg-primary" />
+                }
+                  {isActive && isMobile &&
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-full bg-primary" />
+                }
                   <cat.icon className="h-[18px] w-[18px]" />
                 </button>
               </TooltipTrigger>
-              {!flyoutCategory && isEffectivelyCollapsed && (
-                <TooltipContent side="right" sideOffset={8}>
+              {!flyoutCategory && isEffectivelyCollapsed &&
+            <TooltipContent side="right" sideOffset={8}>
                   {cat.label}
                 </TooltipContent>
-              )}
-            </Tooltip>
-          );
-        })}
+            }
+            </Tooltip>);
+
+      })}
       </div>
 
       {/* Bottom actions */}
@@ -291,22 +291,22 @@ export default function AppSidebar({
               <CompanySwitcher compact iconOnly={isMobile ? false : true} />
             </div>
           </TooltipTrigger>
-          {!isMobile && (
-            <TooltipContent side="right" sideOffset={8}>Εταιρεία</TooltipContent>
-          )}
+          {!isMobile &&
+        <TooltipContent side="right" sideOffset={8}>Εταιρεία</TooltipContent>
+        }
         </Tooltip>
         {/* Secretary AI */}
         <Tooltip delayDuration={300}>
           <TooltipTrigger asChild>
             <button
-              onClick={() => { navigate('/secretary'); handleNavClick(); }}
-              className={cn(
-                "flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200",
-                isMobile
-                  ? "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                  : "text-white/50 hover:text-white hover:bg-white/10"
-              )}
-            >
+            onClick={() => {navigate('/secretary');handleNavClick();}}
+            className={cn("flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 bg-blue-400 hover:bg-blue-300",
+
+            isMobile ?
+            "text-muted-foreground hover:text-foreground hover:bg-muted/60" :
+            "text-white/50 hover:text-white hover:bg-white/10"
+            )}>
+            
               <Zap className="h-[18px] w-[18px]" />
             </button>
           </TooltipTrigger>
@@ -319,39 +319,39 @@ export default function AppSidebar({
             <TooltipTrigger asChild>
               <PopoverTrigger asChild>
                 <button
-                  className={cn(
-                    "flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200",
-                    isMobile
-                      ? "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                      : "text-white/50 hover:text-white hover:bg-white/10",
-                    quickOpen && "[&>svg]:rotate-45"
-                  )}
-                >
-                  <Plus className="h-[18px] w-[18px] transition-transform duration-200" />
+                className={cn("flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 border border-primary",
+
+                isMobile ?
+                "text-muted-foreground hover:text-foreground hover:bg-muted/60" :
+                "text-white/50 hover:text-white hover:bg-white/10",
+                quickOpen && "[&>svg]:rotate-45"
+                )}>
+                
+                  <Plus className="h-[18px] w-[18px] transition-transform duration-200 text-lime-300" />
                 </button>
               </PopoverTrigger>
             </TooltipTrigger>
-            {!quickOpen && (
-              <TooltipContent side="right" sideOffset={8}>Quick Actions</TooltipContent>
-            )}
+            {!quickOpen &&
+          <TooltipContent side="right" sideOffset={8}>Quick Actions</TooltipContent>
+          }
           </Tooltip>
           <PopoverContent side="right" align="end" className="w-56 p-2" sideOffset={8}>
             <div className="space-y-1">
-              <button onClick={() => { navigate('/projects?new=true'); setQuickOpen(false); handleNavClick(); }} className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted transition-colors text-left">
+              <button onClick={() => {navigate('/projects?new=true');setQuickOpen(false);handleNavClick();}} className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted transition-colors text-left">
                 <FolderKanban className="h-4 w-4 text-muted-foreground shrink-0" /> Νέο Έργο
               </button>
-              <button onClick={() => { navigate('/tasks?new=true'); setQuickOpen(false); handleNavClick(); }} className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted transition-colors text-left">
+              <button onClick={() => {navigate('/tasks?new=true');setQuickOpen(false);handleNavClick();}} className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted transition-colors text-left">
                 <CheckSquare className="h-4 w-4 text-muted-foreground shrink-0" /> Νέο Task
               </button>
               <div className="h-px bg-border my-1" />
-              {briefDefinitions.map(def => {
-                const Icon = briefIcons[def.icon] || FileText;
-                return (
-                  <button key={def.type} onClick={() => { setSelectedBriefType(def.type); setQuickOpen(false); handleNavClick(); }} className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted transition-colors text-left">
+              {briefDefinitions.map((def) => {
+              const Icon = briefIcons[def.icon] || FileText;
+              return (
+                <button key={def.type} onClick={() => {setSelectedBriefType(def.type);setQuickOpen(false);handleNavClick();}} className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted transition-colors text-left">
                     <Icon className="h-4 w-4 text-muted-foreground shrink-0" /> {def.label}
-                  </button>
-                );
-              })}
+                  </button>);
+
+            })}
             </div>
           </PopoverContent>
         </Popover>
@@ -360,14 +360,14 @@ export default function AppSidebar({
         <Tooltip delayDuration={300}>
           <TooltipTrigger asChild>
             <button
-              onClick={toggleTheme}
-              className={cn(
-                "flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200",
-                isMobile
-                  ? "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                  : "text-white/50 hover:text-white hover:bg-white/10"
-              )}
-            >
+            onClick={toggleTheme}
+            className={cn(
+              "flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200",
+              isMobile ?
+              "text-muted-foreground hover:text-foreground hover:bg-muted/60" :
+              "text-white/50 hover:text-white hover:bg-white/10"
+            )}>
+            
               {resolvedTheme === 'dark' ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
             </button>
           </TooltipTrigger>
@@ -385,9 +385,9 @@ export default function AppSidebar({
                   <Avatar className={cn("h-7 w-7", isMobile ? "ring-2 ring-border/50" : "ring-2 ring-white/20")}>
                     <AvatarImage src={profile?.avatar_url || undefined} />
                     <AvatarFallback className={cn(
-                      "text-[10px] font-medium",
-                      isMobile ? "bg-primary/10 text-primary" : "bg-white/15 text-white"
-                    )}>
+                    "text-[10px] font-medium",
+                    isMobile ? "bg-primary/10 text-primary" : "bg-white/15 text-white"
+                  )}>
                       {getInitials(profile?.full_name)}
                     </AvatarFallback>
                   </Avatar>
@@ -412,70 +412,70 @@ export default function AppSidebar({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </div>
-  );
+    </div>;
+
 
   // ─── Category Nav Panel Content (no Secretary, no Quick Actions, no UserMenu) ───
-  const CategoryPanelContent = ({ isMobile = false, onItemClick }: { isMobile?: boolean; onItemClick?: () => void }) => (
-    <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+  const CategoryPanelContent = ({ isMobile = false, onItemClick }: {isMobile?: boolean;onItemClick?: () => void;}) =>
+  <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
       {/* Header */}
       <div className="p-3 flex items-center justify-between shrink-0">
         <span className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-widest truncate">
-          {categories.find(c => c.id === (flyoutCategory || activeCategory))?.label}
+          {categories.find((c) => c.id === (flyoutCategory || activeCategory))?.label}
         </span>
-        {!isMobile && !isEffectivelyCollapsed && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-all duration-200"
-            onClick={onToggleCollapse}
-          >
+        {!isMobile && !isEffectivelyCollapsed &&
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-all duration-200"
+        onClick={onToggleCollapse}>
+        
             <ChevronLeft className="h-4 w-4" />
           </Button>
-        )}
+      }
       </div>
 
       <ActiveTimerIndicator collapsed={false} />
 
       {/* Nav items */}
       <nav className="flex-1 px-2 py-1 space-y-0.5 overflow-y-auto scrollbar-thin">
-        {isClient && !isAdmin && !isManager ? (
-          <>
-            <SidebarLink to="/" icon={<LayoutDashboard className="h-[18px] w-[18px]" />} label="Τα Έργα μου" active={location.pathname === '/'} collapsed={false} onClick={() => { onItemClick?.(); }} />
-            <SidebarLink to="/tasks" icon={<CheckSquare className="h-[18px] w-[18px]" />} label="Παραδοτέα" active={location.pathname === '/tasks'} collapsed={false} onClick={() => { onItemClick?.(); }} />
-          </>
-        ) : (
-          <>
-            {(flyoutCategory || activeCategory) === 'work' ? (
-              <>
-                <SidebarLink to="/my-work" icon={<LayoutList className="h-[18px] w-[18px]" />} label="My Work" active={location.pathname === '/my-work'} collapsed={false} onClick={() => { onItemClick?.(); }} />
+        {isClient && !isAdmin && !isManager ?
+      <>
+            <SidebarLink to="/" icon={<LayoutDashboard className="h-[18px] w-[18px]" />} label="Τα Έργα μου" active={location.pathname === '/'} collapsed={false} onClick={() => {onItemClick?.();}} />
+            <SidebarLink to="/tasks" icon={<CheckSquare className="h-[18px] w-[18px]" />} label="Παραδοτέα" active={location.pathname === '/tasks'} collapsed={false} onClick={() => {onItemClick?.();}} />
+          </> :
+
+      <>
+            {(flyoutCategory || activeCategory) === 'work' ?
+        <>
+                <SidebarLink to="/my-work" icon={<LayoutList className="h-[18px] w-[18px]" />} label="My Work" active={location.pathname === '/my-work'} collapsed={false} onClick={() => {onItemClick?.();}} />
                 <SidebarNavGroup id="work" icon={<Briefcase className="h-[18px] w-[18px]" />} label="Projects" collapsed={false} isActive={location.pathname === '/work' || location.pathname.startsWith('/projects/') || location.pathname.startsWith('/tasks/')} defaultOpen>
-                  <SidebarSubLink to="/work?tab=projects" icon={<FolderKanban className="h-4 w-4" />} label="Projects" active={location.pathname === '/work' && (!location.search || location.search.includes('tab=projects'))} onClick={() => { navigate('/work?tab=projects'); onItemClick?.(); }} />
+                  <SidebarSubLink to="/work?tab=projects" icon={<FolderKanban className="h-4 w-4" />} label="Projects" active={location.pathname === '/work' && (!location.search || location.search.includes('tab=projects'))} onClick={() => {navigate('/work?tab=projects');onItemClick?.();}} />
                   <SidebarProjectTree collapsed={false} />
-                  <SidebarSubLink to="/work?tab=tasks" icon={<CheckSquare className="h-4 w-4" />} label="Tasks" active={location.pathname === '/work' && location.search.includes('tab=tasks')} onClick={() => { navigate('/work?tab=tasks'); onItemClick?.(); }} />
+                  <SidebarSubLink to="/work?tab=tasks" icon={<CheckSquare className="h-4 w-4" />} label="Tasks" active={location.pathname === '/work' && location.search.includes('tab=tasks')} onClick={() => {navigate('/work?tab=tasks');onItemClick?.();}} />
                 </SidebarNavGroup>
-                <SidebarLink to="/campaigns" icon={<FileText className="h-[18px] w-[18px]" />} label="Campaigns" active={location.pathname === '/campaigns'} collapsed={false} onClick={() => { onItemClick?.(); }} />
-                <SidebarLink to="/calendar" icon={<CalendarDays className="h-[18px] w-[18px]" />} label="Calendar" active={location.pathname === '/calendar'} collapsed={false} onClick={() => { onItemClick?.(); }} />
-                <SidebarLink to="/backlog" icon={<FileStack className="h-[18px] w-[18px]" />} label="Backlog" active={location.pathname === '/backlog'} collapsed={false} onClick={() => { onItemClick?.(); }} />
-                <SidebarLink to="/blueprints" icon={<FileStack className="h-[18px] w-[18px]" />} label="Templates" active={location.pathname === '/blueprints'} collapsed={false} onClick={() => { onItemClick?.(); }} />
-                <SidebarLink to="/files" icon={<FileArchive className="h-[18px] w-[18px]" />} label="Files" active={location.pathname === '/files'} collapsed={false} onClick={() => { onItemClick?.(); }} />
-                <SidebarLink to="/workflows" icon={<GitBranch className="h-[18px] w-[18px]" />} label="Workflows" active={location.pathname === '/workflows'} collapsed={false} onClick={() => { onItemClick?.(); }} />
-              </>
-            ) : (
-              categoryNavItems[flyoutCategory || activeCategory]?.filter(canAccess).map((item) => {
-                const isActiveItem = item.href.includes('?')
-                  ? location.pathname + location.search === item.href
-                  : location.pathname === item.href;
-                return (
-                  <SidebarLink key={item.href} to={item.href} icon={<item.icon className="h-[18px] w-[18px]" />} label={item.title} active={isActiveItem} collapsed={false} onClick={() => { onItemClick?.(); }} />
-                );
-              })
-            )}
+                <SidebarLink to="/campaigns" icon={<FileText className="h-[18px] w-[18px]" />} label="Campaigns" active={location.pathname === '/campaigns'} collapsed={false} onClick={() => {onItemClick?.();}} />
+                <SidebarLink to="/calendar" icon={<CalendarDays className="h-[18px] w-[18px]" />} label="Calendar" active={location.pathname === '/calendar'} collapsed={false} onClick={() => {onItemClick?.();}} />
+                <SidebarLink to="/backlog" icon={<FileStack className="h-[18px] w-[18px]" />} label="Backlog" active={location.pathname === '/backlog'} collapsed={false} onClick={() => {onItemClick?.();}} />
+                <SidebarLink to="/blueprints" icon={<FileStack className="h-[18px] w-[18px]" />} label="Templates" active={location.pathname === '/blueprints'} collapsed={false} onClick={() => {onItemClick?.();}} />
+                <SidebarLink to="/files" icon={<FileArchive className="h-[18px] w-[18px]" />} label="Files" active={location.pathname === '/files'} collapsed={false} onClick={() => {onItemClick?.();}} />
+                <SidebarLink to="/workflows" icon={<GitBranch className="h-[18px] w-[18px]" />} label="Workflows" active={location.pathname === '/workflows'} collapsed={false} onClick={() => {onItemClick?.();}} />
+              </> :
+
+        categoryNavItems[flyoutCategory || activeCategory]?.filter(canAccess).map((item) => {
+          const isActiveItem = item.href.includes('?') ?
+          location.pathname + location.search === item.href :
+          location.pathname === item.href;
+          return (
+            <SidebarLink key={item.href} to={item.href} icon={<item.icon className="h-[18px] w-[18px]" />} label={item.title} active={isActiveItem} collapsed={false} onClick={() => {onItemClick?.();}} />);
+
+        })
+        }
           </>
-        )}
+      }
       </nav>
-    </div>
-  );
+    </div>;
+
 
   // Mobile sheet rendering
   if (isMobileSheet) {
@@ -485,11 +485,11 @@ export default function AppSidebar({
           <IconRail isMobile />
           <CategoryPanelContent isMobile />
         </div>
-        {selectedDef && (
-          <BriefFormDialog open={true} onOpenChange={() => setSelectedBriefType(null)} definition={selectedDef} />
-        )}
-      </>
-    );
+        {selectedDef &&
+        <BriefFormDialog open={true} onOpenChange={() => setSelectedBriefType(null)} definition={selectedDef} />
+        }
+      </>);
+
   }
 
   return (
@@ -497,8 +497,8 @@ export default function AppSidebar({
       <div
         ref={containerRef}
         className="h-screen bg-card border-r border-border/40 flex overflow-visible"
-        tabIndex={-1}
-      >
+        tabIndex={-1}>
+        
         {/* Dark floated icon rail */}
         <IconRail />
 
@@ -507,30 +507,30 @@ export default function AppSidebar({
       </div>
 
       {/* Ephemeral flyout panel — fixed positioning outside overflow */}
-      {isEffectivelyCollapsed && flyoutCategory && (
-        <div
-          className="fixed top-0 bottom-0 w-56 bg-card border-r border-border/40 shadow-2xl z-[60] animate-slide-in-left"
-          style={{ left: 48 }}
-          onMouseEnter={handleFlyoutEnter}
-          onMouseLeave={handleFlyoutLeave}
-        >
+      {isEffectivelyCollapsed && flyoutCategory &&
+      <div
+        className="fixed top-0 bottom-0 w-56 bg-card border-r border-border/40 shadow-2xl z-[60] animate-slide-in-left"
+        style={{ left: 48 }}
+        onMouseEnter={handleFlyoutEnter}
+        onMouseLeave={handleFlyoutLeave}>
+        
           <CategoryPanelContent onItemClick={handleNavClick} />
         </div>
-      )}
+      }
 
-      {selectedDef && (
-        <BriefFormDialog open={true} onOpenChange={() => setSelectedBriefType(null)} definition={selectedDef} />
-      )}
-    </>
-  );
+      {selectedDef &&
+      <BriefFormDialog open={true} onOpenChange={() => setSelectedBriefType(null)} definition={selectedDef} />
+      }
+    </>);
+
 }
 
 function SidebarLink({
-  to, icon, label, active, collapsed, onClick, delay = 0,
-}: {
-  to: string; icon: React.ReactNode; label: string; active: boolean;
-  collapsed: boolean; onClick?: () => void; delay?: number;
-}) {
+  to, icon, label, active, collapsed, onClick, delay = 0
+
+
+
+}: {to: string;icon: React.ReactNode;label: string;active: boolean;collapsed: boolean;onClick?: () => void;delay?: number;}) {
   return (
     <NavLink
       to={to}
@@ -540,19 +540,19 @@ function SidebarLink({
         active ? "bg-accent text-foreground font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted",
         collapsed && "justify-center px-2"
       )}
-      style={{ animationDelay: `${delay}ms` }}
-    >
-      {active && !collapsed && (
-        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-full bg-foreground" />
-      )}
+      style={{ animationDelay: `${delay}ms` }}>
+      
+      {active && !collapsed &&
+      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-full bg-foreground" />
+      }
       <span className={cn("transition-transform duration-200 shrink-0", active && "scale-105 text-foreground", !active && "group-hover:scale-105")}>
         {icon}
       </span>
-      {!collapsed && (
-        <span className={cn("text-sm font-medium transition-colors truncate min-w-0", active && "font-semibold")}>
+      {!collapsed &&
+      <span className={cn("text-sm font-medium transition-colors truncate min-w-0", active && "font-semibold")}>
           {label}
         </span>
-      )}
-    </NavLink>
-  );
+      }
+    </NavLink>);
+
 }

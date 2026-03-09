@@ -33,7 +33,6 @@ import {
   CheckSquare,
   User,
   Flag,
-  ExternalLink
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TaskTimer } from '@/components/time-tracking/TaskTimer';
@@ -89,6 +88,7 @@ interface TasksTableViewProps {
   onDelete: (taskId: string) => void;
   onInlineUpdate: (taskId: string, field: string, value: string | number | null) => Promise<void>;
   onCreateSubtask?: (parentTaskId: string) => void;
+  onInlineCreateSubtask?: (parentTaskId: string, title: string) => Promise<void>;
   onBulkUpdate?: (taskIds: string[], field: string, value: string | null) => Promise<void>;
   canManage: boolean;
   showProject?: boolean;
@@ -168,6 +168,7 @@ export function TasksTableView({
   onDelete,
   onInlineUpdate,
   onCreateSubtask,
+  onInlineCreateSubtask,
   onBulkUpdate,
   canManage,
   showProject = true
@@ -447,27 +448,36 @@ export function TasksTableView({
   };
 
   const handleAddSubtask = async (parentId: string) => {
-    if (!newSubtaskTitle.trim() || !onCreateSubtask) return;
-    onCreateSubtask(parentId);
+    if (!newSubtaskTitle.trim()) return;
+    if (onInlineCreateSubtask) {
+      await onInlineCreateSubtask(parentId, newSubtaskTitle.trim());
+    } else if (onCreateSubtask) {
+      onCreateSubtask(parentId);
+    }
     setAddingSubtaskTo(null);
     setNewSubtaskTitle('');
   };
 
   const visibleColumnCount = columns.filter(c => c.visible).length;
 
-  const renderTaskRow = (task: Task, level = 0) => {
+  const renderTaskRow = (task: Task, level = 0, rowIndex = 0) => {
     const children = childTasksMap.get(task.id) || [];
     const hasChildren = children.length > 0;
     const isExpanded = expandedTasks.has(task.id);
     const depCount = dependencyCountMap.get(task.id) || 0;
     const dueDateInfo = formatDueDate(task.due_date);
     const isSelected = selectedTasks.has(task.id);
+    const isStriped = rowIndex % 2 === 1;
 
     return (
       <>
         <TableRow 
           key={task.id} 
-          className={cn("group hover:bg-muted/50 cursor-pointer", isSelected && "bg-primary/5")}
+          className={cn(
+            "group cursor-pointer border-b border-border/60 hover:bg-muted/50",
+            isSelected && "bg-primary/5",
+            isStriped && !isSelected && "bg-muted/20"
+          )}
           onClick={(e) => {
             // Don't navigate if clicking on interactive elements
             const target = e.target as HTMLElement;
@@ -488,19 +498,10 @@ export function TasksTableView({
           {/* Title with expand/collapse */}
           <TableCell className="font-medium" style={{ width: getColumnWidth('title') }}>
             <div className="flex items-center gap-2" style={{ paddingLeft: `${level * 20}px` }}>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 shrink-0 text-muted-foreground hover:text-primary"
-                onClick={() => navigate(`/projects/${task.project_id}`)}
-                title="Άνοιγμα έργου"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-              </Button>
               
               {hasChildren || level === 0 ? (
                 <button 
-                  onClick={() => hasChildren ? toggleExpand(task.id) : canManage && onCreateSubtask && setAddingSubtaskTo(task.id)}
+                  onClick={() => hasChildren ? toggleExpand(task.id) : canManage && (onInlineCreateSubtask || onCreateSubtask) && setAddingSubtaskTo(task.id)}
                   className={cn(
                     "p-0.5 rounded transition-colors",
                     hasChildren ? "hover:bg-muted" : "opacity-0 group-hover:opacity-100 hover:bg-muted text-muted-foreground"
@@ -974,7 +975,7 @@ export function TasksTableView({
                 </TableCell>
               </TableRow>
             ) : groupBy === 'none' ? (
-              sortedTasks.map(task => renderTaskRow(task))
+              sortedTasks.map((task, i) => renderTaskRow(task, 0, i))
             ) : (
               groupedTasks.map(group => (
                 <GroupedTableSection
@@ -1020,7 +1021,7 @@ export function TasksTableView({
                     </TableRow>
                   }
                 >
-                  {group.tasks.map(task => renderTaskRow(task))}
+                  {group.tasks.map((task, i) => renderTaskRow(task, 0, i))}
                 </GroupedTableSection>
               ))
             )}

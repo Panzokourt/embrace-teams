@@ -628,6 +628,7 @@ export default function TendersPage() {
           <UnifiedViewToggle 
             viewMode={viewMode} 
             onViewModeChange={setViewMode}
+            showCards
           />
           
           {canManage && (

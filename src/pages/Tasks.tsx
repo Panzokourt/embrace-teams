@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/select';
 import { UnifiedViewToggle, usePersistedViewMode, type UnifiedViewMode } from '@/components/ui/unified-view-toggle';
 import { TasksTableView } from '@/components/tasks/TasksTableView';
+import { TaskGanttView } from '@/components/tasks/TaskGanttView';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { toast } from 'sonner';
 import { 
@@ -126,7 +127,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
   const [saving, setSaving] = useState(false);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [viewMode, setViewMode] = usePersistedViewMode('tasks', 'kanban');
+  const [viewMode, setViewMode] = usePersistedViewMode('tasks', 'table');
 
   const [formData, setFormData] = useState({
     title: '',
@@ -507,27 +508,29 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
     }
   };
 
-  // Create subtask
-  const handleCreateSubtask = (parentTaskId: string) => {
+  // Inline subtask creation
+  const handleInlineCreateSubtask = async (parentTaskId: string, title: string) => {
     const parentTask = tasks.find(t => t.id === parentTaskId);
     if (!parentTask) return;
-    
-    setEditingTask(null);
-    setFormData({
-      title: '',
-      description: '',
-      project_id: parentTask.project_id,
-      status: 'todo',
-      priority: 'medium',
-      due_date: '',
-      start_date: '',
-      assigned_to: '',
-      estimated_hours: '',
-      task_type: 'task',
-      task_category: '',
-    });
-    // Store parent task id for subtask creation - we'll add this to the dialog
-    setDialogOpen(true);
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .insert({
+          title,
+          project_id: parentTask.project_id,
+          parent_task_id: parentTaskId,
+          status: 'todo',
+          priority: 'medium',
+        })
+        .select('*, project:projects(name)')
+        .single();
+      if (error) throw error;
+      setTasks(prev => [...prev, { ...data, assignee: null } as Task]);
+      toast.success('Subtask δημιουργήθηκε!');
+    } catch (error) {
+      console.error('Error creating subtask:', error);
+      toast.error('Σφάλμα κατά τη δημιουργία subtask');
+    }
   };
 
   const handleInlineUpdate = async (taskId: string, field: string, value: string | number | null) => {
@@ -575,69 +578,51 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
     return (
       <div 
         className={cn(
-          "group bg-card rounded-lg border border-border/50 p-3.5 transition-all duration-200 cursor-pointer",
-          "hover:shadow-md hover:border-border hover:-translate-y-0.5",
+          "group/card bg-card rounded-lg border border-border/50 transition-all duration-200 cursor-pointer overflow-hidden",
           isOverdue && "border-destructive/30",
           isDragOverlay && "shadow-lg rotate-1 scale-105"
         )}
         onClick={() => !isDragOverlay && navigate(`/tasks/${task.id}`)}
       >
-        <div className="flex items-start gap-2.5">
-          <GripVertical className="h-4 w-4 text-muted-foreground/30 mt-0.5 flex-shrink-0 cursor-grab transition-colors group-hover:text-muted-foreground/50" />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start gap-2">
-              <span className="mt-0.5">
-                {statusConfig[task.status].icon}
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className={cn(
-                  "font-medium text-sm leading-snug",
-                  task.status === 'completed' && "line-through text-muted-foreground"
-                )}>
-                  {task.title}
-                </p>
-                {task.project && (
-                  <p className="text-xs text-muted-foreground/60 mt-0.5">{task.project.name}</p>
-                )}
-              </div>
-              {canManage && !isDragOverlay && (
-                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-secondary" onClick={() => handleEdit(task)}>
-                    <Pencil className="h-3 w-3" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/70 hover:text-destructive hover:bg-destructive/10" onClick={() => handleDelete(task.id)}>
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              )}
-            </div>
-            <div className="flex items-center gap-2 mt-2.5 flex-wrap">
-              {task.assignee && (
-                <Avatar className="h-5 w-5">
-                  <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
-                    {getInitials(task.assignee.full_name)}
-                  </AvatarFallback>
-                </Avatar>
-              )}
+        {/* Compact default view */}
+        <div className="flex items-center gap-2 px-2.5 py-1.5">
+          <GripVertical className="h-3.5 w-3.5 text-muted-foreground/20 shrink-0 cursor-grab" />
+          <p className={cn(
+            "text-xs font-medium truncate flex-1",
+            task.status === 'completed' && "line-through text-muted-foreground"
+          )}>{task.title}</p>
+          {task.assignee && (
+            <Avatar className="h-5 w-5 shrink-0">
+              <AvatarFallback className="text-[9px] bg-primary/10 text-primary">
+                {getInitials(task.assignee.full_name)}
+              </AvatarFallback>
+            </Avatar>
+          )}
+        </div>
+        {/* Expanded on hover */}
+        <div className="max-h-0 group-hover/card:max-h-40 overflow-hidden transition-all duration-200 ease-in-out opacity-0 group-hover/card:opacity-100">
+          <div className="px-2.5 pb-2 pt-0.5 space-y-1.5 border-t border-border/30">
+            {task.project && (
+              <p className="text-[10px] text-muted-foreground truncate">{task.project.name}</p>
+            )}
+            <div className="flex items-center gap-1.5 flex-wrap">
               {priorityColor && (
-                <span
-                  className="text-[10px] font-semibold rounded px-1.5 py-0.5"
-                  style={{ backgroundColor: priorityColor.bg, color: priorityColor.text }}
-                >
-                  {priorityColor.label.slice(0, 2).toUpperCase()}
+                <span className="text-[9px] font-semibold rounded px-1 py-0.5" style={{ backgroundColor: priorityColor.bg, color: priorityColor.text }}>
+                  {priorityColor.label}
                 </span>
               )}
               {task.due_date && (
-                <div className={cn(
-                  "flex items-center gap-1 text-xs",
-                  isOverdue ? "text-destructive font-medium" : "text-muted-foreground/60"
-                )}>
-                  <Calendar className="h-3 w-3" />
+                <span className={cn("text-[10px]", isOverdue ? "text-destructive font-medium" : "text-muted-foreground")}>
                   {format(new Date(task.due_date), 'd MMM', { locale: el })}
-                  {isOverdue && <span>(Overdue)</span>}
-                </div>
+                </span>
               )}
             </div>
+            {canManage && !isDragOverlay && (
+              <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
+                <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleEdit(task)}><Pencil className="h-2.5 w-2.5" /></Button>
+                <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive/70" onClick={() => handleDelete(task.id)}><Trash2 className="h-2.5 w-2.5" /></Button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -653,66 +638,6 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
     { id: 'completed' as TaskStatus, label: 'Ολοκληρώθηκε', icon: <CheckCircle2 className="h-5 w-5 text-success" /> },
   ];
 
-  const renderCardView = () => (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {filteredTasks.map(task => (
-        <Card 
-          key={task.id} 
-          className="hover:shadow-lg transition-shadow cursor-pointer"
-          onClick={() => navigate(`/tasks/${task.id}`)}
-        >
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex-1 min-w-0">
-                <h3 className={cn(
-                  "font-semibold mb-1",
-                  task.status === 'completed' && "line-through text-muted-foreground"
-                )}>{task.title}</h3>
-                {task.project && (
-                  <p className="text-sm text-muted-foreground">{task.project.name}</p>
-                )}
-              </div>
-              {getStatusBadge(task.status)}
-            </div>
-            {task.description && (
-              <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{task.description}</p>
-            )}
-            <div className="flex items-center justify-between text-sm">
-              {task.assignee ? (
-                <div className="flex items-center gap-2">
-                  <Avatar className="h-6 w-6">
-                    <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                      {getInitials(task.assignee.full_name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="text-muted-foreground">{task.assignee.full_name}</span>
-                </div>
-              ) : (
-                <span className="text-muted-foreground">Χωρίς ανάθεση</span>
-              )}
-              {task.due_date && (
-                <span className="flex items-center gap-1 text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  {format(new Date(task.due_date), 'd MMM', { locale: el })}
-                </span>
-              )}
-            </div>
-            {canManage && (
-              <div className="flex gap-2 mt-4 pt-3 border-t" onClick={(e) => e.stopPropagation()}>
-                <Button variant="outline" size="sm" onClick={() => handleEdit(task)}>
-                  <Pencil className="h-3 w-3 mr-1" /> Επεξεργασία
-                </Button>
-                <Button variant="outline" size="sm" className="text-destructive" onClick={() => handleDelete(task.id)}>
-                  <Trash2 className="h-3 w-3 mr-1" /> Διαγραφή
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
-
   const renderTableView = () => (
     <TasksTableView
       tasks={filteredTasks}
@@ -721,7 +646,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
       onEdit={handleEdit}
       onDelete={handleDelete}
       onInlineUpdate={handleInlineUpdate}
-      onCreateSubtask={handleCreateSubtask}
+      onInlineCreateSubtask={handleInlineCreateSubtask}
       onBulkUpdate={handleBulkUpdate}
       canManage={canManage}
       showProject={!projectId}
@@ -801,6 +726,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
             <UnifiedViewToggle 
               viewMode={viewMode} 
               onViewModeChange={setViewMode}
+              showGantt
             />
 
             {canManage && (
@@ -1023,6 +949,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
               <UnifiedViewToggle 
                 viewMode={viewMode} 
                 onViewModeChange={setViewMode}
+                showGantt
               />
             </div>
             {canManage && (
@@ -1223,7 +1150,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
         </Card>
       ) : (
         <>
-          {viewMode === 'card' && renderCardView()}
+          {viewMode === 'gantt' && <TaskGanttView tasks={filteredTasks} />}
           {viewMode === 'table' && renderTableView()}
           {viewMode === 'kanban' && renderKanbanView()}
         </>

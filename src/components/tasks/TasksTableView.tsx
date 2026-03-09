@@ -34,6 +34,7 @@ import {
   CheckSquare,
   User,
   Flag,
+  X as XIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TaskTimer } from '@/components/time-tracking/TaskTimer';

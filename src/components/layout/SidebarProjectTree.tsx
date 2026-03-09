@@ -202,7 +202,7 @@ function ProjectLink({ project, isActive }: { project: ProjectItem; isActive: bo
           : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
       )}
     >
-      <FileText className="h-3 w-3 shrink-0" />
+      <span className={cn("h-2 w-2 rounded-full shrink-0", getStatusColor(project.status))} />
       <span className="truncate">{project.name}</span>
     </button>
   );

@@ -1150,7 +1150,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
         </Card>
       ) : (
         <>
-          {viewMode === 'gantt' && <TaskGanttView tasks={filteredTasks} />}
+          {viewMode === 'gantt' && <TaskGanttView tasks={filteredTasks} onTaskUpdated={fetchTasks} />}
           {viewMode === 'table' && renderTableView()}
           {viewMode === 'kanban' && renderKanbanView()}
         </>

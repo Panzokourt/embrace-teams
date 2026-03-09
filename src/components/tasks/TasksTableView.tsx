@@ -33,7 +33,7 @@ import {
   CheckSquare,
   User,
   Flag,
-  ExternalLink,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TaskTimer } from '@/components/time-tracking/TaskTimer';
 import { MondayStatusCell } from '@/components/shared/MondayStatusCell';

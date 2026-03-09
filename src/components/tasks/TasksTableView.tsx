@@ -975,7 +975,7 @@ export function TasksTableView({
                 </TableCell>
               </TableRow>
             ) : groupBy === 'none' ? (
-              sortedTasks.map(task => renderTaskRow(task))
+              sortedTasks.map((task, i) => renderTaskRow(task, 0, i))
             ) : (
               groupedTasks.map(group => (
                 <GroupedTableSection

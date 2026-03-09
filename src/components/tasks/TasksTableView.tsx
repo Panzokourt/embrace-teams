@@ -489,15 +489,6 @@ export function TasksTableView({
           {/* Title with expand/collapse */}
           <TableCell className="font-medium" style={{ width: getColumnWidth('title') }}>
             <div className="flex items-center gap-2" style={{ paddingLeft: `${level * 20}px` }}>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 shrink-0 text-muted-foreground hover:text-primary"
-                onClick={() => navigate(`/projects/${task.project_id}`)}
-                title="Άνοιγμα έργου"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-              </Button>
               
               {hasChildren || level === 0 ? (
                 <button 

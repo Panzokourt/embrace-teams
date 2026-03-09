@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { LayoutGrid, List, Columns } from 'lucide-react';
+import { GanttChartSquare, List, Columns } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type UnifiedViewMode = 'card' | 'table' | 'kanban';
+export type UnifiedViewMode = 'gantt' | 'table' | 'kanban';
 
 interface UnifiedViewToggleProps {
   viewMode?: UnifiedViewMode;

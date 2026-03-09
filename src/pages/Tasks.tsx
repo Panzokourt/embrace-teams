@@ -127,7 +127,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
   const [saving, setSaving] = useState(false);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [viewMode, setViewMode] = usePersistedViewMode('tasks', 'kanban');
+  const [viewMode, setViewMode] = usePersistedViewMode('tasks', 'table');
 
   const [formData, setFormData] = useState({
     title: '',

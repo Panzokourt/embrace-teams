@@ -1,66 +1,90 @@
 
 
-# Org Chart — Full Rebuild Plan
+# Αναβάθμιση Task Tables — Πίνακας, Kanban, Gantt & Dependencies
 
-## Πρόβλημα
+## Σύνοψη αλλαγών (7 αιτήματα)
 
-Το τρέχον οργανόγραμμα είναι ένα static rendered tree μέσα σε ScrollArea με βασικό zoom (CSS scale). Δεν υποστηρίζει pan/drag-to-move, δεν έχει infinite canvas, τα nodes δεν είναι clickable για detail, δεν υπάρχουν views (by department, by person), και τα templates δεν αξιοποιούν το υπάρχον προσωπικό.
+1. **Καθαρότερος πίνακας** — Εναλλαγή χρώματος γραμμών (striped rows), σαφέστερα borders, μικρότερο padding
+2. **Πολλαπλοί assignees στον πίνακα** — Χρήση του υπάρχοντος `task_assignees` table, εμφάνιση stacked avatars
+3. **Avatar στήλη υπευθύνου** — Εμφάνιση avatar εικόνων αντί text
+4. **Αφαίρεση εικονιδίου ExternalLink** — Από τη στήλη τίτλου
+5. **Inline subtask creation** — Αντί dialog, δημιουργία subtask inline στο table row (ήδη μερικώς υλοποιημένο, θα διορθωθεί ώστε να αποθηκεύει κατευθείαν μέσω Supabase αντί να καλεί `onCreateSubtask` που ανοίγει dialog)
+6. **Αντικατάσταση Card view με Gantt view** — Νέο μοντέρνο Gantt chart (reuse/enhance existing `ProjectGanttView`)
+7. **Compact Kanban cards** — Μικρά cards default, expand on hover
+8. **Task dependencies** — Νέος `task_dependencies` table (many-to-many, με `dependency_type`) αντί single `depends_on` UUID
 
-## Λύση
+---
 
-Πλήρες rebuild του OrgChart σε **infinite canvas** στυλ Miro με pan+zoom, πολλαπλά views, clickable nodes με detail panel, και smart templates.
+## Database Migration
 
-## Τεχνική Προσέγγιση
+Νέος πίνακας `task_dependencies` για many-to-many dependencies:
 
-### 1. Infinite Canvas Engine (χωρίς εξωτερική βιβλιοθήκη)
-- Custom React canvas με `transform: translate(x, y) scale(z)` σε ένα wrapper div
-- **Mouse wheel** → zoom (centered on cursor)
-- **Middle-click drag** ή **Space+drag** → pan (hand tool)
-- **Touch**: pinch-to-zoom, two-finger pan
-- Mini-map στο corner (optional, phase 2)
-- Fit-to-screen button, zoom controls
+```sql
+CREATE TABLE public.task_dependencies (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id UUID NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
+  depends_on_task_id UUID NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
+  dependency_type TEXT NOT NULL DEFAULT 'finish_to_start',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(task_id, depends_on_task_id)
+);
 
-### 2. Views (3 modes)
-- **Hierarchy View** (default): Κλασικό tree ανά reporting line — αυτό που υπάρχει τώρα αλλά σε canvas
-- **Department View**: Grouped κάρτες ανά department σε columns/clusters, κάθε cluster δείχνει τα μέλη
-- **List View**: Compact table/list με sorting, φιλτράρισμα, search — γρήγορη εύρεση ατόμου
+ALTER TABLE public.task_dependencies ENABLE ROW LEVEL SECURITY;
 
-Toggle μεταξύ views μέσω tabs στο header.
+CREATE POLICY "Authenticated users can view dependencies"
+  ON public.task_dependencies FOR SELECT TO authenticated USING (true);
 
-### 3. Interactive Nodes
-- **Click** σε node → slide-in panel (sheet) δεξιά με:
-  - Profile info (avatar, name, email, phone)
-  - Position & department
-  - Direct reports count
-  - Link to Employee Profile (`/hr/employee/:id`)
-  - Quick actions (edit, reassign, add subordinate)
-- **Hover** → subtle highlight + tooltip με title
-- **Vacant positions** → dashed border, prominent "Κενή θέση" badge, click to assign
-- Connector lines μεταξύ nodes: animated SVG paths αντί για div borders
+CREATE POLICY "Admin/manager can manage dependencies"
+  ON public.task_dependencies FOR ALL TO authenticated
+  USING (public.is_admin_or_manager(auth.uid()));
+```
 
-### 4. Smart Templates & Auto-build
-- Βελτίωση του Wizard: αφού επιλεγεί template, **auto-match** υπάρχοντα profiles σε positions βάσει `job_title` ή `department`
-- **Gap Analysis panel**: Μετά τη δημιουργία, δείχνει πόσες θέσεις είναι κενές, ποια departments λείπουν, ποια levels δεν έχουν κάλυψη
-- Wizard step: "Αντιστοίχιση Προσωπικού" — drag-drop ή auto-suggest
+---
 
-### 5. SVG Connector Lines
-- Αντικατάσταση CSS div lines με SVG `<path>` elements (bezier curves)
-- Animated flow direction (subtle dash animation)
-- Color-coded κατά department
+## Αλλαγές ανά αρχείο
 
-## Αρχεία
+### 1. `src/components/ui/unified-view-toggle.tsx`
+- Αντικατάσταση `card` option με `gantt` (icon: `GanttChartSquare`, label: "Gantt")
+- Type: `'gantt' | 'table' | 'kanban'`
 
-| Αρχείο | Αλλαγή |
-|---|---|
-| `src/pages/OrgChart.tsx` | **Rewrite** — Infinite canvas, views, SVG connectors, detail panel |
-| `src/components/org-chart/OrgChartCanvas.tsx` | **New** — Pan+zoom canvas wrapper |
-| `src/components/org-chart/OrgNodeCard.tsx` | **New** — Redesigned node card (clickable, expandable) |
-| `src/components/org-chart/OrgDetailPanel.tsx` | **New** — Slide-in sheet for node details |
-| `src/components/org-chart/OrgDepartmentView.tsx` | **New** — Department-grouped view |
-| `src/components/org-chart/OrgListView.tsx` | **New** — Table/list view |
-| `src/components/org-chart/OrgConnectors.tsx` | **New** — SVG connector line renderer |
-| `src/components/org-chart/OrgChartWizard.tsx` | **Update** — Add auto-match step + gap analysis |
-| `src/components/org-chart/DraggableOrgNode.tsx` | **Remove** — Replaced by new OrgNodeCard |
+### 2. `src/components/tasks/TasksTableView.tsx`
+- **Striped rows**: Εναλλαγή `bg-muted/30` σε ζυγές γραμμές
+- **Borders**: Πιο ορατά `border-b` σε κάθε cell
+- **Αφαίρεση ExternalLink** button από title cell
+- **Multi-assignee**: Fetch `task_assignees` per task, εμφάνιση overlapping avatar group (max 3 + "+N")
+- **Inline subtask**: Το `handleAddSubtask` δημιουργεί κατευθείαν insert στη Supabase (αντί callback σε dialog), refetch after
+- Πέρασμα `onInlineCreateSubtask` callback αντί `onCreateSubtask`
 
-Δεν χρειάζονται DB changes — το schema `org_chart_positions` καλύπτει ήδη hierarchy, department, user_id, color, level, sort_order.
+### 3. `src/pages/Tasks.tsx`
+- Αντικατάσταση `renderCardView` με `renderGanttView` — reuse/adapt `ProjectGanttView` component
+- Fetch `task_assignees` batch (single query) μαζί με tasks, map σε `assignees: Profile[]` per task
+- `handleCreateSubtask` → inline insert (χωρίς dialog), parent_task_id set
+- **Kanban cards**: Default compact (title + avatar only), on hover expand με priority, due date, project name. Transition animation.
+
+### 4. `src/components/projects/ProjectTasksTable.tsx`
+- Ίδιες αλλαγές multi-assignee & inline subtask
+
+### 5. `src/components/tasks/TaskGanttView.tsx` (NEW)
+- Standalone Gantt component for the Tasks page (all projects)
+- Βασισμένο στο `ProjectGanttView` αλλά χωρίς deliverable grouping — groups by project ή status
+- Modern design: rounded bars, progress fill, dependency arrows (SVG lines)
+- Zoom: week/month toggle
+- Color-coded bars from `STATUS_COLORS`
+
+### 6. `src/components/tasks/TaskDependencySelector.tsx` (NEW)
+- Popover component για add/remove dependencies σε task
+- Εμφανίζεται στο task detail page και στο table (future)
+- Dropdown search tasks → add dependency (finish_to_start default)
+
+---
+
+## Kanban compact design
+- Default card height: ~40px (title only + small avatar)
+- On `group-hover` / card hover: expand to full height showing priority badge, due date, project, actions
+- CSS transition: `max-height` + `opacity` animation
+
+## Τεχνικά σημεία
+- Δεν αλλάζει η δομή του `assigned_to` field (backward compat) — ο πίνακας απλά δείχνει επιπλέον τα `task_assignees`
+- Gantt view: client-side rendering με CSS grid, no external library
+- Dependencies θα φαίνονται ως γραμμές στο Gantt view (SVG overlay)
 

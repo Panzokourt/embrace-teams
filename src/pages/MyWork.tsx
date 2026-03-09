@@ -976,16 +976,25 @@ export default function MyWork() {
                   {backlogTasks.length === 0 ? (
                     <p className="text-sm text-muted-foreground px-4 py-4">Κανένα task χωρίς ημερομηνία</p>
                   ) : (
-                    <SortableContext items={backlogIds} strategy={verticalListSortingStrategy}>
-                      {backlogTasks.map(task => (
-                        <BacklogTaskRow
-                          key={task.id} task={task} today={today}
-                          onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
-                          activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
-                          onFlagToggle={toggleFlagPriority}
-                        />
-                      ))}
-                    </SortableContext>
+                    <>
+                      <ScrollArea className="max-h-[32rem]">
+                        <SortableContext items={backlogIds} strategy={verticalListSortingStrategy}>
+                          {pagedBacklogTasks.map(task => (
+                            <BacklogTaskRow
+                              key={task.id} task={task} today={today}
+                              onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
+                              activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
+                              onFlagToggle={toggleFlagPriority}
+                            />
+                          ))}
+                        </SortableContext>
+                      </ScrollArea>
+                      {backlogTasks.length > backlogPagination.pageSize && (
+                        <div className="px-4 border-t border-border/50">
+                          <PaginationControls pagination={backlogPagination} />
+                        </div>
+                      )}
+                    </>
                   )}
                 </DroppableContainer>
               </CardContent>

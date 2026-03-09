@@ -13,6 +13,9 @@ interface GroupedTableSectionProps {
   children: React.ReactNode;
   defaultExpanded?: boolean;
   badge?: React.ReactNode;
+  color?: string;
+  summaryRow?: React.ReactNode;
+  addTaskRow?: React.ReactNode;
 }
 
 export function GroupedTableSection({
@@ -23,14 +26,21 @@ export function GroupedTableSection({
   children,
   defaultExpanded = true,
   badge,
+  color,
+  summaryRow,
+  addTaskRow,
 }: GroupedTableSectionProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   return (
     <>
       <TableRow 
-        className="bg-muted/30 hover:bg-muted/50 cursor-pointer border-y"
+        className="hover:bg-transparent cursor-pointer border-y"
         onClick={() => setIsExpanded(!isExpanded)}
+        style={{
+          borderLeft: color ? `4px solid ${color}` : undefined,
+          backgroundColor: color ? `${color}12` : undefined,
+        }}
       >
         <TableCell colSpan={colSpan} className="py-2">
           <div className="flex items-center gap-2">
@@ -49,7 +59,12 @@ export function GroupedTableSection({
                 <ChevronRight className="h-4 w-4" />
               )}
             </Button>
-            <span className="font-medium text-sm">{groupLabel}</span>
+            <span 
+              className="font-semibold text-sm"
+              style={{ color: color || undefined }}
+            >
+              {groupLabel}
+            </span>
             {badge}
             <Badge variant="secondary" className="text-xs ml-1">
               {itemCount}
@@ -57,7 +72,13 @@ export function GroupedTableSection({
           </div>
         </TableCell>
       </TableRow>
-      {isExpanded && children}
+      {isExpanded && (
+        <>
+          {children}
+          {summaryRow}
+          {addTaskRow}
+        </>
+      )}
     </>
   );
 }

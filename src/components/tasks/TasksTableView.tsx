@@ -37,6 +37,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TaskTimer } from '@/components/time-tracking/TaskTimer';
+import { MondayStatusCell } from '@/components/shared/MondayStatusCell';
+import { STATUS_COLORS, PRIORITY_COLORS, GROUP_COLORS } from '@/components/shared/mondayStyleConfig';
 import { format, isPast, isToday, isTomorrow, parseISO } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -593,29 +595,37 @@ export function TasksTableView({
             </TableCell>
           )}
 
-          {/* Status */}
+          {/* Status - Monday.com colored cell */}
           {isColumnVisible('status') && (
-            <TableCell style={{ width: getColumnWidth('status') }}>
-              <EnhancedInlineEditCell
+            <TableCell style={{ width: getColumnWidth('status') }} className="p-1">
+              <MondayStatusCell
                 value={task.status}
+                options={Object.entries(STATUS_COLORS).map(([value, c]) => ({
+                  value,
+                  label: c.label,
+                  bg: c.bg,
+                  text: c.text,
+                }))}
                 onSave={(val) => onInlineUpdate(task.id, 'status', val)}
-                type="select"
-                options={STATUS_OPTIONS}
                 disabled={!canManage}
               />
             </TableCell>
           )}
 
-          {/* Priority */}
+          {/* Priority - Monday.com colored cell */}
           {isColumnVisible('priority') && (
-            <TableCell style={{ width: getColumnWidth('priority') }}>
-              <EnhancedInlineEditCell
+            <TableCell style={{ width: getColumnWidth('priority') }} className="p-1">
+              <MondayStatusCell
                 value={task.priority}
+                options={Object.entries(PRIORITY_COLORS).map(([value, c]) => ({
+                  value,
+                  label: c.label,
+                  bg: c.bg,
+                  text: c.text,
+                }))}
                 onSave={(val) => onInlineUpdate(task.id, 'priority', val)}
-                type="select"
-                options={PRIORITY_OPTIONS}
-                placeholder="Καμία"
                 disabled={!canManage}
+                placeholder="Καμία"
               />
             </TableCell>
           )}
@@ -974,6 +984,41 @@ export function TasksTableView({
                   itemCount={group.tasks.length}
                   colSpan={visibleColumnCount}
                   badge={group.badge}
+                  color={GROUP_COLORS[group.key] || GROUP_COLORS.none}
+                  summaryRow={
+                    <TableRow className="bg-muted/20 border-t" style={{ borderLeft: `4px solid ${GROUP_COLORS[group.key] || GROUP_COLORS.none}` }}>
+                      <TableCell colSpan={visibleColumnCount} className="py-1.5">
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground pl-10">
+                          <span className="font-medium">{group.tasks.length} tasks</span>
+                          {isColumnVisible('progress') && (
+                            <span>Πρόοδος: {Math.round(group.tasks.reduce((sum, t) => sum + (t.progress ?? 0), 0) / Math.max(group.tasks.length, 1))}%</span>
+                          )}
+                          {isColumnVisible('estimated_hours') && (
+                            <span>Εκτίμηση: {group.tasks.reduce((sum, t) => sum + (t.estimated_hours ?? 0), 0)}h</span>
+                          )}
+                          {isColumnVisible('status') && groupBy !== 'status' && (
+                            <div className="flex items-center gap-0.5">
+                              {Object.entries(STATUS_COLORS).map(([key, c]) => {
+                                const count = group.tasks.filter(t => t.status === key).length;
+                                if (count === 0) return null;
+                                return (
+                                  <div
+                                    key={key}
+                                    className="h-3 rounded-sm"
+                                    style={{
+                                      backgroundColor: c.bg,
+                                      width: `${Math.max((count / group.tasks.length) * 60, 4)}px`,
+                                    }}
+                                    title={`${c.label}: ${count}`}
+                                  />
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  }
                 >
                   {group.tasks.map(task => renderTaskRow(task))}
                 </GroupedTableSection>

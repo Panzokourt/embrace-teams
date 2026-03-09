@@ -30,6 +30,8 @@ import {
 import { format, parseISO } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { MondayStatusCell } from '@/components/shared/MondayStatusCell';
+import { STATUS_COLORS } from '@/components/shared/mondayStyleConfig';
 import type { Tables } from '@/integrations/supabase/types';
 
 type TaskStatus = 'todo' | 'in_progress' | 'review' | 'completed';
@@ -449,14 +451,19 @@ export function ProjectTasksTable({ projectId }: ProjectTasksTableProps) {
                     </TableCell>
                   )}
                   {isColumnVisible('status') && (
-                    <TableCell style={{ width: getColumnWidth('status') }}>
-                      <EnhancedInlineEditCell
+                    <TableCell style={{ width: getColumnWidth('status') }} className="p-1">
+                      <MondayStatusCell
                         value={task.status}
+                        options={Object.entries(STATUS_COLORS)
+                          .filter(([key]) => ['todo', 'in_progress', 'review', 'completed'].includes(key))
+                          .map(([value, c]) => ({
+                            value,
+                            label: c.label,
+                            bg: c.bg,
+                            text: c.text,
+                          }))}
                         onSave={(val) => handleInlineUpdate(task.id, 'status', val as string)}
-                        type="select"
-                        options={STATUS_OPTIONS.map(s => ({ value: s.value, label: s.label, icon: s.icon, color: s.color }))}
                         disabled={!canManage}
-                        displayValue={STATUS_OPTIONS.find(s => s.value === task.status)?.label || task.status}
                       />
                     </TableCell>
                   )}

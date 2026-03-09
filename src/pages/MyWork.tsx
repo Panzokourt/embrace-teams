@@ -74,33 +74,21 @@ interface MyProject {
 
 
 
+import { STATUS_COLORS, PRIORITY_COLORS } from '@/components/shared/mondayStyleConfig';
+
 const TASK_SELECT = 'id, title, status, priority, due_date, start_date, estimated_hours, actual_hours, progress, task_type, task_category, project_id, description, assigned_to, internal_reviewer, project:projects(name)';
 
 // ── Helpers ────────────────────────────────────────
 function getStatusLabel(s: string) {
-  switch (s) {
-    case 'todo': return 'To Do';
-    case 'in_progress': return 'In Progress';
-    case 'in_review': return 'In Review';
-    case 'review': return 'Review';
-    case 'completed': return 'Done';
-    default: return s;
-  }
+  return STATUS_COLORS[s]?.label || s;
 }
-function getStatusVariant(s: string): 'default' | 'secondary' | 'destructive' | 'outline' {
-  switch (s) {
-    case 'in_progress': return 'default';
-    case 'in_review': case 'review': return 'secondary';
-    case 'completed': return 'outline';
-    default: return 'outline';
-  }
+function getStatusStyle(s: string): React.CSSProperties {
+  const c = STATUS_COLORS[s];
+  return c ? { backgroundColor: c.bg, color: c.text } : {};
 }
-function getPriorityColor(p: string) {
-  switch (p) {
-    case 'high': case 'urgent': return 'destructive' as const;
-    case 'medium': return 'secondary' as const;
-    default: return 'outline' as const;
-  }
+function getPriorityStyle(p: string): React.CSSProperties {
+  const c = PRIORITY_COLORS[p];
+  return c ? { backgroundColor: c.bg, color: c.text } : {};
 }
 function getOrderKey(userId: string) {
   return `my-work-task-order-${userId}-${format(new Date(), 'yyyy-MM-dd')}`;
@@ -187,10 +175,10 @@ function SortableTaskRow({
         </span>
       </td>
       <td className="py-2.5 px-2">
-        <Badge variant={getStatusVariant(task.status)} className="text-[10px]">{getStatusLabel(task.status)}</Badge>
+        <span className="text-[10px] font-medium rounded-full px-2 py-0.5" style={getStatusStyle(task.status)}>{getStatusLabel(task.status)}</span>
       </td>
       <td className="py-2.5 px-2 hidden sm:table-cell">
-        <Badge variant={getPriorityColor(task.priority)} className="text-[10px]">{task.priority}</Badge>
+        <span className="text-[10px] font-medium rounded-full px-2 py-0.5" style={getPriorityStyle(task.priority)}>{PRIORITY_COLORS[task.priority]?.label || task.priority}</span>
       </td>
       <td className="py-2.5 px-2 w-10">
         {!activeTimer?.is_running || activeTimer.task_id !== task.id ? (
@@ -235,7 +223,7 @@ function BacklogTaskRow({
         <p className="text-sm font-medium text-foreground hover:text-primary truncate">{task.title}</p>
         <p className="text-xs text-muted-foreground truncate">{(task.project as any)?.name || '-'}</p>
       </div>
-      <Badge variant={getPriorityColor(task.priority)} className="text-[10px] shrink-0 hidden sm:flex">{task.priority}</Badge>
+      <span className="text-[10px] font-medium rounded-full px-2 py-0.5 shrink-0 hidden sm:flex" style={getPriorityStyle(task.priority)}>{PRIORITY_COLORS[task.priority]?.label || task.priority}</span>
       {!activeTimer?.is_running || activeTimer.task_id !== task.id ? (
         <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-primary shrink-0" onClick={() => startTimer(task.id, task.project_id)}>
           <Play className="h-3.5 w-3.5" />
@@ -347,7 +335,7 @@ function AttentionPanel({
           )}
         </div>
       </div>
-      <Badge variant={getStatusVariant(task.status)} className="text-[10px] hidden sm:flex">{getStatusLabel(task.status)}</Badge>
+      <span className="text-[10px] font-medium rounded-full px-2 py-0.5 hidden sm:flex" style={getStatusStyle(task.status)}>{getStatusLabel(task.status)}</span>
       {!activeTimer?.is_running || activeTimer.task_id !== task.id ? (
         <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-primary shrink-0" onClick={() => startTimer(task.id, task.project_id)}>
           <Play className="h-3.5 w-3.5" />
@@ -460,7 +448,7 @@ function AttentionPanel({
                       <p className="text-sm font-medium text-foreground hover:text-primary">{task.title}</p>
                       <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
                     </div>
-                    <Badge variant={getPriorityColor(task.priority)} className="text-[10px]">{task.priority}</Badge>
+                    <span className="text-[10px] font-medium rounded-full px-2 py-0.5" style={getPriorityStyle(task.priority)}>{PRIORITY_COLORS[task.priority]?.label || task.priority}</span>
                     <div className="flex gap-1.5">
                       <Button size="icon" variant="ghost" className="h-7 w-7 text-success hover:text-success" onClick={() => onApproveClient(task)}><Check className="h-4 w-4" /></Button>
                       <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onRejectClient(task)}><X className="h-4 w-4" /></Button>
@@ -1228,11 +1216,11 @@ export default function MyWork() {
                   <tbody className="divide-y divide-border/50">
                     <tr>
                       <td className="py-2.5 pr-4 text-muted-foreground whitespace-nowrap w-28">Status</td>
-                      <td className="py-2.5"><Badge variant={getStatusVariant(selectedTask.status)}>{getStatusLabel(selectedTask.status)}</Badge></td>
+                      <td className="py-2.5"><span className="text-xs font-medium rounded-full px-2.5 py-1" style={getStatusStyle(selectedTask.status)}>{getStatusLabel(selectedTask.status)}</span></td>
                     </tr>
                     <tr>
                       <td className="py-2.5 pr-4 text-muted-foreground whitespace-nowrap">Priority</td>
-                      <td className="py-2.5"><Badge variant={getPriorityColor(selectedTask.priority)}>{selectedTask.priority}</Badge></td>
+                      <td className="py-2.5"><span className="text-xs font-medium rounded-full px-2.5 py-1" style={getPriorityStyle(selectedTask.priority)}>{PRIORITY_COLORS[selectedTask.priority]?.label || selectedTask.priority}</span></td>
                     </tr>
                     <tr>
                       <td className="py-2.5 pr-4 text-muted-foreground whitespace-nowrap">Έναρξη</td>

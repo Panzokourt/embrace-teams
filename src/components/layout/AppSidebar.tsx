@@ -361,11 +361,11 @@ export default function AppSidebar({
           <TooltipTrigger asChild>
             <button
             onClick={toggleTheme}
-            className={cn(
-              "flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200",
-              isMobile ?
-              "text-muted-foreground hover:text-foreground hover:bg-muted/60" :
-              "text-white/50 hover:text-white hover:bg-white/10"
+            className={cn("flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 bg-primary-foreground text-primary border border-primary",
+
+            isMobile ?
+            "text-muted-foreground hover:text-foreground hover:bg-muted/60" :
+            "text-white/50 hover:text-white hover:bg-white/10"
             )}>
             
               {resolvedTheme === 'dark' ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}

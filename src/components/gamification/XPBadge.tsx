@@ -28,7 +28,7 @@ export function XPBadge({ userId, size = 'sm', showXP = false, className }: XPBa
         )}
         title={`Level ${level} — ${levelTitle} — ${totalXP} XP`}>
         
-        <Zap className={cn("h-3 w-3 bg-primary text-inherit", colorClass)} />
+        <Zap className={cn("h-3 w-3 text-inherit bg-transparent", colorClass)} />
         <span className={colorClass}>{level}</span>
         {showXP && <span className="text-muted-foreground font-normal ml-0.5">{totalXP}</span>}
       </span>);

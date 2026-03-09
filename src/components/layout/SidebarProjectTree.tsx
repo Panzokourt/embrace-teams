@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,8 +14,15 @@ import {
   useSensors,
   DragStartEvent,
   DragEndEvent,
+  DragOverEvent,
 } from '@dnd-kit/core';
-import { useDraggable, useDroppable } from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import {
   ChevronRight,
   Folder,
@@ -25,8 +32,6 @@ import {
   Trash2,
   FileText,
   GripVertical,
-  LayoutGrid,
-  FolderTree,
 } from 'lucide-react';
 import {
   ContextMenu,
@@ -35,9 +40,9 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
+
+/* ───────── Types ───────── */
 
 interface ProjectFolder {
   id: string;
@@ -53,32 +58,45 @@ interface ProjectItem {
   status: string;
   folder_id: string | null;
   client_id: string | null;
+  sidebar_sort_order: number;
   client?: { id: string; name: string; sector: string | null } | null;
 }
 
 type TreeMode = 'manual' | 'auto';
 
-// Draggable project item
-function DraggableProject({ project, isActive }: { project: ProjectItem; isActive: boolean }) {
+/* ───────── Sortable Project (manual mode) ───────── */
+
+function SortableProject({ project, isActive }: { project: ProjectItem; isActive: boolean }) {
   const navigate = useNavigate();
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `project-${project.id}`,
-    data: { type: 'project', projectId: project.id },
+    data: { type: 'project', projectId: project.id, folderId: project.folder_id },
   });
+
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    transition,
+  };
 
   return (
     <button
       ref={setNodeRef}
+      style={style}
       onClick={() => navigate(`/projects/${project.id}`)}
       className={cn(
         "flex items-center gap-2 w-full rounded-lg px-2 py-1 text-xs transition-colors truncate group",
-        isDragging && "opacity-30",
+        isDragging && "opacity-30 z-50",
         isActive
           ? "bg-muted text-foreground font-medium"
           : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
       )}
     >
-      <span {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" onClick={e => e.stopPropagation()}>
+      <span
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing shrink-0 opacity-0 group-hover:opacity-60 transition-opacity"
+        onClick={e => e.stopPropagation()}
+      >
         <GripVertical className="h-3 w-3" />
       </span>
       <FileText className="h-3 w-3 shrink-0" />
@@ -87,65 +105,51 @@ function DraggableProject({ project, isActive }: { project: ProjectItem; isActiv
   );
 }
 
-// Status color indicator
-function statusColor(status: string): string {
-  switch (status) {
-    case 'active': return 'text-green-500';
-    case 'lead': return 'text-blue-400';
-    case 'proposal': return 'text-amber-500';
-    case 'completed': return 'text-muted-foreground/40';
-    case 'on_hold': return 'text-orange-400';
-    case 'cancelled': return 'text-destructive/50';
-    default: return 'text-muted-foreground';
-  }
-}
+/* ───────── Sortable Folder (manual mode) ───────── */
 
-// Simple project link (no drag) for auto mode
-function ProjectLink({ project, isActive }: { project: ProjectItem; isActive: boolean }) {
-  const navigate = useNavigate();
-  return (
-    <button
-      onClick={() => navigate(`/projects/${project.id}`)}
-      className={cn(
-        "flex items-center gap-2 w-full rounded-lg px-2 py-1 text-xs transition-colors truncate",
-        isActive
-           ? "bg-muted text-foreground font-medium"
-           : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
-      )}
-    >
-      <FileText className={cn("h-3 w-3 shrink-0", statusColor(project.status))} />
-      <span className="truncate">{project.name}</span>
-    </button>
-  );
-}
-
-// Droppable folder (manual mode)
-function DroppableFolder({
+function SortableFolder({
   folder, isOpen, children, onToggle, onRename, onDelete,
   renamingId, renameValue, setRenameValue, setRenamingId, onRenameSubmit, projectCount,
+  isOverFolder,
 }: {
   folder: ProjectFolder; isOpen: boolean; children: React.ReactNode;
   onToggle: () => void; onRename: () => void; onDelete: () => void;
   renamingId: string | null; renameValue: string;
   setRenameValue: (v: string) => void; setRenamingId: (v: string | null) => void;
   onRenameSubmit: () => void; projectCount: number;
+  isOverFolder: boolean;
 }) {
-  const { setNodeRef, isOver } = useDroppable({
+  const {
+    attributes, listeners, setNodeRef, transform, transition, isDragging,
+  } = useSortable({
     id: `folder-${folder.id}`,
     data: { type: 'folder', folderId: folder.id },
   });
 
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    transition,
+  };
+
   return (
-    <div ref={setNodeRef}>
+    <div ref={setNodeRef} style={style} className={cn(isDragging && "opacity-30")}>
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <button
             onClick={onToggle}
             className={cn(
-              "flex items-center gap-2 w-full rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors group",
-              isOver && "bg-muted ring-1 ring-foreground/20"
+              "flex items-center gap-2 w-full rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all group",
+              isOverFolder && "bg-accent/40 ring-2 ring-primary/40 scale-[1.02]"
             )}
           >
+            <span
+              {...attributes}
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing shrink-0 opacity-0 group-hover:opacity-60 transition-opacity"
+              onClick={e => e.stopPropagation()}
+            >
+              <GripVertical className="h-3 w-3" />
+            </span>
             <ChevronRight className={cn("h-3 w-3 transition-transform duration-200 shrink-0", isOpen && "rotate-90")} />
             {isOpen ? (
               <FolderOpen className="h-3.5 w-3.5 shrink-0" style={{ color: folder.color || undefined }} />
@@ -172,7 +176,26 @@ function DroppableFolder({
   );
 }
 
-// Collapsible virtual folder for auto mode — controlled open state
+/* ───────── Auto-mode helpers ───────── */
+
+function ProjectLink({ project, isActive }: { project: ProjectItem; isActive: boolean }) {
+  const navigate = useNavigate();
+  return (
+    <button
+      onClick={() => navigate(`/projects/${project.id}`)}
+      className={cn(
+        "flex items-center gap-2 w-full rounded-lg px-2 py-1 text-xs transition-colors truncate",
+        isActive
+          ? "bg-muted text-foreground font-medium"
+          : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
+      )}
+    >
+      <FileText className="h-3 w-3 shrink-0" />
+      <span className="truncate">{project.name}</span>
+    </button>
+  );
+}
+
 function VirtualFolder({ name, color, children, open, onToggle }: {
   name: string; color?: string | null; children: React.ReactNode; open: boolean; onToggle: () => void;
 }) {
@@ -195,6 +218,10 @@ function VirtualFolder({ name, color, children, open, onToggle }: {
   );
 }
 
+/* ═══════════════════════════════════════════════════════
+   MAIN COMPONENT
+   ═══════════════════════════════════════════════════════ */
+
 export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -202,31 +229,29 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
   const companyId = company?.id;
   const queryClient = useQueryClient();
 
-  const [mode, setMode] = useState<TreeMode>(() => {
-    return (localStorage.getItem('sidebar-project-tree-mode') as TreeMode) || 'auto';
-  });
+  const [mode, setMode] = useState<TreeMode>(() =>
+    (localStorage.getItem('sidebar-project-tree-mode') as TreeMode) || 'auto'
+  );
 
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => {
     try {
-      const stored = JSON.parse(localStorage.getItem('sidebar-project-folders') || '[]');
-      return new Set(stored);
+      return new Set(JSON.parse(localStorage.getItem('sidebar-project-folders') || '[]'));
     } catch { return new Set(); }
   });
 
-  // Expanded virtual folders for auto mode (keyed by "cat::client" or "cat")
   const [expandedVirtual, setExpandedVirtual] = useState<Set<string>>(new Set());
-
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [overFolderId, setOverFolderId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
 
-  // Listen for storage changes from Settings page
+  // Persist mode & folders
   useEffect(() => {
     const handleStorage = () => {
       const stored = localStorage.getItem('sidebar-project-tree-mode') as TreeMode;
@@ -236,15 +261,12 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
     return () => window.removeEventListener('storage', handleStorage);
   }, [mode]);
 
-  useEffect(() => {
-    localStorage.setItem('sidebar-project-tree-mode', mode);
-  }, [mode]);
-
-  useEffect(() => {
-    localStorage.setItem('sidebar-project-folders', JSON.stringify([...expandedFolders]));
-  }, [expandedFolders]);
+  useEffect(() => { localStorage.setItem('sidebar-project-tree-mode', mode); }, [mode]);
+  useEffect(() => { localStorage.setItem('sidebar-project-folders', JSON.stringify([...expandedFolders])); }, [expandedFolders]);
 
   const { data: categories = [] } = useProjectCategories();
+
+  /* ── Queries ── */
 
   const { data: folders = [] } = useQuery({
     queryKey: ['project-folders', companyId],
@@ -268,23 +290,27 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
       if (mode === 'auto') {
         const { data, error } = await supabase
           .from('projects')
-          .select('id, name, status, folder_id, client_id, client:clients(id, name, sector)')
+          .select('id, name, status, folder_id, client_id, sidebar_sort_order, client:clients(id, name, sector)')
           .eq('company_id', companyId)
           .order('name');
         if (error) throw error;
         return (data || []).map((d: any) => ({
-          id: d.id, name: d.name, status: d.status, folder_id: d.folder_id, client_id: d.client_id,
+          id: d.id, name: d.name, status: d.status, folder_id: d.folder_id,
+          client_id: d.client_id, sidebar_sort_order: d.sidebar_sort_order ?? 0,
           client: d.client,
         })) as ProjectItem[];
       } else {
         const { data, error } = await supabase
           .from('projects')
-          .select('id, name, status, folder_id, client_id')
+          .select('id, name, status, folder_id, client_id, sidebar_sort_order')
           .eq('company_id', companyId)
           .in('status', ['active', 'lead', 'proposal'])
+          .order('sidebar_sort_order')
           .order('name');
         if (error) throw error;
-        return (data || []) as ProjectItem[];
+        return (data || []).map((d: any) => ({
+          ...d, sidebar_sort_order: d.sidebar_sort_order ?? 0,
+        })) as ProjectItem[];
       }
     },
     enabled: !!companyId,
@@ -292,55 +318,43 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
 
   const currentProjectId = location.pathname.match(/\/projects\/(.+)/)?.[1];
 
-  // Auto-expand folders containing the active project (manual mode)
+  // Auto-expand for active project (manual mode)
   useEffect(() => {
     if (mode !== 'manual' || !currentProjectId || projects.length === 0) return;
-    const activeProject = projects.find(p => p.id === currentProjectId);
-    if (activeProject?.folder_id && !expandedFolders.has(activeProject.folder_id)) {
-      setExpandedFolders(prev => {
-        const next = new Set(prev);
-        next.add(activeProject.folder_id!);
-        return next;
-      });
+    const ap = projects.find(p => p.id === currentProjectId);
+    if (ap?.folder_id && !expandedFolders.has(ap.folder_id)) {
+      setExpandedFolders(prev => new Set([...prev, ap.folder_id!]));
     }
   }, [currentProjectId, projects, mode]);
 
-  // Auto-expand virtual folders containing the active project (auto mode)
+  // Auto-expand for active project (auto mode)
   useEffect(() => {
     if (mode !== 'auto' || !currentProjectId || projects.length === 0) return;
-    const activeProject = projects.find(p => p.id === currentProjectId);
-    if (!activeProject) return;
-
-    const keysToExpand: string[] = [];
-
-    if (activeProject.client) {
-      const categoryName = sectorToCategory(activeProject.client.sector);
-      const clientName = activeProject.client.name;
-      if (categoryName) {
-        keysToExpand.push(`cat::${categoryName}`);
-        keysToExpand.push(`cat::${categoryName}::${clientName}`);
-      } else {
-        keysToExpand.push('cat::__uncategorized__');
-        keysToExpand.push(`cat::__uncategorized__::${clientName}`);
-      }
+    const ap = projects.find(p => p.id === currentProjectId);
+    if (!ap) return;
+    const keys: string[] = [];
+    if (ap.client) {
+      const cat = sectorToCategory(ap.client.sector);
+      const cn = ap.client.name;
+      if (cat) { keys.push(`cat::${cat}`, `cat::${cat}::${cn}`); }
+      else { keys.push('cat::__uncategorized__', `cat::__uncategorized__::${cn}`); }
     } else {
-      keysToExpand.push('cat::__uncategorized__');
+      keys.push('cat::__uncategorized__');
     }
-
     setExpandedVirtual(prev => {
       const next = new Set(prev);
       let changed = false;
-      for (const key of keysToExpand) {
-        if (!next.has(key)) { next.add(key); changed = true; }
-      }
+      for (const k of keys) if (!next.has(k)) { next.add(k); changed = true; }
       return changed ? next : prev;
     });
   }, [currentProjectId, projects, mode]);
 
-  // Manual mode mutations
+  /* ── Mutations ── */
+
   const createFolder = useMutation({
     mutationFn: async (name: string) => {
-      const { error } = await supabase.from('project_folders').insert({ company_id: companyId!, name });
+      const maxOrder = folders.length > 0 ? Math.max(...folders.map(f => f.sort_order)) + 1 : 0;
+      const { error } = await supabase.from('project_folders').insert({ company_id: companyId!, name, sort_order: maxOrder });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -384,9 +398,36 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sidebar-projects'] });
-      toast.success('Το έργο μετακινήθηκε');
     },
   });
+
+  const reorderProjects = useMutation({
+    mutationFn: async (items: { id: string; sort_order: number }[]) => {
+      await Promise.all(
+        items.map(it =>
+          supabase.from('projects').update({ sidebar_sort_order: it.sort_order }).eq('id', it.id)
+        )
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sidebar-projects'] });
+    },
+  });
+
+  const reorderFolders = useMutation({
+    mutationFn: async (items: { id: string; sort_order: number }[]) => {
+      await Promise.all(
+        items.map(it =>
+          supabase.from('project_folders').update({ sort_order: it.sort_order }).eq('id', it.id)
+        )
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project-folders'] });
+    },
+  });
+
+  /* ── Helpers ── */
 
   const toggleFolder = (id: string) => {
     setExpandedFolders(prev => {
@@ -404,59 +445,158 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
     });
   };
 
-  const handleDragStart = (event: DragStartEvent) => { setActiveDragId(event.active.id as string); };
-  const handleDragEnd = (event: DragEndEvent) => {
-    setActiveDragId(null);
-    const { active, over } = event;
-    if (!over) return;
-    const activeData = active.data.current;
+  /* ── DnD derived data ── */
+
+  const rootFolders = useMemo(() => folders.filter(f => !f.parent_folder_id), [folders]);
+
+  const projectsByFolder = useMemo(() => {
+    const map = new Map<string | null, ProjectItem[]>();
+    projects.forEach(p => {
+      const key = p.folder_id;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(p);
+    });
+    // Sort each group by sidebar_sort_order
+    map.forEach((arr) => arr.sort((a, b) => a.sidebar_sort_order - b.sidebar_sort_order));
+    return map;
+  }, [projects]);
+
+  // Build sortable IDs for the root level (folders + unfoldered projects interleaved)
+  const rootSortableIds = useMemo(() => {
+    const ids: string[] = [];
+    rootFolders.forEach(f => ids.push(`folder-${f.id}`));
+    (projectsByFolder.get(null) || []).forEach(p => ids.push(`project-${p.id}`));
+    return ids;
+  }, [rootFolders, projectsByFolder]);
+
+  const folderProjectIds = useCallback((folderId: string) => {
+    return (projectsByFolder.get(folderId) || []).map(p => `project-${p.id}`);
+  }, [projectsByFolder]);
+
+  /* ── DnD handlers ── */
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveDragId(event.active.id as string);
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const { over } = event;
+    if (!over) { setOverFolderId(null); return; }
     const overData = over.data.current;
-    if (!activeData || activeData.type !== 'project') return;
-    const projectId = activeData.projectId as string;
-    let targetFolderId: string | null = null;
-    if (overData?.type === 'folder') targetFolderId = overData.folderId as string;
-    else if (over.id === 'root-drop') targetFolderId = null;
-    const currentProject = projects.find(p => p.id === projectId);
-    if (currentProject && currentProject.folder_id !== targetFolderId) {
-      moveProject.mutate({ projectId, folderId: targetFolderId });
+    if (overData?.type === 'folder') {
+      setOverFolderId(overData.folderId as string);
+    } else {
+      setOverFolderId(null);
     }
   };
 
-  if (collapsed) return null;
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveDragId(null);
+    setOverFolderId(null);
+    if (!over || active.id === over.id) return;
 
-  // --- AUTO MODE ---
-  if (mode === 'auto') {
-    const categoryLookup = new Map<string, { color: string | null; sortOrder: number }>();
-    categories.forEach(cat => {
-      categoryLookup.set(cat.name, { color: cat.color, sortOrder: cat.sort_order });
-    });
+    const activeData = active.data.current;
+    const overData = over.data.current;
 
-    const dynamicCategories = new Map<string, { color: string | null; sortOrder: number; clients: Map<string, ProjectItem[]> }>();
-    const uncategorized: { clients: Map<string, ProjectItem[]>; orphans: ProjectItem[] } = {
-      clients: new Map(),
-      orphans: [],
-    };
+    if (!activeData) return;
 
-    projects.forEach(project => {
-      if (!project.client) {
-        uncategorized.orphans.push(project);
+    // ─── PROJECT DRAG ───
+    if (activeData.type === 'project') {
+      const projectId = activeData.projectId as string;
+      const sourceFolderId = activeData.folderId as string | null;
+
+      // Dropped on a folder → move to that folder
+      if (overData?.type === 'folder') {
+        const targetFolderId = overData.folderId as string;
+        if (sourceFolderId !== targetFolderId) {
+          moveProject.mutate({ projectId, folderId: targetFolderId });
+          // Auto-expand target folder
+          setExpandedFolders(prev => new Set([...prev, targetFolderId]));
+        }
         return;
       }
+
+      // Dropped on another project → reorder within same folder or move
+      if (overData?.type === 'project') {
+        const overProjectId = overData.projectId as string;
+        const targetFolderId = overData.folderId as string | null;
+
+        if (sourceFolderId !== targetFolderId) {
+          // Moving to a different folder
+          moveProject.mutate({ projectId, folderId: targetFolderId });
+          return;
+        }
+
+        // Same folder → reorder
+        const folderProjects = [...(projectsByFolder.get(sourceFolderId) || [])];
+        const oldIndex = folderProjects.findIndex(p => p.id === projectId);
+        const newIndex = folderProjects.findIndex(p => p.id === overProjectId);
+        if (oldIndex === -1 || newIndex === -1) return;
+
+        const reordered = arrayMove(folderProjects, oldIndex, newIndex);
+        const updates = reordered.map((p, i) => ({ id: p.id, sort_order: i }));
+        reorderProjects.mutate(updates);
+        return;
+      }
+
+      // Dropped on root-drop zone → remove from folder
+      if (over.id === 'root-drop') {
+        if (sourceFolderId !== null) {
+          moveProject.mutate({ projectId, folderId: null });
+        }
+        return;
+      }
+    }
+
+    // ─── FOLDER DRAG ───
+    if (activeData.type === 'folder') {
+      const activeFolderId = activeData.folderId as string;
+
+      // Reorder folders at root level
+      if (overData?.type === 'folder') {
+        const overFid = overData.folderId as string;
+        if (activeFolderId === overFid) return;
+        const oldIndex = rootFolders.findIndex(f => f.id === activeFolderId);
+        const newIndex = rootFolders.findIndex(f => f.id === overFid);
+        if (oldIndex === -1 || newIndex === -1) return;
+        const reordered = arrayMove(rootFolders, oldIndex, newIndex);
+        const updates = reordered.map((f, i) => ({ id: f.id, sort_order: i }));
+        reorderFolders.mutate(updates);
+      }
+    }
+  };
+
+  const handleDragCancel = () => {
+    setActiveDragId(null);
+    setOverFolderId(null);
+  };
+
+  /* ── Render ── */
+
+  if (collapsed) return null;
+
+  // ─── AUTO MODE ───
+  if (mode === 'auto') {
+    const categoryLookup = new Map<string, { color: string | null; sortOrder: number }>();
+    categories.forEach(cat => categoryLookup.set(cat.name, { color: cat.color, sortOrder: cat.sort_order }));
+
+    const dynamicCategories = new Map<string, { color: string | null; sortOrder: number; clients: Map<string, ProjectItem[]> }>();
+    const uncategorized: { clients: Map<string, ProjectItem[]>; orphans: ProjectItem[] } = { clients: new Map(), orphans: [] };
+
+    projects.forEach(project => {
+      if (!project.client) { uncategorized.orphans.push(project); return; }
       const clientName = project.client.name;
       const categoryName = sectorToCategory(project.client.sector);
-
       if (!categoryName) {
         if (!uncategorized.clients.has(clientName)) uncategorized.clients.set(clientName, []);
         uncategorized.clients.get(clientName)!.push(project);
         return;
       }
-
       if (!dynamicCategories.has(categoryName)) {
         const defined = categoryLookup.get(categoryName);
         dynamicCategories.set(categoryName, {
-          color: defined?.color || '#6B7280',
-          sortOrder: defined?.sortOrder ?? 999,
-          clients: new Map(),
+          color: defined?.color || '#6B7280', sortOrder: defined?.sortOrder ?? 999, clients: new Map(),
         });
       }
       const cat = dynamicCategories.get(categoryName)!;
@@ -474,25 +614,12 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
             if (catData.clients.size === 0) return null;
             const catKey = `cat::${catName}`;
             return (
-              <VirtualFolder
-                key={catName}
-                name={catName}
-                color={catData.color}
-                open={expandedVirtual.has(catKey)}
-                onToggle={() => toggleVirtual(catKey)}
-              >
+              <VirtualFolder key={catName} name={catName} color={catData.color} open={expandedVirtual.has(catKey)} onToggle={() => toggleVirtual(catKey)}>
                 {Array.from(catData.clients.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([clientName, clientProjects]) => {
                   const clientKey = `cat::${catName}::${clientName}`;
                   return (
-                    <VirtualFolder
-                      key={clientName}
-                      name={clientName}
-                      open={expandedVirtual.has(clientKey)}
-                      onToggle={() => toggleVirtual(clientKey)}
-                    >
-                      {clientProjects.map(p => (
-                        <ProjectLink key={p.id} project={p} isActive={currentProjectId === p.id} />
-                      ))}
+                    <VirtualFolder key={clientName} name={clientName} open={expandedVirtual.has(clientKey)} onToggle={() => toggleVirtual(clientKey)}>
+                      {clientProjects.map(p => <ProjectLink key={p.id} project={p} isActive={currentProjectId === p.id} />)}
                     </VirtualFolder>
                   );
                 })}
@@ -500,32 +627,17 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
             );
           })}
 
-          {/* Uncategorized */}
           {(uncategorized.clients.size > 0 || uncategorized.orphans.length > 0) && (
-            <VirtualFolder
-              name="Χωρίς Κατηγορία"
-              color="#9CA3AF"
-              open={expandedVirtual.has('cat::__uncategorized__')}
-              onToggle={() => toggleVirtual('cat::__uncategorized__')}
-            >
+            <VirtualFolder name="Χωρίς Κατηγορία" color="#9CA3AF" open={expandedVirtual.has('cat::__uncategorized__')} onToggle={() => toggleVirtual('cat::__uncategorized__')}>
               {Array.from(uncategorized.clients.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([clientName, clientProjects]) => {
                 const clientKey = `cat::__uncategorized__::${clientName}`;
                 return (
-                  <VirtualFolder
-                    key={clientName}
-                    name={clientName}
-                    open={expandedVirtual.has(clientKey)}
-                    onToggle={() => toggleVirtual(clientKey)}
-                  >
-                    {clientProjects.map(p => (
-                      <ProjectLink key={p.id} project={p} isActive={currentProjectId === p.id} />
-                    ))}
+                  <VirtualFolder key={clientName} name={clientName} open={expandedVirtual.has(clientKey)} onToggle={() => toggleVirtual(clientKey)}>
+                    {clientProjects.map(p => <ProjectLink key={p.id} project={p} isActive={currentProjectId === p.id} />)}
                   </VirtualFolder>
                 );
               })}
-              {uncategorized.orphans.map(p => (
-                <ProjectLink key={p.id} project={p} isActive={currentProjectId === p.id} />
-              ))}
+              {uncategorized.orphans.map(p => <ProjectLink key={p.id} project={p} isActive={currentProjectId === p.id} />)}
             </VirtualFolder>
           )}
 
@@ -537,15 +649,25 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
     );
   }
 
-  // --- MANUAL MODE ---
-  const rootFolders = folders.filter(f => !f.parent_folder_id);
-  const unfolderedProjects = projects.filter(p => !p.folder_id);
-  const draggedProject = activeDragId ? projects.find(p => `project-${p.id}` === activeDragId) : null;
+  // ─── MANUAL MODE ───
+  const unfolderedProjects = projectsByFolder.get(null) || [];
+  const draggedProject = activeDragId?.startsWith('project-')
+    ? projects.find(p => `project-${p.id}` === activeDragId)
+    : null;
+  const draggedFolder = activeDragId?.startsWith('folder-')
+    ? folders.find(f => `folder-${f.id}` === activeDragId)
+    : null;
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
       <div className="space-y-0.5 mt-1">
-
         <div className="max-h-[300px] overflow-y-auto space-y-0.5 scrollbar-thin">
           {/* Create folder */}
           {creatingFolder ? (
@@ -558,38 +680,47 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
             </button>
           )}
 
-          {/* Folders */}
-          {rootFolders.map(folder => {
-            const folderProjects = projects.filter(p => p.folder_id === folder.id);
-            const isOpen = expandedFolders.has(folder.id);
-            return (
-              <DroppableFolder
-                key={folder.id} folder={folder} isOpen={isOpen}
-                onToggle={() => toggleFolder(folder.id)}
-                onRename={() => { setRenamingId(folder.id); setRenameValue(folder.name); }}
-                onDelete={() => deleteFolder.mutate(folder.id)}
-                renamingId={renamingId} renameValue={renameValue}
-                setRenameValue={setRenameValue} setRenamingId={setRenamingId}
-                onRenameSubmit={() => renameFolder.mutate({ id: folder.id, name: renameValue })}
-                projectCount={folderProjects.length}
-              >
-                {folderProjects.length > 0 && (
-                  <div className="ml-4 pl-2 border-l border-border/20 space-y-0.5">
-                    {folderProjects.map(project => (
-                      <DraggableProject key={project.id} project={project} isActive={currentProjectId === project.id} />
-                    ))}
-                  </div>
-                )}
-              </DroppableFolder>
-            );
-          })}
+          {/* Root-level sortable context (folders + unfoldered projects) */}
+          <SortableContext items={rootSortableIds} strategy={verticalListSortingStrategy}>
+            {/* Folders */}
+            {rootFolders.map(folder => {
+              const folderProjects = projectsByFolder.get(folder.id) || [];
+              const isOpen = expandedFolders.has(folder.id);
+              const projIds = folderProjectIds(folder.id);
+              return (
+                <SortableFolder
+                  key={folder.id}
+                  folder={folder}
+                  isOpen={isOpen}
+                  onToggle={() => toggleFolder(folder.id)}
+                  onRename={() => { setRenamingId(folder.id); setRenameValue(folder.name); }}
+                  onDelete={() => deleteFolder.mutate(folder.id)}
+                  renamingId={renamingId}
+                  renameValue={renameValue}
+                  setRenameValue={setRenameValue}
+                  setRenamingId={setRenamingId}
+                  onRenameSubmit={() => renameFolder.mutate({ id: folder.id, name: renameValue })}
+                  projectCount={folderProjects.length}
+                  isOverFolder={overFolderId === folder.id}
+                >
+                  {folderProjects.length > 0 && (
+                    <div className="ml-4 pl-2 border-l border-border/20 space-y-0.5">
+                      <SortableContext items={projIds} strategy={verticalListSortingStrategy}>
+                        {folderProjects.map(project => (
+                          <SortableProject key={project.id} project={project} isActive={currentProjectId === project.id} />
+                        ))}
+                      </SortableContext>
+                    </div>
+                  )}
+                </SortableFolder>
+              );
+            })}
 
-          {/* Unfoldered projects */}
-          <RootDropZone>
+            {/* Unfoldered projects */}
             {unfolderedProjects.map(project => (
-              <DraggableProject key={project.id} project={project} isActive={currentProjectId === project.id} />
+              <SortableProject key={project.id} project={project} isActive={currentProjectId === project.id} />
             ))}
-          </RootDropZone>
+          </SortableContext>
         </div>
       </div>
 
@@ -600,19 +731,13 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
             <span className="truncate">{draggedProject.name}</span>
           </div>
         )}
+        {draggedFolder && (
+          <div className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm bg-card border shadow-lg">
+            <Folder className="h-3.5 w-3.5 shrink-0" style={{ color: draggedFolder.color || undefined }} />
+            <span className="truncate text-xs">{draggedFolder.name}</span>
+          </div>
+        )}
       </DragOverlay>
     </DndContext>
-  );
-}
-
-function RootDropZone({ children }: { children: React.ReactNode }) {
-  const { setNodeRef, isOver } = useDroppable({
-    id: 'root-drop',
-    data: { type: 'root' },
-  });
-  return (
-    <div ref={setNodeRef} className={cn("space-y-0.5 transition-colors rounded-lg", isOver && "bg-secondary/30 ring-1 ring-foreground/20")}>
-      {children}
-    </div>
   );
 }

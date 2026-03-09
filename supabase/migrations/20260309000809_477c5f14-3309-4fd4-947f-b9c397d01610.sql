@@ -1,0 +1,1 @@
+ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS sidebar_sort_order integer DEFAULT 0;

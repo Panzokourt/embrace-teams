@@ -800,19 +800,14 @@ export function TasksTableView({
           <TableHeader>
             <TableRow>
               {isColumnVisible('select') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('select')}
-                  onWidthChange={(w) => setColumnWidth('select', w)}
-                  minWidth={40}
-                  className="w-[40px]"
-                >
+                <TableHead className="w-[44px] min-w-[44px] max-w-[44px] px-3">
                   <Checkbox
                     checked={allSelected}
                     // @ts-ignore - indeterminate is valid but not in types
                     indeterminate={someSelected}
                     onCheckedChange={toggleSelectAll}
                   />
-                </ResizableTableHeader>
+                </TableHead>
               )}
               
               <ResizableTableHeader 

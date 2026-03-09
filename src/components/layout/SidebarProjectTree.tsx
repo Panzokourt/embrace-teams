@@ -64,6 +64,18 @@ interface ProjectItem {
 
 type TreeMode = 'manual' | 'auto';
 
+function getStatusColor(status: string): string {
+  switch (status) {
+    case 'active': return 'bg-emerald-500';
+    case 'completed': return 'bg-blue-500';
+    case 'on_hold': case 'paused': return 'bg-amber-500';
+    case 'cancelled': return 'bg-red-500';
+    case 'lead': return 'bg-purple-500';
+    case 'proposal': return 'bg-cyan-500';
+    default: return 'bg-muted-foreground/40';
+  }
+}
+
 /* ───────── Sortable Project (manual mode) ───────── */
 
 function SortableProject({ project, isActive }: { project: ProjectItem; isActive: boolean }) {

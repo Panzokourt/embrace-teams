@@ -734,33 +734,44 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
-      <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        {columns.map(column => (
-          <div key={column.id} className="space-y-4">
-            <div className="flex items-center gap-2">
-              {column.icon}
-              <h3 className="font-semibold">{column.label}</h3>
-              <Badge variant="secondary">{tasksByStatus[column.id].length}</Badge>
-            </div>
-            <DroppableColumn
-              id={column.id}
-              items={tasksByStatus[column.id].map(t => t.id)}
-            >
-              <div className="space-y-3">
-                {tasksByStatus[column.id].map(task => (
-                  <DraggableCard key={task.id} id={task.id}>
-                    <TaskCard task={task} />
-                  </DraggableCard>
-                ))}
-                {tasksByStatus[column.id].length === 0 && (
-                  <div className="border border-dashed rounded-lg p-4 text-center text-muted-foreground text-sm">
-                    Σύρετε tasks εδώ
-                  </div>
-                )}
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        {columns.map(column => {
+          const colColor = STATUS_COLORS[column.id];
+          return (
+            <div key={column.id} className="space-y-3">
+              {/* Monday.com-style colored column header */}
+              <div className="flex items-center gap-2">
+                <span style={{ color: colColor?.bg }}>{column.icon}</span>
+                <h3 className="font-semibold text-sm" style={{ color: colColor?.bg }}>
+                  {column.label}
+                </h3>
+                <Badge 
+                  variant="secondary" 
+                  className="text-xs min-w-[22px] justify-center"
+                >
+                  {tasksByStatus[column.id].length}
+                </Badge>
               </div>
-            </DroppableColumn>
-          </div>
-        ))}
+              <DroppableColumn
+                id={column.id}
+                items={tasksByStatus[column.id].map(t => t.id)}
+              >
+                <div className="space-y-2.5">
+                  {tasksByStatus[column.id].map(task => (
+                    <DraggableCard key={task.id} id={task.id}>
+                      <TaskCard task={task} />
+                    </DraggableCard>
+                  ))}
+                  {tasksByStatus[column.id].length === 0 && (
+                    <div className="border border-dashed rounded-lg p-4 text-center text-muted-foreground text-sm">
+                      Σύρετε tasks εδώ
+                    </div>
+                  )}
+                </div>
+              </DroppableColumn>
+            </div>
+          );
+        })}
       </div>
 
       <DragOverlay>

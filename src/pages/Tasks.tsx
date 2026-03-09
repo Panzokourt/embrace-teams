@@ -195,9 +195,48 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
           .in('id', assigneeIds);
         profilesMap = new Map((profiles || []).map(p => [p.id, { full_name: p.full_name, avatar_url: p.avatar_url }]));
       }
+      // Batch fetch task_assignees
+      const taskIds = (data || []).map(t => t.id);
+      let assigneesMap = new Map<string, TaskAssignee[]>();
+      if (taskIds.length > 0) {
+        const { data: taskAssignees } = await supabase
+          .from('task_assignees')
+          .select('task_id, user_id')
+          .in('task_id', taskIds);
+        
+        // Collect all unique user IDs from task_assignees
+        const allAssigneeIds = [...new Set([
+          ...assigneeIds,
+          ...(taskAssignees || []).map(ta => ta.user_id)
+        ])];
+        
+        // Re-fetch all needed profiles
+        if (allAssigneeIds.length > 0) {
+          const { data: allProfiles } = await supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url')
+            .in('id', allAssigneeIds);
+          profilesMap = new Map((allProfiles || []).map(p => [p.id, { full_name: p.full_name, avatar_url: p.avatar_url }]));
+        }
+        
+        // Group assignees by task
+        for (const ta of (taskAssignees || [])) {
+          const profile = profilesMap.get(ta.user_id);
+          const assignee: TaskAssignee = {
+            user_id: ta.user_id,
+            full_name: profile?.full_name || null,
+            avatar_url: profile?.avatar_url || null,
+          };
+          const existing = assigneesMap.get(ta.task_id) || [];
+          existing.push(assignee);
+          assigneesMap.set(ta.task_id, existing);
+        }
+      }
+
       const tasksWithAssignees = (data || []).map(task => ({
         ...task,
         assignee: task.assigned_to ? profilesMap.get(task.assigned_to) || null : null,
+        assignees: assigneesMap.get(task.id) || [],
       }));
       
       setTasks(tasksWithAssignees as Task[]);

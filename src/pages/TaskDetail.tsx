@@ -356,16 +356,35 @@ export default function TaskDetailPage() {
         <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h1
-          className="text-base font-semibold truncate cursor-pointer hover:bg-muted/50 px-1.5 py-0.5 rounded transition-colors max-w-[300px]"
-          onClick={() => {
-            const newTitle = prompt('Τίτλος Task:', task.title);
-            if (newTitle && newTitle !== task.title) updateField('title', newTitle);
-          }}
-          title="Κλικ για επεξεργασία"
-        >
-          {task.title}
-        </h1>
+        {editingTitle ? (
+          <Input
+            autoFocus
+            className="h-8 text-base font-semibold max-w-[300px]"
+            value={titleDraft}
+            onChange={(e) => setTitleDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                if (titleDraft.trim() && titleDraft !== task.title) updateField('title', titleDraft.trim());
+                setEditingTitle(false);
+              } else if (e.key === 'Escape') {
+                setTitleDraft(task.title);
+                setEditingTitle(false);
+              }
+            }}
+            onBlur={() => {
+              if (titleDraft.trim() && titleDraft !== task.title) updateField('title', titleDraft.trim());
+              setEditingTitle(false);
+            }}
+          />
+        ) : (
+          <h1
+            className="text-base font-semibold truncate cursor-pointer hover:bg-muted/50 px-1.5 py-0.5 rounded transition-colors max-w-[300px]"
+            onClick={() => { setTitleDraft(task.title); setEditingTitle(true); }}
+            title="Κλικ για επεξεργασία"
+          >
+            {task.title}
+          </h1>
+        )}
         <TaskTimer taskId={task.id} projectId={task.project_id} compact />
 
         <div className="flex-1" />

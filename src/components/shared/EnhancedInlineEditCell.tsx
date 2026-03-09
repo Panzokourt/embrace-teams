@@ -161,7 +161,7 @@ export function EnhancedInlineEditCell({
         >
           <SelectValue placeholder={placeholder}>
             {selectedOption ? (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2" title={type === 'avatar-select' ? selectedOption.label : undefined}>
                 {type === 'avatar-select' && (
                   <Avatar className="h-5 w-5">
                     {selectedOption.avatar && <AvatarImage src={selectedOption.avatar} />}
@@ -177,7 +177,7 @@ export function EnhancedInlineEditCell({
                     style={{ backgroundColor: selectedOption.color }}
                   />
                 )}
-                <span className="truncate">{selectedOption.label}</span>
+                {type !== 'avatar-select' && <span className="truncate">{selectedOption.label}</span>}
               </div>
             ) : (
               <span className="text-muted-foreground">{placeholder}</span>

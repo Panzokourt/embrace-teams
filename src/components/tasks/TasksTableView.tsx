@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { EnhancedInlineEditCell } from '@/components/shared/EnhancedInlineEditCell';
 import { TableToolbar } from '@/components/shared/TableToolbar';
 import { BulkActionsDialog } from '@/components/shared/BulkActionsDialog';
@@ -33,6 +34,7 @@ import {
   CheckSquare,
   User,
   Flag,
+  X as XIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TaskTimer } from '@/components/time-tracking/TaskTimer';
@@ -544,14 +546,83 @@ export function TasksTableView({
           {/* Assignee */}
           {isColumnVisible('assignee') && (
             <TableCell style={{ width: getColumnWidth('assignee') }}>
-              <EnhancedInlineEditCell
-                value={task.assigned_to}
-                onSave={(val) => onInlineUpdate(task.id, 'assigned_to', val)}
-                type="avatar-select"
-                options={userOptions}
-                placeholder="Κανένας"
-                disabled={!canManage}
-              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button className="flex items-center gap-1 hover:bg-muted rounded-md p-1 transition-colors -mx-1" title={task.assignee?.full_name || 'Κανένας'}>
+                    {task.assigned_to ? (
+                      <Avatar className="h-6 w-6">
+                        {task.assignee?.avatar_url && <AvatarImage src={task.assignee.avatar_url} />}
+                        <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                          {(task.assignee?.full_name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                    ) : (
+                      <div className="h-6 w-6 rounded-full border border-dashed border-muted-foreground/40 flex items-center justify-center">
+                        <User className="h-3 w-3 text-muted-foreground/60" />
+                      </div>
+                    )}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-2" align="start">
+                  <div className="space-y-2">
+                    {task.assigned_to && (
+                      <div className="flex items-center gap-2 p-1.5 bg-muted/50 rounded-md">
+                        <Avatar className="h-7 w-7">
+                          {task.assignee?.avatar_url && <AvatarImage src={task.assignee.avatar_url} />}
+                          <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                            {(task.assignee?.full_name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{task.assignee?.full_name || 'Χωρίς όνομα'}</p>
+                        </div>
+                        {canManage && (
+                          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={async () => { await onInlineUpdate(task.id, 'assigned_to', null); }}>
+                            <XIcon className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                    {canManage && (
+                      <>
+                        <Input
+                          placeholder="Αναζήτηση..."
+                          className="h-7 text-xs"
+                          onChange={(e) => {
+                            const searchEl = e.target.closest('.space-y-2')?.querySelector('[data-user-list]');
+                            if (searchEl) {
+                              const items = searchEl.querySelectorAll('[data-user-item]');
+                              items.forEach((item: Element) => {
+                                const name = item.getAttribute('data-user-name')?.toLowerCase() || '';
+                                (item as HTMLElement).style.display = name.includes(e.target.value.toLowerCase()) ? '' : 'none';
+                              });
+                            }
+                          }}
+                        />
+                        <div className="max-h-40 overflow-y-auto space-y-0.5" data-user-list>
+                          {users.filter(u => u.id !== task.assigned_to).map(u => (
+                            <button
+                              key={u.id}
+                              data-user-item
+                              data-user-name={u.full_name || u.email}
+                              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-muted transition-colors"
+                              onClick={async () => { await onInlineUpdate(task.id, 'assigned_to', u.id); }}
+                            >
+                              <Avatar className="h-5 w-5">
+                                {u.avatar_url && <AvatarImage src={u.avatar_url} />}
+                                <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                                  {(u.full_name || u.email).split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="truncate">{u.full_name || u.email}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </TableCell>
           )}
 

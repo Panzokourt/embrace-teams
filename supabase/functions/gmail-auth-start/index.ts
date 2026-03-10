@@ -14,6 +14,21 @@ const SCOPES = [
   "https://www.googleapis.com/auth/userinfo.profile",
 ].join(" ");
 
+async function hmacSign(data: string, secret: string): Promise<string> {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(data));
+  return Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -54,8 +69,12 @@ Deno.serve(async (req) => {
 
     const redirectUri = `${supabaseUrl}/functions/v1/gmail-auth-callback`;
 
-    // State contains user_id for the callback to link the token
-    const state = btoa(JSON.stringify({ user_id: userId }));
+    // Generate a nonce and HMAC-sign the state to prevent forgery
+    const nonce = crypto.randomUUID();
+    const hmacSecret = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const payload = JSON.stringify({ user_id: userId, nonce });
+    const signature = await hmacSign(payload, hmacSecret);
+    const state = btoa(JSON.stringify({ user_id: userId, nonce, sig: signature }));
 
     const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
     authUrl.searchParams.set("client_id", clientId);
@@ -71,7 +90,7 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error("gmail-auth-start error:", err);
-    return new Response(JSON.stringify({ error: String(err) }), {
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

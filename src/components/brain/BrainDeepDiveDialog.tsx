@@ -68,34 +68,62 @@ function buildExportContent(result: DeepDiveResult, title: string): string {
 }
 
 function exportAsPDF(result: DeepDiveResult, title: string) {
-  const content = buildExportContent(result, title);
   const printWindow = window.open('', '_blank');
   if (!printWindow) return;
-  printWindow.document.write(`
-    <html><head><title>Deep Dive: ${title}</title>
-    <style>
-      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; line-height: 1.6; font-size: 14px; }
-      h1 { font-size: 20px; border-bottom: 2px solid #e5e5e5; padding-bottom: 8px; }
-      h2 { font-size: 16px; margin-top: 24px; }
-      pre { white-space: pre-wrap; font-family: inherit; }
-      .step { background: #f5f5f5; padding: 12px; border-radius: 8px; margin: 8px 0; }
-      .step-num { font-weight: bold; color: #6366f1; }
-      .meta { color: #666; font-size: 12px; }
-    </style></head><body>
-    <h1>🧠 Deep Dive: ${title}</h1>
-    <pre>${result.extended_analysis}</pre>
-    ${result.action_plan?.length ? `
-      <h2>⚡ Action Plan</h2>
-      ${result.action_plan.map((item, i) => `
-        <div class="step">
-          <span class="step-num">${i + 1}.</span> ${item.step}
-          <div class="meta">Timeline: ${item.timeline} | Effort: ${item.effort}</div>
-        </div>
-      `).join('')}
-    ` : ''}
-    </body></html>
-  `);
-  printWindow.document.close();
+  const doc = printWindow.document;
+
+  // Build styles
+  const style = doc.createElement('style');
+  style.textContent = `
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; line-height: 1.6; font-size: 14px; }
+    h1 { font-size: 20px; border-bottom: 2px solid #e5e5e5; padding-bottom: 8px; }
+    h2 { font-size: 16px; margin-top: 24px; }
+    pre { white-space: pre-wrap; font-family: inherit; }
+    .step { background: #f5f5f5; padding: 12px; border-radius: 8px; margin: 8px 0; }
+    .step-num { font-weight: bold; color: #6366f1; }
+    .meta { color: #666; font-size: 12px; }
+  `;
+  doc.head.appendChild(style);
+
+  const titleEl = doc.createElement('title');
+  titleEl.textContent = `Deep Dive: ${title}`;
+  doc.head.appendChild(titleEl);
+
+  const h1 = doc.createElement('h1');
+  h1.textContent = `🧠 Deep Dive: ${title}`;
+  doc.body.appendChild(h1);
+
+  const pre = doc.createElement('pre');
+  pre.textContent = result.extended_analysis;
+  doc.body.appendChild(pre);
+
+  if (result.action_plan?.length) {
+    const h2 = doc.createElement('h2');
+    h2.textContent = '⚡ Action Plan';
+    doc.body.appendChild(h2);
+
+    result.action_plan.forEach((item, i) => {
+      const stepDiv = doc.createElement('div');
+      stepDiv.className = 'step';
+
+      const numSpan = doc.createElement('span');
+      numSpan.className = 'step-num';
+      numSpan.textContent = `${i + 1}. `;
+      stepDiv.appendChild(numSpan);
+
+      const stepText = doc.createTextNode(item.step);
+      stepDiv.appendChild(stepText);
+
+      const metaDiv = doc.createElement('div');
+      metaDiv.className = 'meta';
+      metaDiv.textContent = `Timeline: ${item.timeline} | Effort: ${item.effort}`;
+      stepDiv.appendChild(metaDiv);
+
+      doc.body.appendChild(stepDiv);
+    });
+  }
+
+  doc.close();
   setTimeout(() => printWindow.print(), 300);
 }
 
@@ -135,7 +163,6 @@ export function BrainDeepDiveDialog({
             </DialogTitle>
             {result && (
               <div className="flex items-center gap-1">
-                {/* Save button */}
                 {onSave && (
                   <Button
                     size="sm"
@@ -147,7 +174,6 @@ export function BrainDeepDiveDialog({
                     {isSaved ? <><Check className="h-3 w-3" /> Αποθηκεύτηκε</> : saving ? <><Loader2 className="h-3 w-3 animate-spin" /> Αποθήκευση...</> : <><Save className="h-3 w-3" /> Αποθήκευση</>}
                   </Button>
                 )}
-                {/* Export dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" className="h-7 text-[11px] gap-1">
@@ -178,7 +204,6 @@ export function BrainDeepDiveDialog({
             </div>
           ) : result ? (
             <div className="space-y-5">
-              {/* Extended Analysis — well-formatted prose */}
               <article className="prose prose-sm dark:prose-invert max-w-none
                 prose-headings:text-foreground prose-headings:font-semibold
                 prose-h1:text-base prose-h1:mt-5 prose-h1:mb-2 prose-h1:border-b prose-h1:border-border/30 prose-h1:pb-2
@@ -193,7 +218,6 @@ export function BrainDeepDiveDialog({
                 <ReactMarkdown>{result.extended_analysis}</ReactMarkdown>
               </article>
 
-              {/* Action Plan */}
               {result.action_plan && result.action_plan.length > 0 && (
                 <div className="space-y-2 pt-2 border-t border-border/30">
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
@@ -222,7 +246,6 @@ export function BrainDeepDiveDialog({
                 </div>
               )}
 
-              {/* Action Buttons */}
               <div className="flex flex-wrap gap-2 pt-2 border-t border-border/30">
                 {result.suggested_project && onCreateProject && (
                   <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => onCreateProject(result.suggested_project)}>

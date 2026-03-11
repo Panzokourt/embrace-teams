@@ -205,7 +205,7 @@ export function ProjectAIAnalysisInline({
           .insert({
             project_id: projectId, client_id: project?.client_id || null,
             invoice_number: `INV-${Date.now().toString().slice(-6)}`,
-            amount: inv.amount, due_date: inv.due_date || null,
+            amount: inv.amount, due_date: sanitizeDate(inv.due_date),
             issued_date: new Date().toISOString().split('T')[0], paid: false,
           });
         if (error) throw error;

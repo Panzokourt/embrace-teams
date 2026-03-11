@@ -322,7 +322,7 @@ export default function ProjectDetailPage() {
 
       {/* ── TABS LAYOUT ────────────────────────────────────────────────── */}
       <div className="space-y-4">
-          <Tabs defaultValue="overview" className="space-y-3">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-3">
             <TabsList className="h-auto gap-1 flex-wrap">
               <TabsTrigger value="overview" className="text-xs gap-1">
                 <FolderInput className="h-3.5 w-3.5" /> Επισκόπηση

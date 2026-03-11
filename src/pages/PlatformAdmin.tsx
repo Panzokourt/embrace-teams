@@ -315,7 +315,7 @@ export default function PlatformAdmin() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="text-emerald-500 hover:text-emerald-600"
+                                className="text-primary hover:text-primary/80"
                                 disabled={actionLoading === p.id}
                                 onClick={() => handleUserAction('activate', p.id)}
                               >

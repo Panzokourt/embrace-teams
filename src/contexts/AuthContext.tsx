@@ -163,6 +163,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAllCompanies([]);
     setPermissions([]);
     setLegacyRoles([]);
+    setIsPlatformAdmin(false);
     setPostLoginRoute(null);
   };
 

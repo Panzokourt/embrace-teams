@@ -216,8 +216,8 @@ export function ProjectAIAnalysisInline({
         const details = suggestions.suggestedProjectDetails;
         const updateData: any = {};
         if (details.description) updateData.description = details.description;
-        if (details.start_date) updateData.start_date = details.start_date;
-        if (details.end_date) updateData.end_date = details.end_date;
+        if (sanitizeDate(details.start_date)) updateData.start_date = sanitizeDate(details.start_date);
+        if (sanitizeDate(details.end_date)) updateData.end_date = sanitizeDate(details.end_date);
         if (details.budget && details.budget > 0) updateData.budget = details.budget;
         if (Object.keys(updateData).length > 0) {
           await supabase.from('projects').update(updateData).eq('id', projectId);

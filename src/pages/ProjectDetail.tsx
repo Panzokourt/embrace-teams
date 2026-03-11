@@ -25,6 +25,10 @@ import {
   Palette, FolderInput, Timer, ListChecks, FileText, MessageSquare,
   Pencil, Save, X, ClipboardList, Sparkles, FolderOpen, Layers,
 } from 'lucide-react';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import { ProjectAIAnalysisInline } from '@/components/projects/ProjectAIAnalysisInline';
 import { format, differenceInDays } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -84,6 +88,7 @@ export default function ProjectDetailPage() {
   const [budgetDraft, setBudgetDraft] = useState('');
   const [editingFee, setEditingFee] = useState(false);
   const [feeDraft, setFeeDraft] = useState('');
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
 
   // Folders query
   const { data: folders = [] } = useQuery({
@@ -352,6 +357,11 @@ export default function ProjectDetailPage() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {canEdit && (
+              <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => setAiDialogOpen(true)}>
+                <Sparkles className="h-3.5 w-3.5" /> AI Ανάλυση
+              </Button>
+            )}
             <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground">
               <Timer className="h-3 w-3" />{totalTrackedHours}h
             </span>
@@ -685,6 +695,32 @@ export default function ProjectDetailPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* AI Analysis Dialog */}
+      <Dialog open={aiDialogOpen} onOpenChange={setAiDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5" /> AI Ανάλυση — {project.name}
+            </DialogTitle>
+          </DialogHeader>
+          <ProjectAIAnalysisInline
+            projectId={project.id}
+            projectName={project.name}
+            projectBudget={project.budget}
+            allowUpload={true}
+            onDone={() => {
+              setAiDialogOpen(false);
+              fetchProjectData();
+            }}
+            onProjectDetailsUpdate={(details) => {
+              supabase.from('projects').update(details).eq('id', project.id).then(() => {
+                fetchProjectData();
+              });
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

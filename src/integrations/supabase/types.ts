@@ -4509,6 +4509,7 @@ export type Database = {
           client_id: string | null
           company_id: string
           created_at: string
+          created_by: string | null
           description: string | null
           end_date: string | null
           folder_id: string | null
@@ -4537,6 +4538,7 @@ export type Database = {
           client_id?: string | null
           company_id: string
           created_at?: string
+          created_by?: string | null
           description?: string | null
           end_date?: string | null
           folder_id?: string | null
@@ -4565,6 +4567,7 @@ export type Database = {
           client_id?: string | null
           company_id?: string
           created_at?: string
+          created_by?: string | null
           description?: string | null
           end_date?: string | null
           folder_id?: string | null

@@ -415,6 +415,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user, session, profile, company, companyRole, allCompanyRoles, allCompanies,
       permissions, loading,
       isOwner, isSuperAdmin, isCompanyAdmin, isManager, isMember, isViewer, isBillingRole, isApproved,
+      isPlatformAdmin,
       isAdmin, isEmployee, isClient,
       roles: legacyRoles,
       hasPermission, signUp, signIn, signOut, switchCompany, refreshUserData, postLoginRoute

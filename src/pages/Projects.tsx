@@ -227,7 +227,10 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
         is_internal: formData.is_internal,
         parent_project_id: formData.parent_project_id || null,
       };
-      if (!editingProject && company) projectData.company_id = company.id;
+      if (!editingProject && company) {
+        projectData.company_id = company.id;
+        projectData.created_by = user?.id || null;
+      }
 
       if (editingProject) {
         const { data, error } = await supabase.from('projects').update(projectData).eq('id', editingProject.id).select(`*, client:clients(name, sector)`).single();

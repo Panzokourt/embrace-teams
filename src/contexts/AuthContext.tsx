@@ -67,6 +67,9 @@ interface AuthContextType {
   isBillingRole: boolean;
   isApproved: boolean;
   
+  // Platform-level
+  isPlatformAdmin: boolean;
+  
   // Legacy compatibility
   isAdmin: boolean;
   isEmployee: boolean;
@@ -101,6 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [allCompanies, setAllCompanies] = useState<Company[]>([]);
   const [permissions, setPermissions] = useState<PermissionType[]>([]);
   const [legacyRoles, setLegacyRoles] = useState<string[]>([]);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const fetchingRef = useRef(false);
   const userRef = useRef<User | null>(null);
@@ -159,6 +163,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAllCompanies([]);
     setPermissions([]);
     setLegacyRoles([]);
+    setIsPlatformAdmin(false);
     setPostLoginRoute(null);
   };
 
@@ -294,6 +299,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (rolesData) {
         setLegacyRoles(rolesData.map(r => r.role));
       }
+
+      // Check platform admin status
+      const { data: platformAdminCheck } = await (supabase.rpc as any)('is_platform_admin', { _user_id: userId });
+      setIsPlatformAdmin(!!platformAdminCheck);
     } catch (error) {
       console.error('Error fetching user data:', error);
     } finally {
@@ -412,6 +421,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user, session, profile, company, companyRole, allCompanyRoles, allCompanies,
       permissions, loading,
       isOwner, isSuperAdmin, isCompanyAdmin, isManager, isMember, isViewer, isBillingRole, isApproved,
+      isPlatformAdmin,
       isAdmin, isEmployee, isClient,
       roles: legacyRoles,
       hasPermission, signUp, signIn, signOut, switchCompany, refreshUserData, postLoginRoute

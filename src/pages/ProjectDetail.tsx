@@ -549,7 +549,7 @@ export default function ProjectDetailPage() {
                 </Card>
 
                 {/* Contracts Card */}
-                <ProjectContractsCard projectId={project.id} />
+                <ProjectContractsCard projectId={project.id} onUploadContract={() => setActiveTab('files')} />
               </div>
             </TabsContent>
 

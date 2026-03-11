@@ -339,7 +339,9 @@ export function ProjectAIAnalysisInline({
           {expandedSections.tasks ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </CollapsibleTrigger>
         <CollapsibleContent className="space-y-1.5 mt-1">
-          {suggestions.tasks.map((t, idx) => (
+          {suggestions.tasks.map((t, idx) => {
+            const linkedDeliverable = t.deliverable_index !== undefined ? suggestions.deliverables[t.deliverable_index] : null;
+            return (
             <div key={idx} className="flex items-start gap-2 p-2.5 rounded-lg border bg-card hover:bg-muted/50 text-sm">
               <Checkbox checked={selectedTasks.includes(idx)}
                 onCheckedChange={checked => {
@@ -349,10 +351,19 @@ export function ProjectAIAnalysisInline({
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-xs">{t.title}</p>
                 <p className="text-xs text-muted-foreground line-clamp-2">{t.description}</p>
-                {safeFormatDate(t.due_date) && <span className="text-[10px] text-muted-foreground">Προθεσμία: {safeFormatDate(t.due_date)}</span>}
+                <div className="flex flex-wrap gap-2 mt-0.5">
+                  {safeFormatDate(t.due_date) && <span className="text-[10px] text-muted-foreground">Προθεσμία: {safeFormatDate(t.due_date)}</span>}
+                  {linkedDeliverable && (
+                    <Badge variant="outline" className="text-[9px] h-4 gap-0.5 bg-primary/5 border-primary/20 text-primary">
+                      <Package className="h-2.5 w-2.5" />
+                      {linkedDeliverable.name}
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </CollapsibleContent>
       </Collapsible>
 

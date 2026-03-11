@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
 import { useActivityLogger } from '@/hooks/useActivityLogger';
 import { useProjectsRealtime } from '@/hooks/useRealtimeSubscription';
+import { ProjectAIAnalysisInline } from '@/components/projects/ProjectAIAnalysisInline';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';

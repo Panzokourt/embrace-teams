@@ -67,6 +67,9 @@ interface AuthContextType {
   isBillingRole: boolean;
   isApproved: boolean;
   
+  // Platform-level
+  isPlatformAdmin: boolean;
+  
   // Legacy compatibility
   isAdmin: boolean;
   isEmployee: boolean;

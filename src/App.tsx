@@ -49,6 +49,7 @@ import Brain from "@/pages/Brain";
 import Secretary from "@/pages/Secretary";
 import Workflows from "@/pages/Workflows";
 import ResetPassword from "@/pages/ResetPassword";
+import PlatformAdmin from "@/pages/PlatformAdmin";
 
 function RedirectUserToEmployee() {
   const { id } = useParams();

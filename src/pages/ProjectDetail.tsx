@@ -88,6 +88,7 @@ export default function ProjectDetailPage() {
   const [budgetDraft, setBudgetDraft] = useState('');
   const [editingFee, setEditingFee] = useState(false);
   const [feeDraft, setFeeDraft] = useState('');
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
 
   // Folders query
   const { data: folders = [] } = useQuery({

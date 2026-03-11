@@ -15,6 +15,14 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { format, isValid, parseISO } from 'date-fns';
 import { el } from 'date-fns/locale';
 
+const sanitizeDate = (dateStr?: string | null): string | null => {
+  if (!dateStr) return null;
+  // Must match YYYY-MM-DD with valid numbers
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return null;
+  const parsed = parseISO(dateStr);
+  return isValid(parsed) ? dateStr : null;
+};
+
 interface ProjectSuggestion {
   deliverables: Array<{ name: string; description: string; due_date?: string; budget?: number }>;
   tasks: Array<{ title: string; description: string; due_date?: string; deliverable_index?: number }>;
@@ -173,7 +181,7 @@ export function ProjectAIAnalysisInline({
         const d = suggestions.deliverables[idx];
         const { data, error } = await supabase
           .from('deliverables')
-          .insert({ project_id: projectId, name: d.name, description: d.description, due_date: d.due_date || null, budget: d.budget || null, completed: false })
+          .insert({ project_id: projectId, name: d.name, description: d.description, due_date: sanitizeDate(d.due_date), budget: d.budget || null, completed: false })
           .select('id').single();
         if (error) throw error;
         deliverableIds[idx] = data.id;
@@ -185,7 +193,7 @@ export function ProjectAIAnalysisInline({
           ? deliverableIds[t.deliverable_index] : null;
         const { error } = await supabase
           .from('tasks')
-          .insert({ project_id: projectId, title: t.title, description: t.description, due_date: t.due_date || null, status: 'todo', deliverable_id: deliverableId });
+          .insert({ project_id: projectId, title: t.title, description: t.description, due_date: sanitizeDate(t.due_date), status: 'todo', deliverable_id: deliverableId });
         if (error) throw error;
       }
 
@@ -197,7 +205,7 @@ export function ProjectAIAnalysisInline({
           .insert({
             project_id: projectId, client_id: project?.client_id || null,
             invoice_number: `INV-${Date.now().toString().slice(-6)}`,
-            amount: inv.amount, due_date: inv.due_date || null,
+            amount: inv.amount, due_date: sanitizeDate(inv.due_date),
             issued_date: new Date().toISOString().split('T')[0], paid: false,
           });
         if (error) throw error;
@@ -208,8 +216,8 @@ export function ProjectAIAnalysisInline({
         const details = suggestions.suggestedProjectDetails;
         const updateData: any = {};
         if (details.description) updateData.description = details.description;
-        if (details.start_date) updateData.start_date = details.start_date;
-        if (details.end_date) updateData.end_date = details.end_date;
+        if (sanitizeDate(details.start_date)) updateData.start_date = sanitizeDate(details.start_date);
+        if (sanitizeDate(details.end_date)) updateData.end_date = sanitizeDate(details.end_date);
         if (details.budget && details.budget > 0) updateData.budget = details.budget;
         if (Object.keys(updateData).length > 0) {
           await supabase.from('projects').update(updateData).eq('id', projectId);

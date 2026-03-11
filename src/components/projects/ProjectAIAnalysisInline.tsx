@@ -193,7 +193,7 @@ export function ProjectAIAnalysisInline({
           ? deliverableIds[t.deliverable_index] : null;
         const { error } = await supabase
           .from('tasks')
-          .insert({ project_id: projectId, title: t.title, description: t.description, due_date: t.due_date || null, status: 'todo', deliverable_id: deliverableId });
+          .insert({ project_id: projectId, title: t.title, description: t.description, due_date: sanitizeDate(t.due_date), status: 'todo', deliverable_id: deliverableId });
         if (error) throw error;
       }
 

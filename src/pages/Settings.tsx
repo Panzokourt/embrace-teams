@@ -39,6 +39,7 @@ import {
   LayoutGrid
 } from 'lucide-react';
 import { ProjectCategoriesManager } from '@/components/settings/ProjectCategoriesManager';
+import { ProjectFolderTemplatesManager } from '@/components/settings/ProjectFolderTemplatesManager';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { EmailAccountSetup } from '@/components/settings/EmailAccountSetup';
 

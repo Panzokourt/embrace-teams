@@ -1,66 +1,37 @@
 
 
-# Org Chart — Full Rebuild Plan
+# Στάδια ασφαλείας στην Εγγραφή & Σύνδεση
 
-## Πρόβλημα
+## Τι θα προστεθεί
 
-Το τρέχον οργανόγραμμα είναι ένα static rendered tree μέσα σε ScrollArea με βασικό zoom (CSS scale). Δεν υποστηρίζει pan/drag-to-move, δεν έχει infinite canvas, τα nodes δεν είναι clickable για detail, δεν υπάρχουν views (by department, by person), και τα templates δεν αξιοποιούν το υπάρχον προσωπικό.
+### 1. Confirm Password (Εγγραφή)
+Νέο πεδίο "Επιβεβαίωση κωδικού" στη φόρμα εγγραφής. Validation μέσω zod `.refine()` ότι ταιριάζουν.
 
-## Λύση
+### 2. Password Strength Indicator (Εγγραφή)
+Visual bar κάτω από το πεδίο κωδικού με 4 κριτήρια:
+- 8+ χαρακτήρες
+- Τουλάχιστον 1 κεφαλαίο
+- Τουλάχιστον 1 αριθμός
+- Τουλάχιστον 1 ειδικός χαρακτήρας (!@#$%...)
 
-Πλήρες rebuild του OrgChart σε **infinite canvas** στυλ Miro με pan+zoom, πολλαπλά views, clickable nodes με detail panel, και smart templates.
+Χρώμα bar: κόκκινο → πορτοκαλί → κίτρινο → πράσινο. Minimum requirement: 3/4 κριτήρια για να επιτραπεί η εγγραφή.
 
-## Τεχνική Προσέγγιση
+### 3. Forgot Password & Reset Password Flow
+- **Στη σελίδα σύνδεσης**: Link "Ξεχάσατε τον κωδικό;" → εμφανίζει inline φόρμα με email input + κουμπί αποστολής
+- **Νέα σελίδα `/reset-password`**: Φόρμα νέου κωδικού + confirm, ελέγχει `type=recovery` στο URL hash, καλεί `supabase.auth.updateUser({ password })`
+- Route registration στο `App.tsx`
 
-### 1. Infinite Canvas Engine (χωρίς εξωτερική βιβλιοθήκη)
-- Custom React canvas με `transform: translate(x, y) scale(z)` σε ένα wrapper div
-- **Mouse wheel** → zoom (centered on cursor)
-- **Middle-click drag** ή **Space+drag** → pan (hand tool)
-- **Touch**: pinch-to-zoom, two-finger pan
-- Mini-map στο corner (optional, phase 2)
-- Fit-to-screen button, zoom controls
+### 4. Client-side Rate Limiting (Σύνδεση)
+Μετρητής αποτυχημένων προσπαθειών. Μετά από 5 αποτυχίες → cooldown 30 δευτερολέπτων με countdown timer. Αποθήκευση σε state (χάνεται με refresh — δεν είναι real security, αλλά αποτρέπει casual brute-force).
 
-### 2. Views (3 modes)
-- **Hierarchy View** (default): Κλασικό tree ανά reporting line — αυτό που υπάρχει τώρα αλλά σε canvas
-- **Department View**: Grouped κάρτες ανά department σε columns/clusters, κάθε cluster δείχνει τα μέλη
-- **List View**: Compact table/list με sorting, φιλτράρισμα, search — γρήγορη εύρεση ατόμου
-
-Toggle μεταξύ views μέσω tabs στο header.
-
-### 3. Interactive Nodes
-- **Click** σε node → slide-in panel (sheet) δεξιά με:
-  - Profile info (avatar, name, email, phone)
-  - Position & department
-  - Direct reports count
-  - Link to Employee Profile (`/hr/employee/:id`)
-  - Quick actions (edit, reassign, add subordinate)
-- **Hover** → subtle highlight + tooltip με title
-- **Vacant positions** → dashed border, prominent "Κενή θέση" badge, click to assign
-- Connector lines μεταξύ nodes: animated SVG paths αντί για div borders
-
-### 4. Smart Templates & Auto-build
-- Βελτίωση του Wizard: αφού επιλεγεί template, **auto-match** υπάρχοντα profiles σε positions βάσει `job_title` ή `department`
-- **Gap Analysis panel**: Μετά τη δημιουργία, δείχνει πόσες θέσεις είναι κενές, ποια departments λείπουν, ποια levels δεν έχουν κάλυψη
-- Wizard step: "Αντιστοίχιση Προσωπικού" — drag-drop ή auto-suggest
-
-### 5. SVG Connector Lines
-- Αντικατάσταση CSS div lines με SVG `<path>` elements (bezier curves)
-- Animated flow direction (subtle dash animation)
-- Color-coded κατά department
+### 5. Terms & Privacy Checkbox (Εγγραφή)
+Checkbox "Αποδέχομαι τους Όρους Χρήσης και την Πολιτική Απορρήτου" — required πριν την υποβολή. Placeholder links (μπορούν να ρυθμιστούν αργότερα).
 
 ## Αρχεία
 
 | Αρχείο | Αλλαγή |
-|---|---|
-| `src/pages/OrgChart.tsx` | **Rewrite** — Infinite canvas, views, SVG connectors, detail panel |
-| `src/components/org-chart/OrgChartCanvas.tsx` | **New** — Pan+zoom canvas wrapper |
-| `src/components/org-chart/OrgNodeCard.tsx` | **New** — Redesigned node card (clickable, expandable) |
-| `src/components/org-chart/OrgDetailPanel.tsx` | **New** — Slide-in sheet for node details |
-| `src/components/org-chart/OrgDepartmentView.tsx` | **New** — Department-grouped view |
-| `src/components/org-chart/OrgListView.tsx` | **New** — Table/list view |
-| `src/components/org-chart/OrgConnectors.tsx` | **New** — SVG connector line renderer |
-| `src/components/org-chart/OrgChartWizard.tsx` | **Update** — Add auto-match step + gap analysis |
-| `src/components/org-chart/DraggableOrgNode.tsx` | **Remove** — Replaced by new OrgNodeCard |
-
-Δεν χρειάζονται DB changes — το schema `org_chart_positions` καλύπτει ήδη hierarchy, department, user_id, color, level, sort_order.
+|--------|--------|
+| `src/pages/Auth.tsx` | Confirm password, strength bar, rate limiting, terms checkbox, forgot password inline |
+| `src/pages/ResetPassword.tsx` | Νέα σελίδα για reset password |
+| `src/App.tsx` | Route `/reset-password` |
 

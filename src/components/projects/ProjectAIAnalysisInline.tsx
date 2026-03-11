@@ -15,6 +15,14 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { format, isValid, parseISO } from 'date-fns';
 import { el } from 'date-fns/locale';
 
+const sanitizeDate = (dateStr?: string | null): string | null => {
+  if (!dateStr) return null;
+  // Must match YYYY-MM-DD with valid numbers
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return null;
+  const parsed = parseISO(dateStr);
+  return isValid(parsed) ? dateStr : null;
+};
+
 interface ProjectSuggestion {
   deliverables: Array<{ name: string; description: string; due_date?: string; budget?: number }>;
   tasks: Array<{ title: string; description: string; due_date?: string; deliverable_index?: number }>;

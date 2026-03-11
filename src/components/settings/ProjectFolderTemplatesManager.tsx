@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { FolderTree, Plus, Trash2, GripVertical, Loader2, RotateCcw, Save, Undo2 } from 'lucide-react';
-import { DOCUMENT_TYPES } from '@/components/files/FileUploadDialog';
+import { DOCUMENT_TYPES } from '@/components/files/FileUploadWizard';
 
 interface FolderTemplate {
   id: string;

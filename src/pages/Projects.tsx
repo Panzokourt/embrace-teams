@@ -78,7 +78,7 @@ interface Profile {
 
 export default function ProjectsPage({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
-  const { isAdmin, isManager, company } = useAuth();
+  const { isAdmin, isManager, company, user } = useAuth();
   const { logCreate, logUpdate, logDelete, logStatusChange } = useActivityLogger();
   const [projects, setProjects] = useState<Project[]>([]);
   const [clients, setClients] = useState<{ id: string; name: string; sector?: string | null }[]>([]);

@@ -257,7 +257,7 @@ export function FileUploadWizard({
           {/* STEP 2: Analyzing */}
           {step === 'analyzing' && (
             <div className="flex flex-col items-center justify-center py-12 gap-3">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <Loader2 className="h-8 w-8 animate-spin text-primary/80" />
               <p className="text-sm text-muted-foreground">Ανάλυση εγγράφου σε εξέλιξη...</p>
               <p className="text-xs text-muted-foreground">Εξαγωγή δεδομένων, παραδοτέων & ενεργειών</p>
             </div>

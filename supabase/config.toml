@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.brain-deep-analyze]
 verify_jwt = false
+
+[functions.analyze-document]
+verify_jwt = false

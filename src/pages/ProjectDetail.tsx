@@ -14,6 +14,7 @@ import { ProjectCreatives } from '@/components/projects/ProjectCreatives';
 import { ProjectMediaPlan } from '@/components/projects/ProjectMediaPlan';
 import { ProjectTeamManager } from '@/components/projects/ProjectTeamManager';
 import { FileExplorer } from '@/components/files/FileExplorer';
+import { ProjectContractsCard } from '@/components/projects/ProjectContractsCard';
 import { ProjectCommentsAndHistory } from '@/components/projects/ProjectCommentsAndHistory';
 import { ProjectWorkflowTracker } from '@/components/projects/ProjectWorkflowTracker';
 import { Textarea } from '@/components/ui/textarea';
@@ -546,6 +547,9 @@ export default function ProjectDetailPage() {
                     />
                   </CardContent>
                 </Card>
+
+                {/* Contracts Card */}
+                <ProjectContractsCard projectId={project.id} />
               </div>
             </TabsContent>
 

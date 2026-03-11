@@ -39,6 +39,7 @@ import {
   LayoutGrid
 } from 'lucide-react';
 import { ProjectCategoriesManager } from '@/components/settings/ProjectCategoriesManager';
+import { ProjectFolderTemplatesManager } from '@/components/settings/ProjectFolderTemplatesManager';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { EmailAccountSetup } from '@/components/settings/EmailAccountSetup';
 
@@ -490,6 +491,9 @@ export default function SettingsPage() {
 
       {/* Project Categories (Admin only) */}
       {isAdmin && <ProjectCategoriesManager />}
+
+      {/* Project Folder Templates (Admin only) */}
+      {isAdmin && <ProjectFolderTemplatesManager />}
 
       {/* Email / Inbox */}
       <EmailAccountSetup />

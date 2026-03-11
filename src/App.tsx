@@ -48,6 +48,7 @@ import ServiceDetailPage from "@/pages/ServiceDetailPage";
 import Brain from "@/pages/Brain";
 import Secretary from "@/pages/Secretary";
 import Workflows from "@/pages/Workflows";
+import ResetPassword from "@/pages/ResetPassword";
 
 function RedirectUserToEmployee() {
   const { id } = useParams();
@@ -67,6 +68,7 @@ const App = () => (
             <ChatProvider>
               <Routes>
                 <Route path="/auth" element={<Auth />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/onboarding" element={<Onboarding />} />
                 <Route path="/select-workspace" element={<WorkspaceSelector />} />
                 <Route path="/accept-invite/:token" element={<AcceptInvite />} />

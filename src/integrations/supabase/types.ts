@@ -1644,9 +1644,11 @@ export type Database = {
       }
       file_attachments: {
         Row: {
+          ai_analysis: Json | null
           content_type: string | null
           created_at: string
           deliverable_id: string | null
+          document_type: Database["public"]["Enums"]["document_type"] | null
           file_name: string
           file_path: string
           file_size: number | null
@@ -1658,9 +1660,11 @@ export type Database = {
           uploaded_by: string
         }
         Insert: {
+          ai_analysis?: Json | null
           content_type?: string | null
           created_at?: string
           deliverable_id?: string | null
+          document_type?: Database["public"]["Enums"]["document_type"] | null
           file_name: string
           file_path: string
           file_size?: number | null
@@ -1672,9 +1676,11 @@ export type Database = {
           uploaded_by: string
         }
         Update: {
+          ai_analysis?: Json | null
           content_type?: string | null
           created_at?: string
           deliverable_id?: string | null
+          document_type?: Database["public"]["Enums"]["document_type"] | null
           file_name?: string
           file_path?: string
           file_size?: number | null
@@ -4014,6 +4020,76 @@ export type Database = {
           },
         ]
       }
+      project_contracts: {
+        Row: {
+          company_id: string
+          contract_type: string | null
+          created_at: string | null
+          end_date: string | null
+          extracted_data: Json | null
+          file_attachment_id: string | null
+          id: string
+          parties: Json | null
+          project_id: string
+          start_date: string | null
+          status: string | null
+          updated_at: string | null
+          value: number | null
+        }
+        Insert: {
+          company_id: string
+          contract_type?: string | null
+          created_at?: string | null
+          end_date?: string | null
+          extracted_data?: Json | null
+          file_attachment_id?: string | null
+          id?: string
+          parties?: Json | null
+          project_id: string
+          start_date?: string | null
+          status?: string | null
+          updated_at?: string | null
+          value?: number | null
+        }
+        Update: {
+          company_id?: string
+          contract_type?: string | null
+          created_at?: string | null
+          end_date?: string | null
+          extracted_data?: Json | null
+          file_attachment_id?: string | null
+          id?: string
+          parties?: Json | null
+          project_id?: string
+          start_date?: string | null
+          status?: string | null
+          updated_at?: string | null
+          value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_contracts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_contracts_file_attachment_id_fkey"
+            columns: ["file_attachment_id"]
+            isOneToOne: false
+            referencedRelation: "file_attachments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_contracts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_creatives: {
         Row: {
           company_id: string
@@ -4129,6 +4205,44 @@ export type Database = {
             columns: ["uploaded_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_folder_templates: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          document_type: Database["public"]["Enums"]["document_type"] | null
+          id: string
+          is_default: boolean | null
+          name: string
+          sort_order: number | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          document_type?: Database["public"]["Enums"]["document_type"] | null
+          id?: string
+          is_default?: boolean | null
+          name: string
+          sort_order?: number | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          document_type?: Database["public"]["Enums"]["document_type"] | null
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          sort_order?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_folder_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -6461,6 +6575,17 @@ export type Database = {
         | "viewer"
         | "billing"
         | "member"
+      document_type:
+        | "contract"
+        | "brief"
+        | "proposal"
+        | "report"
+        | "invoice"
+        | "presentation"
+        | "creative"
+        | "vendor_doc"
+        | "correspondence"
+        | "other"
       invitation_status: "pending" | "accepted" | "expired" | "cancelled"
       permission_type:
         | "users.view"
@@ -6677,6 +6802,18 @@ export const Constants = {
         "viewer",
         "billing",
         "member",
+      ],
+      document_type: [
+        "contract",
+        "brief",
+        "proposal",
+        "report",
+        "invoice",
+        "presentation",
+        "creative",
+        "vendor_doc",
+        "correspondence",
+        "other",
       ],
       invitation_status: ["pending", "accepted", "expired", "cancelled"],
       permission_type: [

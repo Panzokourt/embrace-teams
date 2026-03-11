@@ -181,7 +181,7 @@ export function ProjectAIAnalysisInline({
         const d = suggestions.deliverables[idx];
         const { data, error } = await supabase
           .from('deliverables')
-          .insert({ project_id: projectId, name: d.name, description: d.description, due_date: d.due_date || null, budget: d.budget || null, completed: false })
+          .insert({ project_id: projectId, name: d.name, description: d.description, due_date: sanitizeDate(d.due_date), budget: d.budget || null, completed: false })
           .select('id').single();
         if (error) throw error;
         deliverableIds[idx] = data.id;

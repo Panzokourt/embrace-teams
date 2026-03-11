@@ -566,86 +566,27 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
     </DndContext>
   );
 
-  // AI Analysis step - simplified inline component
-  const AIAnalysisStep = ({ projectId }: { projectId: string }) => {
-    const [aiInstructions, setAiInstructions] = useState('');
-    const [analyzing, setAnalyzing] = useState(false);
-    const [done, setDone] = useState(false);
-
-    const handleAnalyze = async () => {
-      setAnalyzing(true);
-      try {
-        // Get uploaded files for this project
-        const { data: files } = await supabase
-          .from('file_attachments')
-          .select('id, file_name, document_type')
-          .eq('project_id', projectId)
-          .order('created_at', { ascending: false })
-          .limit(5);
-
-        if (!files || files.length === 0) {
-          toast.info('Δεν βρέθηκαν αρχεία για ανάλυση');
-          setDone(true);
-          return;
-        }
-
-        toast.info(`Ανάλυση ${files.length} αρχείων...`);
-        // The actual analysis happens in the FileExplorer/FileUploadWizard
-        // Here we just inform and redirect
-        setDone(true);
-        toast.success('Μπορείτε να κάνετε AI ανάλυση από τo tab Αρχεία του έργου');
-      } catch {
-        toast.error('Σφάλμα κατά την ανάλυση');
-      } finally {
-        setAnalyzing(false);
-      }
-    };
-
-    return (
-      <div className="space-y-4 py-2">
-        <div className="text-center py-4">
-          <Sparkles className="h-8 w-8 text-primary mx-auto mb-3" />
-          <p className="text-sm font-medium">AI Ανάλυση Αρχείων</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Τα αρχεία ανέβηκαν. Μπορείτε να κάνετε AI ανάλυση τώρα ή αργότερα.
-          </p>
-        </div>
-
-        <div>
-          <Label>Οδηγίες AI (προαιρετικό)</Label>
-          <Textarea
-            value={aiInstructions}
-            onChange={e => setAiInstructions(e.target.value)}
-            placeholder="π.χ. Ψάξε για budget, ημερομηνίες παράδοσης, και deliverables..."
-            rows={3}
-            className="mt-1"
-          />
-        </div>
-
-        {done ? (
-          <div className="text-center py-4">
-            <p className="text-sm text-muted-foreground">
-              Μεταβείτε στο έργο για πλήρη AI ανάλυση μέσω του tab Αρχεία.
-            </p>
-          </div>
-        ) : (
-          <div className="flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={() => { setDialogOpen(false); resetForm(); navigate(`/projects/${projectId}`); }}>
-              Παράλειψη → Μετάβαση στο Έργο
-            </Button>
-            <Button className="flex-1" onClick={handleAnalyze} disabled={analyzing}>
-              {analyzing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
-              Μετάβαση & Ανάλυση
-            </Button>
-          </div>
-        )}
-
-        <Button variant="link" className="w-full text-xs" onClick={() => { setDialogOpen(false); resetForm(); navigate(`/projects/${projectId}`); }}>
-          Μετάβαση στο Έργο →
-        </Button>
-      </div>
-    );
-  };
+  // AI Analysis step uses inline component
+  const renderAIStep = (projectId: string) => (
+    <ProjectAIAnalysisInline
+      projectId={projectId}
+      projectName={formData.name}
+      projectBudget={parseFloat(formData.budget) || undefined}
+      initialFiles={uploadedFileObjects}
+      allowUpload={true}
+      onDone={() => {
+        setDialogOpen(false);
+        resetForm();
+        navigate(`/projects/${projectId}`);
+      }}
+      onProjectDetailsUpdate={(details) => {
+        // Update project in DB directly
+        supabase.from('projects').update(details).eq('id', projectId).then(() => {
+          toast.info('Τα στοιχεία έργου ενημερώθηκαν');
+        });
+      }}
+    />
+  );
 
   return (
     <div className={embedded ? 'space-y-6' : 'page-shell'}>

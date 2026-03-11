@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -6,12 +6,19 @@ import { Search, X, Upload } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { FinderColumnView } from './FinderColumnView';
-import { FileUploadDialog, DOCTYPE_FOLDER_MAP } from './FileUploadDialog';
+import { FileUploadDialog } from './FileUploadDialog';
 import { DocumentAnalysisPanel } from './DocumentAnalysisPanel';
 import { createProjectFilesObjectKey } from '@/utils/storageKeys';
+import { useDocumentParser } from '@/hooks/useDocumentParser';
 import type { FileFolder } from './FolderTree';
 import type { FileAttachment } from './FilesTableView';
 import type { DocumentType } from './FileUploadDialog';
+
+const DEFAULT_FOLDER_NAMES = [
+  'Προτάσεις', 'Παρουσιάσεις', 'Προσφορές', 'Συμβόλαια & Συμβάσεις',
+  'Briefs', 'Αναφορές', 'Δημιουργικά', 'Τιμολόγια & Παραστατικά',
+  'Προμηθευτές', 'Αλληλογραφία',
+];
 
 interface FileExplorerProps {
   tenderId?: string;
@@ -31,6 +38,8 @@ export function FileExplorer({ tenderId, projectId }: FileExplorerProps) {
 
   const canManage = isAdmin || isManager;
 
+  const { parseFiles } = useDocumentParser();
+
   useEffect(() => {
     fetchData();
   }, [tenderId, projectId]);
@@ -38,7 +47,11 @@ export function FileExplorer({ tenderId, projectId }: FileExplorerProps) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      await Promise.all([fetchFolders(), fetchFiles()]);
+      const [fetchedFolders] = await Promise.all([fetchFolders(), fetchFiles()]);
+      // Auto-sync: create folders from templates if none exist for this project
+      if (projectId && fetchedFolders && fetchedFolders.length === 0) {
+        await autoCreateFolders();
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -46,13 +59,53 @@ export function FileExplorer({ tenderId, projectId }: FileExplorerProps) {
     }
   };
 
-  const fetchFolders = async () => {
+  const autoCreateFolders = async () => {
+    if (!user || !projectId) return;
+    try {
+      // Get company_id from project
+      const { data: project } = await supabase
+        .from('projects')
+        .select('company_id')
+        .eq('id', projectId)
+        .single();
+      if (!project) return;
+
+      // Try to get custom templates
+      const { data: templates } = await supabase
+        .from('project_folder_templates')
+        .select('name, sort_order')
+        .eq('company_id', project.company_id)
+        .order('sort_order');
+
+      const folderNames = templates && templates.length > 0
+        ? templates.map(t => t.name)
+        : DEFAULT_FOLDER_NAMES;
+
+      const inserts = folderNames.map(name => ({
+        name,
+        project_id: projectId,
+        created_by: user.id,
+      }));
+
+      const { error } = await supabase.from('file_folders').insert(inserts);
+      if (error) throw error;
+
+      // Re-fetch folders
+      await fetchFolders();
+    } catch (error) {
+      console.error('Error auto-creating folders:', error);
+    }
+  };
+
+  const fetchFolders = async (): Promise<FileFolder[]> => {
     let query = supabase.from('file_folders').select('*').order('name');
     if (tenderId) query = query.eq('tender_id', tenderId);
     else if (projectId) query = query.eq('project_id', projectId);
     const { data, error } = await query;
     if (error) throw error;
-    setFolders((data || []) as FileFolder[]);
+    const result = (data || []) as FileFolder[];
+    setFolders(result);
+    return result;
   };
 
   const fetchFiles = async () => {
@@ -192,7 +245,7 @@ export function FileExplorer({ tenderId, projectId }: FileExplorerProps) {
       // Run AI analysis if requested
       if (runAnalysis && uploadedFileIds.length > 0) {
         for (const fileId of uploadedFileIds) {
-          await runDocumentAnalysis(fileId, documentType);
+          await runDocumentAnalysis(fileId, documentType, Array.from(selectedFiles));
         }
       }
     } catch (error) {
@@ -208,36 +261,45 @@ export function FileExplorer({ tenderId, projectId }: FileExplorerProps) {
     await handleUploadWithType(selectedFiles, folderId, 'other', false);
   };
 
-  const runDocumentAnalysis = async (fileId: string, documentType: string) => {
+  const runDocumentAnalysis = async (fileId: string, documentType: string, originalFiles?: File[]) => {
     setAnalyzing(true);
     try {
-      // Get file content for analysis
+      // Get file record
       const file = files.find(f => f.id === fileId) || 
         (await supabase.from('file_attachments').select('*').eq('id', fileId).single()).data;
       
       if (!file) throw new Error('File not found');
 
-      // Download file content
-      const { data: fileData, error: dlError } = await supabase.storage
-        .from('project-files')
-        .download((file as any).file_path);
-      if (dlError) throw dlError;
-
-      let textContent = '';
       const contentType = (file as any).content_type || '';
-      
+      let textContent = '';
+
+      // Use useDocumentParser for all non-plain-text files (PDF, DOCX, PPTX, etc.)
       if (contentType.includes('text') || contentType.includes('json') || contentType.includes('xml')) {
+        // Plain text: download and read directly
+        const { data: fileData, error: dlError } = await supabase.storage
+          .from('project-files')
+          .download((file as any).file_path);
+        if (dlError) throw dlError;
         textContent = await fileData.text();
-      } else if (contentType.includes('pdf')) {
-        // For PDF, send base64 and let AI handle it
-        const arrayBuf = await fileData.arrayBuffer();
-        const bytes = new Uint8Array(arrayBuf);
-        // Truncate to ~300KB for safety
-        const truncated = bytes.slice(0, 300000);
-        textContent = `[PDF document: ${(file as any).file_name}] Base64 content follows, extract text and analyze:\n` +
-          btoa(String.fromCharCode(...truncated));
       } else {
-        textContent = `[Αρχείο: ${(file as any).file_name}, Τύπος: ${contentType}] Δεν είναι δυνατή η εξαγωγή κειμένου.`;
+        // For PDF, DOCX, PPTX, images etc. — use parse-document edge function
+        const { data: fileData, error: dlError } = await supabase.storage
+          .from('project-files')
+          .download((file as any).file_path);
+        if (dlError) throw dlError;
+
+        // Create a File object from the blob
+        const blob = fileData;
+        const fileObj = new window.File([blob], (file as any).file_name, { type: contentType });
+
+        const parsed = await parseFiles([fileObj]);
+        if (parsed && parsed.length > 0) {
+          textContent = parsed[0].content;
+        }
+
+        if (!textContent || textContent.length < 50) {
+          textContent = `[Αρχείο: ${(file as any).file_name}, Τύπος: ${contentType}] Δεν ήταν δυνατή η εξαγωγή κειμένου.`;
+        }
       }
 
       // Truncate
@@ -253,7 +315,6 @@ export function FileExplorer({ tenderId, projectId }: FileExplorerProps) {
 
       if (result?.analysis) {
         toast.success('Η ανάλυση ολοκληρώθηκε!');
-        // Auto-create contract record if document type is contract
         if (documentType === 'contract' && projectId && result.analysis) {
           await createContractFromAnalysis(fileId, result.analysis);
         }

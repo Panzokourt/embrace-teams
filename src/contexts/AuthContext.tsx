@@ -104,6 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [allCompanies, setAllCompanies] = useState<Company[]>([]);
   const [permissions, setPermissions] = useState<PermissionType[]>([]);
   const [legacyRoles, setLegacyRoles] = useState<string[]>([]);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const fetchingRef = useRef(false);
   const userRef = useRef<User | null>(null);

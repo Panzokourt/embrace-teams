@@ -91,7 +91,8 @@ export default function ProjectDetailPage() {
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Inline editing state
+  // Tab & inline editing state
+  const [activeTab, setActiveTab] = useState('overview');
   const [editingDescription, setEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState('');
   const [editingBudget, setEditingBudget] = useState(false);
@@ -322,7 +323,7 @@ export default function ProjectDetailPage() {
 
       {/* ── TABS LAYOUT ────────────────────────────────────────────────── */}
       <div className="space-y-4">
-          <Tabs defaultValue="overview" className="space-y-3">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-3">
             <TabsList className="h-auto gap-1 flex-wrap">
               <TabsTrigger value="overview" className="text-xs gap-1">
                 <FolderInput className="h-3.5 w-3.5" /> Επισκόπηση
@@ -549,7 +550,7 @@ export default function ProjectDetailPage() {
                 </Card>
 
                 {/* Contracts Card */}
-                <ProjectContractsCard projectId={project.id} />
+                <ProjectContractsCard projectId={project.id} onUploadContract={() => setActiveTab('files')} />
               </div>
             </TabsContent>
 

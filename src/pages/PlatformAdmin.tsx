@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,11 +8,13 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Users, Building2, BarChart3, Search, Shield, ShieldOff, Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Users, Building2, BarChart3, Search, Shield, ShieldOff, Loader2, Lock, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
 
+// ─── Types ───────────────────────────────────────────────────────
 interface PlatformProfile {
   id: string;
   email: string;
@@ -46,8 +48,14 @@ interface PlatformStats {
   activeUsers: number;
 }
 
+// ─── Constants ───────────────────────────────────────────────────
 const PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+const REAUTH_SESSION_KEY = 'pa_reauth_ts';
+const REAUTH_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const MAX_ATTEMPTS = 3;
+const LOCKOUT_MS = 60_000; // 60 seconds
 
+// ─── API helpers ─────────────────────────────────────────────────
 async function platformFetch(type: string) {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
@@ -85,8 +93,131 @@ async function platformAction(action: string, userId: string) {
   return res.json();
 }
 
+// ─── Re-auth helpers ─────────────────────────────────────────────
+function isReauthValid(): boolean {
+  const ts = sessionStorage.getItem(REAUTH_SESSION_KEY);
+  if (!ts) return false;
+  return Date.now() - parseInt(ts, 10) < REAUTH_TTL_MS;
+}
+
+function markReauthValid() {
+  sessionStorage.setItem(REAUTH_SESSION_KEY, Date.now().toString());
+}
+
+// ─── Re-auth Gate Component ──────────────────────────────────────
+function ReauthGate({ userEmail, onSuccess }: { userEmail: string; onSuccess: () => void }) {
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [attempts, setAttempts] = useState(0);
+  const [lockedUntil, setLockedUntil] = useState<number | null>(null);
+  const [lockCountdown, setLockCountdown] = useState(0);
+
+  // Countdown timer for lockout
+  useEffect(() => {
+    if (!lockedUntil) return;
+    const interval = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((lockedUntil - Date.now()) / 1000));
+      setLockCountdown(remaining);
+      if (remaining <= 0) {
+        setLockedUntil(null);
+        setAttempts(0);
+      }
+    }, 500);
+    return () => clearInterval(interval);
+  }, [lockedUntil]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (lockedUntil && Date.now() < lockedUntil) return;
+    if (!password.trim()) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: userEmail,
+        password,
+      });
+
+      if (error) {
+        const newAttempts = attempts + 1;
+        setAttempts(newAttempts);
+        setPassword('');
+
+        if (newAttempts >= MAX_ATTEMPTS) {
+          const until = Date.now() + LOCKOUT_MS;
+          setLockedUntil(until);
+          toast.error(`Πολλές αποτυχημένες προσπάθειες. Δοκιμάστε ξανά σε ${LOCKOUT_MS / 1000} δευτερόλεπτα.`);
+        } else {
+          toast.error(`Λάθος κωδικός (${newAttempts}/${MAX_ATTEMPTS})`);
+        }
+        return;
+      }
+
+      markReauthValid();
+      onSuccess();
+    } catch {
+      toast.error('Σφάλμα κατά την επαλήθευση');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isLocked = lockedUntil !== null && Date.now() < lockedUntil;
+
+  return (
+    <Dialog open modal>
+      <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+        <DialogHeader>
+          <div className="flex items-center gap-2">
+            <Lock className="h-5 w-5 text-primary" />
+            <DialogTitle>Επαλήθευση Ταυτότητας</DialogTitle>
+          </div>
+          <DialogDescription>
+            Για λόγους ασφαλείας, εισάγετε τον κωδικό σας για πρόσβαση στο Platform Admin.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground">Κωδικός πρόσβασης</label>
+            <Input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              disabled={isLocked || loading}
+              autoFocus
+              autoComplete="current-password"
+            />
+          </div>
+
+          {isLocked && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span>Κλειδώθηκε. Δοκιμάστε ξανά σε {lockCountdown} δευτερόλεπτα.</span>
+            </div>
+          )}
+
+          <Button type="submit" className="w-full" disabled={isLocked || loading || !password.trim()}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Shield className="h-4 w-4 mr-2" />}
+            Επαλήθευση
+          </Button>
+
+          {attempts > 0 && !isLocked && (
+            <p className="text-xs text-muted-foreground text-center">
+              Προσπάθεια {attempts}/{MAX_ATTEMPTS}
+            </p>
+          )}
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Main Component ──────────────────────────────────────────────
 export default function PlatformAdmin() {
   const { user, loading, isPlatformAdmin } = useAuth();
+  const [authenticated, setAuthenticated] = useState(() => isReauthValid());
   const [tab, setTab] = useState('stats');
   const [profiles, setProfiles] = useState<PlatformProfile[]>([]);
   const [roles, setRoles] = useState<CompanyRole[]>([]);
@@ -97,10 +228,22 @@ export default function PlatformAdmin() {
   const [loadingData, setLoadingData] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
+  // Check session timeout periodically
   useEffect(() => {
-    if (!isPlatformAdmin) return;
+    if (!authenticated) return;
+    const interval = setInterval(() => {
+      if (!isReauthValid()) {
+        setAuthenticated(false);
+        toast.info('Η συνεδρία έληξε. Εισάγετε ξανά τον κωδικό σας.');
+      }
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [authenticated]);
+
+  useEffect(() => {
+    if (!isPlatformAdmin || !authenticated) return;
     loadData(tab);
-  }, [isPlatformAdmin, tab]);
+  }, [isPlatformAdmin, authenticated, tab]);
 
   const loadData = async (currentTab: string) => {
     setLoadingData(true);
@@ -147,6 +290,15 @@ export default function PlatformAdmin() {
   if (!user) return <Navigate to="/auth" replace />;
   if (!isPlatformAdmin) return <Navigate to="/" replace />;
 
+  // Show re-auth gate
+  if (!authenticated) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <ReauthGate userEmail={user.email || ''} onSuccess={() => setAuthenticated(true)} />
+      </div>
+    );
+  }
+
   const filteredProfiles = profiles.filter(p =>
     (p.email?.toLowerCase() || '').includes(searchUsers.toLowerCase()) ||
     (p.full_name?.toLowerCase() || '').includes(searchUsers.toLowerCase())
@@ -170,7 +322,6 @@ export default function PlatformAdmin() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <div className="border-b border-border bg-card">
         <div className="max-w-7xl mx-auto px-6 py-5 flex items-center gap-3">
           <Shield className="h-7 w-7 text-primary" />

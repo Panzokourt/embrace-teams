@@ -91,7 +91,8 @@ export default function ProjectDetailPage() {
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Inline editing state
+  // Tab & inline editing state
+  const [activeTab, setActiveTab] = useState('overview');
   const [editingDescription, setEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState('');
   const [editingBudget, setEditingBudget] = useState(false);

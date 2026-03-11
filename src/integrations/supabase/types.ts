@@ -4513,9 +4513,11 @@ export type Database = {
           end_date: string | null
           folder_id: string | null
           id: string
+          is_internal: boolean
           lost_reason: string | null
           metadata: Json | null
           name: string
+          parent_project_id: string | null
           probability: number | null
           progress: number | null
           project_lead_id: string | null
@@ -4539,9 +4541,11 @@ export type Database = {
           end_date?: string | null
           folder_id?: string | null
           id?: string
+          is_internal?: boolean
           lost_reason?: string | null
           metadata?: Json | null
           name: string
+          parent_project_id?: string | null
           probability?: number | null
           progress?: number | null
           project_lead_id?: string | null
@@ -4565,9 +4569,11 @@ export type Database = {
           end_date?: string | null
           folder_id?: string | null
           id?: string
+          is_internal?: boolean
           lost_reason?: string | null
           metadata?: Json | null
           name?: string
+          parent_project_id?: string | null
           probability?: number | null
           progress?: number | null
           project_lead_id?: string | null
@@ -4607,6 +4613,13 @@ export type Database = {
             columns: ["folder_id"]
             isOneToOne: false
             referencedRelation: "project_folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_parent_project_id_fkey"
+            columns: ["parent_project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
           {

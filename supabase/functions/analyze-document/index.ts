@@ -19,7 +19,6 @@ const DOCUMENT_TYPE_PROMPTS: Record<string, string> = {
 - termination_conditions: Όροι λύσης (array of strings)
 - special_clauses: Ειδικοί όροι (array of strings)
 - summary: Περίληψη 2-3 προτάσεις`,
-
   brief: `Αναλύεις ένα brief. Εξήγαγε:
 - objectives: Στόχοι (array of strings)
 - target_audience: Κοινό-στόχος
@@ -30,7 +29,6 @@ const DOCUMENT_TYPE_PROMPTS: Record<string, string> = {
 - tone_of_voice: Τόνος επικοινωνίας
 - constraints: Περιορισμοί (array of strings)
 - summary: Περίληψη 2-3 προτάσεις`,
-
   proposal: `Αναλύεις μία πρόταση/προσφορά. Εξήγαγε:
 - services: Υπηρεσίες (array of {name, description, cost})
 - total_cost: Συνολικό κόστος (number ή null)
@@ -40,7 +38,6 @@ const DOCUMENT_TYPE_PROMPTS: Record<string, string> = {
 - terms: Όροι (array of strings)
 - validity_period: Περίοδος ισχύος
 - summary: Περίληψη 2-3 προτάσεις`,
-
   invoice: `Αναλύεις ένα τιμολόγιο/παραστατικό. Εξήγαγε:
 - invoice_number: Αριθμός τιμολογίου
 - issuer: Εκδότης
@@ -53,7 +50,6 @@ const DOCUMENT_TYPE_PROMPTS: Record<string, string> = {
 - issue_date: Ημερομηνία έκδοσης
 - due_date: Ημερομηνία πληρωμής
 - summary: Περίληψη`,
-
   other: `Αναλύεις ένα γενικό έγγραφο. Εξήγαγε:
 - title: Τίτλος εγγράφου
 - entities: Αναφερόμενα πρόσωπα/εταιρείες (array of strings)
@@ -64,8 +60,67 @@ const DOCUMENT_TYPE_PROMPTS: Record<string, string> = {
 - summary: Περίληψη 2-3 προτάσεις`,
 };
 
-function getPromptForType(docType: string): string {
-  return DOCUMENT_TYPE_PROMPTS[docType] || DOCUMENT_TYPE_PROMPTS.other;
+function buildToolProperties(docType: string): Record<string, any> {
+  const toolProperties: Record<string, any> = {
+    summary: { type: "string", description: "Περίληψη εγγράφου" },
+  };
+  if (docType === "contract") {
+    Object.assign(toolProperties, {
+      parties: { type: "array", items: { type: "object", properties: { name: { type: "string" }, role: { type: "string" } } } },
+      start_date: { type: ["string", "null"] },
+      end_date: { type: ["string", "null"] },
+      value: { type: ["number", "null"] },
+      currency: { type: ["string", "null"] },
+      payment_terms: { type: ["string", "null"] },
+      obligations: { type: "array", items: { type: "string" } },
+      termination_conditions: { type: "array", items: { type: "string" } },
+      special_clauses: { type: "array", items: { type: "string" } },
+    });
+  } else if (docType === "brief") {
+    Object.assign(toolProperties, {
+      objectives: { type: "array", items: { type: "string" } },
+      target_audience: { type: ["string", "null"] },
+      kpis: { type: "array", items: { type: "string" } },
+      budget: { type: ["number", "null"] },
+      timeline: { type: ["string", "null"] },
+      deliverables: { type: "array", items: { type: "string" } },
+      tone_of_voice: { type: ["string", "null"] },
+      constraints: { type: "array", items: { type: "string" } },
+    });
+  } else if (docType === "proposal") {
+    Object.assign(toolProperties, {
+      services: { type: "array", items: { type: "object", properties: { name: { type: "string" }, description: { type: "string" }, cost: { type: ["number", "null"] } } } },
+      total_cost: { type: ["number", "null"] },
+      currency: { type: ["string", "null"] },
+      deliverables: { type: "array", items: { type: "string" } },
+      timeline: { type: ["string", "null"] },
+      terms: { type: "array", items: { type: "string" } },
+      validity_period: { type: ["string", "null"] },
+    });
+  } else if (docType === "invoice") {
+    Object.assign(toolProperties, {
+      invoice_number: { type: ["string", "null"] },
+      issuer: { type: ["string", "null"] },
+      recipient: { type: ["string", "null"] },
+      items: { type: "array", items: { type: "object", properties: { description: { type: "string" }, quantity: { type: ["number", "null"] }, unit_price: { type: ["number", "null"] }, total: { type: ["number", "null"] } } } },
+      subtotal: { type: ["number", "null"] },
+      vat: { type: ["number", "null"] },
+      total: { type: ["number", "null"] },
+      currency: { type: ["string", "null"] },
+      issue_date: { type: ["string", "null"] },
+      due_date: { type: ["string", "null"] },
+    });
+  } else {
+    Object.assign(toolProperties, {
+      title: { type: ["string", "null"] },
+      entities: { type: "array", items: { type: "string" } },
+      dates: { type: "array", items: { type: "object", properties: { date: { type: "string" }, context: { type: "string" } } } },
+      amounts: { type: "array", items: { type: "object", properties: { amount: { type: "number" }, currency: { type: "string" }, context: { type: "string" } } } },
+      key_points: { type: "array", items: { type: "string" } },
+      action_items: { type: "array", items: { type: "string" } },
+    });
+  }
+  return toolProperties;
 }
 
 serve(async (req) => {
@@ -95,7 +150,7 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { fileId, documentType, textContent } = await req.json();
+    const { fileId, documentType, textContent, projectContext, userInstructions } = await req.json();
 
     if (!fileId || !textContent) {
       return new Response(JSON.stringify({ error: "fileId and textContent required" }), {
@@ -105,156 +160,128 @@ serve(async (req) => {
     }
 
     const docType = documentType || "other";
-    const typePrompt = getPromptForType(docType);
+    const typePrompt = DOCUMENT_TYPE_PROMPTS[docType] || DOCUMENT_TYPE_PROMPTS.other;
+    const toolProperties = buildToolProperties(docType);
 
-    const systemPrompt = `Είσαι ειδικός αναλυτής εγγράφων για agency/εταιρεία επικοινωνίας & marketing. 
+    // Build enriched system prompt with project context
+    let systemPrompt = `Είσαι ειδικός αναλυτής εγγράφων για agency/εταιρεία επικοινωνίας & marketing. 
 Αναλύεις έγγραφα στα Ελληνικά ή Αγγλικά και εξάγεις δομημένες πληροφορίες.
 Απάντησε ΜΟΝΟ με structured data μέσω tool calling. Μην προσθέσεις σχόλια εκτός tool call.
 Αν κάποιο πεδίο δεν βρίσκεται στο έγγραφο, βάλε null.`;
 
-    // Build tools based on document type
-    const toolProperties: Record<string, any> = {};
+    if (projectContext) {
+      systemPrompt += `\n\n--- ΠΛΗΡΟΦΟΡΙΕΣ ΕΡΓΟΥ ---
+Όνομα: ${projectContext.name || 'N/A'}
+Περιγραφή: ${projectContext.description || 'N/A'}
+Πελάτης: ${projectContext.clientName || 'N/A'}
+Budget: ${projectContext.budget || 'N/A'}
+Ημ. Έναρξης: ${projectContext.startDate || 'N/A'}
+Ημ. Λήξης: ${projectContext.endDate || 'N/A'}
+Λάβε υπόψη τα παραπάνω στοιχεία κατά την ανάλυση.`;
+    }
+
+    let userMessage = `${typePrompt}\n\n--- ΕΓΓΡΑΦΟ ---\n`;
     
-    // Common fields all types have
-    toolProperties.summary = { type: "string", description: "Περίληψη εγγράφου" };
-
-    if (docType === "contract") {
-      Object.assign(toolProperties, {
-        parties: { type: "array", items: { type: "object", properties: { name: { type: "string" }, role: { type: "string" } } } },
-        start_date: { type: ["string", "null"] },
-        end_date: { type: ["string", "null"] },
-        value: { type: ["number", "null"] },
-        currency: { type: ["string", "null"] },
-        payment_terms: { type: ["string", "null"] },
-        obligations: { type: "array", items: { type: "string" } },
-        termination_conditions: { type: "array", items: { type: "string" } },
-        special_clauses: { type: "array", items: { type: "string" } },
-      });
-    } else if (docType === "brief") {
-      Object.assign(toolProperties, {
-        objectives: { type: "array", items: { type: "string" } },
-        target_audience: { type: ["string", "null"] },
-        kpis: { type: "array", items: { type: "string" } },
-        budget: { type: ["number", "null"] },
-        timeline: { type: ["string", "null"] },
-        deliverables: { type: "array", items: { type: "string" } },
-        tone_of_voice: { type: ["string", "null"] },
-        constraints: { type: "array", items: { type: "string" } },
-      });
-    } else if (docType === "proposal") {
-      Object.assign(toolProperties, {
-        services: { type: "array", items: { type: "object", properties: { name: { type: "string" }, description: { type: "string" }, cost: { type: ["number", "null"] } } } },
-        total_cost: { type: ["number", "null"] },
-        currency: { type: ["string", "null"] },
-        deliverables: { type: "array", items: { type: "string" } },
-        timeline: { type: ["string", "null"] },
-        terms: { type: "array", items: { type: "string" } },
-        validity_period: { type: ["string", "null"] },
-      });
-    } else if (docType === "invoice") {
-      Object.assign(toolProperties, {
-        invoice_number: { type: ["string", "null"] },
-        issuer: { type: ["string", "null"] },
-        recipient: { type: ["string", "null"] },
-        items: { type: "array", items: { type: "object", properties: { description: { type: "string" }, quantity: { type: ["number", "null"] }, unit_price: { type: ["number", "null"] }, total: { type: ["number", "null"] } } } },
-        subtotal: { type: ["number", "null"] },
-        vat: { type: ["number", "null"] },
-        total: { type: ["number", "null"] },
-        currency: { type: ["string", "null"] },
-        issue_date: { type: ["string", "null"] },
-        due_date: { type: ["string", "null"] },
-      });
-    } else {
-      Object.assign(toolProperties, {
-        title: { type: ["string", "null"] },
-        entities: { type: "array", items: { type: "string" } },
-        dates: { type: "array", items: { type: "object", properties: { date: { type: "string" }, context: { type: "string" } } } },
-        amounts: { type: "array", items: { type: "object", properties: { amount: { type: "number" }, currency: { type: "string" }, context: { type: "string" } } } },
-        key_points: { type: "array", items: { type: "string" } },
-        action_items: { type: "array", items: { type: "string" } },
-      });
+    if (userInstructions) {
+      userMessage = `ΟΔΗΓΙΕΣ ΧΡΗΣΤΗ: ${userInstructions}\n\n${userMessage}`;
     }
 
-    // Truncate content to ~400KB to stay within limits
-    const truncatedContent = textContent.substring(0, 400000);
+    // Truncate content to ~800KB for larger context support with Pro model
+    const truncatedContent = textContent.substring(0, 800000);
+    userMessage += truncatedContent;
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: `${typePrompt}\n\n--- ΕΓΓΡΑΦΟ ---\n${truncatedContent}` },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "extract_document_data",
-              description: "Εξαγωγή δομημένων δεδομένων από το έγγραφο",
-              parameters: {
-                type: "object",
-                properties: toolProperties,
-                required: ["summary"],
-                additionalProperties: false,
-              },
-            },
-          },
-        ],
-        tool_choice: { type: "function", function: { name: "extract_document_data" } },
-      }),
-    });
+    // Try with gemini-2.5-pro first, fallback to flash
+    const models = ["google/gemini-2.5-pro", "google/gemini-2.5-flash"];
+    let lastError = "";
 
-    if (!aiResponse.ok) {
-      const errText = await aiResponse.text();
-      console.error("AI error:", aiResponse.status, errText);
-      
-      if (aiResponse.status === 429) {
-        return new Response(JSON.stringify({ error: "Υπερβολικά πολλά αιτήματα, δοκιμάστε ξανά αργότερα" }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (aiResponse.status === 402) {
-        return new Response(JSON.stringify({ error: "Απαιτείται ανανέωση credits" }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      return new Response(JSON.stringify({ error: "AI analysis failed" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const aiData = await aiResponse.json();
-    let extractedData: any = {};
-
-    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-    if (toolCall?.function?.arguments) {
+    for (const model of models) {
       try {
-        extractedData = JSON.parse(toolCall.function.arguments);
-      } catch {
-        extractedData = { summary: "Δεν ήταν δυνατή η ανάλυση", raw: toolCall.function.arguments };
+        const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${lovableApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userMessage },
+            ],
+            tools: [
+              {
+                type: "function",
+                function: {
+                  name: "extract_document_data",
+                  description: "Εξαγωγή δομημένων δεδομένων από το έγγραφο",
+                  parameters: {
+                    type: "object",
+                    properties: toolProperties,
+                    required: ["summary"],
+                    additionalProperties: false,
+                  },
+                },
+              },
+            ],
+            tool_choice: { type: "function", function: { name: "extract_document_data" } },
+          }),
+        });
+
+        if (aiResponse.status === 429) {
+          return new Response(JSON.stringify({ error: "Υπερβολικά πολλά αιτήματα, δοκιμάστε ξανά αργότερα" }), {
+            status: 429,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        if (aiResponse.status === 402) {
+          return new Response(JSON.stringify({ error: "Απαιτείται ανανέωση credits" }), {
+            status: 402,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        if (!aiResponse.ok) {
+          const errText = await aiResponse.text();
+          console.error(`AI error (${model}):`, aiResponse.status, errText);
+          lastError = errText;
+          continue; // Try next model
+        }
+
+        const aiData = await aiResponse.json();
+        let extractedData: any = {};
+
+        const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+        if (toolCall?.function?.arguments) {
+          try {
+            extractedData = JSON.parse(toolCall.function.arguments);
+          } catch {
+            extractedData = { summary: "Δεν ήταν δυνατή η ανάλυση", raw: toolCall.function.arguments };
+          }
+        }
+
+        // Save analysis to file_attachments
+        const { error: updateError } = await supabase
+          .from("file_attachments")
+          .update({ ai_analysis: extractedData, document_type: docType })
+          .eq("id", fileId);
+
+        if (updateError) {
+          console.error("Update error:", updateError);
+        }
+
+        return new Response(JSON.stringify({ analysis: extractedData, document_type: docType, model_used: model }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (modelErr) {
+        console.error(`Model ${model} failed:`, modelErr);
+        lastError = modelErr instanceof Error ? modelErr.message : String(modelErr);
+        continue;
       }
     }
 
-    // Save analysis to file_attachments
-    const { error: updateError } = await supabase
-      .from("file_attachments")
-      .update({ ai_analysis: extractedData, document_type: docType })
-      .eq("id", fileId);
-
-    if (updateError) {
-      console.error("Update error:", updateError);
-    }
-
-    return new Response(JSON.stringify({ analysis: extractedData, document_type: docType }), {
+    // All models failed
+    return new Response(JSON.stringify({ error: "AI analysis failed", details: lastError }), {
+      status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

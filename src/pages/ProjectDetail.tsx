@@ -21,32 +21,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import {
-  ArrowLeft,
-  Calendar,
-  DollarSign,
-  Clock,
-  Loader2,
-  Megaphone,
-  GitBranch,
-  Palette,
-  FolderInput,
-  Timer,
-  ListChecks,
-  FileText,
-  MessageSquare,
-  Pencil,
-  Save,
-  X,
-  ClipboardList,
+  ArrowLeft, Calendar, DollarSign, Clock, Loader2, Megaphone, GitBranch,
+  Palette, FolderInput, Timer, ListChecks, FileText, MessageSquare,
+  Pencil, Save, X, ClipboardList, Sparkles, FolderOpen, Layers,
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
 type ProjectStatus = 'lead' | 'proposal' | 'negotiation' | 'won' | 'active' | 'completed' | 'cancelled' | 'lost' | 'tender';
@@ -64,6 +47,8 @@ interface Project {
   project_lead_id: string | null;
   account_manager_id: string | null;
   client?: { name: string } | null;
+  is_internal?: boolean;
+  parent_project_id?: string | null;
 }
 
 interface Task {
@@ -126,6 +111,53 @@ export default function ProjectDetailPage() {
         .eq('project_id', id)
         .eq('is_running', false);
       return (data || []).reduce((sum, e) => sum + (e.duration_minutes || 0), 0);
+    },
+    enabled: !!id,
+  });
+
+  // Sub-projects query
+  const { data: subProjects = [] } = useQuery({
+    queryKey: ['sub-projects', id],
+    queryFn: async () => {
+      if (!id) return [];
+      const { data } = await supabase
+        .from('projects')
+        .select('id, name, status, budget')
+        .eq('parent_project_id', id)
+        .order('created_at');
+      return data || [];
+    },
+    enabled: !!id,
+  });
+
+  // Proposals files query
+  const { data: proposalFiles = [] } = useQuery({
+    queryKey: ['project-proposals', id],
+    queryFn: async () => {
+      if (!id) return [];
+      const { data } = await supabase
+        .from('file_attachments')
+        .select('id, file_name, created_at, file_path')
+        .eq('project_id', id)
+        .eq('document_type', 'proposal')
+        .order('created_at', { ascending: false });
+      return data || [];
+    },
+    enabled: !!id,
+  });
+
+  // Briefs files query
+  const { data: briefFiles = [] } = useQuery({
+    queryKey: ['project-briefs', id],
+    queryFn: async () => {
+      if (!id) return [];
+      const { data } = await supabase
+        .from('file_attachments')
+        .select('id, file_name, created_at, file_path')
+        .eq('project_id', id)
+        .eq('document_type', 'brief')
+        .order('created_at', { ascending: false });
+      return data || [];
     },
     enabled: !!id,
   });
@@ -251,9 +283,14 @@ export default function ProjectDetailPage() {
   const dueDateInfo = getDueDateInfo();
   const statusConfig = getStatusConfig(project.status);
 
+  const getStatusBadgeForSub = (status: string) => {
+    const s = getStatusConfig(status as ProjectStatus);
+    return <Badge variant="outline" className={cn("text-[10px]", s.className)}>{s.label}</Badge>;
+  };
+
   return (
     <div className="page-shell">
-      {/* ── BREADCRUMBS ──────────────────────────────────────────────────── */}
+      {/* Breadcrumbs */}
       <nav className="text-xs text-muted-foreground/60 flex items-center gap-1.5 mb-1">
         <Link to="/" className="hover:text-foreground transition-colors">Dashboard</Link>
         <span className="text-muted-foreground/40">›</span>
@@ -264,7 +301,7 @@ export default function ProjectDetailPage() {
         <span className="text-muted-foreground/70">{project.name}</span>
       </nav>
 
-      {/* ── STICKY HEADER ──────────────────────────────────────────────────── */}
+      {/* Sticky Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 -mx-6 px-6 py-3 border-b border-border/50">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" className="shrink-0" onClick={() => navigate('/projects')}>
@@ -300,9 +337,11 @@ export default function ProjectDetailPage() {
                 <Badge variant="outline" className={statusConfig.className}>{statusConfig.label}</Badge>
               )}
 
+              {(project as any).is_internal && (
+                <Badge variant="outline" className="text-[10px] bg-muted/50">Internal</Badge>
+              )}
             </div>
 
-            {/* Sub-info */}
             <div className="flex items-center gap-3 mt-1 flex-wrap text-sm text-muted-foreground">
               {project.client && project.client_id && (
                 <Link to={`/clients/${project.client_id}`} className="font-medium text-foreground hover:text-primary transition-colors">
@@ -312,7 +351,6 @@ export default function ProjectDetailPage() {
             </div>
           </div>
 
-          {/* Right side: timer badge only */}
           <div className="flex items-center gap-2 shrink-0">
             <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground">
               <Timer className="h-3 w-3" />{totalTrackedHours}h
@@ -321,287 +359,331 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
-      {/* ── TABS LAYOUT ────────────────────────────────────────────────── */}
+      {/* Tabs */}
       <div className="space-y-4">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-3">
-            <TabsList className="h-auto gap-1 flex-wrap">
-              <TabsTrigger value="overview" className="text-xs gap-1">
-                <FolderInput className="h-3.5 w-3.5" /> Επισκόπηση
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-3">
+          <TabsList className="h-auto gap-1 flex-wrap">
+            <TabsTrigger value="overview" className="text-xs gap-1">
+              <FolderInput className="h-3.5 w-3.5" /> Επισκόπηση
+            </TabsTrigger>
+            <TabsTrigger value="deliverables" className="text-xs gap-1">
+              <ListChecks className="h-3.5 w-3.5" /> Παραδοτέα
+            </TabsTrigger>
+            <TabsTrigger value="tasks" className="text-xs gap-1">
+              <ClipboardList className="h-3.5 w-3.5" /> Tasks
+            </TabsTrigger>
+            <TabsTrigger value="files" className="text-xs gap-1">
+              <FileText className="h-3.5 w-3.5" /> Αρχεία
+            </TabsTrigger>
+            <TabsTrigger value="media-plan" className="text-xs gap-1">
+              <Megaphone className="h-3.5 w-3.5" /> Media Plan
+            </TabsTrigger>
+            <TabsTrigger value="creatives" className="text-xs gap-1">
+              <Palette className="h-3.5 w-3.5" /> Δημιουργικά
+            </TabsTrigger>
+            {(canViewFinancials || isClient) && (
+              <TabsTrigger value="financials" className="text-xs gap-1">
+                <DollarSign className="h-3.5 w-3.5" /> Οικονομικά
               </TabsTrigger>
-              <TabsTrigger value="deliverables" className="text-xs gap-1">
-                <ListChecks className="h-3.5 w-3.5" /> Παραδοτέα
-              </TabsTrigger>
-              <TabsTrigger value="tasks" className="text-xs gap-1">
-                <ClipboardList className="h-3.5 w-3.5" /> Tasks
-              </TabsTrigger>
-              <TabsTrigger value="files" className="text-xs gap-1">
-                <FileText className="h-3.5 w-3.5" /> Αρχεία
-              </TabsTrigger>
-              <TabsTrigger value="media-plan" className="text-xs gap-1">
-                <Megaphone className="h-3.5 w-3.5" /> Media Plan
-              </TabsTrigger>
-              <TabsTrigger value="creatives" className="text-xs gap-1">
-                <Palette className="h-3.5 w-3.5" /> Δημιουργικά
-              </TabsTrigger>
-              {(canViewFinancials || isClient) && (
-                <TabsTrigger value="financials" className="text-xs gap-1">
-                  <DollarSign className="h-3.5 w-3.5" /> Οικονομικά
-                </TabsTrigger>
-              )}
-              <TabsTrigger value="workflow" className="text-xs gap-1">
-                <GitBranch className="h-3.5 w-3.5" /> Ροή
-              </TabsTrigger>
-              <TabsTrigger value="comments" className="text-xs gap-1">
-                <MessageSquare className="h-3.5 w-3.5" /> Σχόλια
-              </TabsTrigger>
-            </TabsList>
+            )}
+            <TabsTrigger value="workflow" className="text-xs gap-1">
+              <GitBranch className="h-3.5 w-3.5" /> Ροή
+            </TabsTrigger>
+            <TabsTrigger value="comments" className="text-xs gap-1">
+              <MessageSquare className="h-3.5 w-3.5" /> Σχόλια
+            </TabsTrigger>
+          </TabsList>
 
-            <TabsContent value="overview">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Project Info Card */}
-                <Card>
-                  <CardContent className="p-5 space-y-3">
-                    <p className="text-sm font-semibold">Πληροφορίες Έργου</p>
+          <TabsContent value="overview">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Project Info Card */}
+              <Card>
+                <CardContent className="p-5 space-y-3">
+                  <p className="text-sm font-semibold">Πληροφορίες Έργου</p>
 
-                    {/* Description - inline edit */}
-                    <div className="group">
-                      <p className="text-xs text-muted-foreground mb-1">Περιγραφή</p>
-                      {editingDescription ? (
-                        <div className="space-y-2">
-                          <Textarea
-                            value={descriptionDraft}
-                            onChange={e => setDescriptionDraft(e.target.value)}
-                            rows={3}
-                            className="text-sm"
-                            autoFocus
-                            onKeyDown={e => {
-                              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                                updateProjectField('description', descriptionDraft.trim() || null);
-                                setEditingDescription(false);
-                              }
-                            }}
-                          />
-                          <div className="flex gap-1">
-                            <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setEditingDescription(false)}>
-                              <X className="h-3 w-3" />
-                            </Button>
-                            <Button size="sm" className="h-6 px-2 text-xs" onClick={() => {
+                  {/* Description */}
+                  <div className="group">
+                    <p className="text-xs text-muted-foreground mb-1">Περιγραφή</p>
+                    {editingDescription ? (
+                      <div className="space-y-2">
+                        <Textarea
+                          value={descriptionDraft}
+                          onChange={e => setDescriptionDraft(e.target.value)}
+                          rows={3}
+                          className="text-sm"
+                          autoFocus
+                          onKeyDown={e => {
+                            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
                               updateProjectField('description', descriptionDraft.trim() || null);
                               setEditingDescription(false);
-                            }}>
-                              <Save className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <p
-                          className={cn(
-                            "text-sm cursor-pointer rounded px-1 -mx-1 py-0.5 hover:bg-muted/50 transition-colors",
-                            !project.description && "text-muted-foreground italic"
-                          )}
-                          onClick={() => {
-                            if (!canEdit) return;
-                            setDescriptionDraft(project.description || '');
-                            setEditingDescription(true);
+                            }
                           }}
-                        >
-                          {project.description || 'Προσθέστε περιγραφή...'}
-                          {canEdit && <Pencil className="h-3 w-3 ml-1 inline opacity-0 group-hover:opacity-50" />}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Client */}
-                    {project.client && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">Πελάτης</span>
-                        <span className="text-sm font-medium">{project.client.name}</span>
-                      </div>
-                    )}
-
-                    {/* Budget - inline edit */}
-                    <div className="group flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Budget</span>
-                      {editingBudget ? (
-                        <div className="flex items-center gap-1">
-                          <Input
-                            type="number"
-                            value={budgetDraft}
-                            onChange={e => setBudgetDraft(e.target.value)}
-                            className="h-6 w-24 text-xs"
-                            autoFocus
-                            onKeyDown={e => {
-                              if (e.key === 'Enter') {
-                                updateProjectField('budget', parseFloat(budgetDraft) || 0);
-                                setEditingBudget(false);
-                              }
-                              if (e.key === 'Escape') setEditingBudget(false);
-                            }}
-                            onBlur={() => {
-                              updateProjectField('budget', parseFloat(budgetDraft) || 0);
-                              setEditingBudget(false);
-                            }}
-                          />
+                        />
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setEditingDescription(false)}>
+                            <X className="h-3 w-3" />
+                          </Button>
+                          <Button size="sm" className="h-6 px-2 text-xs" onClick={() => {
+                            updateProjectField('description', descriptionDraft.trim() || null);
+                            setEditingDescription(false);
+                          }}>
+                            <Save className="h-3 w-3" />
+                          </Button>
                         </div>
-                      ) : (
-                        <span
-                          className="text-sm font-medium cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 transition-colors"
-                          onClick={() => { if (!canEdit) return; setBudgetDraft(project.budget.toString()); setEditingBudget(true); }}
-                        >
-                          €{project.budget.toLocaleString()}
-                        </span>
-                      )}
-                    </div>
+                      </div>
+                    ) : (
+                      <p
+                        className={cn(
+                          "text-sm cursor-pointer rounded px-1 -mx-1 py-0.5 hover:bg-muted/50 transition-colors",
+                          !project.description && "text-muted-foreground italic"
+                        )}
+                        onClick={() => {
+                          if (!canEdit) return;
+                          setDescriptionDraft(project.description || '');
+                          setEditingDescription(true);
+                        }}
+                      >
+                        {project.description || 'Προσθέστε περιγραφή...'}
+                        {canEdit && <Pencil className="h-3 w-3 ml-1 inline opacity-0 group-hover:opacity-50" />}
+                      </p>
+                    )}
+                  </div>
 
-                    {/* Agency Fee - inline edit */}
+                  {/* Client */}
+                  {project.client && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Πελάτης</span>
+                      <span className="text-sm font-medium">{project.client.name}</span>
+                    </div>
+                  )}
+
+                  {/* Budget */}
+                  <div className="group flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Budget</span>
+                    {editingBudget ? (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number" value={budgetDraft}
+                          onChange={e => setBudgetDraft(e.target.value)}
+                          className="h-6 w-24 text-xs" autoFocus
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') { updateProjectField('budget', parseFloat(budgetDraft) || 0); setEditingBudget(false); }
+                            if (e.key === 'Escape') setEditingBudget(false);
+                          }}
+                          onBlur={() => { updateProjectField('budget', parseFloat(budgetDraft) || 0); setEditingBudget(false); }}
+                        />
+                      </div>
+                    ) : (
+                      <span className="text-sm font-medium cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 transition-colors"
+                        onClick={() => { if (!canEdit) return; setBudgetDraft(project.budget.toString()); setEditingBudget(true); }}>
+                        €{project.budget.toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Agency Fee */}
+                  {!(project as any).is_internal && (
                     <div className="group flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">Agency Fee</span>
                       {editingFee ? (
                         <Input
-                          type="number"
-                          value={feeDraft}
+                          type="number" value={feeDraft}
                           onChange={e => setFeeDraft(e.target.value)}
-                          className="h-6 w-16 text-xs"
-                          autoFocus
+                          className="h-6 w-16 text-xs" autoFocus
                           onKeyDown={e => {
-                            if (e.key === 'Enter') {
-                              updateProjectField('agency_fee_percentage', parseFloat(feeDraft) || 0);
-                              setEditingFee(false);
-                            }
+                            if (e.key === 'Enter') { updateProjectField('agency_fee_percentage', parseFloat(feeDraft) || 0); setEditingFee(false); }
                             if (e.key === 'Escape') setEditingFee(false);
                           }}
-                          onBlur={() => {
-                            updateProjectField('agency_fee_percentage', parseFloat(feeDraft) || 0);
-                            setEditingFee(false);
-                          }}
+                          onBlur={() => { updateProjectField('agency_fee_percentage', parseFloat(feeDraft) || 0); setEditingFee(false); }}
                         />
                       ) : (
-                        <span
-                          className="text-sm font-medium cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 transition-colors"
-                          onClick={() => { if (!canEdit) return; setFeeDraft(project.agency_fee_percentage.toString()); setEditingFee(true); }}
-                        >
+                        <span className="text-sm font-medium cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 transition-colors"
+                          onClick={() => { if (!canEdit) return; setFeeDraft(project.agency_fee_percentage.toString()); setEditingFee(true); }}>
                           {project.agency_fee_percentage}%
                         </span>
                       )}
                     </div>
+                  )}
 
-                    {/* Dates */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Έναρξη</span>
-                      <input
-                        type="date"
-                        value={project.start_date || ''}
-                        onChange={e => updateProjectField('start_date', e.target.value || null)}
-                        disabled={!canEdit}
-                        className="text-xs bg-transparent border-none outline-none text-foreground cursor-pointer disabled:cursor-default"
-                      />
+                  {/* Dates */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Έναρξη</span>
+                    <input type="date" value={project.start_date || ''} onChange={e => updateProjectField('start_date', e.target.value || null)} disabled={!canEdit}
+                      className="text-xs bg-transparent border-none outline-none text-foreground cursor-pointer disabled:cursor-default" />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Λήξη</span>
+                    <input type="date" value={project.end_date || ''} onChange={e => updateProjectField('end_date', e.target.value || null)} disabled={!canEdit}
+                      className="text-xs bg-transparent border-none outline-none text-foreground cursor-pointer disabled:cursor-default" />
+                  </div>
+
+                  {dueDateInfo && (
+                    <div className="flex items-center gap-2 text-xs">
+                      <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className={cn('font-medium', dueDateInfo.className)}>{dueDateInfo.label}</span>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Λήξη</span>
-                      <input
-                        type="date"
-                        value={project.end_date || ''}
-                        onChange={e => updateProjectField('end_date', e.target.value || null)}
-                        disabled={!canEdit}
-                        className="text-xs bg-transparent border-none outline-none text-foreground cursor-pointer disabled:cursor-default"
-                      />
-                    </div>
+                  )}
 
-                    {dueDateInfo && (
-                      <div className="flex items-center gap-2 text-xs">
-                        <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className={cn('font-medium', dueDateInfo.className)}>{dueDateInfo.label}</span>
-                      </div>
-                    )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Καταγεγραμμένες Ώρες</span>
+                    <span className="text-sm font-medium flex items-center gap-1">
+                      <Timer className="h-3.5 w-3.5 text-muted-foreground" />{totalTrackedHours}h
+                    </span>
+                  </div>
 
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Καταγεγραμμένες Ώρες</span>
-                      <span className="text-sm font-medium flex items-center gap-1">
-                        <Timer className="h-3.5 w-3.5 text-muted-foreground" />
-                        {totalTrackedHours}h
-                      </span>
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Tasks</span>
+                    <span className="text-sm font-medium">{completedTasks}/{tasks.length} ολοκληρωμένα</span>
+                  </div>
 
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Tasks</span>
-                      <span className="text-sm font-medium">{completedTasks}/{tasks.length} ολοκληρωμένα</span>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Παραδοτέα</span>
-                      <span className="text-sm font-medium">{completedDeliverables}/{deliverables.length} ολοκληρωμένα</span>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Team Card */}
-                <Card>
-                  <CardContent className="p-5">
-                    <ProjectTeamManager
-                      projectId={project.id}
-                      canEdit={canEdit}
-                      compact
-                      showFullNames
-                      projectLeadId={project.project_lead_id}
-                      accountManagerId={project.account_manager_id}
-                      onUpdateProjectRole={(field, value) => updateProjectField(field, value)}
-                    />
-                  </CardContent>
-                </Card>
-
-                {/* Contracts Card */}
-                <ProjectContractsCard projectId={project.id} onUploadContract={() => setActiveTab('files')} />
-              </div>
-            </TabsContent>
-
-            <TabsContent value="deliverables">
-              <ProjectDeliverablesTable projectId={project.id} projectName={project.name} />
-            </TabsContent>
-            <TabsContent value="tasks">
-              <TasksPage embedded projectId={project.id} />
-            </TabsContent>
-            <TabsContent value="files">
-              <FileExplorer projectId={project.id} />
-            </TabsContent>
-            <TabsContent value="media-plan">
-              <ProjectMediaPlan
-                projectId={project.id}
-                projectName={project.name}
-                projectBudget={project.budget}
-                agencyFeePercentage={project.agency_fee_percentage || 0}
-                deliverables={deliverables.map(d => ({ id: d.id, name: d.name }))}
-              />
-            </TabsContent>
-            <TabsContent value="creatives">
-              <ProjectCreatives
-                projectId={project.id}
-                projectName={project.name}
-                deliverables={deliverables.map(d => ({ id: d.id, name: d.name }))}
-                tasks={tasks.map(t => ({ id: t.id, title: t.title }))}
-                mediaPlanItems={[]}
-              />
-            </TabsContent>
-            {(canViewFinancials || isClient) && (
-              <TabsContent value="financials">
-                <ProjectFinancialsHub
-                  projectId={project.id}
-                  clientId={project.client_id}
-                  projectBudget={project.budget}
-                  agencyFeePercentage={project.agency_fee_percentage || 0}
-                />
-              </TabsContent>
-            )}
-            <TabsContent value="workflow">
-              <ProjectWorkflowTracker projectId={project.id} />
-            </TabsContent>
-            <TabsContent value="comments">
-              <Card>
-                <CardContent className="pt-6">
-                  <ProjectCommentsAndHistory projectId={project.id} />
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Παραδοτέα</span>
+                    <span className="text-sm font-medium">{completedDeliverables}/{deliverables.length} ολοκληρωμένα</span>
+                  </div>
                 </CardContent>
               </Card>
+
+              {/* Team Card */}
+              <Card>
+                <CardContent className="p-5">
+                  <ProjectTeamManager
+                    projectId={project.id}
+                    canEdit={canEdit}
+                    compact
+                    showFullNames
+                    projectLeadId={project.project_lead_id}
+                    accountManagerId={project.account_manager_id}
+                    onUpdateProjectRole={(field, value) => updateProjectField(field, value)}
+                  />
+                </CardContent>
+              </Card>
+
+              {/* Contracts Card */}
+              <ProjectContractsCard projectId={project.id} onUploadContract={() => setActiveTab('files')} />
+
+              {/* Proposals Card */}
+              {proposalFiles.length > 0 && (
+                <Card>
+                  <CardContent className="p-5 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                      <p className="text-sm font-semibold">Προτάσεις / Προσφορές</p>
+                      <Badge variant="secondary" className="text-[10px]">{proposalFiles.length}</Badge>
+                    </div>
+                    <div className="space-y-1.5">
+                      {proposalFiles.map(f => (
+                        <div key={f.id} className="flex items-center gap-2 text-sm">
+                          <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="truncate flex-1">{f.file_name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(f.created_at), 'd/M/yy', { locale: el })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Briefs Card */}
+              {briefFiles.length > 0 && (
+                <Card>
+                  <CardContent className="p-5 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <p className="text-sm font-semibold">Briefs</p>
+                      <Badge variant="secondary" className="text-[10px]">{briefFiles.length}</Badge>
+                    </div>
+                    <div className="space-y-1.5">
+                      {briefFiles.map(f => (
+                        <div key={f.id} className="flex items-center gap-2 text-sm">
+                          <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="truncate flex-1">{f.file_name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(f.created_at), 'd/M/yy', { locale: el })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Sub-projects Card */}
+              {subProjects.length > 0 && (
+                <Card>
+                  <CardContent className="p-5 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Layers className="h-4 w-4 text-muted-foreground" />
+                      <p className="text-sm font-semibold">Υπό-έργα</p>
+                      <Badge variant="secondary" className="text-[10px]">{subProjects.length}</Badge>
+                    </div>
+                    <div className="space-y-2">
+                      {subProjects.map(sp => (
+                        <Link key={sp.id} to={`/projects/${sp.id}`}
+                          className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                          <span className="text-sm font-medium">{sp.name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">€{(sp.budget || 0).toLocaleString()}</span>
+                            {getStatusBadgeForSub(sp.status)}
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="deliverables">
+            <ProjectDeliverablesTable projectId={project.id} projectName={project.name} />
+          </TabsContent>
+          <TabsContent value="tasks">
+            <TasksPage embedded projectId={project.id} />
+          </TabsContent>
+          <TabsContent value="files">
+            <FileExplorer projectId={project.id} />
+          </TabsContent>
+          <TabsContent value="media-plan">
+            <ProjectMediaPlan
+              projectId={project.id}
+              projectName={project.name}
+              projectBudget={project.budget}
+              agencyFeePercentage={project.agency_fee_percentage || 0}
+              deliverables={deliverables.map(d => ({ id: d.id, name: d.name }))}
+            />
+          </TabsContent>
+          <TabsContent value="creatives">
+            <ProjectCreatives
+              projectId={project.id}
+              projectName={project.name}
+              deliverables={deliverables.map(d => ({ id: d.id, name: d.name }))}
+              tasks={tasks.map(t => ({ id: t.id, title: t.title }))}
+              mediaPlanItems={[]}
+            />
+          </TabsContent>
+          {(canViewFinancials || isClient) && (
+            <TabsContent value="financials">
+              <ProjectFinancialsHub
+                projectId={project.id}
+                clientId={project.client_id}
+                projectBudget={project.budget}
+                agencyFeePercentage={project.agency_fee_percentage || 0}
+              />
             </TabsContent>
-          </Tabs>
+          )}
+          <TabsContent value="workflow">
+            <ProjectWorkflowTracker projectId={project.id} />
+          </TabsContent>
+          <TabsContent value="comments">
+            <Card>
+              <CardContent className="pt-6">
+                <ProjectCommentsAndHistory projectId={project.id} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

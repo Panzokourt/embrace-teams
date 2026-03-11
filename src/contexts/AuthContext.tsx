@@ -301,7 +301,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Check platform admin status
-      const { data: platformAdminCheck } = await supabase.rpc('is_platform_admin', { _user_id: userId });
+      const { data: platformAdminCheck } = await (supabase.rpc as any)('is_platform_admin', { _user_id: userId });
       setIsPlatformAdmin(!!platformAdminCheck);
     } catch (error) {
       console.error('Error fetching user data:', error);

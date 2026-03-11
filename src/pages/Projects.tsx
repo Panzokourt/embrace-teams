@@ -793,8 +793,8 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
                 </DialogFooter>
               </form>
             ) : (
-              /* Step 2: AI Analysis */
-              createdProjectId && <AIAnalysisStep projectId={createdProjectId} />
+              /* Step 2: AI Analysis - inline */
+              createdProjectId && renderAIStep(createdProjectId)
             )}
           </DialogContent>
         </Dialog>

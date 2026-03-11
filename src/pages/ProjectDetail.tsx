@@ -357,6 +357,11 @@ export default function ProjectDetailPage() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {canEdit && (
+              <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => setAiDialogOpen(true)}>
+                <Sparkles className="h-3.5 w-3.5" /> AI Ανάλυση
+              </Button>
+            )}
             <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground">
               <Timer className="h-3 w-3" />{totalTrackedHours}h
             </span>

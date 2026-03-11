@@ -492,6 +492,9 @@ export default function SettingsPage() {
       {/* Project Categories (Admin only) */}
       {isAdmin && <ProjectCategoriesManager />}
 
+      {/* Project Folder Templates (Admin only) */}
+      {isAdmin && <ProjectFolderTemplatesManager />}
+
       {/* Email / Inbox */}
       <EmailAccountSetup />
 

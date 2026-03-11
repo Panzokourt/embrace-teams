@@ -547,6 +547,9 @@ export default function ProjectDetailPage() {
                     />
                   </CardContent>
                 </Card>
+
+                {/* Contracts Card */}
+                <ProjectContractsCard projectId={project.id} />
               </div>
             </TabsContent>
 

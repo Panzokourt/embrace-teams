@@ -25,6 +25,10 @@ import {
   Palette, FolderInput, Timer, ListChecks, FileText, MessageSquare,
   Pencil, Save, X, ClipboardList, Sparkles, FolderOpen, Layers,
 } from 'lucide-react';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import { ProjectAIAnalysisInline } from '@/components/projects/ProjectAIAnalysisInline';
 import { format, differenceInDays } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';

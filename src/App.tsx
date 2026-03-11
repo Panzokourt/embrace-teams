@@ -75,6 +75,7 @@ const App = () => (
                 <Route path="/accept-invite/:token" element={<AcceptInvite />} />
                 <Route path="/accept-invite" element={<AcceptInvite />} />
                 <Route path="/welcome" element={<WelcomeWizard />} />
+                <Route path="/platform-admin" element={<PlatformAdmin />} />
                 <Route element={<AppLayout />}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/dashboard/:templateId" element={<Dashboard />} />

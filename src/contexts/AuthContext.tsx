@@ -298,6 +298,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (rolesData) {
         setLegacyRoles(rolesData.map(r => r.role));
       }
+
+      // Check platform admin status
+      const { data: platformAdminCheck } = await supabase.rpc('is_platform_admin', { _user_id: userId });
+      setIsPlatformAdmin(!!platformAdminCheck);
     } catch (error) {
       console.error('Error fetching user data:', error);
     } finally {

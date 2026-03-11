@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Search, X, FileArchive, Filter, FolderOpen, Users, Briefcase, CalendarDays } from 'lucide-react';
+import { Search, X, Filter, FolderOpen, Users, Briefcase, CalendarDays } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -10,7 +10,6 @@ import { FinderColumnView } from './FinderColumnView';
 import { createProjectFilesObjectKey } from '@/utils/storageKeys';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
 import type { FileFolder } from './FolderTree';
 import type { FileAttachment } from './FilesTableView';
 
@@ -119,7 +118,6 @@ export function CentralFileExplorer() {
     }
   };
 
-  // Filter files by type
   const typeFilteredFiles = useMemo(() => {
     if (typeFilter === 'all') return files;
     return files.filter((f) => matchesTypeFilter(f.content_type, typeFilter));
@@ -135,7 +133,6 @@ export function CentralFileExplorer() {
     const vFiles: FileAttachment[] = [];
 
     if (viewMode === 'by-client') {
-      // Group by client: create virtual folders for each client that has files
       const clientIds = new Set(typeFilteredFiles.map((f) => f.project_id).filter(Boolean));
       const projectClientMap = new Map(projects.map((p) => [p.id, p.client_id]));
       const relevantClientIds = new Set<string>();
@@ -144,9 +141,6 @@ export function CentralFileExplorer() {
         const clientId = projectClientMap.get(pid!);
         if (clientId) relevantClientIds.add(clientId);
       });
-
-      // Also add files without project
-      const filesWithoutProject = typeFilteredFiles.filter((f) => !f.project_id);
 
       clients.forEach((client) => {
         if (relevantClientIds.has(client.id)) {
@@ -161,7 +155,6 @@ export function CentralFileExplorer() {
         }
       });
 
-      // Map files to their virtual client folder
       typeFilteredFiles.forEach((f) => {
         if (f.project_id) {
           const clientId = projectClientMap.get(f.project_id);
@@ -172,35 +165,65 @@ export function CentralFileExplorer() {
         }
         vFiles.push({ ...f, folder_id: null });
       });
-
-      if (filesWithoutProject.length > 0 && vFolders.length > 0) {
-        // Files without project stay at root
-      }
     } else if (viewMode === 'by-project') {
+      // Build project virtual folders
       const projectIds = new Set(typeFilteredFiles.map((f) => f.project_id).filter(Boolean));
+
+      // Also get real file_folders per project to show subfolders
+      const projectFoldersMap = new Map<string, FileFolder[]>();
+      folders.forEach((f) => {
+        const pid = (f as any).project_id;
+        if (pid && projectIds.has(pid)) {
+          if (!projectFoldersMap.has(pid)) projectFoldersMap.set(pid, []);
+          projectFoldersMap.get(pid)!.push(f);
+        }
+      });
 
       projects.forEach((project) => {
         if (projectIds.has(project.id)) {
+          // Add project as virtual root folder
+          const vpId = `vp-${project.id}`;
           vFolders.push({
-            id: `vp-${project.id}`,
+            id: vpId,
             name: project.name,
             parent_folder_id: null,
             created_by: '',
             created_at: '',
             color: null,
           } as FileFolder);
+
+          // Add real subfolders under this virtual project folder
+          const realFolders = projectFoldersMap.get(project.id) || [];
+          realFolders.forEach((rf) => {
+            // Only add root-level project folders (no parent or parent is null)
+            if (!rf.parent_folder_id) {
+              vFolders.push({
+                ...rf,
+                id: rf.id, // keep real ID so files with folder_id match
+                parent_folder_id: vpId, // nest under virtual project folder
+              } as FileFolder);
+            } else {
+              // Sub-subfolders: keep as-is (their parent_folder_id points to a real folder)
+              vFolders.push(rf);
+            }
+          });
         }
       });
 
       typeFilteredFiles.forEach((f) => {
         if (f.project_id) {
-          vFiles.push({ ...f, folder_id: `vp-${f.project_id}` });
+          // If file has a real folder_id that exists, keep it (it's now nested under the project virtual folder)
+          if (f.folder_id && folders.some(fl => fl.id === f.folder_id)) {
+            vFiles.push(f); // folder_id already points to the real folder
+          } else {
+            // File without a subfolder → goes directly under the virtual project folder
+            vFiles.push({ ...f, folder_id: `vp-${f.project_id}` });
+          }
         } else {
           vFiles.push({ ...f, folder_id: null });
         }
       });
     } else if (viewMode === 'by-date') {
-      // Group by month
       const monthGroups = new Map<string, string>();
       typeFilteredFiles.forEach((f) => {
         const date = new Date(f.created_at);
@@ -210,7 +233,6 @@ export function CentralFileExplorer() {
         }
       });
 
-      // Sort months descending
       const sortedMonths = [...monthGroups.entries()].sort((a, b) => b[0].localeCompare(a[0]));
       sortedMonths.forEach(([key, label]) => {
         vFolders.push({
@@ -339,9 +361,8 @@ export function CentralFileExplorer() {
 
   return (
     <div className="space-y-3">
-      {/* Toolbar: View tabs + Search + Filters */}
+      {/* Toolbar */}
       <div className="flex items-center gap-3 flex-wrap">
-        {/* View mode tabs */}
         <div className="flex items-center gap-1 p-1 rounded-lg bg-secondary shadow-md opacity-85">
           {VIEW_TABS.map((tab) => {
             const Icon = tab.icon;
@@ -360,7 +381,6 @@ export function CentralFileExplorer() {
           })}
         </div>
 
-        {/* Search */}
         <div className="relative w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -381,7 +401,6 @@ export function CentralFileExplorer() {
           )}
         </div>
 
-        {/* File type filter */}
         <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as FileTypeFilter)}>
           <SelectTrigger className="w-[160px] h-8">
             <Filter className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
@@ -396,13 +415,11 @@ export function CentralFileExplorer() {
           </SelectContent>
         </Select>
 
-        {/* File count */}
         <span className="text-xs text-muted-foreground ml-auto">
           {virtualFiles.length} αρχεί{virtualFiles.length === 1 ? 'ο' : 'α'}
         </span>
       </div>
 
-      {/* Finder view */}
       <FinderColumnView
         files={virtualFiles}
         folders={virtualFolders}

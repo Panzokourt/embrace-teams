@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
 import {
@@ -15,12 +15,11 @@ import {
   Upload,
   FolderPlus,
   Loader2,
-  Search,
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -78,15 +77,14 @@ export function FinderColumnView({
   uploading,
   searchQuery,
 }: FinderColumnViewProps) {
-  // path = array of folder IDs representing the drill-down path
   const [path, setPath] = useState<(string | null)[]>([null]);
   const [selectedItem, setSelectedItem] = useState<ColumnItem | null>(null);
   const [creatingInColumn, setCreatingInColumn] = useState<number | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
+  const [dragOverColumn, setDragOverColumn] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-scroll right when path grows
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
@@ -109,39 +107,27 @@ export function FinderColumnView({
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((f) => ({ kind: 'folder' as const, data: f }));
 
-    let childFiles: ColumnItem[];
-    
-    // At root level: if no root folders exist, show ALL files regardless of folder_id
-    if (parentId === null && childFolders.length === 0) {
-      childFiles = filteredFiles
-        .sort((a, b) => a.file_name.localeCompare(b.file_name))
-        .map((f) => ({ kind: 'file' as const, data: f }));
-    } else {
-      childFiles = filteredFiles
-        .filter((f) => f.folder_id === parentId)
-        .sort((a, b) => a.file_name.localeCompare(b.file_name))
-        .map((f) => ({ kind: 'file' as const, data: f }));
-    }
+    // Always show files belonging to this folder (no flat fallback)
+    const childFiles = filteredFiles
+      .filter((f) => f.folder_id === parentId)
+      .sort((a, b) => a.file_name.localeCompare(b.file_name))
+      .map((f) => ({ kind: 'file' as const, data: f }));
 
     return [...childFolders, ...childFiles];
   }
 
   function handleSelectItem(item: ColumnItem, columnIndex: number) {
     setSelectedItem(item);
-
     if (item.kind === 'folder') {
-      // Trim path to this column + add the new folder
       const newPath = path.slice(0, columnIndex + 1);
       newPath.push(item.data.id);
       setPath(newPath);
     } else {
-      // Just select the file, trim any deeper columns
       setPath(path.slice(0, columnIndex + 1));
     }
   }
 
   function handleUploadToColumn(parentId: string | null) {
-    // Store the target folder for upload
     (fileInputRef.current as any).__targetFolder = parentId;
     fileInputRef.current?.click();
   }
@@ -154,6 +140,31 @@ export function FinderColumnView({
     }
     e.target.value = '';
   }
+
+  // Drag & drop handlers
+  const handleDragOver = useCallback((e: React.DragEvent, colIndex: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverColumn(colIndex);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverColumn(null);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent, colIndex: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverColumn(null);
+
+    const droppedFiles = e.dataTransfer.files;
+    if (droppedFiles && droppedFiles.length > 0) {
+      const folderId = path[colIndex] ?? null;
+      onUpload(droppedFiles, folderId);
+    }
+  }, [path, onUpload]);
 
   async function handleCreateFolder(columnIndex: number) {
     if (!newFolderName.trim()) return;
@@ -176,7 +187,6 @@ export function FinderColumnView({
     }
   }
 
-  // Breadcrumb
   const breadcrumb = useMemo(() => {
     const items: { id: string | null; name: string }[] = [
       { id: null, name: 'Αρχεία' },
@@ -204,7 +214,6 @@ export function FinderColumnView({
     <div className="flex flex-col h-[calc(100vh-12rem)] border border-border rounded-xl bg-card overflow-hidden">
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-muted/30">
-        {/* Breadcrumb */}
         <div className="flex items-center gap-1 text-sm min-w-0 flex-1">
           {breadcrumb.map((item, i) => (
             <span key={item.id ?? 'root'} className="flex items-center gap-1">
@@ -262,19 +271,23 @@ export function FinderColumnView({
 
       {/* Columns + Preview */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        {/* Columns area */}
         <div ref={scrollRef} className="flex flex-1 min-w-0 overflow-x-auto">
           {path.map((folderId, colIndex) => {
             const items = getColumnItems(folderId);
             const isLastColumn = colIndex === path.length - 1;
+            const isDragOver = dragOverColumn === colIndex;
 
             return (
               <div
                 key={`col-${colIndex}-${folderId}`}
                 className={cn(
-                  'flex flex-col min-w-[220px] w-[220px] border-r border-border shrink-0',
-                  isLastColumn && 'flex-1 min-w-[220px] w-auto'
+                  'flex flex-col min-w-[220px] w-[220px] border-r border-border shrink-0 transition-colors',
+                  isLastColumn && 'flex-1 min-w-[220px] w-auto',
+                  isDragOver && 'bg-primary/5 border-primary/30'
                 )}
+                onDragOver={(e) => handleDragOver(e, colIndex)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, colIndex)}
               >
                 <ScrollArea className="flex-1">
                   <div className="py-1">
@@ -311,9 +324,27 @@ export function FinderColumnView({
                       </div>
                     )}
 
-                    {items.length === 0 && (
+                    {items.length === 0 && !isDragOver && (
                       <div className="px-3 py-8 text-center text-xs text-muted-foreground">
                         Κενός φάκελος
+                      </div>
+                    )}
+
+                    {items.length === 0 && isDragOver && (
+                      <div className="px-3 py-8 text-center">
+                        <Upload className="h-6 w-6 mx-auto mb-2 text-primary/60" />
+                        <p className="text-xs text-primary/80 font-medium">
+                          Αφήστε αρχεία εδώ
+                        </p>
+                      </div>
+                    )}
+
+                    {isDragOver && items.length > 0 && (
+                      <div className="px-3 py-2 text-center border-b border-dashed border-primary/30">
+                        <p className="text-xs text-primary/80 font-medium flex items-center justify-center gap-1">
+                          <Upload className="h-3 w-3" />
+                          Αφήστε αρχεία εδώ
+                        </p>
                       </div>
                     )}
 
@@ -327,7 +358,6 @@ export function FinderColumnView({
                             selectedItem.kind === 'file' &&
                             item.data.id === (selectedItem.data as FileAttachment).id));
 
-                      // Is this folder in the path (i.e. drilled into)?
                       const isDrilledInto =
                         item.kind === 'folder' && path.includes(item.data.id);
 
@@ -377,19 +407,13 @@ export function FinderColumnView({
           <div className="w-[280px] shrink-0 border-l border-border bg-muted/20 flex flex-col">
             <ScrollArea className="flex-1">
               <div className="p-4 flex flex-col items-center gap-4">
-                {/* Icon */}
                 <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center">
                   <FileIcon className="h-10 w-10 text-muted-foreground" />
                 </div>
-
-                {/* File name */}
                 <h3 className="text-sm font-semibold text-center break-all leading-tight">
                   {selectedFile.file_name}
                 </h3>
-
                 <Separator />
-
-                {/* Metadata */}
                 <div className="w-full space-y-3 text-xs">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Τύπος</span>
@@ -406,9 +430,7 @@ export function FinderColumnView({
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Ημερομηνία</span>
                     <span className="text-foreground font-medium">
-                      {format(new Date(selectedFile.created_at), 'dd MMM yyyy', {
-                        locale: el,
-                      })}
+                      {format(new Date(selectedFile.created_at), 'dd MMM yyyy', { locale: el })}
                     </span>
                   </div>
                   {selectedFile.uploader && (
@@ -420,10 +442,7 @@ export function FinderColumnView({
                     </div>
                   )}
                 </div>
-
                 <Separator />
-
-                {/* Actions */}
                 <div className="w-full space-y-2">
                   <Button
                     variant="outline"

@@ -695,6 +695,32 @@ export default function ProjectDetailPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* AI Analysis Dialog */}
+      <Dialog open={aiDialogOpen} onOpenChange={setAiDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5" /> AI Ανάλυση — {project.name}
+            </DialogTitle>
+          </DialogHeader>
+          <ProjectAIAnalysisInline
+            projectId={project.id}
+            projectName={project.name}
+            projectBudget={project.budget}
+            allowUpload={true}
+            onDone={() => {
+              setAiDialogOpen(false);
+              fetchProjectData();
+            }}
+            onProjectDetailsUpdate={(details) => {
+              supabase.from('projects').update(details).eq('id', project.id).then(() => {
+                fetchProjectData();
+              });
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

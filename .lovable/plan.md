@@ -1,66 +1,66 @@
 
 
-# Org Chart — Full Rebuild Plan
+# Platform Admin Panel — `/platform-admin`
 
-## Πρόβλημα
+## Σκοπός
+Μια ξεχωριστή σελίδα αποκλειστικά για τον δημιουργό/ιδιοκτήτη της πλατφόρμας, που επιτρέπει cross-tenant διαχείριση χωρίς να ανήκει σε κάθε εταιρεία.
 
-Το τρέχον οργανόγραμμα είναι ένα static rendered tree μέσα σε ScrollArea με βασικό zoom (CSS scale). Δεν υποστηρίζει pan/drag-to-move, δεν έχει infinite canvas, τα nodes δεν είναι clickable για detail, δεν υπάρχουν views (by department, by person), και τα templates δεν αξιοποιούν το υπάρχον προσωπικό.
+## Ασφάλεια
+- Νέος πίνακας `platform_admins` με στήλη `email` (whitelisted emails, π.χ. `koupant@gmail.com`)
+- Νέα `security definer` function `is_platform_admin(uuid)` που ελέγχει αν το email του χρήστη υπάρχει στο `platform_admins`
+- RLS policies: μόνο platform admins μπορούν να διαβάσουν cross-tenant data
+- Στο frontend: guard στο route — αν δεν είσαι platform admin, redirect
 
-## Λύση
+## Database Migration
+```sql
+-- Platform admins table
+CREATE TABLE public.platform_admins (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  email text NOT NULL UNIQUE,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE public.platform_admins ENABLE ROW LEVEL SECURITY;
 
-Πλήρες rebuild του OrgChart σε **infinite canvas** στυλ Miro με pan+zoom, πολλαπλά views, clickable nodes με detail panel, και smart templates.
+-- Seed the creator
+INSERT INTO public.platform_admins (email) VALUES ('koupant@gmail.com');
 
-## Τεχνική Προσέγγιση
+-- Security definer function
+CREATE OR REPLACE FUNCTION public.is_platform_admin(_user_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.platform_admins pa
+    JOIN auth.users u ON u.email = pa.email
+    WHERE u.id = _user_id
+  )
+$$;
 
-### 1. Infinite Canvas Engine (χωρίς εξωτερική βιβλιοθήκη)
-- Custom React canvas με `transform: translate(x, y) scale(z)` σε ένα wrapper div
-- **Mouse wheel** → zoom (centered on cursor)
-- **Middle-click drag** ή **Space+drag** → pan (hand tool)
-- **Touch**: pinch-to-zoom, two-finger pan
-- Mini-map στο corner (optional, phase 2)
-- Fit-to-screen button, zoom controls
+-- RLS: only platform admins can read
+CREATE POLICY "Platform admins can read" ON public.platform_admins
+  FOR SELECT TO authenticated USING (public.is_platform_admin(auth.uid()));
+```
 
-### 2. Views (3 modes)
-- **Hierarchy View** (default): Κλασικό tree ανά reporting line — αυτό που υπάρχει τώρα αλλά σε canvas
-- **Department View**: Grouped κάρτες ανά department σε columns/clusters, κάθε cluster δείχνει τα μέλη
-- **List View**: Compact table/list με sorting, φιλτράρισμα, search — γρήγορη εύρεση ατόμου
+## UI — Σελίδα `/platform-admin`
+Tabs:
+1. **Χρήστες** — Λίστα ΟΛΩΝ των χρηστών (cross-company) με search, email, status, ημερομηνία εγγραφής. Actions: suspend/activate.
+2. **Εταιρείες** — Λίστα ΟΛΩΝ των companies με μέλη, domain, ημερομηνία δημιουργίας.
+3. **Στατιστικά** — Σύνολο χρηστών, σύνολο εταιρειών, εγγραφές τελευταίου μήνα, active users.
 
-Toggle μεταξύ views μέσω tabs στο header.
-
-### 3. Interactive Nodes
-- **Click** σε node → slide-in panel (sheet) δεξιά με:
-  - Profile info (avatar, name, email, phone)
-  - Position & department
-  - Direct reports count
-  - Link to Employee Profile (`/hr/employee/:id`)
-  - Quick actions (edit, reassign, add subordinate)
-- **Hover** → subtle highlight + tooltip με title
-- **Vacant positions** → dashed border, prominent "Κενή θέση" badge, click to assign
-- Connector lines μεταξύ nodes: animated SVG paths αντί για div borders
-
-### 4. Smart Templates & Auto-build
-- Βελτίωση του Wizard: αφού επιλεγεί template, **auto-match** υπάρχοντα profiles σε positions βάσει `job_title` ή `department`
-- **Gap Analysis panel**: Μετά τη δημιουργία, δείχνει πόσες θέσεις είναι κενές, ποια departments λείπουν, ποια levels δεν έχουν κάλυψη
-- Wizard step: "Αντιστοίχιση Προσωπικού" — drag-drop ή auto-suggest
-
-### 5. SVG Connector Lines
-- Αντικατάσταση CSS div lines με SVG `<path>` elements (bezier curves)
-- Animated flow direction (subtle dash animation)
-- Color-coded κατά department
+## Edge Function — `platform-admin-data`
+Ένα edge function που δέχεται JWT, ελέγχει `is_platform_admin`, και επιστρέφει data χρησιμοποιώντας service role key (bypass RLS):
+- `GET ?type=users` → all profiles + company roles
+- `GET ?type=companies` → all companies + member counts
+- `GET ?type=stats` → aggregate stats
+- `POST ?action=suspend&userId=...` → suspend user
+- `POST ?action=activate&userId=...` → activate user
 
 ## Αρχεία
 
 | Αρχείο | Αλλαγή |
-|---|---|
-| `src/pages/OrgChart.tsx` | **Rewrite** — Infinite canvas, views, SVG connectors, detail panel |
-| `src/components/org-chart/OrgChartCanvas.tsx` | **New** — Pan+zoom canvas wrapper |
-| `src/components/org-chart/OrgNodeCard.tsx` | **New** — Redesigned node card (clickable, expandable) |
-| `src/components/org-chart/OrgDetailPanel.tsx` | **New** — Slide-in sheet for node details |
-| `src/components/org-chart/OrgDepartmentView.tsx` | **New** — Department-grouped view |
-| `src/components/org-chart/OrgListView.tsx` | **New** — Table/list view |
-| `src/components/org-chart/OrgConnectors.tsx` | **New** — SVG connector line renderer |
-| `src/components/org-chart/OrgChartWizard.tsx` | **Update** — Add auto-match step + gap analysis |
-| `src/components/org-chart/DraggableOrgNode.tsx` | **Remove** — Replaced by new OrgNodeCard |
-
-Δεν χρειάζονται DB changes — το schema `org_chart_positions` καλύπτει ήδη hierarchy, department, user_id, color, level, sort_order.
+|--------|--------|
+| Migration SQL | Πίνακας `platform_admins`, function `is_platform_admin` |
+| `supabase/functions/platform-admin-data/index.ts` | Edge function για cross-tenant queries |
+| `src/pages/PlatformAdmin.tsx` | Νέα σελίδα με 3 tabs |
+| `src/App.tsx` | Route `/platform-admin` (εκτός AppLayout) |
+| `src/contexts/AuthContext.tsx` | Προσθήκη `isPlatformAdmin` flag |
 

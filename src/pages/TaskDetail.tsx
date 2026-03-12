@@ -17,6 +17,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { EnhancedInlineEditCell } from '@/components/shared/EnhancedInlineEditCell';
 import { CommentsSection } from '@/components/comments/CommentsSection';
 import { FileExplorer } from '@/components/files/FileExplorer';
+import { TaskMediaSourceCard } from '@/components/tasks/TaskMediaSourceCard';
 import { TaskTimer } from '@/components/time-tracking/TaskTimer';
 import { toast } from 'sonner';
 import {
@@ -788,6 +789,9 @@ export default function TaskDetailPage() {
                 </MetaRow>
               </CardContent>
             </Card>
+
+            {/* Media Plan Source Card */}
+            <TaskMediaSourceCard taskId={task.id} />
           </div>
         </div>
       </div>

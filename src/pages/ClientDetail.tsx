@@ -19,6 +19,7 @@ import { ClientBriefsCard } from '@/components/clients/detail/ClientBriefsCard';
 import { ClientTeamCard } from '@/components/clients/detail/ClientTeamCard';
 import { ClientContactsCard } from '@/components/clients/detail/ClientContactsCard';
 import { ClientFilesCard } from '@/components/clients/detail/ClientFilesCard';
+import { ClientMediaPlansCard } from '@/components/clients/detail/ClientMediaPlansCard';
 
 export default function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -187,13 +188,14 @@ export default function ClientDetailPage() {
         </div>
 
         {/* Right Column — Execution & People */}
-        <div className="col-span-12 lg:col-span-5 space-y-6">
-          <ClientProjectsCard projects={projects} clientId={client.id} />
-          <ClientTasksSnapshot overdue={overdueTasks} dueThisWeek={dueThisWeek} open={openTasks} />
-          <ClientBriefsCard briefs={briefs} clientId={client.id} />
-          <ClientTeamCard members={teamMembers} onEdit={() => setEditOpen(true)} />
-          <ClientContactsCard contacts={contacts} onEdit={() => setEditOpen(true)} />
-        </div>
+          <div className="col-span-12 lg:col-span-5 space-y-6">
+            <ClientProjectsCard projects={projects} clientId={client.id} />
+            <ClientMediaPlansCard clientId={client.id} />
+            <ClientTasksSnapshot overdue={overdueTasks} dueThisWeek={dueThisWeek} open={openTasks} />
+            <ClientBriefsCard briefs={briefs} clientId={client.id} />
+            <ClientTeamCard members={teamMembers} onEdit={() => setEditOpen(true)} />
+            <ClientContactsCard contacts={contacts} onEdit={() => setEditOpen(true)} />
+          </div>
       </div>
 
       {/* SECTION 3 — Files (full width) */}

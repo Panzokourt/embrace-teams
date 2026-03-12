@@ -33,7 +33,7 @@ export function ClientMediaPlansCard({ clientId }: { clientId: string }) {
     (async () => {
       const { data } = await supabase
         .from('media_plans')
-        .select('id, name, status, total_budget, start_date, end_date')
+        .select('id, name, status, total_budget')
         .eq('client_id', clientId)
         .order('created_at', { ascending: false })
         .limit(10);

@@ -620,6 +620,9 @@ export default function ProjectDetailPage() {
                 </Card>
               )}
 
+              {/* Media Plans Card */}
+              <ProjectMediaPlansCard projectId={project.id} />
+
               {/* Sub-projects Card */}
               {subProjects.length > 0 && (
                 <Card>

@@ -789,6 +789,9 @@ export default function TaskDetailPage() {
                 </MetaRow>
               </CardContent>
             </Card>
+
+            {/* Media Plan Source Card */}
+            <TaskMediaSourceCard taskId={task.id} />
           </div>
         </div>
       </div>

@@ -1,6 +1,6 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -13,6 +13,7 @@ import { MediaPlanDetailPanel } from '@/components/media-plan/MediaPlanDetailPan
 import { MediaPlanGantt } from '@/components/media-plan/MediaPlanGantt';
 import { MediaPlanCalendar } from '@/components/media-plan/MediaPlanCalendar';
 import { MediaPlanBoard } from '@/components/media-plan/MediaPlanBoard';
+import { MediaPlanBaselineCompare } from '@/components/media-plan/MediaPlanBaselineCompare';
 import { toast } from 'sonner';
 
 export default function MediaPlanWorkspace() {
@@ -26,6 +27,10 @@ export default function MediaPlanWorkspace() {
   const [groupBy, setGroupBy] = useState('none');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+
+  // Baseline comparison state
+  const [compareMode, setCompareMode] = useState(false);
+  const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(null);
 
   // Fetch plan
   const { data: plan, isLoading: planLoading } = useQuery({
@@ -104,6 +109,22 @@ export default function MediaPlanWorkspace() {
     enabled: items.length > 0,
   });
 
+  // Fetch selected snapshot data
+  const { data: snapshotData = [] } = useQuery({
+    queryKey: ['media-plan-snapshot-data', selectedSnapshotId],
+    queryFn: async () => {
+      if (!selectedSnapshotId) return [];
+      const { data, error } = await supabase
+        .from('media_plan_snapshots' as any)
+        .select('snapshot_data')
+        .eq('id', selectedSnapshotId)
+        .single();
+      if (error) throw error;
+      return ((data as any)?.snapshot_data || []) as any[];
+    },
+    enabled: !!selectedSnapshotId,
+  });
+
   const selectedItem = useMemo(() => items.find(i => i.id === selectedItemId) || null, [items, selectedItemId]);
 
   const summary = useMemo(() => {
@@ -122,6 +143,13 @@ export default function MediaPlanWorkspace() {
   const handleUpdateName = async (name: string) => {
     if (!id || !name.trim()) return;
     await supabase.from('media_plans').update({ name: name.trim() }).eq('id', id);
+    queryClient.invalidateQueries({ queryKey: ['media-plan', id] });
+  };
+
+  // Update plan notes
+  const handleUpdateNotes = async (notes: string) => {
+    if (!id) return;
+    await supabase.from('media_plans').update({ notes } as any).eq('id', id);
     queryClient.invalidateQueries({ queryKey: ['media-plan', id] });
   };
 
@@ -175,6 +203,7 @@ export default function MediaPlanWorkspace() {
     period_start: plan.period_start,
     period_end: plan.period_end,
     objective: plan.objective,
+    notes: (plan as any).notes || null,
     client_name: enrichment?.client_name,
     project_name: enrichment?.project_name,
     owner_name: enrichment?.owner_name,
@@ -202,6 +231,17 @@ export default function MediaPlanWorkspace() {
         summary={summary}
         onAddAction={handleAddAction}
         onUpdateName={handleUpdateName}
+        onUpdateNotes={handleUpdateNotes}
+        baselineControls={
+          <MediaPlanBaselineCompare
+            planId={id!}
+            items={items}
+            compareMode={compareMode}
+            onCompareModeChange={setCompareMode}
+            selectedSnapshotId={selectedSnapshotId}
+            onSelectSnapshot={setSelectedSnapshotId}
+          />
+        }
       />
 
       {/* View switcher */}
@@ -233,6 +273,8 @@ export default function MediaPlanWorkspace() {
           selectedItemId={selectedItemId}
           onInlineUpdate={handleInlineUpdate}
           onAddAction={handleAddAction}
+          compareMode={compareMode}
+          snapshotData={snapshotData}
         />
       )}
 
@@ -270,6 +312,7 @@ export default function MediaPlanWorkspace() {
         onClose={() => setDetailOpen(false)}
         onUpdate={handleInlineUpdate}
         profiles={profiles}
+        planId={id}
       />
     </div>
   );

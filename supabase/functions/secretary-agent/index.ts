@@ -1751,13 +1751,13 @@ ${contextParts.join("\n")}`;
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    // Tool calling loop (max 5 iterations)
+    // Tool calling loop (max 8 iterations for complex workflows)
     let conversationMessages = [
       { role: "system", content: systemPrompt },
       ...messages,
     ];
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 8; i++) {
       const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -1765,7 +1765,7 @@ ${contextParts.join("\n")}`;
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
+          model: "google/gemini-2.5-pro",
           messages: conversationMessages,
           tools: toolDefinitions,
         }),

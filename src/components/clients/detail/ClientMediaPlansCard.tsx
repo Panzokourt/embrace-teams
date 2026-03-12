@@ -4,8 +4,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Megaphone, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { format } from 'date-fns';
-import { el } from 'date-fns/locale';
 
 interface MediaPlan {
   id: string;

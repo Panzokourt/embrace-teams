@@ -288,8 +288,10 @@ export default function MediaPlanning() {
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Budget</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
-                    <TableHead className="text-right">Channels</TableHead>
-                    <TableHead>Updated</TableHead>
+                     <TableHead className="text-right">Channels</TableHead>
+                     <TableHead>Ver</TableHead>
+                     <TableHead>Updated</TableHead>
+                     <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>

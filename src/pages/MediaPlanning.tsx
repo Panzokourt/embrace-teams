@@ -42,8 +42,8 @@ interface MediaPlanRow {
 
 export default function MediaPlanning() {
   const navigate = useNavigate();
-  const { profile } = useAuth();
-  const companyId = profile?.company_id;
+  const { profile, company } = useAuth();
+  const companyId = company?.id;
   const [search, setSearch] = useState('');
   const [groupBy, setGroupBy] = useState('all');
   const [createOpen, setCreateOpen] = useState(false);

@@ -37,6 +37,10 @@ interface MediaPlanHeaderProps {
   onUpdateName: (name: string) => void;
   onUpdateNotes?: (notes: string) => void;
   baselineControls?: React.ReactNode;
+  onExport?: () => void;
+  version?: number | null;
+  versions?: { id: string; name: string; version: number }[];
+  onSwitchVersion?: (id: string) => void;
 }
 
 export function MediaPlanHeader({ plan, summary, onAddAction, onUpdateName, onUpdateNotes, baselineControls }: MediaPlanHeaderProps) {

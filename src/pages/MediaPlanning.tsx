@@ -170,6 +170,56 @@ export default function MediaPlanning() {
     navigate(`/media-planning/${data.id}`);
   };
 
+  const handleDuplicateAsVersion = async (planId: string) => {
+    const sourcePlan = plans.find(p => p.id === planId);
+    if (!sourcePlan) return;
+
+    // Get source items
+    const { data: sourceItems } = await supabase
+      .from('media_plan_items')
+      .select('*')
+      .eq('media_plan_id', planId);
+
+    // Get max version for sibling plans
+    const siblings = plans.filter(p =>
+      p.project_id === sourcePlan.project_id && p.project_id
+    );
+    const maxVersion = Math.max(1, ...siblings.map(s => (s as any).version || 1));
+
+    // Create new plan
+    const { data: newPlan, error } = await supabase.from('media_plans').insert({
+      name: `${sourcePlan.name} (v${maxVersion + 1})`,
+      status: 'draft',
+      company_id: sourcePlan.company_id || companyId,
+      project_id: sourcePlan.project_id,
+      client_id: sourcePlan.client_id,
+      owner_id: sourcePlan.owner_id,
+      total_budget: sourcePlan.total_budget,
+      period_start: sourcePlan.period_start,
+      period_end: sourcePlan.period_end,
+      objective: sourcePlan.objective,
+      version: maxVersion + 1,
+      created_by: profile?.id,
+    } as any).select('id').single();
+
+    if (error || !newPlan) {
+      toast.error('Failed to duplicate: ' + (error?.message || ''));
+      return;
+    }
+
+    // Copy items
+    if (sourceItems && sourceItems.length > 0) {
+      const newItems = sourceItems.map(item => {
+        const { id, media_plan_id, ...rest } = item;
+        return { ...rest, media_plan_id: newPlan.id };
+      });
+      await supabase.from('media_plan_items').insert(newItems);
+    }
+
+    toast.success(`Version ${maxVersion + 1} created`);
+    navigate(`/media-planning/${newPlan.id}`);
+  };
+
   const getStatusBadge = (status: string) => {
     const colors = STATUS_COLORS[status as keyof typeof STATUS_COLORS] || 'bg-muted text-muted-foreground';
     const label = PLAN_STATUS_LABELS[status as MediaPlanStatus] || status;

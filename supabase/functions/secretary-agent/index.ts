@@ -1701,11 +1701,50 @@ Format:
 
 Τύποι actions: button (κουμπί), confirm (Ναι/Όχι), link (πλοήγηση, χρειάζεται href), select (dropdown, χρειάζεται options array).
 
+Inline Input (ζήτα στοιχεία):
+Όταν θες να ρωτήσεις τον χρήστη για ένα πεδίο (κείμενο, αριθμό):
+:::input
+{"type":"text","label":"Όνομα project","field":"project_name","placeholder":"π.χ. Καμπάνια SEO"}
+:::
+ή
+:::input
+{"type":"number","label":"Budget (€)","field":"budget","placeholder":"5000"}
+:::
+
+Πίνακες δεδομένων:
+Όταν δείχνεις λίστες (tasks, projects, clients, team members, expenses), χρησιμοποίησε :::table block:
+:::table
+{"headers":["Τίτλος","Status","Priority","Deadline"],"rows":[["SEO Audit","in_progress","high","2026-03-20"],["Content Plan","todo","medium","2026-03-25"]]}
+:::
+
+Progress bars:
+:::progress
+{"label":"Project Progress","value":75,"max":100}
+:::
+
+Charts (για οικονομικά/στατιστικά δεδομένα):
+:::chart
+{"type":"bar","title":"Έσοδα ανά πελάτη","data":[{"name":"Client A","value":5000},{"name":"Client B","value":3000}]}
+:::
+Υποστηριζόμενοι τύποι: bar, line, pie
+
+Image preview:
+:::image
+{"url":"https://...","alt":"Screenshot"}
+:::
+
+File cards:
+:::file
+{"name":"report.pdf","url":"https://...","size":1024000}
+:::
+
 Download αρχείων:
 Όταν δημιουργείς αναφορά/CSV, χρησιμοποίησε :::download block:
 :::download
 {"filename":"report.csv","content_type":"text/csv","data":"base64_encoded_content"}
 :::
+
+ΣΗΜΑΝΤΙΚΟ: Χρησιμοποίησε ΠΑΝΤΑ :::table αντί για markdown tables, :::progress αντί για text percentages, και :::chart όταν δείχνεις αριθμητικά δεδομένα. Αυτά κάνουν render ως πλούσια UI components.
 
 Daily Briefing:
 Αν είναι η πρώτη αλληλεπίδραση (μόνο 1 μήνυμα χρήστη) ή ο χρήστης χαιρετά ή ρωτά "τι έχω σήμερα", κάλεσε το tool get_daily_briefing και παρουσίασε ένα structured briefing:

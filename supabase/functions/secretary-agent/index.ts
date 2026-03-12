@@ -1153,11 +1153,12 @@ async function executeTool(
         }
 
         if (args.action_type === "create_project") {
-          const { data: proj, error: projErr } = await supabase.from("projects").insert({
+        const { data: proj, error: projErr } = await supabase.from("projects").insert({
             name: insight.title,
             description: insight.body,
             status: "lead",
             company_id: companyId,
+            created_by: userId,
           }).select("id, name, status").single();
           if (projErr) throw projErr;
           await supabase.from("project_user_access").insert({ project_id: proj.id, user_id: userId, role: "project_lead" }).select().maybeSingle();

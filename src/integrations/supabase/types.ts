@@ -3472,104 +3472,226 @@ export type Database = {
           },
         ]
       }
+      media_channels: {
+        Row: {
+          channel_name: string
+          company_id: string | null
+          group_name: string
+          id: string
+          is_default: boolean | null
+          sort_order: number | null
+        }
+        Insert: {
+          channel_name: string
+          company_id?: string | null
+          group_name: string
+          id?: string
+          is_default?: boolean | null
+          sort_order?: number | null
+        }
+        Update: {
+          channel_name?: string
+          company_id?: string | null
+          group_name?: string
+          id?: string
+          is_default?: boolean | null
+          sort_order?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_channels_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      media_plan_item_tasks: {
+        Row: {
+          created_at: string | null
+          id: string
+          media_plan_item_id: string
+          task_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          media_plan_item_id: string
+          task_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          media_plan_item_id?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_plan_item_tasks_media_plan_item_id_fkey"
+            columns: ["media_plan_item_id"]
+            isOneToOne: false
+            referencedRelation: "media_plan_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_plan_item_tasks_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       media_plan_items: {
         Row: {
           actual_cost: number | null
+          approval_needed: boolean | null
+          audience: string | null
           budget: number | null
           campaign_name: string | null
+          category: string | null
           clicks: number | null
+          color: string | null
           commission_rate: number | null
+          cost_type: string | null
           cpc: number | null
           cpm: number | null
           created_at: string
           ctr: number | null
+          daily_budget: number | null
           deliverable_id: string | null
+          dependency_id: string | null
+          duration: number | null
           end_date: string | null
           format: string | null
           frequency: number | null
+          funnel_stage: string | null
+          geography: string | null
           id: string
           impressions: number | null
           invoice_id: string | null
+          kpi_target: string | null
           media_plan_id: string | null
           medium: string
+          message_summary: string | null
           net_budget: number | null
           notes: string | null
           objective: string | null
+          owner_id: string | null
           phase: string | null
           placement: string | null
+          priority: string | null
           project_id: string
           reach: number | null
           sort_order: number | null
           start_date: string | null
           status: string | null
+          subchannel: string | null
+          tags: string[] | null
           target_audience: string | null
           task_id: string | null
+          title: string | null
           updated_at: string
         }
         Insert: {
           actual_cost?: number | null
+          approval_needed?: boolean | null
+          audience?: string | null
           budget?: number | null
           campaign_name?: string | null
+          category?: string | null
           clicks?: number | null
+          color?: string | null
           commission_rate?: number | null
+          cost_type?: string | null
           cpc?: number | null
           cpm?: number | null
           created_at?: string
           ctr?: number | null
+          daily_budget?: number | null
           deliverable_id?: string | null
+          dependency_id?: string | null
+          duration?: number | null
           end_date?: string | null
           format?: string | null
           frequency?: number | null
+          funnel_stage?: string | null
+          geography?: string | null
           id?: string
           impressions?: number | null
           invoice_id?: string | null
+          kpi_target?: string | null
           media_plan_id?: string | null
           medium: string
+          message_summary?: string | null
           net_budget?: number | null
           notes?: string | null
           objective?: string | null
+          owner_id?: string | null
           phase?: string | null
           placement?: string | null
+          priority?: string | null
           project_id: string
           reach?: number | null
           sort_order?: number | null
           start_date?: string | null
           status?: string | null
+          subchannel?: string | null
+          tags?: string[] | null
           target_audience?: string | null
           task_id?: string | null
+          title?: string | null
           updated_at?: string
         }
         Update: {
           actual_cost?: number | null
+          approval_needed?: boolean | null
+          audience?: string | null
           budget?: number | null
           campaign_name?: string | null
+          category?: string | null
           clicks?: number | null
+          color?: string | null
           commission_rate?: number | null
+          cost_type?: string | null
           cpc?: number | null
           cpm?: number | null
           created_at?: string
           ctr?: number | null
+          daily_budget?: number | null
           deliverable_id?: string | null
+          dependency_id?: string | null
+          duration?: number | null
           end_date?: string | null
           format?: string | null
           frequency?: number | null
+          funnel_stage?: string | null
+          geography?: string | null
           id?: string
           impressions?: number | null
           invoice_id?: string | null
+          kpi_target?: string | null
           media_plan_id?: string | null
           medium?: string
+          message_summary?: string | null
           net_budget?: number | null
           notes?: string | null
           objective?: string | null
+          owner_id?: string | null
           phase?: string | null
           placement?: string | null
+          priority?: string | null
           project_id?: string
           reach?: number | null
           sort_order?: number | null
           start_date?: string | null
           status?: string | null
+          subchannel?: string | null
+          tags?: string[] | null
           target_audience?: string | null
           task_id?: string | null
+          title?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -3578,6 +3700,13 @@ export type Database = {
             columns: ["deliverable_id"]
             isOneToOne: false
             referencedRelation: "deliverables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_plan_items_dependency_id_fkey"
+            columns: ["dependency_id"]
+            isOneToOne: false
+            referencedRelation: "media_plan_items"
             referencedColumns: ["id"]
           },
           {
@@ -3592,6 +3721,13 @@ export type Database = {
             columns: ["media_plan_id"]
             isOneToOne: false
             referencedRelation: "media_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_plan_items_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -3613,47 +3749,92 @@ export type Database = {
       media_plans: {
         Row: {
           agency_fee_percentage: number | null
+          client_id: string | null
+          company_id: string | null
           created_at: string | null
           created_by: string | null
+          currency: string | null
           description: string | null
           id: string
           name: string
           notes: string | null
+          objective: string | null
+          owner_id: string | null
+          period_end: string | null
+          period_start: string | null
           project_id: string
           status: string
           total_budget: number | null
           updated_at: string | null
+          version: number | null
         }
         Insert: {
           agency_fee_percentage?: number | null
+          client_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
+          currency?: string | null
           description?: string | null
           id?: string
           name?: string
           notes?: string | null
+          objective?: string | null
+          owner_id?: string | null
+          period_end?: string | null
+          period_start?: string | null
           project_id: string
           status?: string
           total_budget?: number | null
           updated_at?: string | null
+          version?: number | null
         }
         Update: {
           agency_fee_percentage?: number | null
+          client_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
+          currency?: string | null
           description?: string | null
           id?: string
           name?: string
           notes?: string | null
+          objective?: string | null
+          owner_id?: string | null
+          period_end?: string | null
+          period_start?: string | null
           project_id?: string
           status?: string
           total_budget?: number | null
           updated_at?: string | null
+          version?: number | null
         }
         Relationships: [
           {
+            foreignKeyName: "media_plans_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_plans_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "media_plans_created_by_fkey"
             columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_plans_owner_id_fkey"
+            columns: ["owner_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]

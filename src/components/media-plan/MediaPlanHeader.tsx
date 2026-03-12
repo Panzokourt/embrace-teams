@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { PLAN_STATUS_LABELS, STATUS_COLORS, type MediaPlanStatus } from './mediaConstants';
-import { Plus, ChevronDown, StickyNote, FileDown, GitBranch } from 'lucide-react';
+import { Plus, ChevronDown, StickyNote, FileDown, GitBranch, Sparkles, Upload } from 'lucide-react';
 import { format } from 'date-fns';
 import { useState } from 'react';
 

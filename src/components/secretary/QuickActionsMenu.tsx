@@ -53,9 +53,10 @@ export default function QuickActionsMenu({ disabled, onSendMessage, onFileUpload
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      onFileUpload(file);
+    const files = e.target.files;
+    if (files) {
+      // Support multiple file uploads
+      Array.from(files).forEach(file => onFileUpload(file));
       e.target.value = "";
     }
   };

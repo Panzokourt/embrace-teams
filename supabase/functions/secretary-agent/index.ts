@@ -1329,6 +1329,7 @@ ${args.template_hint ? `Τύπος: ${args.template_hint}` : ""}
           end_date: endDate,
           status: "active",
           company_id: companyId,
+          created_by: userId,
         }).select("id, name, status, budget").single();
         if (projErr) throw projErr;
 

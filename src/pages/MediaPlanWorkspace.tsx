@@ -216,6 +216,9 @@ export default function MediaPlanWorkspace() {
           <TabsTrigger value="calendar" className="gap-1.5">
             <CalendarDays className="h-3.5 w-3.5" /> Calendar
           </TabsTrigger>
+          <TabsTrigger value="board" className="gap-1.5">
+            <Columns className="h-3.5 w-3.5" /> Board
+          </TabsTrigger>
         </TabsList>
       </Tabs>
 

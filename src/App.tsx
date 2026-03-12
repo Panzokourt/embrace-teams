@@ -136,7 +136,7 @@ const App = () => (
                   <Route path="/intelligence/insights" element={<Navigate to="/reports" replace />} />
                   <Route path="/intelligence/benchmarks" element={<Navigate to="/reports" replace />} />
                   <Route path="/intelligence/forecasting" element={<Navigate to="/reports" replace />} />
-                  <Route path="/intelligence/media-planning" element={<Navigate to="/reports" replace />} />
+                  <Route path="/intelligence/media-planning" element={<Navigate to="/media-planning" replace />} />
                   <Route path="/governance/integrations" element={<Navigate to="/governance" replace />} />
                   <Route path="/governance/audit-log" element={<Navigate to="/governance/compliance" replace />} />
                   <Route path="/governance/ownership-map" element={<Navigate to="/governance" replace />} />

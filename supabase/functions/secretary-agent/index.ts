@@ -544,6 +544,22 @@ const toolDefinitions = [
   {
     type: "function",
     function: {
+      name: "analyze_uploaded_file",
+      description: "Analyze uploaded file content (CSV, text, JSON, etc). Use when user uploads a file and you need to extract insights or structured data from it.",
+      parameters: {
+        type: "object",
+        properties: {
+          file_content: { type: "string", description: "The text content of the file (provided by the user message)" },
+          file_name: { type: "string", description: "Original file name" },
+          analysis_type: { type: "string", enum: ["summarize", "extract_data", "find_patterns"], description: "Type of analysis to perform" },
+        },
+        required: ["file_content", "file_name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "get_risk_radar",
       description: "Comprehensive risk analysis: overdue tasks, budget overruns, unassigned tasks, stale projects, team capacity issues. Returns a structured risk report.",
       parameters: { type: "object", properties: {} },
@@ -649,6 +665,20 @@ async function executeTool(
       }
 
       case "create_client": {
+        // Check for existing client with same name first
+        const { data: existingClients } = await supabase
+          .from("clients")
+          .select("id, name")
+          .eq("company_id", companyId)
+          .ilike("name", args.name)
+          .limit(3);
+        if (existingClients && existingClients.length > 0) {
+          return { 
+            warning: true,
+            message: `Found existing client(s) with similar name: ${existingClients.map((c: any) => `"${c.name}" (id: ${c.id})`).join(", ")}. Use their ID instead of creating a duplicate, or confirm creation.`,
+            existing_clients: existingClients,
+          };
+        }
         const { data, error } = await supabase.from("clients").insert({
           name: args.name,
           contact_email: args.contact_email || null,
@@ -866,6 +896,13 @@ async function executeTool(
       // ── NEW TOOL EXECUTORS ──
 
       case "create_project": {
+        // Check for existing client first if name is provided
+        if (args.client_id) {
+          const { data: existingClient } = await supabase.from("clients").select("id, name").eq("id", args.client_id).single();
+          if (!existingClient) {
+            return { error: `Client not found with id: ${args.client_id}` };
+          }
+        }
         const { data, error } = await supabase.from("projects").insert({
           name: args.name,
           description: args.description || null,
@@ -875,6 +912,7 @@ async function executeTool(
           end_date: args.end_date || null,
           status: args.status || "active",
           company_id: companyId,
+          created_by: userId,
         }).select("id, name, status, budget").single();
         if (error) throw error;
         // Also add the creator to the project team
@@ -1131,11 +1169,12 @@ async function executeTool(
         }
 
         if (args.action_type === "create_project") {
-          const { data: proj, error: projErr } = await supabase.from("projects").insert({
+        const { data: proj, error: projErr } = await supabase.from("projects").insert({
             name: insight.title,
             description: insight.body,
             status: "lead",
             company_id: companyId,
+            created_by: userId,
           }).select("id, name, status").single();
           if (projErr) throw projErr;
           await supabase.from("project_user_access").insert({ project_id: proj.id, user_id: userId, role: "project_lead" }).select().maybeSingle();
@@ -1307,6 +1346,7 @@ ${args.template_hint ? `Τύπος: ${args.template_hint}` : ""}
           end_date: endDate,
           status: "active",
           company_id: companyId,
+          created_by: userId,
         }).select("id, name, status, budget").single();
         if (projErr) throw projErr;
 
@@ -1368,6 +1408,64 @@ ${args.template_hint ? `Τύπος: ${args.template_hint}` : ""}
             team_members: (args.team_members?.length || 0) + 1,
           },
           message: `Project "${project.name}" created with ${totalDeliverablesCreated} deliverables and ${totalTasksCreated} tasks.`,
+        };
+      }
+
+      case "analyze_uploaded_file": {
+        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+        if (!LOVABLE_API_KEY) return { error: "AI not configured" };
+
+        const content = args.file_content || "";
+        const fileName = args.file_name || "unknown";
+        const analysisType = args.analysis_type || "summarize";
+
+        // Truncate if too long for AI context
+        const maxChars = 30000;
+        const truncatedContent = content.length > maxChars 
+          ? content.slice(0, maxChars) + `\n\n[Truncated: showing first ${maxChars} of ${content.length} characters]`
+          : content;
+
+        const analysisPrompt = `Analyze the following file content.
+File name: ${fileName}
+Analysis type: ${analysisType}
+
+${analysisType === "summarize" ? "Provide a clear summary of the file contents. Identify key data points, structure, and notable patterns." : ""}
+${analysisType === "extract_data" ? "Extract structured data from the file. Return key columns, rows, and any meaningful aggregations." : ""}
+${analysisType === "find_patterns" ? "Find patterns, trends, anomalies, and actionable insights in the data." : ""}
+
+File content:
+\`\`\`
+${truncatedContent}
+\`\`\`
+
+Respond in Greek. Be thorough but concise.`;
+
+        const analysisResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [{ role: "user", content: analysisPrompt }],
+          }),
+        });
+
+        if (!analysisResp.ok) {
+          return { error: "Failed to analyze file" };
+        }
+
+        const analysisResult = await analysisResp.json();
+        const analysis = analysisResult.choices?.[0]?.message?.content || "No analysis generated";
+
+        return {
+          success: true,
+          file_name: fileName,
+          analysis_type: analysisType,
+          analysis,
+          content_length: content.length,
+          truncated: content.length > maxChars,
         };
       }
 
@@ -1677,11 +1775,50 @@ Format:
 
 Τύποι actions: button (κουμπί), confirm (Ναι/Όχι), link (πλοήγηση, χρειάζεται href), select (dropdown, χρειάζεται options array).
 
+Inline Input (ζήτα στοιχεία):
+Όταν θες να ρωτήσεις τον χρήστη για ένα πεδίο (κείμενο, αριθμό):
+:::input
+{"type":"text","label":"Όνομα project","field":"project_name","placeholder":"π.χ. Καμπάνια SEO"}
+:::
+ή
+:::input
+{"type":"number","label":"Budget (€)","field":"budget","placeholder":"5000"}
+:::
+
+Πίνακες δεδομένων:
+Όταν δείχνεις λίστες (tasks, projects, clients, team members, expenses), χρησιμοποίησε :::table block:
+:::table
+{"headers":["Τίτλος","Status","Priority","Deadline"],"rows":[["SEO Audit","in_progress","high","2026-03-20"],["Content Plan","todo","medium","2026-03-25"]]}
+:::
+
+Progress bars:
+:::progress
+{"label":"Project Progress","value":75,"max":100}
+:::
+
+Charts (για οικονομικά/στατιστικά δεδομένα):
+:::chart
+{"type":"bar","title":"Έσοδα ανά πελάτη","data":[{"name":"Client A","value":5000},{"name":"Client B","value":3000}]}
+:::
+Υποστηριζόμενοι τύποι: bar, line, pie
+
+Image preview:
+:::image
+{"url":"https://...","alt":"Screenshot"}
+:::
+
+File cards:
+:::file
+{"name":"report.pdf","url":"https://...","size":1024000}
+:::
+
 Download αρχείων:
 Όταν δημιουργείς αναφορά/CSV, χρησιμοποίησε :::download block:
 :::download
 {"filename":"report.csv","content_type":"text/csv","data":"base64_encoded_content"}
 :::
+
+ΣΗΜΑΝΤΙΚΟ: Χρησιμοποίησε ΠΑΝΤΑ :::table αντί για markdown tables, :::progress αντί για text percentages, και :::chart όταν δείχνεις αριθμητικά δεδομένα. Αυτά κάνουν render ως πλούσια UI components.
 
 Daily Briefing:
 Αν είναι η πρώτη αλληλεπίδραση (μόνο 1 μήνυμα χρήστη) ή ο χρήστης χαιρετά ή ρωτά "τι έχω σήμερα", κάλεσε το tool get_daily_briefing και παρουσίασε ένα structured briefing:
@@ -1727,13 +1864,13 @@ ${contextParts.join("\n")}`;
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    // Tool calling loop (max 5 iterations)
+    // Tool calling loop (max 8 iterations for complex workflows)
     let conversationMessages = [
       { role: "system", content: systemPrompt },
       ...messages,
     ];
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 8; i++) {
       const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -1741,7 +1878,7 @@ ${contextParts.join("\n")}`;
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
+          model: "google/gemini-2.5-pro",
           messages: conversationMessages,
           tools: toolDefinitions,
         }),

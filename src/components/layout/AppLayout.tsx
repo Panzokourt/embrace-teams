@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Outlet, Navigate } from 'react-router-dom';
+import { Outlet, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import AppSidebar from './AppSidebar';
 import TopBar from './TopBar';
@@ -91,6 +91,22 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
     };
     window.addEventListener('open-secretary-panel', handler);
     return () => window.removeEventListener('open-secretary-panel', handler);
+  }, []);
+
+  // Listen for secretary navigation events — navigate while keeping panel open
+  const navigateRef = useRef(useNavigate());
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.path) {
+        navigateRef.current(detail.path);
+        // Keep/open secretary panel after navigation
+        setRightPanelOpen(true);
+        setActiveTab('secretary');
+      }
+    };
+    window.addEventListener('secretary-navigate', handler);
+    return () => window.removeEventListener('secretary-navigate', handler);
   }, []);
 
   const togglePanel = useCallback((tab: RightPanelTab) => {

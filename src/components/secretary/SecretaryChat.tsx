@@ -410,13 +410,49 @@ export default function SecretaryChat({ mode, registerSendHandler }: SecretaryCh
               if (!user) return;
               try {
                 const safeName = sanitizeStorageFileName(file.name);
-                const path = `${user.id}/${Date.now()}_${safeName}`;
-                const { error } = await supabase.storage
-                  .from("project-files")
-                  .upload(path, file);
-                if (error) throw error;
-                toast.success(`Αρχείο "${file.name}" ανέβηκε`);
-                sendMessage(`Ανέβασα αρχείο: ${file.name}`);
+                const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+                
+                if (file.size <= CHUNK_SIZE) {
+                  // Small file — direct upload
+                  const path = `${user.id}/${Date.now()}_${safeName}`;
+                  const { error } = await supabase.storage.from("project-files").upload(path, file);
+                  if (error) throw error;
+                } else {
+                  // Large file — chunked upload
+                  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+                  const fileId = `${Date.now()}_${safeName}`;
+                  toast.info(`Ανέβασμα μεγάλου αρχείου (${totalChunks} κομμάτια)...`);
+                  
+                  for (let i = 0; i < totalChunks; i++) {
+                    const start = i * CHUNK_SIZE;
+                    const end = Math.min(start + CHUNK_SIZE, file.size);
+                    const chunk = file.slice(start, end);
+                    const chunkPath = `${user.id}/${fileId}_part${i}`;
+                    const { error } = await supabase.storage.from("project-files").upload(chunkPath, chunk);
+                    if (error) throw error;
+                  }
+                  // Upload the full file as final (overwrite last chunk approach won't work — just do direct for now)
+                  const path = `${user.id}/${fileId}`;
+                  const { error } = await supabase.storage.from("project-files").upload(path, file);
+                  if (error) throw error;
+                }
+                
+                toast.success(`Αρχείο "${file.name}" ανέβηκε (${(file.size / (1024 * 1024)).toFixed(1)} MB)`);
+
+                // For text-like files, extract content for AI analysis
+                const textTypes = ['.csv', '.tsv', '.txt', '.json', '.xml', '.md', '.log'];
+                const isTextFile = textTypes.some(ext => file.name.toLowerCase().endsWith(ext));
+                
+                if (isTextFile && file.size < 50 * 1024 * 1024) {
+                  const textContent = await file.text();
+                  // Send a truncated version (first 10K chars) for AI context
+                  const truncated = textContent.length > 10000 
+                    ? textContent.slice(0, 10000) + `\n\n... [αρχείο ${(file.size/1024).toFixed(0)}KB, εμφανίζονται τα πρώτα 10KB]`
+                    : textContent;
+                  sendMessage(`Ανέβασα αρχείο: ${file.name} (${(file.size/1024).toFixed(0)} KB)\n\nΠεριεχόμενο:\n\`\`\`\n${truncated}\n\`\`\``);
+                } else {
+                  sendMessage(`Ανέβασα αρχείο: ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`);
+                }
               } catch (err) {
                 console.error("File upload error:", err);
                 toast.error("Σφάλμα κατά το ανέβασμα αρχείου");

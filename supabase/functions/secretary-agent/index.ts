@@ -1393,7 +1393,7 @@ ${args.template_hint ? `Τύπος: ${args.template_hint}` : ""}
               due_date: taskDue,
               estimated_hours: task.estimated_hours || null,
               status: "todo",
-              company_id: companyId,
+              created_by: userId,
             });
             if (!taskErr) totalTasksCreated++;
           }

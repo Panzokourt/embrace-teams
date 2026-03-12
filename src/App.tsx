@@ -50,6 +50,8 @@ import Secretary from "@/pages/Secretary";
 import Workflows from "@/pages/Workflows";
 import ResetPassword from "@/pages/ResetPassword";
 import PlatformAdmin from "@/pages/PlatformAdmin";
+import MediaPlanning from "@/pages/MediaPlanning";
+import MediaPlanWorkspace from "@/pages/MediaPlanWorkspace";
 
 function RedirectUserToEmployee() {
   const { id } = useParams();

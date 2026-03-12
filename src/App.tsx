@@ -126,6 +126,8 @@ const App = () => (
                   {/* Redirects from removed placeholder pages */}
                   <Route path="/secretary" element={<Secretary />} />
                   <Route path="/workflows" element={<Workflows />} />
+                  <Route path="/media-planning" element={<MediaPlanning />} />
+                  <Route path="/media-planning/:id" element={<MediaPlanWorkspace />} />
                   <Route path="/campaigns" element={<Navigate to="/work" replace />} />
                   <Route path="/backlog" element={<Navigate to="/calendar" replace />} />
                   <Route path="/operations/capacity" element={<Navigate to="/hr" replace />} />

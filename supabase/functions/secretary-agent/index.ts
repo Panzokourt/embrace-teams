@@ -1191,8 +1191,8 @@ async function executeTool(
             description: insight.body,
             status: "todo",
             priority: "high",
-            company_id: companyId,
             assigned_to: userId,
+            created_by: userId,
           }).select("id, title, status").single();
           if (taskErr) throw taskErr;
           await supabase.from("brain_insights").update({ is_actioned: true }).eq("id", args.insight_id);
@@ -1393,7 +1393,7 @@ ${args.template_hint ? `Τύπος: ${args.template_hint}` : ""}
               due_date: taskDue,
               estimated_hours: task.estimated_hours || null,
               status: "todo",
-              company_id: companyId,
+              created_by: userId,
             });
             if (!taskErr) totalTasksCreated++;
           }

@@ -41,6 +41,8 @@ interface MediaPlanHeaderProps {
   version?: number | null;
   versions?: { id: string; name: string; version: number }[];
   onSwitchVersion?: (id: string) => void;
+  onAIGenerate?: () => void;
+  onImportExcel?: () => void;
 }
 
 export function MediaPlanHeader({ plan, summary, onAddAction, onUpdateName, onUpdateNotes, baselineControls, onExport, version, versions, onSwitchVersion }: MediaPlanHeaderProps) {

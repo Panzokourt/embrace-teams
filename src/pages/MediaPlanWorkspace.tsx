@@ -14,6 +14,8 @@ import { MediaPlanGantt } from '@/components/media-plan/MediaPlanGantt';
 import { MediaPlanCalendar } from '@/components/media-plan/MediaPlanCalendar';
 import { MediaPlanBoard } from '@/components/media-plan/MediaPlanBoard';
 import { MediaPlanBaselineCompare } from '@/components/media-plan/MediaPlanBaselineCompare';
+import { MediaPlanExportDialog } from '@/components/media-plan/MediaPlanExportDialog';
+import { MediaPlanPastePreview, type ParsedRow } from '@/components/media-plan/MediaPlanPastePreview';
 import { toast } from 'sonner';
 
 export default function MediaPlanWorkspace() {
@@ -27,10 +29,11 @@ export default function MediaPlanWorkspace() {
   const [groupBy, setGroupBy] = useState('none');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
-
-  // Baseline comparison state
   const [compareMode, setCompareMode] = useState(false);
   const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [pasteText, setPasteText] = useState('');
+  const [pasteOpen, setPasteOpen] = useState(false);
 
   // Fetch plan
   const { data: plan, isLoading: planLoading } = useQuery({
@@ -109,7 +112,7 @@ export default function MediaPlanWorkspace() {
     enabled: items.length > 0,
   });
 
-  // Fetch selected snapshot data
+  // Fetch snapshot data
   const { data: snapshotData = [] } = useQuery({
     queryKey: ['media-plan-snapshot-data', selectedSnapshotId],
     queryFn: async () => {
@@ -123,6 +126,21 @@ export default function MediaPlanWorkspace() {
       return ((data as any)?.snapshot_data || []) as any[];
     },
     enabled: !!selectedSnapshotId,
+  });
+
+  // Fetch sibling versions (same project + name root)
+  const { data: versions = [] } = useQuery({
+    queryKey: ['media-plan-versions', plan?.project_id, plan?.name],
+    queryFn: async () => {
+      if (!plan?.project_id) return [];
+      const { data } = await supabase
+        .from('media_plans')
+        .select('id, name, version')
+        .eq('project_id', plan.project_id)
+        .order('version', { ascending: true });
+      return (data || []) as { id: string; name: string; version: number }[];
+    },
+    enabled: !!plan?.project_id,
   });
 
   const selectedItem = useMemo(() => items.find(i => i.id === selectedItemId) || null, [items, selectedItemId]);
@@ -139,21 +157,18 @@ export default function MediaPlanWorkspace() {
     };
   }, [items, plan?.total_budget, linkedTasksCount]);
 
-  // Update plan name
   const handleUpdateName = async (name: string) => {
     if (!id || !name.trim()) return;
     await supabase.from('media_plans').update({ name: name.trim() }).eq('id', id);
     queryClient.invalidateQueries({ queryKey: ['media-plan', id] });
   };
 
-  // Update plan notes
   const handleUpdateNotes = async (notes: string) => {
     if (!id) return;
     await supabase.from('media_plans').update({ notes } as any).eq('id', id);
     queryClient.invalidateQueries({ queryKey: ['media-plan', id] });
   };
 
-  // Add action
   const handleAddAction = async () => {
     if (!id || !plan?.project_id) return;
     const maxOrder = Math.max(0, ...items.map(i => i.sort_order || 0));
@@ -172,7 +187,6 @@ export default function MediaPlanWorkspace() {
     refetchItems();
   };
 
-  // Inline update
   const handleInlineUpdate = useCallback(async (itemId: string, field: string, value: any) => {
     const { error } = await supabase
       .from('media_plan_items')
@@ -185,6 +199,47 @@ export default function MediaPlanWorkspace() {
   const handleSelectItem = (itemId: string) => {
     setSelectedItemId(itemId);
     setDetailOpen(true);
+  };
+
+  // Paste handler
+  const handlePaste = (text: string) => {
+    setPasteText(text);
+    setPasteOpen(true);
+  };
+
+  const handlePasteConfirm = async (rows: ParsedRow[]) => {
+    if (!id || !plan?.project_id) return;
+    const maxOrder = Math.max(0, ...items.map(i => i.sort_order || 0));
+    const inserts = rows.map((row, i) => ({
+      media_plan_id: id,
+      project_id: plan.project_id,
+      title: row.title,
+      medium: row.medium || 'TBD',
+      placement: row.placement || null,
+      objective: row.objective || null,
+      funnel_stage: row.funnel_stage || null,
+      start_date: row.start_date || null,
+      end_date: row.end_date || null,
+      budget: row.budget,
+      status: row.status || 'draft',
+      priority: row.priority || 'medium',
+      kpi_target: row.kpi_target || null,
+      notes: row.notes || null,
+      sort_order: maxOrder + i + 1,
+    }));
+
+    const { error } = await supabase.from('media_plan_items').insert(inserts);
+    if (error) {
+      toast.error('Import failed: ' + error.message);
+    } else {
+      toast.success(`${rows.length} rows imported`);
+      refetchItems();
+    }
+  };
+
+  // Duplicate as version
+  const handleSwitchVersion = (versionId: string) => {
+    navigate(`/media-planning/${versionId}`);
   };
 
   if (planLoading) {
@@ -232,6 +287,10 @@ export default function MediaPlanWorkspace() {
         onAddAction={handleAddAction}
         onUpdateName={handleUpdateName}
         onUpdateNotes={handleUpdateNotes}
+        onExport={() => setExportOpen(true)}
+        version={plan.version}
+        versions={versions.length > 1 ? versions : undefined}
+        onSwitchVersion={handleSwitchVersion}
         baselineControls={
           <MediaPlanBaselineCompare
             planId={id!}
@@ -262,7 +321,6 @@ export default function MediaPlanWorkspace() {
         </TabsList>
       </Tabs>
 
-      {/* Main content */}
       {activeView === 'table' && (
         <MediaPlanTable
           items={items as any}
@@ -275,6 +333,7 @@ export default function MediaPlanWorkspace() {
           onAddAction={handleAddAction}
           compareMode={compareMode}
           snapshotData={snapshotData}
+          onPaste={handlePaste}
         />
       )}
 
@@ -313,6 +372,24 @@ export default function MediaPlanWorkspace() {
         onUpdate={handleInlineUpdate}
         profiles={profiles}
         planId={id}
+      />
+
+      {/* Export dialog */}
+      <MediaPlanExportDialog
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        plan={planForHeader}
+        items={items}
+        summary={summary}
+        profiles={profiles}
+      />
+
+      {/* Paste preview */}
+      <MediaPlanPastePreview
+        open={pasteOpen}
+        onClose={() => setPasteOpen(false)}
+        pastedText={pasteText}
+        onConfirm={handlePasteConfirm}
       />
     </div>
   );

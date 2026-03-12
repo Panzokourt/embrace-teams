@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { MonitorPlay, Plus, Copy, Archive, Download } from 'lucide-react';
+import { MonitorPlay, Plus, Copy, Archive, Download, GitBranch } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -170,6 +170,56 @@ export default function MediaPlanning() {
     navigate(`/media-planning/${data.id}`);
   };
 
+  const handleDuplicateAsVersion = async (planId: string) => {
+    const sourcePlan = plans.find(p => p.id === planId);
+    if (!sourcePlan) return;
+
+    // Get source items
+    const { data: sourceItems } = await supabase
+      .from('media_plan_items')
+      .select('*')
+      .eq('media_plan_id', planId);
+
+    // Get max version for sibling plans
+    const siblings = plans.filter(p =>
+      p.project_id === sourcePlan.project_id && p.project_id
+    );
+    const maxVersion = Math.max(1, ...siblings.map(s => (s as any).version || 1));
+
+    // Create new plan
+    const { data: newPlan, error } = await supabase.from('media_plans').insert({
+      name: `${sourcePlan.name} (v${maxVersion + 1})`,
+      status: 'draft',
+      company_id: sourcePlan.company_id || companyId,
+      project_id: sourcePlan.project_id,
+      client_id: sourcePlan.client_id,
+      owner_id: sourcePlan.owner_id,
+      total_budget: sourcePlan.total_budget,
+      period_start: sourcePlan.period_start,
+      period_end: sourcePlan.period_end,
+      objective: sourcePlan.objective,
+      version: maxVersion + 1,
+      created_by: profile?.id,
+    } as any).select('id').single();
+
+    if (error || !newPlan) {
+      toast.error('Failed to duplicate: ' + (error?.message || ''));
+      return;
+    }
+
+    // Copy items
+    if (sourceItems && sourceItems.length > 0) {
+      const newItems = sourceItems.map(item => {
+        const { id, media_plan_id, ...rest } = item;
+        return { ...rest, media_plan_id: newPlan.id };
+      });
+      await supabase.from('media_plan_items').insert(newItems);
+    }
+
+    toast.success(`Version ${maxVersion + 1} created`);
+    navigate(`/media-planning/${newPlan.id}`);
+  };
+
   const getStatusBadge = (status: string) => {
     const colors = STATUS_COLORS[status as keyof typeof STATUS_COLORS] || 'bg-muted text-muted-foreground';
     const label = PLAN_STATUS_LABELS[status as MediaPlanStatus] || status;
@@ -238,8 +288,10 @@ export default function MediaPlanning() {
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Budget</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
-                    <TableHead className="text-right">Channels</TableHead>
-                    <TableHead>Updated</TableHead>
+                     <TableHead className="text-right">Channels</TableHead>
+                     <TableHead>Ver</TableHead>
+                     <TableHead>Updated</TableHead>
+                     <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -264,8 +316,22 @@ export default function MediaPlanning() {
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{plan._items_count}</TableCell>
                       <TableCell className="text-right tabular-nums">{plan._channels_count}</TableCell>
+                      <TableCell className="text-xs tabular-nums">
+                        {(plan as any).version ? `v${(plan as any).version}` : 'v1'}
+                      </TableCell>
                       <TableCell className="text-muted-foreground text-xs">
                         {plan.updated_at ? format(new Date(plan.updated_at), 'dd/MM/yy') : '—'}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={(e) => { e.stopPropagation(); handleDuplicateAsVersion(plan.id); }}
+                          title="Duplicate as new version"
+                        >
+                          <GitBranch className="h-3.5 w-3.5" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}

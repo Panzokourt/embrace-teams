@@ -41,6 +41,7 @@ interface MediaPlanTableProps {
   onAddAction: () => void;
   compareMode?: boolean;
   snapshotData?: any[];
+  onPaste?: (text: string) => void;
 }
 
 export function MediaPlanTable({
@@ -54,8 +55,19 @@ export function MediaPlanTable({
   onAddAction,
   compareMode = false,
   snapshotData = [],
+  onPaste,
 }: MediaPlanTableProps) {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  // Paste handler
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const text = e.clipboardData.getData('text/plain');
+    // Only trigger for multi-line pastes (likely from Excel)
+    if (text && text.includes('\t') && text.includes('\n') && onPaste) {
+      e.preventDefault();
+      onPaste(text);
+    }
+  };
 
   const grouped = useMemo(() => {
     if (groupBy === 'none') return { 'All Actions': items };
@@ -92,7 +104,7 @@ export function MediaPlanTable({
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" onPaste={handlePaste}>
       {/* Toolbar */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2">

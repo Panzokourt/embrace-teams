@@ -1411,6 +1411,64 @@ ${args.template_hint ? `Τύπος: ${args.template_hint}` : ""}
         };
       }
 
+      case "analyze_uploaded_file": {
+        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+        if (!LOVABLE_API_KEY) return { error: "AI not configured" };
+
+        const content = args.file_content || "";
+        const fileName = args.file_name || "unknown";
+        const analysisType = args.analysis_type || "summarize";
+
+        // Truncate if too long for AI context
+        const maxChars = 30000;
+        const truncatedContent = content.length > maxChars 
+          ? content.slice(0, maxChars) + `\n\n[Truncated: showing first ${maxChars} of ${content.length} characters]`
+          : content;
+
+        const analysisPrompt = `Analyze the following file content.
+File name: ${fileName}
+Analysis type: ${analysisType}
+
+${analysisType === "summarize" ? "Provide a clear summary of the file contents. Identify key data points, structure, and notable patterns." : ""}
+${analysisType === "extract_data" ? "Extract structured data from the file. Return key columns, rows, and any meaningful aggregations." : ""}
+${analysisType === "find_patterns" ? "Find patterns, trends, anomalies, and actionable insights in the data." : ""}
+
+File content:
+\`\`\`
+${truncatedContent}
+\`\`\`
+
+Respond in Greek. Be thorough but concise.`;
+
+        const analysisResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [{ role: "user", content: analysisPrompt }],
+          }),
+        });
+
+        if (!analysisResp.ok) {
+          return { error: "Failed to analyze file" };
+        }
+
+        const analysisResult = await analysisResp.json();
+        const analysis = analysisResult.choices?.[0]?.message?.content || "No analysis generated";
+
+        return {
+          success: true,
+          file_name: fileName,
+          analysis_type: analysisType,
+          analysis,
+          content_length: content.length,
+          truncated: content.length > maxChars,
+        };
+      }
+
       case "get_risk_radar": {
         const today = new Date().toISOString().split("T")[0];
         const threeDaysLater = new Date(Date.now() + 3 * 86400000).toISOString().split("T")[0];

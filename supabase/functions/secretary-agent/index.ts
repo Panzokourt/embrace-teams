@@ -866,6 +866,13 @@ async function executeTool(
       // ── NEW TOOL EXECUTORS ──
 
       case "create_project": {
+        // Check for existing client first if name is provided
+        if (args.client_id) {
+          const { data: existingClient } = await supabase.from("clients").select("id, name").eq("id", args.client_id).single();
+          if (!existingClient) {
+            return { error: `Client not found with id: ${args.client_id}` };
+          }
+        }
         const { data, error } = await supabase.from("projects").insert({
           name: args.name,
           description: args.description || null,
@@ -875,6 +882,7 @@ async function executeTool(
           end_date: args.end_date || null,
           status: args.status || "active",
           company_id: companyId,
+          created_by: userId,
         }).select("id, name, status, budget").single();
         if (error) throw error;
         // Also add the creator to the project team

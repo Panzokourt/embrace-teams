@@ -55,8 +55,19 @@ export function MediaPlanTable({
   onAddAction,
   compareMode = false,
   snapshotData = [],
+  onPaste,
 }: MediaPlanTableProps) {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  // Paste handler
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const text = e.clipboardData.getData('text/plain');
+    // Only trigger for multi-line pastes (likely from Excel)
+    if (text && text.includes('\t') && text.includes('\n') && onPaste) {
+      e.preventDefault();
+      onPaste(text);
+    }
+  };
 
   const grouped = useMemo(() => {
     if (groupBy === 'none') return { 'All Actions': items };

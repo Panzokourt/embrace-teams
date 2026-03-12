@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { MonitorPlay, ArrowLeft, Table2, CalendarDays, GanttChart } from 'lucide-react';
+import { MonitorPlay, ArrowLeft, Table2, CalendarDays, GanttChart, Columns } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MediaPlanHeader } from '@/components/media-plan/MediaPlanHeader';

@@ -45,7 +45,7 @@ interface MediaPlanHeaderProps {
   onImportExcel?: () => void;
 }
 
-export function MediaPlanHeader({ plan, summary, onAddAction, onUpdateName, onUpdateNotes, baselineControls, onExport, version, versions, onSwitchVersion }: MediaPlanHeaderProps) {
+export function MediaPlanHeader({ plan, summary, onAddAction, onUpdateName, onUpdateNotes, baselineControls, onExport, version, versions, onSwitchVersion, onAIGenerate, onImportExcel }: MediaPlanHeaderProps) {
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(plan.name);
   const [notesOpen, setNotesOpen] = useState(false);

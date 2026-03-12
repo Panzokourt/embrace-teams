@@ -5,7 +5,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Download, ExternalLink, Check, X, Send, FileText, Image as ImageIcon } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 interface ActionItem {
@@ -146,9 +145,32 @@ export function parseAndRenderContent(
 }
 
 // ── Actions Block ──
-function ActionsBlock({ actions, onSendMessage }: { actions: ActionItem[]; onSendMessage: (msg: string) => void }) {
-  const navigate = useNavigate();
+function navigateFromAction(action: ActionItem): boolean {
+  const hrefFromData =
+    typeof action.data?.href === "string" ? action.data.href :
+    typeof action.data?.path === "string" ? action.data.path :
+    typeof action.data?.route === "string" ? action.data.route :
+    null;
 
+  const href = action.href || hrefFromData;
+  const isNavigationAction = action.type === "link" || action.action === "link";
+
+  if (!isNavigationAction || !href) return false;
+
+  if (href.startsWith("/")) {
+    window.dispatchEvent(new CustomEvent("secretary-navigate", { detail: { path: href } }));
+    return true;
+  }
+
+  if (href.startsWith("http://") || href.startsWith("https://")) {
+    window.open(href, "_blank", "noopener,noreferrer");
+    return true;
+  }
+
+  return false;
+}
+
+function ActionsBlock({ actions, onSendMessage }: { actions: ActionItem[]; onSendMessage: (msg: string) => void }) {
   return (
     <div className="flex flex-wrap gap-2 my-2">
       {actions.map((action, i) => {
@@ -160,6 +182,7 @@ function ActionsBlock({ actions, onSendMessage }: { actions: ActionItem[]; onSen
               size="sm"
               className="rounded-lg"
               onClick={() => {
+                if (navigateFromAction(action)) return;
                 const msg = action.data
                   ? `Επέλεξα: ${action.label} ${JSON.stringify(action.data)}`
                   : action.label;
@@ -184,7 +207,7 @@ function ActionsBlock({ actions, onSendMessage }: { actions: ActionItem[]; onSen
           );
         }
 
-        if (action.type === "link" && action.href) {
+        if (action.type === "link") {
           return (
             <Button
               key={i}
@@ -192,8 +215,9 @@ function ActionsBlock({ actions, onSendMessage }: { actions: ActionItem[]; onSen
               size="sm"
               className="rounded-lg gap-1"
               onClick={() => {
-                // Dispatch custom event so AppLayout keeps the panel open
-                window.dispatchEvent(new CustomEvent("secretary-navigate", { detail: { path: action.href } }));
+                if (!navigateFromAction(action) && action.href) {
+                  onSendMessage(action.label);
+                }
               }}
             >
               <ExternalLink className="h-3 w-3" />

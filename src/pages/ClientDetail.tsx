@@ -19,6 +19,7 @@ import { ClientBriefsCard } from '@/components/clients/detail/ClientBriefsCard';
 import { ClientTeamCard } from '@/components/clients/detail/ClientTeamCard';
 import { ClientContactsCard } from '@/components/clients/detail/ClientContactsCard';
 import { ClientFilesCard } from '@/components/clients/detail/ClientFilesCard';
+import { ClientMediaPlansCard } from '@/components/clients/detail/ClientMediaPlansCard';
 
 export default function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();

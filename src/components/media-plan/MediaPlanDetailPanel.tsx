@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -56,19 +57,47 @@ interface MediaPlanDetailPanelProps {
   planId?: string;
 }
 
+/** Hook: local state that syncs from prop, saves onBlur */
+function useLocalField(value: string | number | null | undefined) {
+  const [local, setLocal] = useState(String(value ?? ''));
+  useEffect(() => { setLocal(String(value ?? '')); }, [value]);
+  return [local, setLocal] as const;
+}
+
 export function MediaPlanDetailPanel({ item, open, onClose, onUpdate, profiles = [], planId }: MediaPlanDetailPanelProps) {
   if (!item) return null;
 
   const isLocked = item.is_locked === true;
-  const update = (field: string, value: any) => {
+  const save = (field: string, value: any) => {
     if (isLocked && field !== 'is_locked') return;
     onUpdate(item.id, field, value);
   };
   const effectivePlanId = planId || item.media_plan_id || '';
 
+  // Local state for all text/number inputs
+  const [title, setTitle] = useLocalField(item.title);
+  const [placement, setPlacement] = useLocalField(item.placement);
+  const [category, setCategory] = useLocalField(item.category);
+  const [audience, setAudience] = useLocalField(item.audience);
+  const [geography, setGeography] = useLocalField(item.geography);
+  const [fmt, setFmt] = useLocalField(item.format);
+  const [startDate, setStartDate] = useLocalField(item.start_date);
+  const [endDate, setEndDate] = useLocalField(item.end_date);
+  const [budget, setBudget] = useLocalField(item.budget);
+  const [dailyBudget, setDailyBudget] = useLocalField(item.daily_budget);
+  const [kpiTarget, setKpiTarget] = useLocalField(item.kpi_target);
+  const [messageSummary, setMessageSummary] = useLocalField(item.message_summary);
+  const [notes, setNotes] = useLocalField(item.notes);
+
   const approverName = item.approved_by
     ? profiles.find(p => p.id === item.approved_by)?.full_name || 'Unknown'
     : null;
+
+  const blurSave = (field: string, val: string, type: 'text' | 'number' | 'date' = 'text') => {
+    if (type === 'number') save(field, val ? Number(val) : null);
+    else if (type === 'date') save(field, val || null);
+    else save(field, val);
+  };
 
   return (
     <Sheet open={open} onOpenChange={v => !v && onClose()}>
@@ -125,10 +154,10 @@ export function MediaPlanDetailPanel({ item, open, onClose, onUpdate, profiles =
             {/* Basic */}
             <Section title="Basic Info">
               <Field label="Title">
-                <Input value={item.title || ''} onChange={e => update('title', e.target.value)} disabled={isLocked} />
+                <Input value={title} onChange={e => setTitle(e.target.value)} onBlur={() => blurSave('title', title)} disabled={isLocked} />
               </Field>
               <Field label="Channel">
-                <Select value={item.medium} onValueChange={v => update('medium', v)} disabled={isLocked}>
+                <Select value={item.medium} onValueChange={v => save('medium', v)} disabled={isLocked}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {getAllChannels().map(ch => (
@@ -141,14 +170,14 @@ export function MediaPlanDetailPanel({ item, open, onClose, onUpdate, profiles =
                 <div className="text-xs text-muted-foreground">Group: {getChannelGroup(item.medium) || '—'}</div>
               )}
               <Field label="Placement">
-                <Input value={item.placement || ''} onChange={e => update('placement', e.target.value)} disabled={isLocked} />
+                <Input value={placement} onChange={e => setPlacement(e.target.value)} onBlur={() => blurSave('placement', placement)} disabled={isLocked} />
               </Field>
               <Field label="Category">
-                <Input value={item.category || ''} onChange={e => update('category', e.target.value)} disabled={isLocked} />
+                <Input value={category} onChange={e => setCategory(e.target.value)} onBlur={() => blurSave('category', category)} disabled={isLocked} />
               </Field>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Status">
-                  <Select value={item.status || 'draft'} onValueChange={v => update('status', v)} disabled={isLocked}>
+                  <Select value={item.status || 'draft'} onValueChange={v => save('status', v)} disabled={isLocked}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {MEDIA_ACTION_STATUSES.map(s => (
@@ -158,7 +187,7 @@ export function MediaPlanDetailPanel({ item, open, onClose, onUpdate, profiles =
                   </Select>
                 </Field>
                 <Field label="Priority">
-                  <Select value={item.priority || 'medium'} onValueChange={v => update('priority', v)} disabled={isLocked}>
+                  <Select value={item.priority || 'medium'} onValueChange={v => save('priority', v)} disabled={isLocked}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {PRIORITIES.map(p => (
@@ -169,9 +198,10 @@ export function MediaPlanDetailPanel({ item, open, onClose, onUpdate, profiles =
                 </Field>
               </div>
               <Field label="Owner">
-                <Select value={item.owner_id || ''} onValueChange={v => update('owner_id', v || null)} disabled={isLocked}>
+                <Select value={item.owner_id || '__none__'} onValueChange={v => save('owner_id', v === '__none__' ? null : v)} disabled={isLocked}>
                   <SelectTrigger><SelectValue placeholder="Select owner..." /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__none__">— None —</SelectItem>
                     {profiles.map(p => (
                       <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
                     ))}
@@ -185,9 +215,10 @@ export function MediaPlanDetailPanel({ item, open, onClose, onUpdate, profiles =
             {/* Planning */}
             <Section title="Planning">
               <Field label="Objective">
-                <Select value={item.objective || ''} onValueChange={v => update('objective', v)} disabled={isLocked}>
+                <Select value={item.objective || '__none__'} onValueChange={v => save('objective', v === '__none__' ? null : v)} disabled={isLocked}>
                   <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__none__">— None —</SelectItem>
                     {OBJECTIVES.map(o => (
                       <SelectItem key={o} value={o}>{o}</SelectItem>
                     ))}
@@ -195,9 +226,10 @@ export function MediaPlanDetailPanel({ item, open, onClose, onUpdate, profiles =
                 </Select>
               </Field>
               <Field label="Funnel Stage">
-                <Select value={item.funnel_stage || ''} onValueChange={v => update('funnel_stage', v)} disabled={isLocked}>
+                <Select value={item.funnel_stage || '__none__'} onValueChange={v => save('funnel_stage', v === '__none__' ? null : v)} disabled={isLocked}>
                   <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__none__">— None —</SelectItem>
                     {FUNNEL_STAGES.map(f => (
                       <SelectItem key={f} value={f}>{f}</SelectItem>
                     ))}
@@ -205,13 +237,13 @@ export function MediaPlanDetailPanel({ item, open, onClose, onUpdate, profiles =
                 </Select>
               </Field>
               <Field label="Audience">
-                <Input value={item.audience || ''} onChange={e => update('audience', e.target.value)} disabled={isLocked} />
+                <Input value={audience} onChange={e => setAudience(e.target.value)} onBlur={() => blurSave('audience', audience)} disabled={isLocked} />
               </Field>
               <Field label="Geography">
-                <Input value={item.geography || ''} onChange={e => update('geography', e.target.value)} disabled={isLocked} />
+                <Input value={geography} onChange={e => setGeography(e.target.value)} onBlur={() => blurSave('geography', geography)} disabled={isLocked} />
               </Field>
               <Field label="Format">
-                <Input value={item.format || ''} onChange={e => update('format', e.target.value)} disabled={isLocked} />
+                <Input value={fmt} onChange={e => setFmt(e.target.value)} onBlur={() => blurSave('format', fmt)} disabled={isLocked} />
               </Field>
             </Section>
 
@@ -221,25 +253,26 @@ export function MediaPlanDetailPanel({ item, open, onClose, onUpdate, profiles =
             <Section title="Timing & Budget">
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Start Date">
-                  <Input type="date" value={item.start_date || ''} onChange={e => update('start_date', e.target.value || null)} disabled={isLocked} />
+                  <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} onBlur={() => blurSave('start_date', startDate, 'date')} disabled={isLocked} />
                 </Field>
                 <Field label="End Date">
-                  <Input type="date" value={item.end_date || ''} onChange={e => update('end_date', e.target.value || null)} disabled={isLocked} />
+                  <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} onBlur={() => blurSave('end_date', endDate, 'date')} disabled={isLocked} />
                 </Field>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Budget">
-                  <Input type="number" value={item.budget ?? ''} onChange={e => update('budget', e.target.value ? Number(e.target.value) : null)} disabled={isLocked} />
+                  <Input type="number" value={budget} onChange={e => setBudget(e.target.value)} onBlur={() => blurSave('budget', budget, 'number')} disabled={isLocked} />
                 </Field>
                 <Field label="Daily Budget">
-                  <Input type="number" value={item.daily_budget ?? ''} onChange={e => update('daily_budget', e.target.value ? Number(e.target.value) : null)} disabled={isLocked} />
+                  <Input type="number" value={dailyBudget} onChange={e => setDailyBudget(e.target.value)} onBlur={() => blurSave('daily_budget', dailyBudget, 'number')} disabled={isLocked} />
                 </Field>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Cost Type">
-                  <Select value={item.cost_type || ''} onValueChange={v => update('cost_type', v)} disabled={isLocked}>
+                  <Select value={item.cost_type || '__none__'} onValueChange={v => save('cost_type', v === '__none__' ? null : v)} disabled={isLocked}>
                     <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="__none__">— None —</SelectItem>
                       {COST_TYPES.map(c => (
                         <SelectItem key={c} value={c}>{c}</SelectItem>
                       ))}
@@ -247,7 +280,7 @@ export function MediaPlanDetailPanel({ item, open, onClose, onUpdate, profiles =
                   </Select>
                 </Field>
                 <Field label="KPI Target">
-                  <Input value={item.kpi_target || ''} onChange={e => update('kpi_target', e.target.value)} disabled={isLocked} />
+                  <Input value={kpiTarget} onChange={e => setKpiTarget(e.target.value)} onBlur={() => blurSave('kpi_target', kpiTarget)} disabled={isLocked} />
                 </Field>
               </div>
             </Section>
@@ -257,10 +290,10 @@ export function MediaPlanDetailPanel({ item, open, onClose, onUpdate, profiles =
             {/* Messaging */}
             <Section title="Messaging">
               <Field label="Message Summary">
-                <Textarea value={item.message_summary || ''} onChange={e => update('message_summary', e.target.value)} rows={3} disabled={isLocked} />
+                <Textarea value={messageSummary} onChange={e => setMessageSummary(e.target.value)} onBlur={() => blurSave('message_summary', messageSummary)} rows={3} disabled={isLocked} />
               </Field>
               <Field label="Notes">
-                <Textarea value={item.notes || ''} onChange={e => update('notes', e.target.value)} rows={3} disabled={isLocked} />
+                <Textarea value={notes} onChange={e => setNotes(e.target.value)} onBlur={() => blurSave('notes', notes)} rows={3} disabled={isLocked} />
               </Field>
             </Section>
 

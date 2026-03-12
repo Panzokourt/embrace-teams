@@ -316,8 +316,22 @@ export default function MediaPlanning() {
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{plan._items_count}</TableCell>
                       <TableCell className="text-right tabular-nums">{plan._channels_count}</TableCell>
+                      <TableCell className="text-xs tabular-nums">
+                        {(plan as any).version ? `v${(plan as any).version}` : 'v1'}
+                      </TableCell>
                       <TableCell className="text-muted-foreground text-xs">
                         {plan.updated_at ? format(new Date(plan.updated_at), 'dd/MM/yy') : '—'}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={(e) => { e.stopPropagation(); handleDuplicateAsVersion(plan.id); }}
+                          title="Duplicate as new version"
+                        >
+                          <GitBranch className="h-3.5 w-3.5" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}

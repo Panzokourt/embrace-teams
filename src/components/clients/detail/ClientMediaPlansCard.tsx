@@ -12,8 +12,6 @@ interface MediaPlan {
   name: string;
   status: string;
   total_budget: number | null;
-  start_date: string | null;
-  end_date: string | null;
   item_count?: number;
 }
 

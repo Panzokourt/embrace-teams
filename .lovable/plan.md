@@ -1,169 +1,66 @@
 
 
-# Media Planning — Phase 2 & Phase 3 Implementation Plan
+# Org Chart — Full Rebuild Plan
 
-This is a very large scope. I recommend splitting into **4 implementation batches** to keep quality high and avoid breaking existing functionality.
+## Πρόβλημα
 
----
+Το τρέχον οργανόγραμμα είναι ένα static rendered tree μέσα σε ScrollArea με βασικό zoom (CSS scale). Δεν υποστηρίζει pan/drag-to-move, δεν έχει infinite canvas, τα nodes δεν είναι clickable για detail, δεν υπάρχουν views (by department, by person), και τα templates δεν αξιοποιούν το υπάρχον προσωπικό.
 
-## Batch 1: Gantt Enhancements + Board/Kanban View + Dependency Lines
+## Λύση
 
-### Gantt Improvements (`MediaPlanGantt.tsx`)
-- Add **Quarter zoom level** (dayWidth ~2px)
-- **Drag-to-resize**: mouse handlers on bar edges to update `start_date`/`end_date` via `onInlineUpdate`
-- **Drag-to-move**: mouse down on bar center to shift both dates
-- **Color-by toggle**: switch between channel, status, objective coloring (dropdown above gantt)
-- **Group collapse/expand**: group rows by channel/status and render collapsible section headers
-- **Dependency lines**: render SVG arrows from `dependency_id` item to its dependent, drawn between bar endpoints
+Πλήρες rebuild του OrgChart σε **infinite canvas** στυλ Miro με pan+zoom, πολλαπλά views, clickable nodes με detail panel, και smart templates.
 
-### Board/Kanban View
-- New component `MediaPlanBoard.tsx`
-- Columns by status (or channel/objective via toggle)
-- Cards showing title, channel badge, budget, dates, owner avatar
-- Drag-and-drop between columns updates status (using existing `@dnd-kit`)
-- Add "Board" tab to workspace view switcher
+## Τεχνική Προσέγγιση
 
-### Files touched
-- `MediaPlanGantt.tsx` — major rewrite with drag handlers + SVG dependency layer
-- `MediaPlanBoard.tsx` — new component
-- `MediaPlanWorkspace.tsx` — add board view tab + pass `onInlineUpdate` to gantt
+### 1. Infinite Canvas Engine (χωρίς εξωτερική βιβλιοθήκη)
+- Custom React canvas με `transform: translate(x, y) scale(z)` σε ένα wrapper div
+- **Mouse wheel** → zoom (centered on cursor)
+- **Middle-click drag** ή **Space+drag** → pan (hand tool)
+- **Touch**: pinch-to-zoom, two-finger pan
+- Mini-map στο corner (optional, phase 2)
+- Fit-to-screen button, zoom controls
 
----
+### 2. Views (3 modes)
+- **Hierarchy View** (default): Κλασικό tree ανά reporting line — αυτό που υπάρχει τώρα αλλά σε canvas
+- **Department View**: Grouped κάρτες ανά department σε columns/clusters, κάθε cluster δείχνει τα μέλη
+- **List View**: Compact table/list με sorting, φιλτράρισμα, search — γρήγορη εύρεση ατόμου
 
-## Batch 2: Locked/Approved Rows + Baseline Comparison + Notes/Attachments
+Toggle μεταξύ views μέσω tabs στο header.
 
-### Database changes
-```sql
-ALTER TABLE media_plan_items ADD COLUMN is_locked BOOLEAN DEFAULT false;
-ALTER TABLE media_plan_items ADD COLUMN approved_at TIMESTAMPTZ;
-ALTER TABLE media_plan_items ADD COLUMN approved_by UUID REFERENCES profiles(id);
+### 3. Interactive Nodes
+- **Click** σε node → slide-in panel (sheet) δεξιά με:
+  - Profile info (avatar, name, email, phone)
+  - Position & department
+  - Direct reports count
+  - Link to Employee Profile (`/hr/employee/:id`)
+  - Quick actions (edit, reassign, add subordinate)
+- **Hover** → subtle highlight + tooltip με title
+- **Vacant positions** → dashed border, prominent "Κενή θέση" badge, click to assign
+- Connector lines μεταξύ nodes: animated SVG paths αντί για div borders
 
--- Baseline snapshots
-CREATE TABLE media_plan_snapshots (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  media_plan_id UUID REFERENCES media_plans(id) ON DELETE CASCADE NOT NULL,
-  name TEXT NOT NULL DEFAULT 'Baseline',
-  snapshot_data JSONB NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  created_by UUID REFERENCES profiles(id)
-);
+### 4. Smart Templates & Auto-build
+- Βελτίωση του Wizard: αφού επιλεγεί template, **auto-match** υπάρχοντα profiles σε positions βάσει `job_title` ή `department`
+- **Gap Analysis panel**: Μετά τη δημιουργία, δείχνει πόσες θέσεις είναι κενές, ποια departments λείπουν, ποια levels δεν έχουν κάλυψη
+- Wizard step: "Αντιστοίχιση Προσωπικού" — drag-drop ή auto-suggest
 
--- Attachments per action
-CREATE TABLE media_plan_item_attachments (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  media_plan_item_id UUID REFERENCES media_plan_items(id) ON DELETE CASCADE NOT NULL,
-  file_name TEXT NOT NULL,
-  file_path TEXT NOT NULL,
-  file_size INTEGER,
-  uploaded_by UUID REFERENCES profiles(id),
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-```
+### 5. SVG Connector Lines
+- Αντικατάσταση CSS div lines με SVG `<path>` elements (bezier curves)
+- Animated flow direction (subtle dash animation)
+- Color-coded κατά department
 
-### Locked rows
-- Locked rows show a lock icon and disable inline editing
-- Only admins/managers can lock/unlock via detail panel or bulk action
-- Approved rows get timestamp + approver displayed in detail panel
+## Αρχεία
 
-### Baseline vs Current
-- "Save Baseline" button in header stores current items as JSON snapshot
-- "Compare with Baseline" toggle shows delta indicators (budget change, date shift) inline in table
-- Simple visual: green/red arrows next to changed values
+| Αρχείο | Αλλαγή |
+|---|---|
+| `src/pages/OrgChart.tsx` | **Rewrite** — Infinite canvas, views, SVG connectors, detail panel |
+| `src/components/org-chart/OrgChartCanvas.tsx` | **New** — Pan+zoom canvas wrapper |
+| `src/components/org-chart/OrgNodeCard.tsx` | **New** — Redesigned node card (clickable, expandable) |
+| `src/components/org-chart/OrgDetailPanel.tsx` | **New** — Slide-in sheet for node details |
+| `src/components/org-chart/OrgDepartmentView.tsx` | **New** — Department-grouped view |
+| `src/components/org-chart/OrgListView.tsx` | **New** — Table/list view |
+| `src/components/org-chart/OrgConnectors.tsx` | **New** — SVG connector line renderer |
+| `src/components/org-chart/OrgChartWizard.tsx` | **Update** — Add auto-match step + gap analysis |
+| `src/components/org-chart/DraggableOrgNode.tsx` | **Remove** — Replaced by new OrgNodeCard |
 
-### Attachments in Detail Panel
-- New section in `MediaPlanDetailPanel.tsx` for file attachments
-- Upload to `project-files` bucket under `media-plan/{planId}/{itemId}/`
-- List with download/delete actions
-
-### Notes/Assumptions Section
-- Add a plan-level notes field (already exists as `notes` on `media_plans` — may need to add if missing)
-- Editable textarea in the header area, collapsible
-
-### Files touched
-- Migration SQL
-- `MediaPlanTable.tsx` — lock icon, disable editing for locked rows
-- `MediaPlanDetailPanel.tsx` — approval section, attachments section
-- `MediaPlanHeader.tsx` — baseline save button, notes section
-- New `MediaPlanBaselineCompare.tsx` — comparison overlay
-
----
-
-## Batch 3: PDF Export Templates + Copy/Paste from Excel + Scenario Mode
-
-### PDF Export
-- New edge function or client-side generation using the HTML-to-PDF approach
-- 4 template options via a dialog:
-  1. **Executive Summary** — plan name, client, period, budget summary, channel breakdown chart
-  2. **Detailed Plan** — full table with all rows
-  3. **Calendar View** — month grid rendered as printable HTML
-  4. **Gantt Snapshot** — timeline rendered as printable HTML
-- Button in header → opens template chooser → generates PDF
-
-### Copy/Paste from Excel
-- Add `onPaste` handler to the table container
-- Parse TSV clipboard data into rows
-- Map columns by position to fields (Title, Channel, Placement, etc.)
-- Preview dialog showing parsed rows before inserting
-- Bulk insert via supabase
-
-### Scenario/Version Mode
-- `media_plans.version` already exists — use it
-- "Duplicate as Version" action creates a copy of the plan with version+1
-- Version selector in header to switch between versions
-- Side-by-side comparison view (optional, can show as diff table)
-
-### Files touched
-- `MediaPlanHeader.tsx` — export button, version selector
-- New `MediaPlanExportDialog.tsx` — template chooser + generation
-- `MediaPlanTable.tsx` — paste handler
-- New `MediaPlanPastePreview.tsx` — preview dialog
-- `MediaPlanning.tsx` — duplicate as version action
-
----
-
-## Batch 4: Cross-Module Integration (Phase 3)
-
-### Client Detail — Active Media Plans
-- In `ClientDetail.tsx`, add a new card `ClientMediaPlansCard` showing media plans where `client_id` matches
-- Shows plan name, status, budget, period, action count
-- Click navigates to `/media-planning/:id`
-
-### Task Detail — Media Action Source
-- In `TaskDetail.tsx`, query `media_plan_item_tasks` for the task
-- If linked, show a badge/card: "From Media Plan: [Plan Name] → [Action Title]"
-- Click navigates to workspace with item selected
-
-### Deliverables — Related Media Actions
-- In `ProjectDeliverablesTable.tsx`, for each deliverable, query `media_plan_items` where `deliverable_id` matches
-- Show count badge or expandable list of linked media actions
-
-### Project Overview — Media Plan Block
-- In `ProjectDetail.tsx` overview tab, add a card showing linked media plans
-- Shows plan count, total budget allocated, active actions count
-- "Open in Workspace" link
-
-### Files touched
-- New `ClientMediaPlansCard.tsx`
-- `ClientDetail.tsx` — add the card
-- `TaskDetail.tsx` — add media source section
-- `ProjectDeliverablesTable.tsx` — add linked actions indicator
-- `ProjectDetail.tsx` — add media plans overview card
-
-### Advanced Formula Support (deferred)
-- This would require a custom expression parser — recommend deferring to a later phase or using a library like `hot-formula-parser`
-- Scope: calculated columns (e.g., Budget / Duration = Daily Budget auto-calc)
-- For now, auto-calculate `duration` from dates and `daily_budget` from budget/duration in the detail panel
-
----
-
-## Implementation Order Recommendation
-
-1. **Batch 1** (Gantt + Board) — highest UX impact, builds on existing components
-2. **Batch 4** (Cross-module) — high value, relatively straightforward queries
-3. **Batch 2** (Locking + Baseline + Attachments) — important for governance
-4. **Batch 3** (PDF + Paste + Scenarios) — advanced features, can wait
-
-Total estimated: ~8-10 implementation rounds across all batches.
-
-Shall I proceed with Batch 1 (Gantt enhancements + Board/Kanban view)?
+Δεν χρειάζονται DB changes — το schema `org_chart_positions` καλύπτει ήδη hierarchy, department, user_id, color, level, sort_order.
 

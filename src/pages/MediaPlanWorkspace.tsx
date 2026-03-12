@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { MonitorPlay, ArrowLeft, Table2, CalendarDays, GanttChart } from 'lucide-react';
+import { MonitorPlay, ArrowLeft, Table2, CalendarDays, GanttChart, Columns } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MediaPlanHeader } from '@/components/media-plan/MediaPlanHeader';
@@ -12,6 +12,7 @@ import { MediaPlanTable } from '@/components/media-plan/MediaPlanTable';
 import { MediaPlanDetailPanel } from '@/components/media-plan/MediaPlanDetailPanel';
 import { MediaPlanGantt } from '@/components/media-plan/MediaPlanGantt';
 import { MediaPlanCalendar } from '@/components/media-plan/MediaPlanCalendar';
+import { MediaPlanBoard } from '@/components/media-plan/MediaPlanBoard';
 import { toast } from 'sonner';
 
 export default function MediaPlanWorkspace() {
@@ -21,7 +22,7 @@ export default function MediaPlanWorkspace() {
   const queryClient = useQueryClient();
   const companyId = company?.id;
 
-  const [activeView, setActiveView] = useState<'table' | 'gantt' | 'calendar'>('table');
+  const [activeView, setActiveView] = useState<'table' | 'gantt' | 'calendar' | 'board'>('table');
   const [groupBy, setGroupBy] = useState('none');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -215,6 +216,9 @@ export default function MediaPlanWorkspace() {
           <TabsTrigger value="calendar" className="gap-1.5">
             <CalendarDays className="h-3.5 w-3.5" /> Calendar
           </TabsTrigger>
+          <TabsTrigger value="board" className="gap-1.5">
+            <Columns className="h-3.5 w-3.5" /> Board
+          </TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -237,6 +241,8 @@ export default function MediaPlanWorkspace() {
           items={items as any}
           onSelectItem={handleSelectItem}
           selectedItemId={selectedItemId}
+          onInlineUpdate={handleInlineUpdate}
+          groupBy={groupBy}
         />
       )}
 
@@ -244,6 +250,16 @@ export default function MediaPlanWorkspace() {
         <MediaPlanCalendar
           items={items as any}
           onSelectItem={handleSelectItem}
+        />
+      )}
+
+      {activeView === 'board' && (
+        <MediaPlanBoard
+          items={items as any}
+          onSelectItem={handleSelectItem}
+          selectedItemId={selectedItemId}
+          onInlineUpdate={handleInlineUpdate}
+          profiles={profiles}
         />
       )}
 

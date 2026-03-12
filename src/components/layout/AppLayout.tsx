@@ -93,6 +93,22 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
     return () => window.removeEventListener('open-secretary-panel', handler);
   }, []);
 
+  // Listen for secretary navigation events — navigate while keeping panel open
+  const navigateRef = useRef(useNavigate());
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.path) {
+        navigateRef.current(detail.path);
+        // Keep/open secretary panel after navigation
+        setRightPanelOpen(true);
+        setActiveTab('secretary');
+      }
+    };
+    window.addEventListener('secretary-navigate', handler);
+    return () => window.removeEventListener('secretary-navigate', handler);
+  }, []);
+
   const togglePanel = useCallback((tab: RightPanelTab) => {
     if (rightPanelOpen && activeTab === tab) {
       setRightPanelOpen(false);

@@ -104,7 +104,7 @@ export function MediaPlanTable({
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" onPaste={handlePaste}>
       {/* Toolbar */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2">

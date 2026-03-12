@@ -69,6 +69,7 @@ export default function QuickActionsMenu({ disabled, onSendMessage, onFileUpload
         className="hidden"
         onChange={handleFileChange}
         accept="*/*"
+        multiple
       />
       <Popover>
         <PopoverTrigger asChild>

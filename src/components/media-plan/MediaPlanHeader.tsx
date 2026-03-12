@@ -93,8 +93,30 @@ export function MediaPlanHeader({ plan, summary, onAddAction, onUpdateName, onUp
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
           {baselineControls}
+          {versions && versions.length > 1 && onSwitchVersion && (
+            <div className="flex items-center gap-1">
+              <GitBranch className="h-3.5 w-3.5 text-muted-foreground" />
+              <select
+                className="h-8 rounded-xl border bg-transparent px-2 text-xs"
+                value={plan.id}
+                onChange={e => onSwitchVersion(e.target.value)}
+              >
+                {versions.map(v => (
+                  <option key={v.id} value={v.id}>v{v.version} — {v.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {version != null && (
+            <Badge variant="secondary" className="text-[10px]">v{version}</Badge>
+          )}
+          {onExport && (
+            <Button size="sm" variant="outline" onClick={onExport}>
+              <FileDown className="h-3.5 w-3.5 mr-1" /> Export
+            </Button>
+          )}
           <Button size="sm" onClick={onAddAction}>
             <Plus className="h-4 w-4 mr-1" /> Add Action
           </Button>

@@ -28,7 +28,7 @@ import {
   DollarSign, Settings, LogOut, Zap, ChevronLeft, ChevronRight, UserCog, Building2,
   Moon, Sun, CalendarDays, FileArchive, Timer, FileStack, BarChart3,
   Plus, Palette, Monitor, Globe, Calendar, MessageSquare, BookUser,
-  Briefcase, Mail, Trophy, ShieldCheck, BookOpen, GitBranch } from
+  Briefcase, Mail, Trophy, ShieldCheck, BookOpen, GitBranch, MonitorPlay } from
 'lucide-react';
 import { briefDefinitions, getBriefDefinition } from '@/components/blueprints/briefDefinitions';
 import { BriefFormDialog } from '@/components/blueprints/BriefFormDialog';
@@ -58,7 +58,7 @@ interface Category {
 
 const categories: Category[] = [
 { id: 'overview', icon: LayoutDashboard, label: 'Overview', routePrefixes: ['/my-work', '/', '/dashboard'] },
-{ id: 'work', icon: Briefcase, label: 'Work', routePrefixes: ['/work', '/projects', '/tasks', '/calendar', '/files', '/blueprints', '/workflows', '/workflows'] },
+{ id: 'work', icon: Briefcase, label: 'Work', routePrefixes: ['/work', '/projects', '/tasks', '/calendar', '/files', '/blueprints', '/workflows', '/media-planning'] },
 { id: 'clients', icon: Building2, label: 'Clients', routePrefixes: ['/clients', '/contacts'] },
 { id: 'communication', icon: MessageSquare, label: 'Communication', routePrefixes: ['/chat', '/inbox'] },
 { id: 'revenue', icon: DollarSign, label: 'Revenue', routePrefixes: ['/financials', '/pricing'] },
@@ -115,7 +115,7 @@ const categoryNavItems: Record<CategoryId, NavItem[]> = {
 };
 
 function detectCategory(pathname: string): CategoryId {
-  if (pathname === '/my-work' || pathname.startsWith('/work') || pathname.startsWith('/projects') || pathname.startsWith('/tasks') || pathname.startsWith('/calendar') || pathname.startsWith('/files') || pathname.startsWith('/blueprints') || pathname.startsWith('/workflows')) return 'work';
+  if (pathname === '/my-work' || pathname.startsWith('/work') || pathname.startsWith('/projects') || pathname.startsWith('/tasks') || pathname.startsWith('/calendar') || pathname.startsWith('/files') || pathname.startsWith('/blueprints') || pathname.startsWith('/workflows') || pathname.startsWith('/media-planning')) return 'work';
   if (pathname.startsWith('/clients') || pathname.startsWith('/contacts')) return 'clients';
   if (pathname.startsWith('/chat') || pathname.startsWith('/inbox')) return 'communication';
   if (pathname.startsWith('/financials') || pathname.startsWith('/pricing')) return 'revenue';
@@ -460,6 +460,7 @@ export default function AppSidebar({
                 <SidebarLink to="/blueprints" icon={<FileStack className="h-[18px] w-[18px]" />} label="Templates" active={location.pathname === '/blueprints'} collapsed={false} onClick={() => {onItemClick?.();}} />
                 <SidebarLink to="/files" icon={<FileArchive className="h-[18px] w-[18px]" />} label="Files" active={location.pathname === '/files'} collapsed={false} onClick={() => {onItemClick?.();}} />
                 <SidebarLink to="/workflows" icon={<GitBranch className="h-[18px] w-[18px]" />} label="Workflows" active={location.pathname === '/workflows'} collapsed={false} onClick={() => {onItemClick?.();}} />
+                <SidebarLink to="/media-planning" icon={<MonitorPlay className="h-[18px] w-[18px]" />} label="Media Planning" active={location.pathname.startsWith('/media-planning')} collapsed={false} onClick={() => {onItemClick?.();}} />
               </> :
 
         categoryNavItems[flyoutCategory || activeCategory]?.filter(canAccess).map((item) => {

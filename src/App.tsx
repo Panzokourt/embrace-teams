@@ -50,6 +50,8 @@ import Secretary from "@/pages/Secretary";
 import Workflows from "@/pages/Workflows";
 import ResetPassword from "@/pages/ResetPassword";
 import PlatformAdmin from "@/pages/PlatformAdmin";
+import MediaPlanning from "@/pages/MediaPlanning";
+import MediaPlanWorkspace from "@/pages/MediaPlanWorkspace";
 
 function RedirectUserToEmployee() {
   const { id } = useParams();
@@ -124,6 +126,8 @@ const App = () => (
                   {/* Redirects from removed placeholder pages */}
                   <Route path="/secretary" element={<Secretary />} />
                   <Route path="/workflows" element={<Workflows />} />
+                  <Route path="/media-planning" element={<MediaPlanning />} />
+                  <Route path="/media-planning/:id" element={<MediaPlanWorkspace />} />
                   <Route path="/campaigns" element={<Navigate to="/work" replace />} />
                   <Route path="/backlog" element={<Navigate to="/calendar" replace />} />
                   <Route path="/operations/capacity" element={<Navigate to="/hr" replace />} />
@@ -132,7 +136,7 @@ const App = () => (
                   <Route path="/intelligence/insights" element={<Navigate to="/reports" replace />} />
                   <Route path="/intelligence/benchmarks" element={<Navigate to="/reports" replace />} />
                   <Route path="/intelligence/forecasting" element={<Navigate to="/reports" replace />} />
-                  <Route path="/intelligence/media-planning" element={<Navigate to="/reports" replace />} />
+                  <Route path="/intelligence/media-planning" element={<Navigate to="/media-planning" replace />} />
                   <Route path="/governance/integrations" element={<Navigate to="/governance" replace />} />
                   <Route path="/governance/audit-log" element={<Navigate to="/governance/compliance" replace />} />
                   <Route path="/governance/ownership-map" element={<Navigate to="/governance" replace />} />

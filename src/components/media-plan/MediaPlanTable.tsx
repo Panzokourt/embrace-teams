@@ -3,11 +3,10 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
 import { STATUS_LABELS, STATUS_COLORS, PRIORITY_LABELS, PRIORITY_COLORS, GROUP_BY_OPTIONS, type MediaActionStatus } from './mediaConstants';
-import { getChannelGroup } from './channelTaxonomy';
-import { Plus, GripVertical, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, GripVertical, ChevronDown, ChevronRight, Lock, ArrowUp, ArrowDown } from 'lucide-react';
 import { format } from 'date-fns';
+import { getBaselineDelta } from './MediaPlanBaselineCompare';
 
 interface MediaActionRow {
   id: string;
@@ -28,6 +27,7 @@ interface MediaActionRow {
   notes: string | null;
   phase: string | null;
   sort_order: number | null;
+  is_locked?: boolean;
 }
 
 interface MediaPlanTableProps {
@@ -39,6 +39,8 @@ interface MediaPlanTableProps {
   selectedItemId: string | null;
   onInlineUpdate: (id: string, field: string, value: any) => void;
   onAddAction: () => void;
+  compareMode?: boolean;
+  snapshotData?: any[];
 }
 
 export function MediaPlanTable({
@@ -50,6 +52,8 @@ export function MediaPlanTable({
   selectedItemId,
   onInlineUpdate,
   onAddAction,
+  compareMode = false,
+  snapshotData = [],
 }: MediaPlanTableProps) {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
@@ -149,14 +153,21 @@ export function MediaPlanTable({
                       key={item.id}
                       className={`cursor-pointer transition-colors ${
                         selectedItemId === item.id ? 'bg-accent' : 'hover:bg-accent/50'
-                      }`}
+                      } ${item.is_locked ? 'opacity-80' : ''}`}
                       onClick={() => onSelectItem(item.id)}
                     >
                       <TableCell className="w-8 text-muted-foreground/30">
-                        <GripVertical className="h-3.5 w-3.5" />
+                        {item.is_locked ? (
+                          <Lock className="h-3.5 w-3.5 text-amber-500" />
+                        ) : (
+                          <GripVertical className="h-3.5 w-3.5" />
+                        )}
                       </TableCell>
                       <TableCell className="font-medium sticky left-0 bg-card z-10">
                         {item.title || item.medium || 'Untitled'}
+                        {item.is_locked && (
+                          <Badge variant="outline" className="ml-2 text-[9px] bg-amber-500/10 text-amber-600 dark:text-amber-400">Locked</Badge>
+                        )}
                       </TableCell>
                       <TableCell>
                         <span className="text-xs">{item.medium}</span>
@@ -172,7 +183,12 @@ export function MediaPlanTable({
                         {item.end_date ? format(new Date(item.end_date), 'dd/MM') : '—'}
                       </TableCell>
                       <TableCell className="text-right text-xs tabular-nums">
-                        {item.budget != null ? `€${item.budget.toLocaleString()}` : '—'}
+                        <BudgetCell
+                          itemId={item.id}
+                          budget={item.budget}
+                          compareMode={compareMode}
+                          snapshotData={snapshotData}
+                        />
                       </TableCell>
                       <TableCell>
                         {item.status && (
@@ -201,22 +217,34 @@ export function MediaPlanTable({
   );
 }
 
+function BudgetCell({ itemId, budget, compareMode, snapshotData }: {
+  itemId: string;
+  budget: number | null;
+  compareMode: boolean;
+  snapshotData: any[];
+}) {
+  if (budget == null) return <span>—</span>;
+  const display = `€${budget.toLocaleString()}`;
+
+  if (!compareMode || !snapshotData.length) return <span>{display}</span>;
+
+  const delta = getBaselineDelta(itemId, 'budget', budget, snapshotData);
+  if (!delta || !delta.changed) return <span>{display}</span>;
+
+  return (
+    <span className="inline-flex items-center gap-0.5">
+      {display}
+      {delta.direction === 'up' && <ArrowUp className="h-3 w-3 text-red-500" />}
+      {delta.direction === 'down' && <ArrowDown className="h-3 w-3 text-green-500" />}
+    </span>
+  );
+}
+
 function GroupSection({
-  label,
-  count,
-  budget,
-  isCollapsed,
-  showGroupHeader,
-  onToggle,
-  children,
+  label, count, budget, isCollapsed, showGroupHeader, onToggle, children,
 }: {
-  label: string;
-  count: number;
-  budget: number;
-  isCollapsed: boolean;
-  showGroupHeader: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
+  label: string; count: number; budget: number; isCollapsed: boolean;
+  showGroupHeader: boolean; onToggle: () => void; children: React.ReactNode;
 }) {
   if (!showGroupHeader) return <>{children}</>;
   return (

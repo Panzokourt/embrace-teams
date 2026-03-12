@@ -1,8 +1,10 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { PLAN_STATUS_LABELS, STATUS_COLORS, type MediaPlanStatus } from './mediaConstants';
-import { Plus, Download, ListFilter, Group, CheckSquare } from 'lucide-react';
+import { Plus, ChevronDown, StickyNote } from 'lucide-react';
 import { format } from 'date-fns';
 import { useState } from 'react';
 
@@ -17,6 +19,7 @@ interface MediaPlan {
   client_name?: string;
   project_name?: string;
   owner_name?: string;
+  notes?: string | null;
 }
 
 interface SummaryData {
@@ -32,11 +35,15 @@ interface MediaPlanHeaderProps {
   summary: SummaryData;
   onAddAction: () => void;
   onUpdateName: (name: string) => void;
+  onUpdateNotes?: (notes: string) => void;
+  baselineControls?: React.ReactNode;
 }
 
-export function MediaPlanHeader({ plan, summary, onAddAction, onUpdateName }: MediaPlanHeaderProps) {
+export function MediaPlanHeader({ plan, summary, onAddAction, onUpdateName, onUpdateNotes, baselineControls }: MediaPlanHeaderProps) {
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(plan.name);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [notesValue, setNotesValue] = useState(plan.notes || '');
 
   const remaining = summary.totalBudget - summary.allocatedBudget;
   const allocationPct = summary.totalBudget > 0 ? Math.round((summary.allocatedBudget / summary.totalBudget) * 100) : 0;
@@ -83,11 +90,38 @@ export function MediaPlanHeader({ plan, summary, onAddAction, onUpdateName }: Me
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {baselineControls}
           <Button size="sm" onClick={onAddAction}>
             <Plus className="h-4 w-4 mr-1" /> Add Action
           </Button>
         </div>
       </div>
+
+      {/* Notes / Assumptions */}
+      {onUpdateNotes && (
+        <Collapsible open={notesOpen} onOpenChange={setNotesOpen}>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground">
+              <StickyNote className="h-3 w-3 mr-1" />
+              Notes & Assumptions
+              <ChevronDown className={`h-3 w-3 ml-1 transition-transform ${notesOpen ? 'rotate-180' : ''}`} />
+              {plan.notes && !notesOpen && (
+                <Badge variant="secondary" className="ml-1.5 text-[9px]">Has notes</Badge>
+              )}
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <Textarea
+              value={notesValue}
+              onChange={e => setNotesValue(e.target.value)}
+              onBlur={() => onUpdateNotes(notesValue)}
+              placeholder="Add plan-level notes, assumptions, or context..."
+              rows={3}
+              className="mt-1 text-sm"
+            />
+          </CollapsibleContent>
+        </Collapsible>
+      )}
 
       {/* Summary bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">

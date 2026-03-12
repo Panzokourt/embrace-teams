@@ -1191,8 +1191,8 @@ async function executeTool(
             description: insight.body,
             status: "todo",
             priority: "high",
-            company_id: companyId,
             assigned_to: userId,
+            created_by: userId,
           }).select("id, title, status").single();
           if (taskErr) throw taskErr;
           await supabase.from("brain_insights").update({ is_actioned: true }).eq("id", args.insight_id);

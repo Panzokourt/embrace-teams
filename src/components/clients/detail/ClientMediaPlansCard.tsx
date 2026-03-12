@@ -85,9 +85,7 @@ export function ClientMediaPlansCard({ clientId }: { clientId: string }) {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium truncate">{plan.name}</p>
                   <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
-                    {plan.start_date && (
-                      <span>{format(new Date(plan.start_date), 'MMM yyyy', { locale: el })}</span>
-                    )}
+                    
                     {plan.item_count !== undefined && (
                       <span>{plan.item_count} ενέργειες</span>
                     )}

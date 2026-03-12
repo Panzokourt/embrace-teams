@@ -649,6 +649,20 @@ async function executeTool(
       }
 
       case "create_client": {
+        // Check for existing client with same name first
+        const { data: existingClients } = await supabase
+          .from("clients")
+          .select("id, name")
+          .eq("company_id", companyId)
+          .ilike("name", args.name)
+          .limit(3);
+        if (existingClients && existingClients.length > 0) {
+          return { 
+            warning: true,
+            message: `Found existing client(s) with similar name: ${existingClients.map((c: any) => `"${c.name}" (id: ${c.id})`).join(", ")}. Use their ID instead of creating a duplicate, or confirm creation.`,
+            existing_clients: existingClients,
+          };
+        }
         const { data, error } = await supabase.from("clients").insert({
           name: args.name,
           contact_email: args.contact_email || null,

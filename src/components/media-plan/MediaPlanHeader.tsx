@@ -114,9 +114,19 @@ export function MediaPlanHeader({ plan, summary, onAddAction, onUpdateName, onUp
           {version != null && (
             <Badge variant="secondary" className="text-[10px]">v{version}</Badge>
           )}
+          {onImportExcel && (
+            <Button size="sm" variant="outline" onClick={onImportExcel}>
+              <Upload className="h-3.5 w-3.5 mr-1" /> Import
+            </Button>
+          )}
           {onExport && (
             <Button size="sm" variant="outline" onClick={onExport}>
               <FileDown className="h-3.5 w-3.5 mr-1" /> Export
+            </Button>
+          )}
+          {onAIGenerate && (
+            <Button size="sm" variant="outline" onClick={onAIGenerate}>
+              <Sparkles className="h-3.5 w-3.5 mr-1" /> AI Generate
             </Button>
           )}
           <Button size="sm" onClick={onAddAction}>

@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.analyze-document]
 verify_jwt = false
+
+[functions.analyze-media-plan-excel]
+verify_jwt = false

@@ -544,6 +544,22 @@ const toolDefinitions = [
   {
     type: "function",
     function: {
+      name: "analyze_uploaded_file",
+      description: "Analyze uploaded file content (CSV, text, JSON, etc). Use when user uploads a file and you need to extract insights or structured data from it.",
+      parameters: {
+        type: "object",
+        properties: {
+          file_content: { type: "string", description: "The text content of the file (provided by the user message)" },
+          file_name: { type: "string", description: "Original file name" },
+          analysis_type: { type: "string", enum: ["summarize", "extract_data", "find_patterns"], description: "Type of analysis to perform" },
+        },
+        required: ["file_content", "file_name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "get_risk_radar",
       description: "Comprehensive risk analysis: overdue tasks, budget overruns, unassigned tasks, stale projects, team capacity issues. Returns a structured risk report.",
       parameters: { type: "object", properties: {} },

@@ -3507,6 +3507,54 @@ export type Database = {
           },
         ]
       }
+      media_plan_item_attachments: {
+        Row: {
+          content_type: string | null
+          created_at: string | null
+          file_name: string
+          file_path: string
+          file_size: number | null
+          id: string
+          media_plan_item_id: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          content_type?: string | null
+          created_at?: string | null
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          id?: string
+          media_plan_item_id: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          content_type?: string | null
+          created_at?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          media_plan_item_id?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_plan_item_attachments_media_plan_item_id_fkey"
+            columns: ["media_plan_item_id"]
+            isOneToOne: false
+            referencedRelation: "media_plan_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_plan_item_attachments_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       media_plan_item_tasks: {
         Row: {
           created_at: string | null
@@ -3547,6 +3595,8 @@ export type Database = {
         Row: {
           actual_cost: number | null
           approval_needed: boolean | null
+          approved_at: string | null
+          approved_by: string | null
           audience: string | null
           budget: number | null
           campaign_name: string | null
@@ -3571,6 +3621,7 @@ export type Database = {
           id: string
           impressions: number | null
           invoice_id: string | null
+          is_locked: boolean | null
           kpi_target: string | null
           media_plan_id: string | null
           medium: string
@@ -3597,6 +3648,8 @@ export type Database = {
         Insert: {
           actual_cost?: number | null
           approval_needed?: boolean | null
+          approved_at?: string | null
+          approved_by?: string | null
           audience?: string | null
           budget?: number | null
           campaign_name?: string | null
@@ -3621,6 +3674,7 @@ export type Database = {
           id?: string
           impressions?: number | null
           invoice_id?: string | null
+          is_locked?: boolean | null
           kpi_target?: string | null
           media_plan_id?: string | null
           medium: string
@@ -3647,6 +3701,8 @@ export type Database = {
         Update: {
           actual_cost?: number | null
           approval_needed?: boolean | null
+          approved_at?: string | null
+          approved_by?: string | null
           audience?: string | null
           budget?: number | null
           campaign_name?: string | null
@@ -3671,6 +3727,7 @@ export type Database = {
           id?: string
           impressions?: number | null
           invoice_id?: string | null
+          is_locked?: boolean | null
           kpi_target?: string | null
           media_plan_id?: string | null
           medium?: string
@@ -3695,6 +3752,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "media_plan_items_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "media_plan_items_deliverable_id_fkey"
             columns: ["deliverable_id"]
@@ -3742,6 +3806,48 @@ export type Database = {
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      media_plan_snapshots: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          media_plan_id: string
+          name: string
+          snapshot_data: Json
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          media_plan_id: string
+          name?: string
+          snapshot_data: Json
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          media_plan_id?: string
+          name?: string
+          snapshot_data?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_plan_snapshots_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_plan_snapshots_media_plan_id_fkey"
+            columns: ["media_plan_id"]
+            isOneToOne: false
+            referencedRelation: "media_plans"
             referencedColumns: ["id"]
           },
         ]

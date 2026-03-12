@@ -241,6 +241,8 @@ export default function MediaPlanWorkspace() {
           items={items as any}
           onSelectItem={handleSelectItem}
           selectedItemId={selectedItemId}
+          onInlineUpdate={handleInlineUpdate}
+          groupBy={groupBy}
         />
       )}
 
@@ -248,6 +250,16 @@ export default function MediaPlanWorkspace() {
         <MediaPlanCalendar
           items={items as any}
           onSelectItem={handleSelectItem}
+        />
+      )}
+
+      {activeView === 'board' && (
+        <MediaPlanBoard
+          items={items as any}
+          onSelectItem={handleSelectItem}
+          selectedItemId={selectedItemId}
+          onInlineUpdate={handleInlineUpdate}
+          profiles={profiles}
         />
       )}
 

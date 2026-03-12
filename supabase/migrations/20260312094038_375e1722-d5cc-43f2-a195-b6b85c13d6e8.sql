@@ -1,0 +1,2 @@
+ALTER TABLE public.media_plan_items DROP CONSTRAINT IF EXISTS media_plan_items_status_check;
+ALTER TABLE public.media_plan_items ADD CONSTRAINT media_plan_items_status_check CHECK (status IN ('draft', 'planned', 'ready_for_production', 'in_production', 'ready_to_launch', 'live', 'completed', 'on_hold', 'cancelled'));

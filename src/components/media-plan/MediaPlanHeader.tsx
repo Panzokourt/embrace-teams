@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { PLAN_STATUS_LABELS, STATUS_COLORS, type MediaPlanStatus } from './mediaConstants';
-import { Plus, ChevronDown, StickyNote, FileDown, GitBranch } from 'lucide-react';
+import { Plus, ChevronDown, StickyNote, FileDown, GitBranch, Sparkles, Upload } from 'lucide-react';
 import { format } from 'date-fns';
 import { useState } from 'react';
 
@@ -41,9 +41,11 @@ interface MediaPlanHeaderProps {
   version?: number | null;
   versions?: { id: string; name: string; version: number }[];
   onSwitchVersion?: (id: string) => void;
+  onAIGenerate?: () => void;
+  onImportExcel?: () => void;
 }
 
-export function MediaPlanHeader({ plan, summary, onAddAction, onUpdateName, onUpdateNotes, baselineControls, onExport, version, versions, onSwitchVersion }: MediaPlanHeaderProps) {
+export function MediaPlanHeader({ plan, summary, onAddAction, onUpdateName, onUpdateNotes, baselineControls, onExport, version, versions, onSwitchVersion, onAIGenerate, onImportExcel }: MediaPlanHeaderProps) {
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(plan.name);
   const [notesOpen, setNotesOpen] = useState(false);
@@ -112,9 +114,19 @@ export function MediaPlanHeader({ plan, summary, onAddAction, onUpdateName, onUp
           {version != null && (
             <Badge variant="secondary" className="text-[10px]">v{version}</Badge>
           )}
+          {onImportExcel && (
+            <Button size="sm" variant="outline" onClick={onImportExcel}>
+              <Upload className="h-3.5 w-3.5 mr-1" /> Import
+            </Button>
+          )}
           {onExport && (
             <Button size="sm" variant="outline" onClick={onExport}>
               <FileDown className="h-3.5 w-3.5 mr-1" /> Export
+            </Button>
+          )}
+          {onAIGenerate && (
+            <Button size="sm" variant="outline" onClick={onAIGenerate}>
+              <Sparkles className="h-3.5 w-3.5 mr-1" /> AI Generate
             </Button>
           )}
           <Button size="sm" onClick={onAddAction}>

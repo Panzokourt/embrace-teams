@@ -22,7 +22,7 @@ export default function MediaPlanWorkspace() {
   const queryClient = useQueryClient();
   const companyId = company?.id;
 
-  const [activeView, setActiveView] = useState<'table' | 'gantt' | 'calendar'>('table');
+  const [activeView, setActiveView] = useState<'table' | 'gantt' | 'calendar' | 'board'>('table');
   const [groupBy, setGroupBy] = useState('none');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);

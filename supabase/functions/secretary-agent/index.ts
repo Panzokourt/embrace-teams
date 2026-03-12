@@ -587,7 +587,7 @@ async function executeTool(
           assigned_to: args.assigned_to || null,
           deliverable_id: args.deliverable_id || null,
           status: "todo",
-          company_id: companyId,
+          created_by: userId,
         }).select("id, title, status, priority, due_date").single();
         if (error) throw error;
         return { success: true, task: data };

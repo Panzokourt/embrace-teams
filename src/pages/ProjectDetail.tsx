@@ -16,6 +16,7 @@ import { ProjectTeamManager } from '@/components/projects/ProjectTeamManager';
 import { FileExplorer } from '@/components/files/FileExplorer';
 import { ProjectContractsCard } from '@/components/projects/ProjectContractsCard';
 import { ProjectCommentsAndHistory } from '@/components/projects/ProjectCommentsAndHistory';
+import { ProjectMediaPlansCard } from '@/components/projects/ProjectMediaPlansCard';
 import { ProjectWorkflowTracker } from '@/components/projects/ProjectWorkflowTracker';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';

@@ -41,6 +41,7 @@ interface MediaPlanTableProps {
   onAddAction: () => void;
   compareMode?: boolean;
   snapshotData?: any[];
+  onPaste?: (text: string) => void;
 }
 
 export function MediaPlanTable({

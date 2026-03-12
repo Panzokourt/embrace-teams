@@ -115,7 +115,7 @@ const categoryNavItems: Record<CategoryId, NavItem[]> = {
 };
 
 function detectCategory(pathname: string): CategoryId {
-  if (pathname === '/my-work' || pathname.startsWith('/work') || pathname.startsWith('/projects') || pathname.startsWith('/tasks') || pathname.startsWith('/calendar') || pathname.startsWith('/files') || pathname.startsWith('/blueprints') || pathname.startsWith('/workflows')) return 'work';
+  if (pathname === '/my-work' || pathname.startsWith('/work') || pathname.startsWith('/projects') || pathname.startsWith('/tasks') || pathname.startsWith('/calendar') || pathname.startsWith('/files') || pathname.startsWith('/blueprints') || pathname.startsWith('/workflows') || pathname.startsWith('/media-planning')) return 'work';
   if (pathname.startsWith('/clients') || pathname.startsWith('/contacts')) return 'clients';
   if (pathname.startsWith('/chat') || pathname.startsWith('/inbox')) return 'communication';
   if (pathname.startsWith('/financials') || pathname.startsWith('/pricing')) return 'revenue';

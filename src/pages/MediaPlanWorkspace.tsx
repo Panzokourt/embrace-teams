@@ -12,6 +12,7 @@ import { MediaPlanTable } from '@/components/media-plan/MediaPlanTable';
 import { MediaPlanDetailPanel } from '@/components/media-plan/MediaPlanDetailPanel';
 import { MediaPlanGantt } from '@/components/media-plan/MediaPlanGantt';
 import { MediaPlanCalendar } from '@/components/media-plan/MediaPlanCalendar';
+import { MediaPlanBoard } from '@/components/media-plan/MediaPlanBoard';
 import { toast } from 'sonner';
 
 export default function MediaPlanWorkspace() {

@@ -306,6 +306,8 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
       budget: deliverable.budget?.toString() || '',
       cost: deliverable.cost?.toString() || '',
       due_date: deliverable.due_date || '',
+      assigned_to: (deliverable as any).assigned_to || '',
+      department_id: (deliverable as any).department_id || '',
     });
     setDialogOpen(true);
   };

@@ -686,6 +686,42 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
               <div className="space-y-2">
                 <Label htmlFor="budget">Budget (€)</Label>
                 <Input id="budget" type="number" value={formData.budget} onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))} placeholder="0" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Υπεύθυνος</Label>
+                <Select
+                  value={formData.assigned_to || 'none'}
+                  onValueChange={(value) => {
+                    const userId = value === 'none' ? '' : value;
+                    const profile = profiles.find(p => p.id === userId);
+                    const deptId = profile?.department_id || formData.department_id;
+                    setFormData(prev => ({ ...prev, assigned_to: userId, department_id: deptId || '' }));
+                  }}
+                >
+                  <SelectTrigger><SelectValue placeholder="Κανένας" /></SelectTrigger>
+                  <SelectContent className="max-h-60 overflow-y-auto">
+                    <SelectItem value="none">Κανένας</SelectItem>
+                    {profiles.map(p => (
+                      <SelectItem key={p.id} value={p.id}>{p.full_name || p.email}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Ομάδα</Label>
+                <Select
+                  value={formData.department_id || 'none'}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, department_id: value === 'none' ? '' : value }))}
+                >
+                  <SelectTrigger><SelectValue placeholder="Καμία" /></SelectTrigger>
+                  <SelectContent className="max-h-60 overflow-y-auto">
+                    <SelectItem value="none">Καμία</SelectItem>
+                    {departments.map(d => (
+                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="cost">Κόστος (€)</Label>

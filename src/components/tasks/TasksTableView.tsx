@@ -52,6 +52,11 @@ interface TaskAssignee {
   avatar_url: string | null;
 }
 
+interface Deliverable {
+  id: string;
+  name: string;
+}
+
 interface Task {
   id: string;
   title: string;
@@ -63,6 +68,7 @@ interface Task {
   assigned_to: string | null;
   project_id: string;
   deliverable_id: string | null;
+  department_id: string | null;
   parent_task_id: string | null;
   depends_on: string | null;
   estimated_hours: number | null;
@@ -75,6 +81,8 @@ interface Task {
   assignee?: { full_name: string | null; avatar_url?: string | null } | null;
   assignees?: TaskAssignee[];
   project?: { name: string } | null;
+  deliverable?: { name: string } | null;
+  department?: { name: string } | null;
 }
 
 interface Profile {

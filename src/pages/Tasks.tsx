@@ -76,6 +76,7 @@ interface Profile {
   full_name: string | null;
   email: string;
   avatar_url?: string | null;
+  department_id?: string | null;
 }
 
 interface TaskAssignee {

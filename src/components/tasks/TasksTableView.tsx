@@ -684,7 +684,32 @@ export function TasksTableView({
             </TableCell>
           )}
 
-          {/* Start Date */}
+          {/* Deliverable */}
+          {isColumnVisible('deliverable') && (
+            <TableCell style={{ width: getColumnWidth('deliverable') }}>
+              {deliverables.length > 0 ? (
+                <EnhancedInlineEditCell
+                  value={task.deliverable_id}
+                  onSave={(val) => onInlineUpdate(task.id, 'deliverable_id', val)}
+                  type="select"
+                  options={deliverables.map(d => ({ value: d.id, label: d.name }))}
+                  displayValue={task.deliverable?.name}
+                  disabled={!canManage}
+                  placeholder="—"
+                />
+              ) : (
+                <span className="text-xs text-muted-foreground">{task.deliverable?.name || '—'}</span>
+              )}
+            </TableCell>
+          )}
+
+          {/* Team */}
+          {isColumnVisible('team') && (
+            <TableCell style={{ width: getColumnWidth('team') }}>
+              <span className="text-xs text-muted-foreground">{task.department?.name || '—'}</span>
+            </TableCell>
+          )}
+
           {isColumnVisible('start_date') && (
             <TableCell style={{ width: getColumnWidth('start_date') }}>
               <EnhancedInlineEditCell

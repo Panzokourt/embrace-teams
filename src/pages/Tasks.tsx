@@ -314,7 +314,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
       const taskData = {
         title: formData.title,
         description: formData.description || null,
-        project_id: formData.project_id,
+        project_id: effectiveProjectId,
         status: formData.status,
         priority: formData.priority || 'medium',
         due_date: formData.due_date || null,
@@ -323,6 +323,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
         estimated_hours: formData.estimated_hours ? parseFloat(formData.estimated_hours) : null,
         task_type: formData.task_type || 'task',
         task_category: formData.task_category || null,
+        deliverable_id: formData.deliverable_id || null,
       };
 
       if (editingTask) {

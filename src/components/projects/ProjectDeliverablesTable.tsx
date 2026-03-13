@@ -583,130 +583,152 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedDeliverables.map(deliverable => {
-                const isExpanded = expandedDeliverables.has(deliverable.id);
-                return (
-                  <Collapsible key={deliverable.id} open={isExpanded} onOpenChange={() => toggleExpanded(deliverable.id)} asChild>
-                    <>
-                      <TableRow
-                        className={cn(
-                          "group hover:bg-muted/50 cursor-pointer",
-                          deliverable.completed && "opacity-60",
-                          selectedItems.has(deliverable.id) && "bg-primary/5",
-                          isExpanded && "bg-muted/30"
-                        )}
-                      >
-                        <TableCell className="w-[32px] px-2">
-                          <CollapsibleTrigger asChild>
-                            <button className="p-0.5 rounded hover:bg-muted" onClick={e => e.stopPropagation()}>
-                              <ChevronRight className={cn("h-3.5 w-3.5 transition-transform duration-200", isExpanded && "rotate-90")} />
-                            </button>
-                          </CollapsibleTrigger>
-                        </TableCell>
-                        {isColumnVisible('select') && (
-                          <TableCell>
-                            <Checkbox checked={selectedItems.has(deliverable.id)} onCheckedChange={() => toggleSelectItem(deliverable.id)} />
-                          </TableCell>
-                        )}
-                        {isColumnVisible('name') && (
-                          <TableCell style={{ width: getColumnWidth('name') }}>
-                            <EnhancedInlineEditCell
-                              value={deliverable.name}
-                              onSave={(val) => handleInlineUpdate(deliverable.id, 'name', val as string)}
-                              disabled={!canManage}
-                              className={cn(deliverable.completed && "line-through")}
-                            />
-                          </TableCell>
-                        )}
-                        {isColumnVisible('assignee') && (
-                          <TableCell style={{ width: getColumnWidth('assignee') }}>
-                            {deliverable.assignee_profile ? (
-                              <div className="flex items-center gap-1.5">
-                                <Avatar className="h-6 w-6">
-                                  {deliverable.assignee_profile.avatar_url && <AvatarImage src={deliverable.assignee_profile.avatar_url} />}
-                                  <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
-                                    {(deliverable.assignee_profile.full_name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <span className="text-xs truncate">{deliverable.assignee_profile.full_name}</span>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
+              {groupedDeliverables.map(group => (
+                <Fragment key={group.key}>
+                  {groupBy !== 'none' && (
+                    <TableRow className="bg-muted/40 hover:bg-muted/60">
+                      <TableCell colSpan={visibleColumnCount + 1} className="py-2 px-4">
+                        <span className="text-sm font-semibold">{group.label}</span>
+                        <Badge variant="secondary" className="ml-2 text-[10px]">{group.items.length}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {group.items.map(deliverable => {
+                    const isExpanded = expandedDeliverables.has(deliverable.id);
+                    const status = getDeliverableStatus(deliverable);
+                    return (
+                      <Collapsible key={deliverable.id} open={isExpanded} onOpenChange={() => toggleExpanded(deliverable.id)} asChild>
+                        <>
+                          <TableRow
+                            className={cn(
+                              "group hover:bg-muted/50 cursor-pointer",
+                              deliverable.completed && "opacity-60",
+                              selectedItems.has(deliverable.id) && "bg-primary/5",
+                              isExpanded && "bg-muted/30"
                             )}
-                          </TableCell>
-                        )}
-                        {isColumnVisible('team') && (
-                          <TableCell style={{ width: getColumnWidth('team') }}>
-                            <span className="text-xs text-muted-foreground">{deliverable.department_info?.name || '—'}</span>
-                          </TableCell>
-                        )}
-                        {isColumnVisible('budget') && (
-                          <TableCell style={{ width: getColumnWidth('budget') }}>
-                            <EnhancedInlineEditCell
-                              value={Number(deliverable.budget) || 0}
-                              onSave={(val) => handleInlineUpdate(deliverable.id, 'budget', Number(val) || 0)}
-                              type="number"
-                              disabled={!canManage}
-                              displayValue={`€${(Number(deliverable.budget) || 0).toLocaleString()}`}
-                            />
-                          </TableCell>
-                        )}
-                        {isColumnVisible('cost') && (
-                          <TableCell style={{ width: getColumnWidth('cost') }}>
-                            <EnhancedInlineEditCell
-                              value={Number(deliverable.cost) || 0}
-                              onSave={(val) => handleInlineUpdate(deliverable.id, 'cost', Number(val) || 0)}
-                              type="number"
-                              disabled={!canManage}
-                              displayValue={`€${(Number(deliverable.cost) || 0).toLocaleString()}`}
-                            />
-                          </TableCell>
-                        )}
-                        {isColumnVisible('due_date') && (
-                          <TableCell style={{ width: getColumnWidth('due_date') }}>
-                            <EnhancedInlineEditCell
-                              value={deliverable.due_date || ''}
-                              onSave={(val) => handleInlineUpdate(deliverable.id, 'due_date', val as string || null)}
-                              type="date"
-                              disabled={!canManage}
-                              displayValue={deliverable.due_date ? format(parseISO(deliverable.due_date), 'd MMM yyyy', { locale: el }) : '-'}
-                            />
-                          </TableCell>
-                        )}
-                        {isColumnVisible('completed') && (
-                          <TableCell style={{ width: getColumnWidth('completed') }}>
-                            <Checkbox
-                              checked={deliverable.completed || false}
-                              onCheckedChange={() => toggleCompleted(deliverable)}
-                              disabled={!canManage}
-                            />
-                          </TableCell>
-                        )}
-                        {isColumnVisible('actions') && (
-                          <TableCell>
-                            {canManage && (
-                              <EditDeleteActions
-                                onEdit={() => handleEdit(deliverable)}
-                                onDelete={() => handleDelete(deliverable.id)}
-                                itemName={`το παραδοτέο "${deliverable.name}"`}
-                              />
+                          >
+                            <TableCell className="w-[32px] px-2">
+                              <CollapsibleTrigger asChild>
+                                <button className="p-0.5 rounded hover:bg-muted" onClick={e => e.stopPropagation()}>
+                                  <ChevronRight className={cn("h-3.5 w-3.5 transition-transform duration-200", isExpanded && "rotate-90")} />
+                                </button>
+                              </CollapsibleTrigger>
+                            </TableCell>
+                            {isColumnVisible('select') && (
+                              <TableCell>
+                                <Checkbox checked={selectedItems.has(deliverable.id)} onCheckedChange={() => toggleSelectItem(deliverable.id)} />
+                              </TableCell>
                             )}
-                          </TableCell>
-                        )}
-                      </TableRow>
-                      <CollapsibleContent asChild>
-                        <tr>
-                          <td colSpan={visibleColumnCount + 1} className="p-0 border-b">
-                            <div className="bg-muted/20 border-l-2 border-foreground/10 ml-4">
-                              <DeliverableTasksPanel deliverableId={deliverable.id} />
-                            </div>
-                          </td>
-                        </tr>
-                      </CollapsibleContent>
-                    </>
-                  </Collapsible>
-                );
-              })}
+                            {isColumnVisible('name') && (
+                              <TableCell style={{ width: getColumnWidth('name') }}>
+                                <EnhancedInlineEditCell
+                                  value={deliverable.name}
+                                  onSave={(val) => handleInlineUpdate(deliverable.id, 'name', val as string)}
+                                  disabled={!canManage}
+                                  className={cn(deliverable.completed && "line-through")}
+                                />
+                              </TableCell>
+                            )}
+                            {isColumnVisible('status') && (
+                              <TableCell style={{ width: getColumnWidth('status') }} className="p-1">
+                                <MondayStatusCell
+                                  value={status}
+                                  options={Object.entries(DELIVERABLE_STATUS_COLORS).map(([value, c]) => ({
+                                    value,
+                                    label: c.label,
+                                    bg: c.bg,
+                                    text: c.text,
+                                  }))}
+                                  onSave={async (val) => {
+                                    await handleInlineUpdate(deliverable.id, 'completed', val === 'completed' ? true : false);
+                                    fetchDeliverables();
+                                  }}
+                                  disabled={!canManage}
+                                />
+                              </TableCell>
+                            )}
+                            {isColumnVisible('assignee') && (
+                              <TableCell style={{ width: getColumnWidth('assignee') }}>
+                                {deliverable.assignee_profile ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <Avatar className="h-6 w-6">
+                                      {deliverable.assignee_profile.avatar_url && <AvatarImage src={deliverable.assignee_profile.avatar_url} />}
+                                      <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                                        {(deliverable.assignee_profile.full_name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <span className="text-xs truncate">{deliverable.assignee_profile.full_name}</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                            )}
+                            {isColumnVisible('team') && (
+                              <TableCell style={{ width: getColumnWidth('team') }}>
+                                <span className="text-xs text-muted-foreground">{deliverable.department_info?.name || '—'}</span>
+                              </TableCell>
+                            )}
+                            {isColumnVisible('budget') && (
+                              <TableCell style={{ width: getColumnWidth('budget') }}>
+                                <EnhancedInlineEditCell
+                                  value={Number(deliverable.budget) || 0}
+                                  onSave={(val) => handleInlineUpdate(deliverable.id, 'budget', Number(val) || 0)}
+                                  type="number"
+                                  disabled={!canManage}
+                                  displayValue={`€${(Number(deliverable.budget) || 0).toLocaleString()}`}
+                                />
+                              </TableCell>
+                            )}
+                            {isColumnVisible('cost') && (
+                              <TableCell style={{ width: getColumnWidth('cost') }}>
+                                <EnhancedInlineEditCell
+                                  value={Number(deliverable.cost) || 0}
+                                  onSave={(val) => handleInlineUpdate(deliverable.id, 'cost', Number(val) || 0)}
+                                  type="number"
+                                  disabled={!canManage}
+                                  displayValue={`€${(Number(deliverable.cost) || 0).toLocaleString()}`}
+                                />
+                              </TableCell>
+                            )}
+                            {isColumnVisible('due_date') && (
+                              <TableCell style={{ width: getColumnWidth('due_date') }}>
+                                <EnhancedInlineEditCell
+                                  value={deliverable.due_date || ''}
+                                  onSave={(val) => handleInlineUpdate(deliverable.id, 'due_date', val as string || null)}
+                                  type="date"
+                                  disabled={!canManage}
+                                  displayValue={deliverable.due_date ? format(parseISO(deliverable.due_date), 'd MMM yyyy', { locale: el }) : '-'}
+                                />
+                              </TableCell>
+                            )}
+                            {isColumnVisible('actions') && (
+                              <TableCell>
+                                {canManage && (
+                                  <EditDeleteActions
+                                    onEdit={() => handleEdit(deliverable)}
+                                    onDelete={() => handleDelete(deliverable.id)}
+                                    itemName={`το παραδοτέο "${deliverable.name}"`}
+                                  />
+                                )}
+                              </TableCell>
+                            )}
+                          </TableRow>
+                          <CollapsibleContent asChild>
+                            <tr>
+                              <td colSpan={visibleColumnCount + 1} className="p-0 border-b">
+                                <div className="bg-muted/20 border-l-2 border-foreground/10 ml-4">
+                                  <DeliverableTasksPanel deliverableId={deliverable.id} />
+                                </div>
+                              </td>
+                            </tr>
+                          </CollapsibleContent>
+                        </>
+                      </Collapsible>
+                    );
+                  })}
+                </Fragment>
+              ))}
             </TableBody>
           </Table>
         </div>

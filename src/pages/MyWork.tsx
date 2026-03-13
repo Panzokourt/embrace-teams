@@ -143,6 +143,7 @@ export default function MyWork() {
       supabase.from('tasks').select(TASK_SELECT).eq('assigned_to', user.id).in('status', ['internal_review', 'client_review', 'review'] as any),
       supabase.from('tasks').select(TASK_SELECT + ', assignee:profiles!assigned_to(full_name)').or(`internal_reviewer.eq.${user.id},approver.eq.${user.id}`).in('status', ['internal_review', 'client_review', 'review'] as any) as any,
       supabase.from('project_user_access').select('project:projects(id, name, status, progress, parent_project_id, client:clients(name))').eq('user_id', user.id),
+      supabase.from('projects').select('id, name, status, progress, parent_project_id, client:clients(name)').or(`project_lead_id.eq.${user.id},account_manager_id.eq.${user.id}`),
       supabase.from('time_entries').select('duration_minutes').eq('user_id', user.id).gte('start_time', new Date(today).toISOString()).eq('is_running', false),
       supabase.from('time_entries').select('id, duration_minutes, description, start_time, task:tasks(title)').eq('user_id', user.id).gte('start_time', new Date(today).toISOString()).eq('is_running', false).order('start_time', { ascending: false }),
     ]);

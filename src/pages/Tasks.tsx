@@ -284,11 +284,22 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
   // Subscribe to realtime updates
   useTasksRealtime(fetchTasks);
 
+  const fetchDeliverables = useCallback(async () => {
+    if (!projectId) return;
+    const { data } = await supabase
+      .from('deliverables')
+      .select('id, name')
+      .eq('project_id', projectId)
+      .order('created_at');
+    setDeliverables(data || []);
+  }, [projectId]);
+
   useEffect(() => {
     fetchTasks();
     fetchProjects();
     fetchUsers();
-  }, [fetchTasks]);
+    fetchDeliverables();
+  }, [fetchTasks, fetchDeliverables]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

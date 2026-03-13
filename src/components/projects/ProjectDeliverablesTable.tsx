@@ -412,10 +412,42 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
     toast.success('Εξαγωγή Excel ολοκληρώθηκε!');
   }, [deliverables]);
 
+  const getDeliverableStatus = (d: Deliverable): string => {
+    if (d.completed) return 'completed';
+    // Check if any tasks are linked & in progress (heuristic)
+    return 'pending';
+  };
+
   const completedCount = deliverables.filter(d => d.completed).length;
   const progressPercentage = deliverables.length > 0 ? Math.round((completedCount / deliverables.length) * 100) : 0;
   const totalBudget = deliverables.reduce((sum, d) => sum + (Number(d.budget) || 0), 0);
   const totalCost = deliverables.reduce((sum, d) => sum + (Number(d.cost) || 0), 0);
+
+  // Grouping logic
+  const groupedDeliverables = useMemo(() => {
+    if (groupBy === 'none') {
+      return [{ key: 'all', label: 'Όλα τα Παραδοτέα', items: sortedDeliverables }];
+    }
+    const groups = new Map<string, { label: string; items: Deliverable[] }>();
+    sortedDeliverables.forEach(d => {
+      let key: string, label: string;
+      switch (groupBy) {
+        case 'status':
+          key = d.completed ? 'completed' : 'pending';
+          label = d.completed ? 'Ολοκληρωμένα' : 'Εκκρεμούν';
+          break;
+        case 'assignee':
+          key = (d as any).assigned_to || 'unassigned';
+          label = d.assignee_profile?.full_name || 'Μη ανατεθειμένο';
+          break;
+        default:
+          key = 'all'; label = 'Όλα'; break;
+      }
+      if (!groups.has(key)) groups.set(key, { label, items: [] });
+      groups.get(key)!.items.push(d);
+    });
+    return Array.from(groups.entries()).map(([key, v]) => ({ key, label: v.label, items: v.items }));
+  }, [sortedDeliverables, groupBy]);
 
   const visibleColumnCount = columns.filter(c => c.visible).length;
 

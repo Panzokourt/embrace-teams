@@ -275,7 +275,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, email, avatar_url')
+        .select('id, full_name, email, avatar_url, department_id')
         .in('status', ['active', 'pending'])
         .order('full_name');
 

@@ -570,15 +570,26 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
                             />
                           </TableCell>
                         )}
-                        {isColumnVisible('description') && (
-                          <TableCell style={{ width: getColumnWidth('description') }}>
-                            <EnhancedInlineEditCell
-                              value={deliverable.description || ''}
-                              onSave={(val) => handleInlineUpdate(deliverable.id, 'description', val as string || null)}
-                              disabled={!canManage}
-                              placeholder="-"
-                              className="text-muted-foreground"
-                            />
+                        {isColumnVisible('assignee') && (
+                          <TableCell style={{ width: getColumnWidth('assignee') }}>
+                            {deliverable.assignee_profile ? (
+                              <div className="flex items-center gap-1.5">
+                                <Avatar className="h-6 w-6">
+                                  {deliverable.assignee_profile.avatar_url && <AvatarImage src={deliverable.assignee_profile.avatar_url} />}
+                                  <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                                    {(deliverable.assignee_profile.full_name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="text-xs truncate">{deliverable.assignee_profile.full_name}</span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                        )}
+                        {isColumnVisible('team') && (
+                          <TableCell style={{ width: getColumnWidth('team') }}>
+                            <span className="text-xs text-muted-foreground">{deliverable.department_info?.name || '—'}</span>
                           </TableCell>
                         )}
                         {isColumnVisible('budget') && (

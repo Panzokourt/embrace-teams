@@ -640,8 +640,12 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
                                     text: c.text,
                                   }))}
                                   onSave={async (val) => {
-                                    await handleInlineUpdate(deliverable.id, 'completed', val === 'completed' ? 1 : 0);
-                                    fetchDeliverables();
+                                    const newCompleted = val === 'completed';
+                                    try {
+                                      const { error } = await supabase.from('deliverables').update({ completed: newCompleted }).eq('id', deliverable.id);
+                                      if (error) throw error;
+                                      fetchDeliverables();
+                                    } catch { toast.error('Σφάλμα'); }
                                   }}
                                   disabled={!canManage}
                                 />

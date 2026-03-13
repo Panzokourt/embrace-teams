@@ -541,6 +541,11 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
                     </button>
                   </ResizableTableHeader>
                 )}
+                {isColumnVisible('status') && (
+                  <ResizableTableHeader width={getColumnWidth('status') || 120} onWidthChange={(w) => setColumnWidth('status', w)}>
+                    Κατάσταση
+                  </ResizableTableHeader>
+                )}
                 {isColumnVisible('assignee') && (
                   <ResizableTableHeader width={getColumnWidth('assignee') || 120} onWidthChange={(w) => setColumnWidth('assignee', w)}>
                     Υπεύθυνος
@@ -569,13 +574,6 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
                   <ResizableTableHeader width={getColumnWidth('due_date') || 120} onWidthChange={(w) => setColumnWidth('due_date', w)}>
                     <button onClick={() => toggleSort('due_date')} className="flex items-center gap-1 hover:text-foreground transition-colors">
                       Προθεσμία {getSortIcon('due_date')}
-                    </button>
-                  </ResizableTableHeader>
-                )}
-                {isColumnVisible('completed') && (
-                  <ResizableTableHeader width={getColumnWidth('completed') || 100} onWidthChange={(w) => setColumnWidth('completed', w)}>
-                    <button onClick={() => toggleSort('completed')} className="flex items-center gap-1 hover:text-foreground transition-colors">
-                      Ολ. {getSortIcon('completed')}
                     </button>
                   </ResizableTableHeader>
                 )}

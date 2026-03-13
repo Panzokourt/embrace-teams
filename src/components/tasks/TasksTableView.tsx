@@ -341,6 +341,10 @@ export function TasksTableView({
             );
           }
           break;
+        case 'deliverable':
+          groupKey = task.deliverable_id || 'none';
+          groupLabel = task.deliverable?.name || 'Χωρίς Παραδοτέο';
+          break;
         default:
           groupKey = 'all';
           groupLabel = 'Όλα';

@@ -745,6 +745,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
       tasks={filteredTasks}
       projects={projects}
       users={users}
+      deliverables={deliverables}
       onEdit={handleEdit}
       onDelete={handleDelete}
       onInlineUpdate={handleInlineUpdate}

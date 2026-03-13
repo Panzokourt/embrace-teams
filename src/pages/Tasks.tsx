@@ -136,10 +136,12 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [viewMode, setViewMode] = usePersistedViewMode('tasks', 'table');
 
+  const [deliverables, setDeliverables] = useState<{ id: string; name: string }[]>([]);
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    project_id: '',
+    project_id: projectId || '',
     status: 'todo' as TaskStatus,
     priority: 'medium',
     due_date: '',
@@ -148,6 +150,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
     estimated_hours: '',
     task_type: 'task',
     task_category: '',
+    deliverable_id: '',
   });
 
   const sensors = useSensors(
@@ -281,15 +284,27 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
   // Subscribe to realtime updates
   useTasksRealtime(fetchTasks);
 
+  const fetchDeliverables = useCallback(async () => {
+    if (!projectId) return;
+    const { data } = await supabase
+      .from('deliverables')
+      .select('id, name')
+      .eq('project_id', projectId)
+      .order('created_at');
+    setDeliverables(data || []);
+  }, [projectId]);
+
   useEffect(() => {
     fetchTasks();
     fetchProjects();
     fetchUsers();
-  }, [fetchTasks]);
+    fetchDeliverables();
+  }, [fetchTasks, fetchDeliverables]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.project_id) {
+    const effectiveProjectId = formData.project_id || projectId;
+    if (!effectiveProjectId) {
       toast.error('Επιλέξτε ένα έργο');
       return;
     }
@@ -299,7 +314,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
       const taskData = {
         title: formData.title,
         description: formData.description || null,
-        project_id: formData.project_id,
+        project_id: effectiveProjectId,
         status: formData.status,
         priority: formData.priority || 'medium',
         due_date: formData.due_date || null,
@@ -308,6 +323,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
         estimated_hours: formData.estimated_hours ? parseFloat(formData.estimated_hours) : null,
         task_type: formData.task_type || 'task',
         task_category: formData.task_category || null,
+        deliverable_id: formData.deliverable_id || null,
       };
 
       if (editingTask) {
@@ -352,7 +368,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
     setFormData({
       title: '',
       description: '',
-      project_id: '',
+      project_id: projectId || '',
       status: 'todo',
       priority: 'medium',
       due_date: '',
@@ -361,6 +377,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
       estimated_hours: '',
       task_type: 'task',
       task_category: '',
+      deliverable_id: '',
     });
   };
 
@@ -507,6 +524,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
       estimated_hours: task.estimated_hours?.toString() || '',
       task_type: task.task_type || 'task',
       task_category: task.task_category || '',
+      deliverable_id: task.deliverable_id || '',
     });
     setDialogOpen(true);
   };
@@ -847,6 +865,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
                       />
                     </div>
 
+                    {!projectId && (
                     <div className="space-y-2">
                       <Label htmlFor="project">Έργο *</Label>
                       <Select
@@ -865,6 +884,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
                         </SelectContent>
                       </Select>
                     </div>
+                    )}
 
                     <div className="space-y-2">
                       <Label htmlFor="assigned_to">Ανάθεση σε</Label>
@@ -1005,6 +1025,26 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
                       </div>
                     </div>
 
+                    {projectId && deliverables.length > 0 && (
+                      <div className="space-y-2">
+                        <Label>Παραδοτέο</Label>
+                        <Select
+                          value={formData.deliverable_id || 'none'}
+                          onValueChange={(value) => setFormData(prev => ({ ...prev, deliverable_id: value === 'none' ? '' : value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Χωρίς παραδοτέο" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Κανένα</SelectItem>
+                            {deliverables.map(d => (
+                              <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
                     <DialogFooter>
                       <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
                         Ακύρωση
@@ -1143,6 +1183,25 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
                         <Input type="date" value={formData.due_date} onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))} />
                       </div>
                     </div>
+                    {projectId && deliverables.length > 0 && (
+                      <div className="space-y-2">
+                        <Label>Παραδοτέο</Label>
+                        <Select
+                          value={formData.deliverable_id || 'none'}
+                          onValueChange={(value) => setFormData(prev => ({ ...prev, deliverable_id: value === 'none' ? '' : value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Χωρίς παραδοτέο" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Κανένα</SelectItem>
+                            {deliverables.map(d => (
+                              <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                     <DialogFooter>
                       <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>Ακύρωση</Button>
                       <Button type="submit" disabled={saving}>

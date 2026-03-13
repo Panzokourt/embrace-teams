@@ -275,6 +275,8 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
         budget: parseFloat(formData.budget) || 0,
         cost: parseFloat(formData.cost) || 0,
         due_date: formData.due_date || null,
+        assigned_to: formData.assigned_to || null,
+        department_id: formData.department_id || null,
       };
       if (editingDeliverable) {
         const { data, error } = await supabase

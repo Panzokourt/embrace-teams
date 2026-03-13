@@ -150,6 +150,8 @@ const DEFAULT_COLUMNS = [
   { id: 'title', label: 'Τίτλος', visible: true, locked: true },
   { id: 'assignee', label: 'Υπεύθυνοι', visible: true },
   { id: 'project', label: 'Έργο', visible: true },
+  { id: 'deliverable', label: 'Παραδοτέο', visible: true },
+  { id: 'team', label: 'Ομάδα', visible: true },
   { id: 'start_date', label: 'Έναρξη', visible: false },
   { id: 'due_date', label: 'Προθεσμία', visible: true },
   { id: 'status', label: 'Κατάσταση', visible: true },

@@ -136,10 +136,12 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [viewMode, setViewMode] = usePersistedViewMode('tasks', 'table');
 
+  const [deliverables, setDeliverables] = useState<{ id: string; name: string }[]>([]);
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    project_id: '',
+    project_id: projectId || '',
     status: 'todo' as TaskStatus,
     priority: 'medium',
     due_date: '',
@@ -148,6 +150,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
     estimated_hours: '',
     task_type: 'task',
     task_category: '',
+    deliverable_id: '',
   });
 
   const sensors = useSensors(

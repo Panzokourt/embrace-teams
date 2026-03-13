@@ -982,6 +982,26 @@ export function TasksTableView({
                 </ResizableTableHeader>
               )}
               
+              {isColumnVisible('deliverable') && (
+                <ResizableTableHeader 
+                  width={getColumnWidth('deliverable')}
+                  onWidthChange={(w) => setColumnWidth('deliverable', w)}
+                  minWidth={100}
+                >
+                  Παραδοτέο
+                </ResizableTableHeader>
+              )}
+              
+              {isColumnVisible('team') && (
+                <ResizableTableHeader 
+                  width={getColumnWidth('team')}
+                  onWidthChange={(w) => setColumnWidth('team', w)}
+                  minWidth={80}
+                >
+                  Ομάδα
+                </ResizableTableHeader>
+              )}
+              
               {isColumnVisible('start_date') && (
                 <ResizableTableHeader 
                   width={getColumnWidth('start_date')}

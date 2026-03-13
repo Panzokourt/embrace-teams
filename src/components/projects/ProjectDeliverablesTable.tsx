@@ -27,6 +27,8 @@ import {
 import { EditDeleteActions } from '@/components/dialogs/EditDeleteActions';
 import { toast } from 'sonner';
 import { Package, Plus, DollarSign, Loader2, ArrowUpDown, ArrowUp, ArrowDown, ChevronRight, CheckCircle2, Circle, Clock, AlertCircle } from 'lucide-react';
+import { MondayStatusCell } from '@/components/shared/MondayStatusCell';
+import { GroupByField } from '@/hooks/useTableViews';
 import { format, parseISO } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';

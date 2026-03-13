@@ -32,7 +32,10 @@ import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import type { Tables } from '@/integrations/supabase/types';
 
-type Deliverable = Tables<'deliverables'>;
+type Deliverable = Tables<'deliverables'> & {
+  assignee_profile?: { full_name: string | null; avatar_url: string | null } | null;
+  department_info?: { name: string } | null;
+};
 
 interface LinkedTask {
   id: string;
@@ -44,6 +47,19 @@ interface LinkedTask {
   parent_task_id: string | null;
 }
 
+interface Profile {
+  id: string;
+  full_name: string | null;
+  email: string;
+  avatar_url: string | null;
+  department_id: string | null;
+}
+
+interface Department {
+  id: string;
+  name: string;
+}
+
 interface ProjectDeliverablesTableProps {
   projectId: string;
   projectName: string;
@@ -52,7 +68,8 @@ interface ProjectDeliverablesTableProps {
 const DEFAULT_COLUMNS = [
   { id: 'select', label: 'Επιλογή', visible: true, locked: true },
   { id: 'name', label: 'Όνομα', visible: true, locked: true },
-  { id: 'description', label: 'Περιγραφή', visible: true },
+  { id: 'assignee', label: 'Υπεύθυνος', visible: true },
+  { id: 'team', label: 'Ομάδα', visible: true },
   { id: 'budget', label: 'Budget', visible: true },
   { id: 'cost', label: 'Κόστος', visible: true },
   { id: 'due_date', label: 'Προθεσμία', visible: true },

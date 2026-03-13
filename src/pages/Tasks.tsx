@@ -865,6 +865,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
                       />
                     </div>
 
+                    {!projectId && (
                     <div className="space-y-2">
                       <Label htmlFor="project">Έργο *</Label>
                       <Select
@@ -883,6 +884,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
                         </SelectContent>
                       </Select>
                     </div>
+                    )}
 
                     <div className="space-y-2">
                       <Label htmlFor="assigned_to">Ανάθεση σε</Label>

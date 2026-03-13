@@ -1025,6 +1025,26 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
                       </div>
                     </div>
 
+                    {projectId && deliverables.length > 0 && (
+                      <div className="space-y-2">
+                        <Label>Παραδοτέο</Label>
+                        <Select
+                          value={formData.deliverable_id || 'none'}
+                          onValueChange={(value) => setFormData(prev => ({ ...prev, deliverable_id: value === 'none' ? '' : value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Χωρίς παραδοτέο" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Κανένα</SelectItem>
+                            {deliverables.map(d => (
+                              <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
                     <DialogFooter>
                       <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
                         Ακύρωση

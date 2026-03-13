@@ -524,6 +524,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
       estimated_hours: task.estimated_hours?.toString() || '',
       task_type: task.task_type || 'task',
       task_category: task.task_category || '',
+      deliverable_id: task.deliverable_id || '',
     });
     setDialogOpen(true);
   };

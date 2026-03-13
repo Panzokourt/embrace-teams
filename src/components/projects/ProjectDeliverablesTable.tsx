@@ -474,6 +474,9 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
           onLoadView={loadView}
           onDeleteView={deleteView}
           onResetToDefault={resetToDefault}
+          groupBy={groupBy}
+          onGroupByChange={setGroupBy}
+          groupOptions={DELIVERABLE_GROUP_OPTIONS}
         />
         {canManage && (
           <Button onClick={() => { resetForm(); setDialogOpen(true); }}>

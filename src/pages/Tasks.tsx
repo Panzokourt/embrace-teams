@@ -713,11 +713,19 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
       const { error } = await supabase.from('task_assignees').insert({ task_id: taskId, user_id: userId });
       if (error) throw error;
       const profile = users.find(u => u.id === userId);
+      // Auto-fill department_id from assignee's department
+      if (profile?.department_id) {
+        await supabase.from('tasks').update({ department_id: profile.department_id }).eq('id', taskId);
+      }
       setTasks(prev => prev.map(t => {
         if (t.id !== taskId) return t;
         const existing = t.assignees || [];
         if (existing.some(a => a.user_id === userId)) return t;
-        return { ...t, assignees: [...existing, { user_id: userId, full_name: profile?.full_name || null, avatar_url: profile?.avatar_url || null }] };
+        return { 
+          ...t, 
+          assignees: [...existing, { user_id: userId, full_name: profile?.full_name || null, avatar_url: profile?.avatar_url || null }],
+          department_id: profile?.department_id || t.department_id,
+        };
       }));
       toast.success('Προστέθηκε!');
     } catch (error) {

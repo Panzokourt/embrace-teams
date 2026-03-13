@@ -368,7 +368,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
     setFormData({
       title: '',
       description: '',
-      project_id: '',
+      project_id: projectId || '',
       status: 'todo',
       priority: 'medium',
       due_date: '',
@@ -377,6 +377,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
       estimated_hours: '',
       task_type: 'task',
       task_category: '',
+      deliverable_id: '',
     });
   };
 

@@ -179,7 +179,9 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
         .from('tasks')
         .select(`
           *,
-          project:projects(name)
+          project:projects(name),
+          deliverable:deliverables(name),
+          department:departments(name)
         `)
         .order('due_date', { ascending: true, nullsFirst: false })
         .range(pagination.from, pagination.to);

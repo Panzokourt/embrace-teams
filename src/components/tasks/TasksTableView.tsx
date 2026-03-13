@@ -187,6 +187,7 @@ export function TasksTableView({
   tasks,
   projects,
   users,
+  deliverables = [],
   onEdit,
   onDelete,
   onInlineUpdate,

@@ -491,9 +491,14 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
                     </button>
                   </ResizableTableHeader>
                 )}
-                {isColumnVisible('description') && (
-                  <ResizableTableHeader width={getColumnWidth('description')} onWidthChange={(w) => setColumnWidth('description', w)}>
-                    Περιγραφή
+                {isColumnVisible('assignee') && (
+                  <ResizableTableHeader width={getColumnWidth('assignee') || 120} onWidthChange={(w) => setColumnWidth('assignee', w)}>
+                    Υπεύθυνος
+                  </ResizableTableHeader>
+                )}
+                {isColumnVisible('team') && (
+                  <ResizableTableHeader width={getColumnWidth('team') || 100} onWidthChange={(w) => setColumnWidth('team', w)}>
+                    Ομάδα
                   </ResizableTableHeader>
                 )}
                 {isColumnVisible('budget') && (

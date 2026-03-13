@@ -279,20 +279,19 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
         department_id: formData.department_id || null,
       };
       if (editingDeliverable) {
-        const { data, error } = await supabase
-          .from('deliverables').update(deliverableData).eq('id', editingDeliverable.id).select().single();
+        const { error } = await supabase
+          .from('deliverables').update(deliverableData).eq('id', editingDeliverable.id);
         if (error) throw error;
-        setDeliverables(prev => prev.map(d => d.id === editingDeliverable.id ? data : d));
         toast.success('Το παραδοτέο ενημερώθηκε!');
       } else {
-        const { data, error } = await supabase
-          .from('deliverables').insert(deliverableData).select().single();
+        const { error } = await supabase
+          .from('deliverables').insert(deliverableData);
         if (error) throw error;
-        setDeliverables(prev => [...prev, data]);
         toast.success('Το παραδοτέο δημιουργήθηκε!');
       }
       setDialogOpen(false);
       resetForm();
+      fetchDeliverables();
     } catch (error) {
       console.error('Error saving deliverable:', error);
       toast.error('Σφάλμα κατά την αποθήκευση');

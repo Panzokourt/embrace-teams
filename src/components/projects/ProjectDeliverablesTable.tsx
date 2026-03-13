@@ -686,6 +686,15 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
               <div className="space-y-2">
                 <Label htmlFor="budget">Budget (€)</Label>
                 <Input id="budget" type="number" value={formData.budget} onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))} placeholder="0" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cost">Κόστος (€)</Label>
+                <Input id="cost" type="number" value={formData.cost} onChange={(e) => setFormData(prev => ({ ...prev, cost: e.target.value }))} placeholder="0" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="due_date">Deadline</Label>
+                <Input id="due_date" type="date" value={formData.due_date} onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))} />
+              </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -722,14 +731,6 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cost">Κόστος (€)</Label>
-                <Input id="cost" type="number" value={formData.cost} onChange={(e) => setFormData(prev => ({ ...prev, cost: e.target.value }))} placeholder="0" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="due_date">Deadline</Label>
-                <Input id="due_date" type="date" value={formData.due_date} onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))} />
               </div>
             </div>
             <DialogFooter>

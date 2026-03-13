@@ -70,13 +70,25 @@ interface ProjectDeliverablesTableProps {
 const DEFAULT_COLUMNS = [
   { id: 'select', label: 'Επιλογή', visible: true, locked: true },
   { id: 'name', label: 'Όνομα', visible: true, locked: true },
+  { id: 'status', label: 'Κατάσταση', visible: true },
   { id: 'assignee', label: 'Υπεύθυνος', visible: true },
   { id: 'team', label: 'Ομάδα', visible: true },
   { id: 'budget', label: 'Budget', visible: true },
   { id: 'cost', label: 'Κόστος', visible: true },
   { id: 'due_date', label: 'Προθεσμία', visible: true },
-  { id: 'completed', label: 'Ολοκληρώθηκε', visible: true },
   { id: 'actions', label: 'Ενέργειες', visible: true, locked: true },
+];
+
+const DELIVERABLE_STATUS_COLORS: Record<string, { bg: string; text: string; label: string }> = {
+  pending: { bg: '#c4c4c4', text: '#ffffff', label: 'Εκκρεμεί' },
+  in_progress: { bg: '#fdab3d', text: '#ffffff', label: 'Σε Εξέλιξη' },
+  completed: { bg: '#00c875', text: '#ffffff', label: 'Ολοκληρώθηκε' },
+};
+
+const DELIVERABLE_GROUP_OPTIONS = [
+  { value: 'none' as GroupByField, label: 'Χωρίς ομαδοποίηση' },
+  { value: 'status' as GroupByField, label: 'Κατάσταση' },
+  { value: 'assignee' as GroupByField, label: 'Υπεύθυνος' },
 ];
 
 type SortField = 'name' | 'budget' | 'cost' | 'due_date' | 'completed';

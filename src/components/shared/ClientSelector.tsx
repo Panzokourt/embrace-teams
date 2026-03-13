@@ -122,7 +122,7 @@ export function ClientSelector({
           <SelectTrigger className="flex-1">
             <SelectValue placeholder={placeholder} />
           </SelectTrigger>
-          <SelectContent className="bg-popover border shadow-lg z-50">
+          <SelectContent className="bg-popover border shadow-lg z-50 max-h-60 overflow-y-auto">
             {clients.map(client => (
               <SelectItem key={client.id} value={client.id}>
                 {client.name}

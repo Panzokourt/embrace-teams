@@ -190,6 +190,7 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
 
   const {
     columns, setColumns, columnWidths, setColumnWidth,
+    groupBy, setGroupBy,
     savedViews, currentViewId, saveView, loadView, deleteView, resetToDefault,
   } = useTableViews({ storageKey: 'project_deliverables_table', defaultColumns: DEFAULT_COLUMNS });
 

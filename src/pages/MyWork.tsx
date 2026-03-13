@@ -138,11 +138,12 @@ export default function MyWork() {
     if (!user) return;
     setLoading(true);
 
-    const [tasksRes, sentRes, needRes, projectsRes, timeRes, entriesRes] = await Promise.all([
+    const [tasksRes, sentRes, needRes, accessRes, leadRes, timeRes, entriesRes] = await Promise.all([
       supabase.from('tasks').select(TASK_SELECT).eq('assigned_to', user.id).neq('status', 'completed').order('due_date', { ascending: true }),
       supabase.from('tasks').select(TASK_SELECT).eq('assigned_to', user.id).in('status', ['internal_review', 'client_review', 'review'] as any),
       supabase.from('tasks').select(TASK_SELECT + ', assignee:profiles!assigned_to(full_name)').or(`internal_reviewer.eq.${user.id},approver.eq.${user.id}`).in('status', ['internal_review', 'client_review', 'review'] as any) as any,
       supabase.from('project_user_access').select('project:projects(id, name, status, progress, parent_project_id, client:clients(name))').eq('user_id', user.id),
+      supabase.from('projects').select('id, name, status, progress, parent_project_id, client:clients(name)').or(`project_lead_id.eq.${user.id},account_manager_id.eq.${user.id}`),
       supabase.from('time_entries').select('duration_minutes').eq('user_id', user.id).gte('start_time', new Date(today).toISOString()).eq('is_running', false),
       supabase.from('time_entries').select('id, duration_minutes, description, start_time, task:tasks(title)').eq('user_id', user.id).gte('start_time', new Date(today).toISOString()).eq('is_running', false).order('start_time', { ascending: false }),
     ]);
@@ -151,8 +152,16 @@ export default function MyWork() {
     setSentForApproval((sentRes.data || []) as TaskItem[]);
     setNeedMyApproval((needRes.data || []) as TaskItem[]);
 
-    const projects = (projectsRes.data || []).map((p: any) => p.project).filter((p: any) => p && p.status === 'active') as MyProject[];
-    setMyProjects(projects);
+    // Merge projects from access table + lead/manager role, deduplicate, include non-completed statuses
+    const accessProjects = (accessRes.data || []).map((p: any) => p.project).filter(Boolean) as MyProject[];
+    const leadProjects = (leadRes.data || []) as MyProject[];
+    const projectMap = new Map<string, MyProject>();
+    [...accessProjects, ...leadProjects].forEach(p => {
+      if (p && p.status !== 'completed' && p.status !== 'cancelled') {
+        projectMap.set(p.id, p);
+      }
+    });
+    setMyProjects(Array.from(projectMap.values()));
 
     const totalMin = (timeRes.data || []).reduce((s: number, e: any) => s + (e.duration_minutes || 0), 0);
     setTodayHours(Math.round((totalMin / 60) * 10) / 10);

@@ -95,6 +95,7 @@ interface Task {
   project_id: string;
   assigned_to: string | null;
   deliverable_id: string | null;
+  department_id: string | null;
   parent_task_id: string | null;
   depends_on: string | null;
   estimated_hours: number | null;
@@ -107,6 +108,8 @@ interface Task {
   project?: { name: string } | null;
   assignee?: { full_name: string | null; avatar_url?: string | null } | null;
   assignees?: TaskAssignee[];
+  deliverable?: { name: string } | null;
+  department?: { name: string } | null;
 }
 
 const statusConfig: Record<TaskStatus, { icon: React.ReactNode; label: string; className: string }> = {

@@ -354,7 +354,7 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
 
   const resetForm = () => {
     setEditingDeliverable(null);
-    setFormData({ name: '', description: '', budget: '', cost: '', due_date: '' });
+    setFormData({ name: '', description: '', budget: '', cost: '', due_date: '', assigned_to: '', department_id: '' });
   };
 
   const toggleSelectItem = (id: string) => {

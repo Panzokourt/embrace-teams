@@ -303,7 +303,8 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.project_id) {
+    const effectiveProjectId = formData.project_id || projectId;
+    if (!effectiveProjectId) {
       toast.error('Επιλέξτε ένα έργο');
       return;
     }

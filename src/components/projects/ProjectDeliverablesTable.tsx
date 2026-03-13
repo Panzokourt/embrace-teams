@@ -163,6 +163,8 @@ function DeliverableTasksPanel({ deliverableId }: { deliverableId: string }) {
 export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeliverablesTableProps) {
   const { isAdmin, isManager, hasPermission } = useAuth();
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -178,22 +180,40 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
   } = useTableViews({ storageKey: 'project_deliverables_table', defaultColumns: DEFAULT_COLUMNS });
 
   const [formData, setFormData] = useState({
-    name: '', description: '', budget: '', cost: '', due_date: '',
+    name: '', description: '', budget: '', cost: '', due_date: '', assigned_to: '', department_id: '',
   });
 
   const canManage = isAdmin || isManager || hasPermission('projects.edit');
 
-  useEffect(() => { fetchDeliverables(); }, [projectId]);
+  useEffect(() => {
+    fetchDeliverables();
+    fetchProfiles();
+    fetchDepartments();
+  }, [projectId]);
+
+  const fetchProfiles = async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, avatar_url, department_id')
+      .in('status', ['active', 'pending'])
+      .order('full_name');
+    setProfiles(data || []);
+  };
+
+  const fetchDepartments = async () => {
+    const { data } = await supabase.from('departments').select('id, name').order('name');
+    setDepartments(data || []);
+  };
 
   const fetchDeliverables = async () => {
     try {
       const { data, error } = await supabase
         .from('deliverables')
-        .select('*')
+        .select('*, assignee_profile:profiles!deliverables_assigned_to_fkey(full_name, avatar_url), department_info:departments!deliverables_department_id_fkey(name)')
         .eq('project_id', projectId)
         .order('created_at', { ascending: true });
       if (error) throw error;
-      setDeliverables(data || []);
+      setDeliverables((data || []) as Deliverable[]);
     } catch (error) {
       console.error('Error fetching deliverables:', error);
       toast.error('Σφάλμα κατά τη φόρτωση παραδοτέων');

@@ -11,6 +11,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+} from '@/components/ui/select';
 import { EnhancedInlineEditCell } from '@/components/shared/EnhancedInlineEditCell';
 import { TableToolbar } from '@/components/shared/TableToolbar';
 import { ResizableTableHeader } from '@/components/shared/ResizableTableHeader';

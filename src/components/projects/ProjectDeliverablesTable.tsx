@@ -640,7 +640,7 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
                                     text: c.text,
                                   }))}
                                   onSave={async (val) => {
-                                    await handleInlineUpdate(deliverable.id, 'completed', val === 'completed' ? true : false);
+                                    await handleInlineUpdate(deliverable.id, 'completed', val === 'completed' ? 1 : 0);
                                     fetchDeliverables();
                                   }}
                                   disabled={!canManage}

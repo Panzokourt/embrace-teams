@@ -52,6 +52,11 @@ interface TaskAssignee {
   avatar_url: string | null;
 }
 
+interface Deliverable {
+  id: string;
+  name: string;
+}
+
 interface Task {
   id: string;
   title: string;
@@ -63,6 +68,7 @@ interface Task {
   assigned_to: string | null;
   project_id: string;
   deliverable_id: string | null;
+  department_id: string | null;
   parent_task_id: string | null;
   depends_on: string | null;
   estimated_hours: number | null;
@@ -75,6 +81,8 @@ interface Task {
   assignee?: { full_name: string | null; avatar_url?: string | null } | null;
   assignees?: TaskAssignee[];
   project?: { name: string } | null;
+  deliverable?: { name: string } | null;
+  department?: { name: string } | null;
 }
 
 interface Profile {
@@ -93,6 +101,7 @@ interface TasksTableViewProps {
   tasks: Task[];
   projects: Project[];
   users: Profile[];
+  deliverables?: Deliverable[];
   onEdit: (task: Task) => void;
   onDelete: (taskId: string) => void;
   onInlineUpdate: (taskId: string, field: string, value: string | number | null) => Promise<void>;
@@ -141,6 +150,8 @@ const DEFAULT_COLUMNS = [
   { id: 'title', label: 'Τίτλος', visible: true, locked: true },
   { id: 'assignee', label: 'Υπεύθυνοι', visible: true },
   { id: 'project', label: 'Έργο', visible: true },
+  { id: 'deliverable', label: 'Παραδοτέο', visible: true },
+  { id: 'team', label: 'Ομάδα', visible: true },
   { id: 'start_date', label: 'Έναρξη', visible: false },
   { id: 'due_date', label: 'Προθεσμία', visible: true },
   { id: 'status', label: 'Κατάσταση', visible: true },
@@ -169,12 +180,14 @@ const GROUP_OPTIONS = [
   { value: 'assignee' as GroupByField, label: 'Υπεύθυνος' },
   { value: 'project' as GroupByField, label: 'Έργο' },
   { value: 'priority' as GroupByField, label: 'Προτεραιότητα' },
+  { value: 'deliverable' as GroupByField, label: 'Παραδοτέο' },
 ];
 
 export function TasksTableView({
   tasks,
   projects,
   users,
+  deliverables = [],
   onEdit,
   onDelete,
   onInlineUpdate,
@@ -327,6 +340,10 @@ export function TasksTableView({
               />
             );
           }
+          break;
+        case 'deliverable':
+          groupKey = task.deliverable_id || 'none';
+          groupLabel = task.deliverable?.name || 'Χωρίς Παραδοτέο';
           break;
         default:
           groupKey = 'all';
@@ -667,7 +684,32 @@ export function TasksTableView({
             </TableCell>
           )}
 
-          {/* Start Date */}
+          {/* Deliverable */}
+          {isColumnVisible('deliverable') && (
+            <TableCell style={{ width: getColumnWidth('deliverable') }}>
+              {deliverables.length > 0 ? (
+                <EnhancedInlineEditCell
+                  value={task.deliverable_id}
+                  onSave={(val) => onInlineUpdate(task.id, 'deliverable_id', val)}
+                  type="select"
+                  options={deliverables.map(d => ({ value: d.id, label: d.name }))}
+                  displayValue={task.deliverable?.name}
+                  disabled={!canManage}
+                  placeholder="—"
+                />
+              ) : (
+                <span className="text-xs text-muted-foreground">{task.deliverable?.name || '—'}</span>
+              )}
+            </TableCell>
+          )}
+
+          {/* Team */}
+          {isColumnVisible('team') && (
+            <TableCell style={{ width: getColumnWidth('team') }}>
+              <span className="text-xs text-muted-foreground">{task.department?.name || '—'}</span>
+            </TableCell>
+          )}
+
           {isColumnVisible('start_date') && (
             <TableCell style={{ width: getColumnWidth('start_date') }}>
               <EnhancedInlineEditCell
@@ -937,6 +979,26 @@ export function TasksTableView({
                   minWidth={100}
                 >
                   Έργο
+                </ResizableTableHeader>
+              )}
+              
+              {isColumnVisible('deliverable') && (
+                <ResizableTableHeader 
+                  width={getColumnWidth('deliverable')}
+                  onWidthChange={(w) => setColumnWidth('deliverable', w)}
+                  minWidth={100}
+                >
+                  Παραδοτέο
+                </ResizableTableHeader>
+              )}
+              
+              {isColumnVisible('team') && (
+                <ResizableTableHeader 
+                  width={getColumnWidth('team')}
+                  onWidthChange={(w) => setColumnWidth('team', w)}
+                  minWidth={80}
+                >
+                  Ομάδα
                 </ResizableTableHeader>
               )}
               

@@ -11,6 +11,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+} from '@/components/ui/select';
 import { EnhancedInlineEditCell } from '@/components/shared/EnhancedInlineEditCell';
 import { TableToolbar } from '@/components/shared/TableToolbar';
 import { ResizableTableHeader } from '@/components/shared/ResizableTableHeader';
@@ -28,7 +32,10 @@ import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import type { Tables } from '@/integrations/supabase/types';
 
-type Deliverable = Tables<'deliverables'>;
+type Deliverable = Tables<'deliverables'> & {
+  assignee_profile?: { full_name: string | null; avatar_url: string | null } | null;
+  department_info?: { name: string } | null;
+};
 
 interface LinkedTask {
   id: string;
@@ -40,6 +47,19 @@ interface LinkedTask {
   parent_task_id: string | null;
 }
 
+interface Profile {
+  id: string;
+  full_name: string | null;
+  email: string;
+  avatar_url: string | null;
+  department_id: string | null;
+}
+
+interface Department {
+  id: string;
+  name: string;
+}
+
 interface ProjectDeliverablesTableProps {
   projectId: string;
   projectName: string;
@@ -48,7 +68,8 @@ interface ProjectDeliverablesTableProps {
 const DEFAULT_COLUMNS = [
   { id: 'select', label: 'Επιλογή', visible: true, locked: true },
   { id: 'name', label: 'Όνομα', visible: true, locked: true },
-  { id: 'description', label: 'Περιγραφή', visible: true },
+  { id: 'assignee', label: 'Υπεύθυνος', visible: true },
+  { id: 'team', label: 'Ομάδα', visible: true },
   { id: 'budget', label: 'Budget', visible: true },
   { id: 'cost', label: 'Κόστος', visible: true },
   { id: 'due_date', label: 'Προθεσμία', visible: true },
@@ -142,6 +163,8 @@ function DeliverableTasksPanel({ deliverableId }: { deliverableId: string }) {
 export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeliverablesTableProps) {
   const { isAdmin, isManager, hasPermission } = useAuth();
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -157,22 +180,40 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
   } = useTableViews({ storageKey: 'project_deliverables_table', defaultColumns: DEFAULT_COLUMNS });
 
   const [formData, setFormData] = useState({
-    name: '', description: '', budget: '', cost: '', due_date: '',
+    name: '', description: '', budget: '', cost: '', due_date: '', assigned_to: '', department_id: '',
   });
 
   const canManage = isAdmin || isManager || hasPermission('projects.edit');
 
-  useEffect(() => { fetchDeliverables(); }, [projectId]);
+  useEffect(() => {
+    fetchDeliverables();
+    fetchProfiles();
+    fetchDepartments();
+  }, [projectId]);
+
+  const fetchProfiles = async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, avatar_url, department_id')
+      .in('status', ['active', 'pending'])
+      .order('full_name');
+    setProfiles(data || []);
+  };
+
+  const fetchDepartments = async () => {
+    const { data } = await supabase.from('departments').select('id, name').order('name');
+    setDepartments(data || []);
+  };
 
   const fetchDeliverables = async () => {
     try {
       const { data, error } = await supabase
         .from('deliverables')
-        .select('*')
+        .select('*, assignee_profile:profiles!deliverables_assigned_to_fkey(full_name, avatar_url), department_info:departments!deliverables_department_id_fkey(name)')
         .eq('project_id', projectId)
         .order('created_at', { ascending: true });
       if (error) throw error;
-      setDeliverables(data || []);
+      setDeliverables((data || []) as Deliverable[]);
     } catch (error) {
       console.error('Error fetching deliverables:', error);
       toast.error('Σφάλμα κατά τη φόρτωση παραδοτέων');
@@ -234,22 +275,23 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
         budget: parseFloat(formData.budget) || 0,
         cost: parseFloat(formData.cost) || 0,
         due_date: formData.due_date || null,
+        assigned_to: formData.assigned_to || null,
+        department_id: formData.department_id || null,
       };
       if (editingDeliverable) {
-        const { data, error } = await supabase
-          .from('deliverables').update(deliverableData).eq('id', editingDeliverable.id).select().single();
+        const { error } = await supabase
+          .from('deliverables').update(deliverableData).eq('id', editingDeliverable.id);
         if (error) throw error;
-        setDeliverables(prev => prev.map(d => d.id === editingDeliverable.id ? data : d));
         toast.success('Το παραδοτέο ενημερώθηκε!');
       } else {
-        const { data, error } = await supabase
-          .from('deliverables').insert(deliverableData).select().single();
+        const { error } = await supabase
+          .from('deliverables').insert(deliverableData);
         if (error) throw error;
-        setDeliverables(prev => [...prev, data]);
         toast.success('Το παραδοτέο δημιουργήθηκε!');
       }
       setDialogOpen(false);
       resetForm();
+      fetchDeliverables();
     } catch (error) {
       console.error('Error saving deliverable:', error);
       toast.error('Σφάλμα κατά την αποθήκευση');
@@ -264,6 +306,8 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
       budget: deliverable.budget?.toString() || '',
       cost: deliverable.cost?.toString() || '',
       due_date: deliverable.due_date || '',
+      assigned_to: (deliverable as any).assigned_to || '',
+      department_id: (deliverable as any).department_id || '',
     });
     setDialogOpen(true);
   };
@@ -310,7 +354,7 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
 
   const resetForm = () => {
     setEditingDeliverable(null);
-    setFormData({ name: '', description: '', budget: '', cost: '', due_date: '' });
+    setFormData({ name: '', description: '', budget: '', cost: '', due_date: '', assigned_to: '', department_id: '' });
   };
 
   const toggleSelectItem = (id: string) => {
@@ -447,9 +491,14 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
                     </button>
                   </ResizableTableHeader>
                 )}
-                {isColumnVisible('description') && (
-                  <ResizableTableHeader width={getColumnWidth('description')} onWidthChange={(w) => setColumnWidth('description', w)}>
-                    Περιγραφή
+                {isColumnVisible('assignee') && (
+                  <ResizableTableHeader width={getColumnWidth('assignee') || 120} onWidthChange={(w) => setColumnWidth('assignee', w)}>
+                    Υπεύθυνος
+                  </ResizableTableHeader>
+                )}
+                {isColumnVisible('team') && (
+                  <ResizableTableHeader width={getColumnWidth('team') || 100} onWidthChange={(w) => setColumnWidth('team', w)}>
+                    Ομάδα
                   </ResizableTableHeader>
                 )}
                 {isColumnVisible('budget') && (
@@ -521,15 +570,26 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
                             />
                           </TableCell>
                         )}
-                        {isColumnVisible('description') && (
-                          <TableCell style={{ width: getColumnWidth('description') }}>
-                            <EnhancedInlineEditCell
-                              value={deliverable.description || ''}
-                              onSave={(val) => handleInlineUpdate(deliverable.id, 'description', val as string || null)}
-                              disabled={!canManage}
-                              placeholder="-"
-                              className="text-muted-foreground"
-                            />
+                        {isColumnVisible('assignee') && (
+                          <TableCell style={{ width: getColumnWidth('assignee') }}>
+                            {deliverable.assignee_profile ? (
+                              <div className="flex items-center gap-1.5">
+                                <Avatar className="h-6 w-6">
+                                  {deliverable.assignee_profile.avatar_url && <AvatarImage src={deliverable.assignee_profile.avatar_url} />}
+                                  <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                                    {(deliverable.assignee_profile.full_name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="text-xs truncate">{deliverable.assignee_profile.full_name}</span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                        )}
+                        {isColumnVisible('team') && (
+                          <TableCell style={{ width: getColumnWidth('team') }}>
+                            <span className="text-xs text-muted-foreground">{deliverable.department_info?.name || '—'}</span>
                           </TableCell>
                         )}
                         {isColumnVisible('budget') && (
@@ -634,6 +694,43 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
               <div className="space-y-2">
                 <Label htmlFor="due_date">Deadline</Label>
                 <Input id="due_date" type="date" value={formData.due_date} onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Υπεύθυνος</Label>
+                <Select
+                  value={formData.assigned_to || 'none'}
+                  onValueChange={(value) => {
+                    const userId = value === 'none' ? '' : value;
+                    const profile = profiles.find(p => p.id === userId);
+                    const deptId = profile?.department_id || formData.department_id;
+                    setFormData(prev => ({ ...prev, assigned_to: userId, department_id: deptId || '' }));
+                  }}
+                >
+                  <SelectTrigger><SelectValue placeholder="Κανένας" /></SelectTrigger>
+                  <SelectContent className="max-h-60 overflow-y-auto">
+                    <SelectItem value="none">Κανένας</SelectItem>
+                    {profiles.map(p => (
+                      <SelectItem key={p.id} value={p.id}>{p.full_name || p.email}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Ομάδα</Label>
+                <Select
+                  value={formData.department_id || 'none'}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, department_id: value === 'none' ? '' : value }))}
+                >
+                  <SelectTrigger><SelectValue placeholder="Καμία" /></SelectTrigger>
+                  <SelectContent className="max-h-60 overflow-y-auto">
+                    <SelectItem value="none">Καμία</SelectItem>
+                    {departments.map(d => (
+                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <DialogFooter>

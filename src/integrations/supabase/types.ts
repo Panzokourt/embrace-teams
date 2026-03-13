@@ -1162,10 +1162,12 @@ export type Database = {
       }
       deliverables: {
         Row: {
+          assigned_to: string | null
           budget: number | null
           completed: boolean | null
           cost: number | null
           created_at: string
+          department_id: string | null
           description: string | null
           due_date: string | null
           id: string
@@ -1174,10 +1176,12 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          assigned_to?: string | null
           budget?: number | null
           completed?: boolean | null
           cost?: number | null
           created_at?: string
+          department_id?: string | null
           description?: string | null
           due_date?: string | null
           id?: string
@@ -1186,10 +1190,12 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          assigned_to?: string | null
           budget?: number | null
           completed?: boolean | null
           cost?: number | null
           created_at?: string
+          department_id?: string | null
           description?: string | null
           due_date?: string | null
           id?: string
@@ -1198,6 +1204,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "deliverables_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deliverables_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "deliverables_project_id_fkey"
             columns: ["project_id"]
@@ -5669,6 +5689,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           deliverable_id: string | null
+          department_id: string | null
           depends_on: string | null
           description: string | null
           due_date: string | null
@@ -5697,6 +5718,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           deliverable_id?: string | null
+          department_id?: string | null
           depends_on?: string | null
           description?: string | null
           due_date?: string | null
@@ -5725,6 +5747,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           deliverable_id?: string | null
+          department_id?: string | null
           depends_on?: string | null
           description?: string | null
           due_date?: string | null
@@ -5752,6 +5775,13 @@ export type Database = {
             columns: ["deliverable_id"]
             isOneToOne: false
             referencedRelation: "deliverables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
             referencedColumns: ["id"]
           },
           {

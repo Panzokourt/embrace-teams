@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ColumnConfig } from '@/components/shared/ColumnVisibilityToggle';
 
-export type GroupByField = 'none' | 'status' | 'assignee' | 'project' | 'priority';
+export type GroupByField = 'none' | 'status' | 'assignee' | 'project' | 'priority' | 'deliverable';
 
 export interface SavedView {
   id: string;

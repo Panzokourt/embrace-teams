@@ -76,6 +76,7 @@ interface Profile {
   full_name: string | null;
   email: string;
   avatar_url?: string | null;
+  department_id?: string | null;
 }
 
 interface TaskAssignee {
@@ -95,6 +96,7 @@ interface Task {
   project_id: string;
   assigned_to: string | null;
   deliverable_id: string | null;
+  department_id: string | null;
   parent_task_id: string | null;
   depends_on: string | null;
   estimated_hours: number | null;
@@ -107,6 +109,8 @@ interface Task {
   project?: { name: string } | null;
   assignee?: { full_name: string | null; avatar_url?: string | null } | null;
   assignees?: TaskAssignee[];
+  deliverable?: { name: string } | null;
+  department?: { name: string } | null;
 }
 
 const statusConfig: Record<TaskStatus, { icon: React.ReactNode; label: string; className: string }> = {
@@ -176,7 +180,9 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
         .from('tasks')
         .select(`
           *,
-          project:projects(name)
+          project:projects(name),
+          deliverable:deliverables(name),
+          department:departments(name)
         `)
         .order('due_date', { ascending: true, nullsFirst: false })
         .range(pagination.from, pagination.to);
@@ -270,7 +276,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, email, avatar_url')
+        .select('id, full_name, email, avatar_url, department_id')
         .in('status', ['active', 'pending'])
         .order('full_name');
 
@@ -707,11 +713,19 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
       const { error } = await supabase.from('task_assignees').insert({ task_id: taskId, user_id: userId });
       if (error) throw error;
       const profile = users.find(u => u.id === userId);
+      // Auto-fill department_id from assignee's department
+      if (profile?.department_id) {
+        await supabase.from('tasks').update({ department_id: profile.department_id }).eq('id', taskId);
+      }
       setTasks(prev => prev.map(t => {
         if (t.id !== taskId) return t;
         const existing = t.assignees || [];
         if (existing.some(a => a.user_id === userId)) return t;
-        return { ...t, assignees: [...existing, { user_id: userId, full_name: profile?.full_name || null, avatar_url: profile?.avatar_url || null }] };
+        return { 
+          ...t, 
+          assignees: [...existing, { user_id: userId, full_name: profile?.full_name || null, avatar_url: profile?.avatar_url || null }],
+          department_id: profile?.department_id || t.department_id,
+        };
       }));
       toast.success('Προστέθηκε!');
     } catch (error) {
@@ -740,6 +754,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
       tasks={filteredTasks}
       projects={projects}
       users={users}
+      deliverables={deliverables}
       onEdit={handleEdit}
       onDelete={handleDelete}
       onInlineUpdate={handleInlineUpdate}

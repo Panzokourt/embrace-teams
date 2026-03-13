@@ -101,6 +101,7 @@ interface TasksTableViewProps {
   tasks: Task[];
   projects: Project[];
   users: Profile[];
+  deliverables?: Deliverable[];
   onEdit: (task: Task) => void;
   onDelete: (taskId: string) => void;
   onInlineUpdate: (taskId: string, field: string, value: string | number | null) => Promise<void>;

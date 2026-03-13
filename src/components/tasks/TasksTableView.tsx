@@ -180,6 +180,7 @@ const GROUP_OPTIONS = [
   { value: 'assignee' as GroupByField, label: 'Υπεύθυνος' },
   { value: 'project' as GroupByField, label: 'Έργο' },
   { value: 'priority' as GroupByField, label: 'Προτεραιότητα' },
+  { value: 'deliverable' as GroupByField, label: 'Παραδοτέο' },
 ];
 
 export function TasksTableView({

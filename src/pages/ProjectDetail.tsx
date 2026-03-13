@@ -20,11 +20,13 @@ import { ProjectMediaPlansCard } from '@/components/projects/ProjectMediaPlansCa
 import { ProjectWorkflowTracker } from '@/components/projects/ProjectWorkflowTracker';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import {
   ArrowLeft, Calendar, DollarSign, Clock, Loader2, Megaphone, GitBranch,
   Palette, FolderInput, Timer, ListChecks, FileText, MessageSquare,
   Pencil, Save, X, ClipboardList, Sparkles, FolderOpen, Layers,
+  AlignLeft, Users, TrendingUp, Briefcase, Receipt, Activity,
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -406,247 +408,344 @@ export default function ProjectDetailPage() {
           </TabsList>
 
           <TabsContent value="overview">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* Project Info Card */}
-              <Card>
-                <CardContent className="p-5 space-y-3">
-                  <p className="text-sm font-semibold">Πληροφορίες Έργου</p>
-
-                  {/* Description */}
-                  <div className="group">
-                    <p className="text-xs text-muted-foreground mb-1">Περιγραφή</p>
-                    {editingDescription ? (
-                      <div className="space-y-2">
-                        <Textarea
-                          value={descriptionDraft}
-                          onChange={e => setDescriptionDraft(e.target.value)}
-                          rows={3}
-                          className="text-sm"
-                          autoFocus
-                          onKeyDown={e => {
-                            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+              {/* ===== LEFT COLUMN (7) ===== */}
+              <div className="lg:col-span-7 space-y-4">
+                {/* Description Card */}
+                <Card>
+                  <CardContent className="p-5 space-y-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        <AlignLeft className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <h3 className="text-base font-semibold">Περιγραφή Έργου</h3>
+                    </div>
+                    <div className="group">
+                      {editingDescription ? (
+                        <div className="space-y-2">
+                          <Textarea
+                            value={descriptionDraft}
+                            onChange={e => setDescriptionDraft(e.target.value)}
+                            rows={4}
+                            className="text-sm"
+                            autoFocus
+                            onKeyDown={e => {
+                              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                                updateProjectField('description', descriptionDraft.trim() || null);
+                                setEditingDescription(false);
+                              }
+                            }}
+                          />
+                          <div className="flex gap-1">
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setEditingDescription(false)}>
+                              <X className="h-3 w-3 mr-1" /> Ακύρωση
+                            </Button>
+                            <Button size="sm" className="h-7 px-2 text-xs" onClick={() => {
                               updateProjectField('description', descriptionDraft.trim() || null);
                               setEditingDescription(false);
-                            }
-                          }}
-                        />
-                        <div className="flex gap-1">
-                          <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setEditingDescription(false)}>
-                            <X className="h-3 w-3" />
-                          </Button>
-                          <Button size="sm" className="h-6 px-2 text-xs" onClick={() => {
-                            updateProjectField('description', descriptionDraft.trim() || null);
-                            setEditingDescription(false);
-                          }}>
-                            <Save className="h-3 w-3" />
-                          </Button>
+                            }}>
+                              <Save className="h-3 w-3 mr-1" /> Αποθήκευση
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <p
-                        className={cn(
-                          "text-sm cursor-pointer rounded px-1 -mx-1 py-0.5 hover:bg-muted/50 transition-colors",
-                          !project.description && "text-muted-foreground italic"
-                        )}
-                        onClick={() => {
-                          if (!canEdit) return;
-                          setDescriptionDraft(project.description || '');
-                          setEditingDescription(true);
-                        }}
-                      >
-                        {project.description || 'Προσθέστε περιγραφή...'}
-                        {canEdit && <Pencil className="h-3 w-3 ml-1 inline opacity-0 group-hover:opacity-50" />}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Client */}
-                  {project.client && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Πελάτης</span>
-                      <span className="text-sm font-medium">{project.client.name}</span>
-                    </div>
-                  )}
-
-                  {/* Budget */}
-                  <div className="group flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Budget</span>
-                    {editingBudget ? (
-                      <div className="flex items-center gap-1">
-                        <Input
-                          type="number" value={budgetDraft}
-                          onChange={e => setBudgetDraft(e.target.value)}
-                          className="h-6 w-24 text-xs" autoFocus
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') { updateProjectField('budget', parseFloat(budgetDraft) || 0); setEditingBudget(false); }
-                            if (e.key === 'Escape') setEditingBudget(false);
-                          }}
-                          onBlur={() => { updateProjectField('budget', parseFloat(budgetDraft) || 0); setEditingBudget(false); }}
-                        />
-                      </div>
-                    ) : (
-                      <span className="text-sm font-medium cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 transition-colors"
-                        onClick={() => { if (!canEdit) return; setBudgetDraft(project.budget.toString()); setEditingBudget(true); }}>
-                        €{project.budget.toLocaleString()}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Agency Fee */}
-                  {!(project as any).is_internal && (
-                    <div className="group flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Agency Fee</span>
-                      {editingFee ? (
-                        <Input
-                          type="number" value={feeDraft}
-                          onChange={e => setFeeDraft(e.target.value)}
-                          className="h-6 w-16 text-xs" autoFocus
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') { updateProjectField('agency_fee_percentage', parseFloat(feeDraft) || 0); setEditingFee(false); }
-                            if (e.key === 'Escape') setEditingFee(false);
-                          }}
-                          onBlur={() => { updateProjectField('agency_fee_percentage', parseFloat(feeDraft) || 0); setEditingFee(false); }}
-                        />
                       ) : (
-                        <span className="text-sm font-medium cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 transition-colors"
-                          onClick={() => { if (!canEdit) return; setFeeDraft(project.agency_fee_percentage.toString()); setEditingFee(true); }}>
-                          {project.agency_fee_percentage}%
-                        </span>
+                        <p
+                          className={cn(
+                            "text-sm leading-relaxed cursor-pointer rounded-lg px-3 py-2 -mx-1 hover:bg-muted/50 transition-colors whitespace-pre-wrap",
+                            !project.description && "text-muted-foreground italic"
+                          )}
+                          onClick={() => {
+                            if (!canEdit) return;
+                            setDescriptionDraft(project.description || '');
+                            setEditingDescription(true);
+                          }}
+                        >
+                          {project.description || 'Προσθέστε περιγραφή για το έργο...'}
+                          {canEdit && <Pencil className="h-3 w-3 ml-1 inline opacity-0 group-hover:opacity-50" />}
+                        </p>
                       )}
                     </div>
-                  )}
-
-                  {/* Dates */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Έναρξη</span>
-                    <input type="date" value={project.start_date || ''} onChange={e => updateProjectField('start_date', e.target.value || null)} disabled={!canEdit}
-                      className="text-xs bg-transparent border-none outline-none text-foreground cursor-pointer disabled:cursor-default" />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Λήξη</span>
-                    <input type="date" value={project.end_date || ''} onChange={e => updateProjectField('end_date', e.target.value || null)} disabled={!canEdit}
-                      className="text-xs bg-transparent border-none outline-none text-foreground cursor-pointer disabled:cursor-default" />
-                  </div>
-
-                  {dueDateInfo && (
-                    <div className="flex items-center gap-2 text-xs">
-                      <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className={cn('font-medium', dueDateInfo.className)}>{dueDateInfo.label}</span>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Καταγεγραμμένες Ώρες</span>
-                    <span className="text-sm font-medium flex items-center gap-1">
-                      <Timer className="h-3.5 w-3.5 text-muted-foreground" />{totalTrackedHours}h
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Tasks</span>
-                    <span className="text-sm font-medium">{completedTasks}/{tasks.length} ολοκληρωμένα</span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Παραδοτέα</span>
-                    <span className="text-sm font-medium">{completedDeliverables}/{deliverables.length} ολοκληρωμένα</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Team Card */}
-              <Card>
-                <CardContent className="p-5">
-                  <ProjectTeamManager
-                    projectId={project.id}
-                    canEdit={canEdit}
-                    compact
-                    showFullNames
-                    projectLeadId={project.project_lead_id}
-                    accountManagerId={project.account_manager_id}
-                    onUpdateProjectRole={(field, value) => updateProjectField(field, value)}
-                  />
-                </CardContent>
-              </Card>
-
-              {/* Contracts Card */}
-              <ProjectContractsCard projectId={project.id} onUploadContract={() => setActiveTab('files')} />
-
-              {/* Proposals Card */}
-              {proposalFiles.length > 0 && (
-                <Card>
-                  <CardContent className="p-5 space-y-3">
-                    <div className="flex items-center gap-2">
-                      <FolderOpen className="h-4 w-4 text-muted-foreground" />
-                      <p className="text-sm font-semibold">Προτάσεις / Προσφορές</p>
-                      <Badge variant="secondary" className="text-[10px]">{proposalFiles.length}</Badge>
-                    </div>
-                    <div className="space-y-1.5">
-                      {proposalFiles.map(f => (
-                        <div key={f.id} className="flex items-center gap-2 text-sm">
-                          <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="truncate flex-1">{f.file_name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {format(new Date(f.created_at), 'd/M/yy', { locale: el })}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
                   </CardContent>
                 </Card>
-              )}
 
-              {/* Briefs Card */}
-              {briefFiles.length > 0 && (
-                <Card>
-                  <CardContent className="p-5 space-y-3">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                      <p className="text-sm font-semibold">Briefs</p>
-                      <Badge variant="secondary" className="text-[10px]">{briefFiles.length}</Badge>
-                    </div>
-                    <div className="space-y-1.5">
-                      {briefFiles.map(f => (
-                        <div key={f.id} className="flex items-center gap-2 text-sm">
-                          <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="truncate flex-1">{f.file_name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {format(new Date(f.created_at), 'd/M/yy', { locale: el })}
-                          </span>
+                {/* Financials Card */}
+                {canViewFinancials && (
+                  <Card>
+                    <CardContent className="p-5 space-y-4">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                          <DollarSign className="h-4 w-4 text-muted-foreground" />
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+                        <h3 className="text-base font-semibold">Οικονομικά Στοιχεία</h3>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                        {/* Budget */}
+                        <div className="space-y-1">
+                          <span className="text-xs text-muted-foreground">Budget</span>
+                          {editingBudget ? (
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number" value={budgetDraft}
+                                onChange={e => setBudgetDraft(e.target.value)}
+                                className="h-8 w-28 text-sm font-bold" autoFocus
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') { updateProjectField('budget', parseFloat(budgetDraft) || 0); setEditingBudget(false); }
+                                  if (e.key === 'Escape') setEditingBudget(false);
+                                }}
+                                onBlur={() => { updateProjectField('budget', parseFloat(budgetDraft) || 0); setEditingBudget(false); }}
+                              />
+                            </div>
+                          ) : (
+                            <p className="text-lg font-bold cursor-pointer hover:text-primary transition-colors"
+                              onClick={() => { if (!canEdit) return; setBudgetDraft(project.budget.toString()); setEditingBudget(true); }}>
+                              €{project.budget.toLocaleString()}
+                            </p>
+                          )}
+                        </div>
 
-              {/* Media Plans Card */}
-              <ProjectMediaPlansCard projectId={project.id} />
-
-              {/* Sub-projects Card */}
-              {subProjects.length > 0 && (
-                <Card>
-                  <CardContent className="p-5 space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Layers className="h-4 w-4 text-muted-foreground" />
-                      <p className="text-sm font-semibold">Υπό-έργα</p>
-                      <Badge variant="secondary" className="text-[10px]">{subProjects.length}</Badge>
-                    </div>
-                    <div className="space-y-2">
-                      {subProjects.map(sp => (
-                        <Link key={sp.id} to={`/projects/${sp.id}`}
-                          className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                          <span className="text-sm font-medium">{sp.name}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground">€{(sp.budget || 0).toLocaleString()}</span>
-                            {getStatusBadgeForSub(sp.status)}
+                        {/* Agency Fee */}
+                        {!(project as any).is_internal && (
+                          <div className="space-y-1">
+                            <span className="text-xs text-muted-foreground">Agency Fee</span>
+                            {editingFee ? (
+                              <Input
+                                type="number" value={feeDraft}
+                                onChange={e => setFeeDraft(e.target.value)}
+                                className="h-8 w-20 text-sm font-bold" autoFocus
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') { updateProjectField('agency_fee_percentage', parseFloat(feeDraft) || 0); setEditingFee(false); }
+                                  if (e.key === 'Escape') setEditingFee(false);
+                                }}
+                                onBlur={() => { updateProjectField('agency_fee_percentage', parseFloat(feeDraft) || 0); setEditingFee(false); }}
+                              />
+                            ) : (
+                              <p className="text-lg font-bold cursor-pointer hover:text-primary transition-colors"
+                                onClick={() => { if (!canEdit) return; setFeeDraft(project.agency_fee_percentage.toString()); setEditingFee(true); }}>
+                                {project.agency_fee_percentage}%
+                              </p>
+                            )}
                           </div>
+                        )}
+
+                        {/* Net Budget */}
+                        {!(project as any).is_internal && (
+                          <div className="space-y-1">
+                            <span className="text-xs text-muted-foreground">Net Budget</span>
+                            <p className="text-lg font-bold text-success">
+                              €{Math.round(project.budget * (1 - (project.agency_fee_percentage || 0) / 100)).toLocaleString()}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Contracts Card */}
+                <ProjectContractsCard projectId={project.id} onUploadContract={() => setActiveTab('files')} />
+
+                {/* Proposals Card */}
+                <Card>
+                  <CardContent className="p-5 space-y-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <h3 className="text-base font-semibold">Προτάσεις / Προσφορές</h3>
+                      {proposalFiles.length > 0 && (
+                        <Badge variant="secondary" className="text-[10px]">{proposalFiles.length}</Badge>
+                      )}
+                    </div>
+                    {proposalFiles.length > 0 ? (
+                      <div className="space-y-1.5">
+                        {proposalFiles.map(f => (
+                          <div key={f.id} className="flex items-center gap-2 text-sm p-1.5 rounded-md hover:bg-muted/50 transition-colors">
+                            <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                            <span className="truncate flex-1">{f.file_name}</span>
+                            <span className="text-xs text-muted-foreground shrink-0">
+                              {format(new Date(f.created_at), 'd/M/yy', { locale: el })}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">Δεν υπάρχουν προτάσεις</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Briefs Card */}
+                <Card>
+                  <CardContent className="p-5 space-y-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        <Receipt className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <h3 className="text-base font-semibold">Briefs</h3>
+                      {briefFiles.length > 0 && (
+                        <Badge variant="secondary" className="text-[10px]">{briefFiles.length}</Badge>
+                      )}
+                    </div>
+                    {briefFiles.length > 0 ? (
+                      <div className="space-y-1.5">
+                        {briefFiles.map(f => (
+                          <div key={f.id} className="flex items-center gap-2 text-sm p-1.5 rounded-md hover:bg-muted/50 transition-colors">
+                            <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                            <span className="truncate flex-1">{f.file_name}</span>
+                            <span className="text-xs text-muted-foreground shrink-0">
+                              {format(new Date(f.created_at), 'd/M/yy', { locale: el })}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">Δεν υπάρχουν briefs</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Media Plans Card */}
+                <ProjectMediaPlansCard projectId={project.id} />
+
+                {/* Sub-projects Card */}
+                {subProjects.length > 0 && (
+                  <Card>
+                    <CardContent className="p-5 space-y-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                          <Layers className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <h3 className="text-base font-semibold">Υπό-έργα</h3>
+                        <Badge variant="secondary" className="text-[10px]">{subProjects.length}</Badge>
+                      </div>
+                      <div className="space-y-2">
+                        {subProjects.map(sp => (
+                          <Link key={sp.id} to={`/projects/${sp.id}`}
+                            className="flex items-center justify-between p-2.5 rounded-lg hover:bg-muted/50 transition-colors border border-border/30">
+                            <span className="text-sm font-medium">{sp.name}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">€{(sp.budget || 0).toLocaleString()}</span>
+                              {getStatusBadgeForSub(sp.status)}
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+
+              {/* ===== RIGHT COLUMN (5) ===== */}
+              <div className="lg:col-span-5 space-y-4">
+                {/* Client & Timeline Card */}
+                <Card>
+                  <CardContent className="p-5 space-y-4">
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        <Briefcase className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <h3 className="text-base font-semibold">Πελάτης & Χρονοδιάγραμμα</h3>
+                    </div>
+
+                    {/* Client */}
+                    {project.client && project.client_id && (
+                      <div className="flex items-center justify-between py-2 border-b border-border/30">
+                        <span className="text-sm text-muted-foreground">Πελάτης</span>
+                        <Link to={`/clients/${project.client_id}`} className="text-sm font-semibold text-primary hover:underline transition-colors">
+                          {project.client.name}
                         </Link>
-                      ))}
+                      </div>
+                    )}
+
+                    {/* Start Date */}
+                    <div className="flex items-center justify-between py-1">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">Έναρξη</span>
+                      </div>
+                      <input type="date" value={project.start_date || ''} onChange={e => updateProjectField('start_date', e.target.value || null)} disabled={!canEdit}
+                        className="text-sm font-medium bg-transparent border-none outline-none text-foreground cursor-pointer disabled:cursor-default text-right" />
+                    </div>
+
+                    {/* End Date */}
+                    <div className="flex items-center justify-between py-1">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">Λήξη</span>
+                      </div>
+                      <input type="date" value={project.end_date || ''} onChange={e => updateProjectField('end_date', e.target.value || null)} disabled={!canEdit}
+                        className="text-sm font-medium bg-transparent border-none outline-none text-foreground cursor-pointer disabled:cursor-default text-right" />
+                    </div>
+
+                    {dueDateInfo && (
+                      <div className="flex items-center gap-2 py-1 px-3 rounded-lg bg-muted/50">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <span className={cn('text-sm font-medium', dueDateInfo.className)}>{dueDateInfo.label}</span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Progress & Health Card */}
+                <Card>
+                  <CardContent className="p-5 space-y-4">
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        <Activity className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <h3 className="text-base font-semibold">Πρόοδος & Υγεία Έργου</h3>
+                    </div>
+
+                    {/* Tasks progress */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Tasks</span>
+                        <span className="font-semibold">{completedTasks}/{tasks.length}</span>
+                      </div>
+                      <Progress value={tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0} className="h-2" />
+                    </div>
+
+                    {/* Deliverables progress */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Παραδοτέα</span>
+                        <span className="font-semibold">{completedDeliverables}/{deliverables.length}</span>
+                      </div>
+                      <Progress value={deliverables.length > 0 ? Math.round((completedDeliverables / deliverables.length) * 100) : 0} className="h-2" />
+                    </div>
+
+                    {/* Tracked Hours */}
+                    <div className="flex items-center justify-between py-2 border-t border-border/30">
+                      <div className="flex items-center gap-2">
+                        <Timer className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">Καταγεγραμμένες Ώρες</span>
+                      </div>
+                      <span className="text-lg font-bold">{totalTrackedHours}h</span>
                     </div>
                   </CardContent>
                 </Card>
-              )}
+
+                {/* Team Card */}
+                <Card>
+                  <CardContent className="p-5">
+                    <div className="flex items-center gap-2.5 mb-4">
+                      <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <h3 className="text-base font-semibold">Ομάδα Έργου</h3>
+                    </div>
+                    <ProjectTeamManager
+                      projectId={project.id}
+                      canEdit={canEdit}
+                      compact
+                      showFullNames
+                      projectLeadId={project.project_lead_id}
+                      accountManagerId={project.account_manager_id}
+                      onUpdateProjectRole={(field, value) => updateProjectField(field, value)}
+                    />
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </TabsContent>
 

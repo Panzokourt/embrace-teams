@@ -1,63 +1,66 @@
 
 
-# Plan: Project Overview Redesign & Deliverables/Tasks Filter Alignment
+# Org Chart — Full Rebuild Plan
 
-## What needs to change
+## Πρόβλημα
 
-### 1. Overview Tab — Card-based layout with clear sections
+Το τρέχον οργανόγραμμα είναι ένα static rendered tree μέσα σε ScrollArea με βασικό zoom (CSS scale). Δεν υποστηρίζει pan/drag-to-move, δεν έχει infinite canvas, τα nodes δεν είναι clickable για detail, δεν υπάρχουν views (by department, by person), και τα templates δεν αξιοποιούν το υπάρχον προσωπικό.
 
-The current overview is a single flat card with small text listing all project info. It needs to be broken into distinct, well-styled cards with icons and larger typography.
+## Λύση
 
-**New layout structure (grid 7+5 like ClientDetail):**
+Πλήρες rebuild του OrgChart σε **infinite canvas** στυλ Miro με pan+zoom, πολλαπλά views, clickable nodes με detail panel, και smart templates.
 
-**Left column (col-span-7):**
-- **Περιγραφή Έργου** card — Description with icon header, larger text, inline edit
-- **Οικονομικά Στοιχεία** card — Budget, Agency Fee, Net Budget as stat-style items with icons (like `StatKPI` pattern from `ProjectFinancialsHub`)
-- **Συμβόλαια & Έγγραφα** card — Contracts + Proposals + Briefs combined or stacked cards (always visible with empty state)
-- **Media Plans** card
-- **Υπό-έργα** card (if any)
+## Τεχνική Προσέγγιση
 
-**Right column (col-span-5):**
-- **Πελάτης & Χρονοδιάγραμμα** card — Client name (linked), start/end dates with calendar icons, due date warning badge
-- **Πρόοδος & Υγεία Έργου** card — Task progress bar, deliverables progress bar, tracked hours, status badge with health indicator
-- **Ομάδα Έργου** card — Team manager (already exists, just re-wrapped)
+### 1. Infinite Canvas Engine (χωρίς εξωτερική βιβλιοθήκη)
+- Custom React canvas με `transform: translate(x, y) scale(z)` σε ένα wrapper div
+- **Mouse wheel** → zoom (centered on cursor)
+- **Middle-click drag** ή **Space+drag** → pan (hand tool)
+- **Touch**: pinch-to-zoom, two-finger pan
+- Mini-map στο corner (optional, phase 2)
+- Fit-to-screen button, zoom controls
 
-**Design details:**
-- Each card gets an icon in a `h-8 w-8 rounded-lg bg-muted` box next to the title (matching existing widget pattern)
-- Card titles use `text-base font-semibold` instead of `text-sm`
-- Values use `text-lg font-bold` for key numbers (budget, dates)
-- All cards always visible with empty states
+### 2. Views (3 modes)
+- **Hierarchy View** (default): Κλασικό tree ανά reporting line — αυτό που υπάρχει τώρα αλλά σε canvas
+- **Department View**: Grouped κάρτες ανά department σε columns/clusters, κάθε cluster δείχνει τα μέλη
+- **List View**: Compact table/list με sorting, φιλτράρισμα, search — γρήγορη εύρεση ατόμου
 
-### 2. Deliverables Tab — Filter & grouping alignment
+Toggle μεταξύ views μέσω tabs στο header.
 
-Current `ProjectDeliverablesTable` has basic columns but needs:
-- Add **Status** column (derive from `completed` boolean + a proper status field or use completed/in-progress logic based on linked tasks)
-- Add grouping options matching tasks: by status, by assignee, by team
-- Ensure the `TableToolbar` includes group-by dropdown and column visibility toggle (already partially there via `useTableViews`)
-- Match the Monday.com-style UI from TasksTableView (colored status cells, summary rows)
+### 3. Interactive Nodes
+- **Click** σε node → slide-in panel (sheet) δεξιά με:
+  - Profile info (avatar, name, email, phone)
+  - Position & department
+  - Direct reports count
+  - Link to Employee Profile (`/hr/employee/:id`)
+  - Quick actions (edit, reassign, add subordinate)
+- **Hover** → subtle highlight + tooltip με title
+- **Vacant positions** → dashed border, prominent "Κενή θέση" badge, click to assign
+- Connector lines μεταξύ nodes: animated SVG paths αντί για div borders
 
-### 3. Tasks Tab — Fix filters & ensure correct data
+### 4. Smart Templates & Auto-build
+- Βελτίωση του Wizard: αφού επιλεγεί template, **auto-match** υπάρχοντα profiles σε positions βάσει `job_title` ή `department`
+- **Gap Analysis panel**: Μετά τη δημιουργία, δείχνει πόσες θέσεις είναι κενές, ποια departments λείπουν, ποια levels δεν έχουν κάλυψη
+- Wizard step: "Αντιστοίχιση Προσωπικού" — drag-drop ή auto-suggest
 
-- Verify `GROUP_OPTIONS` includes `deliverable` (already added)
-- Ensure deliverables data is passed correctly from `Tasks.tsx` to `TasksTableView`
-- Verify the team/department column renders correctly
-- Align filter/grouping UI to match deliverables table styling
+### 5. SVG Connector Lines
+- Αντικατάσταση CSS div lines με SVG `<path>` elements (bezier curves)
+- Animated flow direction (subtle dash animation)
+- Color-coded κατά department
 
-## Files to modify
+## Αρχεία
 
-1. **`src/pages/ProjectDetail.tsx`** — Complete rewrite of the `overview` TabsContent section. Replace the single info card with the new multi-card grid layout. Add progress/health calculations.
+| Αρχείο | Αλλαγή |
+|---|---|
+| `src/pages/OrgChart.tsx` | **Rewrite** — Infinite canvas, views, SVG connectors, detail panel |
+| `src/components/org-chart/OrgChartCanvas.tsx` | **New** — Pan+zoom canvas wrapper |
+| `src/components/org-chart/OrgNodeCard.tsx` | **New** — Redesigned node card (clickable, expandable) |
+| `src/components/org-chart/OrgDetailPanel.tsx` | **New** — Slide-in sheet for node details |
+| `src/components/org-chart/OrgDepartmentView.tsx` | **New** — Department-grouped view |
+| `src/components/org-chart/OrgListView.tsx` | **New** — Table/list view |
+| `src/components/org-chart/OrgConnectors.tsx` | **New** — SVG connector line renderer |
+| `src/components/org-chart/OrgChartWizard.tsx` | **Update** — Add auto-match step + gap analysis |
+| `src/components/org-chart/DraggableOrgNode.tsx` | **Remove** — Replaced by new OrgNodeCard |
 
-2. **`src/components/projects/ProjectDeliverablesTable.tsx`** — Add status-based grouping options, add a status column (derived from completion + linked task status), align toolbar with TasksTableView patterns.
-
-3. **`src/components/tasks/TasksTableView.tsx`** — Minor fixes to ensure deliverable and team columns render properly, verify grouping logic for deliverables works correctly.
-
-4. **`src/pages/Tasks.tsx`** — Verify deliverables are fetched and passed to `TasksTableView` correctly when embedded in project context.
-
-## Implementation approach
-
-- Extract the overview into clearly separated Card components inline within `ProjectDetail.tsx`
-- Use the existing `StatKPI`-like pattern (icon box + label + value) for financial data
-- Use `Progress` component for task/deliverable completion bars
-- Keep inline editing for budget, fee, dates, description
-- For deliverables table: add `groupBy` support via existing `useTableViews` hook, add status column derived from `completed` field
+Δεν χρειάζονται DB changes — το schema `org_chart_positions` καλύπτει ήδη hierarchy, department, user_id, color, level, sort_order.
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, Fragment } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
@@ -27,6 +27,8 @@ import {
 import { EditDeleteActions } from '@/components/dialogs/EditDeleteActions';
 import { toast } from 'sonner';
 import { Package, Plus, DollarSign, Loader2, ArrowUpDown, ArrowUp, ArrowDown, ChevronRight, CheckCircle2, Circle, Clock, AlertCircle } from 'lucide-react';
+import { MondayStatusCell } from '@/components/shared/MondayStatusCell';
+import { GroupByField } from '@/hooks/useTableViews';
 import { format, parseISO } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -68,13 +70,25 @@ interface ProjectDeliverablesTableProps {
 const DEFAULT_COLUMNS = [
   { id: 'select', label: 'Επιλογή', visible: true, locked: true },
   { id: 'name', label: 'Όνομα', visible: true, locked: true },
+  { id: 'status', label: 'Κατάσταση', visible: true },
   { id: 'assignee', label: 'Υπεύθυνος', visible: true },
   { id: 'team', label: 'Ομάδα', visible: true },
   { id: 'budget', label: 'Budget', visible: true },
   { id: 'cost', label: 'Κόστος', visible: true },
   { id: 'due_date', label: 'Προθεσμία', visible: true },
-  { id: 'completed', label: 'Ολοκληρώθηκε', visible: true },
   { id: 'actions', label: 'Ενέργειες', visible: true, locked: true },
+];
+
+const DELIVERABLE_STATUS_COLORS: Record<string, { bg: string; text: string; label: string }> = {
+  pending: { bg: '#c4c4c4', text: '#ffffff', label: 'Εκκρεμεί' },
+  in_progress: { bg: '#fdab3d', text: '#ffffff', label: 'Σε Εξέλιξη' },
+  completed: { bg: '#00c875', text: '#ffffff', label: 'Ολοκληρώθηκε' },
+};
+
+const DELIVERABLE_GROUP_OPTIONS = [
+  { value: 'none' as GroupByField, label: 'Χωρίς ομαδοποίηση' },
+  { value: 'status' as GroupByField, label: 'Κατάσταση' },
+  { value: 'assignee' as GroupByField, label: 'Υπεύθυνος' },
 ];
 
 type SortField = 'name' | 'budget' | 'cost' | 'due_date' | 'completed';
@@ -176,6 +190,7 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
 
   const {
     columns, setColumns, columnWidths, setColumnWidth,
+    groupBy, setGroupBy,
     savedViews, currentViewId, saveView, loadView, deleteView, resetToDefault,
   } = useTableViews({ storageKey: 'project_deliverables_table', defaultColumns: DEFAULT_COLUMNS });
 
@@ -397,10 +412,42 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
     toast.success('Εξαγωγή Excel ολοκληρώθηκε!');
   }, [deliverables]);
 
+  const getDeliverableStatus = (d: Deliverable): string => {
+    if (d.completed) return 'completed';
+    // Check if any tasks are linked & in progress (heuristic)
+    return 'pending';
+  };
+
   const completedCount = deliverables.filter(d => d.completed).length;
   const progressPercentage = deliverables.length > 0 ? Math.round((completedCount / deliverables.length) * 100) : 0;
   const totalBudget = deliverables.reduce((sum, d) => sum + (Number(d.budget) || 0), 0);
   const totalCost = deliverables.reduce((sum, d) => sum + (Number(d.cost) || 0), 0);
+
+  // Grouping logic
+  const groupedDeliverables = useMemo(() => {
+    if (groupBy === 'none') {
+      return [{ key: 'all', label: 'Όλα τα Παραδοτέα', items: sortedDeliverables }];
+    }
+    const groups = new Map<string, { label: string; items: Deliverable[] }>();
+    sortedDeliverables.forEach(d => {
+      let key: string, label: string;
+      switch (groupBy) {
+        case 'status':
+          key = d.completed ? 'completed' : 'pending';
+          label = d.completed ? 'Ολοκληρωμένα' : 'Εκκρεμούν';
+          break;
+        case 'assignee':
+          key = (d as any).assigned_to || 'unassigned';
+          label = d.assignee_profile?.full_name || 'Μη ανατεθειμένο';
+          break;
+        default:
+          key = 'all'; label = 'Όλα'; break;
+      }
+      if (!groups.has(key)) groups.set(key, { label, items: [] });
+      groups.get(key)!.items.push(d);
+    });
+    return Array.from(groups.entries()).map(([key, v]) => ({ key, label: v.label, items: v.items }));
+  }, [sortedDeliverables, groupBy]);
 
   const visibleColumnCount = columns.filter(c => c.visible).length;
 
@@ -427,6 +474,9 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
           onLoadView={loadView}
           onDeleteView={deleteView}
           onResetToDefault={resetToDefault}
+          groupBy={groupBy}
+          onGroupByChange={setGroupBy}
+          groupOptions={DELIVERABLE_GROUP_OPTIONS}
         />
         {canManage && (
           <Button onClick={() => { resetForm(); setDialogOpen(true); }}>
@@ -491,6 +541,11 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
                     </button>
                   </ResizableTableHeader>
                 )}
+                {isColumnVisible('status') && (
+                  <ResizableTableHeader width={getColumnWidth('status') || 120} onWidthChange={(w) => setColumnWidth('status', w)}>
+                    Κατάσταση
+                  </ResizableTableHeader>
+                )}
                 {isColumnVisible('assignee') && (
                   <ResizableTableHeader width={getColumnWidth('assignee') || 120} onWidthChange={(w) => setColumnWidth('assignee', w)}>
                     Υπεύθυνος
@@ -522,143 +577,162 @@ export function ProjectDeliverablesTable({ projectId, projectName }: ProjectDeli
                     </button>
                   </ResizableTableHeader>
                 )}
-                {isColumnVisible('completed') && (
-                  <ResizableTableHeader width={getColumnWidth('completed') || 100} onWidthChange={(w) => setColumnWidth('completed', w)}>
-                    <button onClick={() => toggleSort('completed')} className="flex items-center gap-1 hover:text-foreground transition-colors">
-                      Ολ. {getSortIcon('completed')}
-                    </button>
-                  </ResizableTableHeader>
-                )}
                 {isColumnVisible('actions') && (
                   <TableHead className="w-[80px]">Ενέργειες</TableHead>
                 )}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedDeliverables.map(deliverable => {
-                const isExpanded = expandedDeliverables.has(deliverable.id);
-                return (
-                  <Collapsible key={deliverable.id} open={isExpanded} onOpenChange={() => toggleExpanded(deliverable.id)} asChild>
-                    <>
-                      <TableRow
-                        className={cn(
-                          "group hover:bg-muted/50 cursor-pointer",
-                          deliverable.completed && "opacity-60",
-                          selectedItems.has(deliverable.id) && "bg-primary/5",
-                          isExpanded && "bg-muted/30"
-                        )}
-                      >
-                        <TableCell className="w-[32px] px-2">
-                          <CollapsibleTrigger asChild>
-                            <button className="p-0.5 rounded hover:bg-muted" onClick={e => e.stopPropagation()}>
-                              <ChevronRight className={cn("h-3.5 w-3.5 transition-transform duration-200", isExpanded && "rotate-90")} />
-                            </button>
-                          </CollapsibleTrigger>
-                        </TableCell>
-                        {isColumnVisible('select') && (
-                          <TableCell>
-                            <Checkbox checked={selectedItems.has(deliverable.id)} onCheckedChange={() => toggleSelectItem(deliverable.id)} />
-                          </TableCell>
-                        )}
-                        {isColumnVisible('name') && (
-                          <TableCell style={{ width: getColumnWidth('name') }}>
-                            <EnhancedInlineEditCell
-                              value={deliverable.name}
-                              onSave={(val) => handleInlineUpdate(deliverable.id, 'name', val as string)}
-                              disabled={!canManage}
-                              className={cn(deliverable.completed && "line-through")}
-                            />
-                          </TableCell>
-                        )}
-                        {isColumnVisible('assignee') && (
-                          <TableCell style={{ width: getColumnWidth('assignee') }}>
-                            {deliverable.assignee_profile ? (
-                              <div className="flex items-center gap-1.5">
-                                <Avatar className="h-6 w-6">
-                                  {deliverable.assignee_profile.avatar_url && <AvatarImage src={deliverable.assignee_profile.avatar_url} />}
-                                  <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
-                                    {(deliverable.assignee_profile.full_name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <span className="text-xs truncate">{deliverable.assignee_profile.full_name}</span>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
+              {groupedDeliverables.map(group => (
+                <Fragment key={group.key}>
+                  {groupBy !== 'none' && (
+                    <TableRow className="bg-muted/40 hover:bg-muted/60">
+                      <TableCell colSpan={visibleColumnCount + 1} className="py-2 px-4">
+                        <span className="text-sm font-semibold">{group.label}</span>
+                        <Badge variant="secondary" className="ml-2 text-[10px]">{group.items.length}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {group.items.map(deliverable => {
+                    const isExpanded = expandedDeliverables.has(deliverable.id);
+                    const status = getDeliverableStatus(deliverable);
+                    return (
+                      <Collapsible key={deliverable.id} open={isExpanded} onOpenChange={() => toggleExpanded(deliverable.id)} asChild>
+                        <>
+                          <TableRow
+                            className={cn(
+                              "group hover:bg-muted/50 cursor-pointer",
+                              deliverable.completed && "opacity-60",
+                              selectedItems.has(deliverable.id) && "bg-primary/5",
+                              isExpanded && "bg-muted/30"
                             )}
-                          </TableCell>
-                        )}
-                        {isColumnVisible('team') && (
-                          <TableCell style={{ width: getColumnWidth('team') }}>
-                            <span className="text-xs text-muted-foreground">{deliverable.department_info?.name || '—'}</span>
-                          </TableCell>
-                        )}
-                        {isColumnVisible('budget') && (
-                          <TableCell style={{ width: getColumnWidth('budget') }}>
-                            <EnhancedInlineEditCell
-                              value={Number(deliverable.budget) || 0}
-                              onSave={(val) => handleInlineUpdate(deliverable.id, 'budget', Number(val) || 0)}
-                              type="number"
-                              disabled={!canManage}
-                              displayValue={`€${(Number(deliverable.budget) || 0).toLocaleString()}`}
-                            />
-                          </TableCell>
-                        )}
-                        {isColumnVisible('cost') && (
-                          <TableCell style={{ width: getColumnWidth('cost') }}>
-                            <EnhancedInlineEditCell
-                              value={Number(deliverable.cost) || 0}
-                              onSave={(val) => handleInlineUpdate(deliverable.id, 'cost', Number(val) || 0)}
-                              type="number"
-                              disabled={!canManage}
-                              displayValue={`€${(Number(deliverable.cost) || 0).toLocaleString()}`}
-                            />
-                          </TableCell>
-                        )}
-                        {isColumnVisible('due_date') && (
-                          <TableCell style={{ width: getColumnWidth('due_date') }}>
-                            <EnhancedInlineEditCell
-                              value={deliverable.due_date || ''}
-                              onSave={(val) => handleInlineUpdate(deliverable.id, 'due_date', val as string || null)}
-                              type="date"
-                              disabled={!canManage}
-                              displayValue={deliverable.due_date ? format(parseISO(deliverable.due_date), 'd MMM yyyy', { locale: el }) : '-'}
-                            />
-                          </TableCell>
-                        )}
-                        {isColumnVisible('completed') && (
-                          <TableCell style={{ width: getColumnWidth('completed') }}>
-                            <Checkbox
-                              checked={deliverable.completed || false}
-                              onCheckedChange={() => toggleCompleted(deliverable)}
-                              disabled={!canManage}
-                            />
-                          </TableCell>
-                        )}
-                        {isColumnVisible('actions') && (
-                          <TableCell>
-                            {canManage && (
-                              <EditDeleteActions
-                                onEdit={() => handleEdit(deliverable)}
-                                onDelete={() => handleDelete(deliverable.id)}
-                                itemName={`το παραδοτέο "${deliverable.name}"`}
-                              />
+                          >
+                            <TableCell className="w-[32px] px-2">
+                              <CollapsibleTrigger asChild>
+                                <button className="p-0.5 rounded hover:bg-muted" onClick={e => e.stopPropagation()}>
+                                  <ChevronRight className={cn("h-3.5 w-3.5 transition-transform duration-200", isExpanded && "rotate-90")} />
+                                </button>
+                              </CollapsibleTrigger>
+                            </TableCell>
+                            {isColumnVisible('select') && (
+                              <TableCell>
+                                <Checkbox checked={selectedItems.has(deliverable.id)} onCheckedChange={() => toggleSelectItem(deliverable.id)} />
+                              </TableCell>
                             )}
-                          </TableCell>
-                        )}
-                      </TableRow>
-                      <CollapsibleContent asChild>
-                        <tr>
-                          <td colSpan={visibleColumnCount + 1} className="p-0 border-b">
-                            <div className="bg-muted/20 border-l-2 border-foreground/10 ml-4">
-                              <DeliverableTasksPanel deliverableId={deliverable.id} />
-                            </div>
-                          </td>
-                        </tr>
-                      </CollapsibleContent>
-                    </>
-                  </Collapsible>
-                );
-              })}
+                            {isColumnVisible('name') && (
+                              <TableCell style={{ width: getColumnWidth('name') }}>
+                                <EnhancedInlineEditCell
+                                  value={deliverable.name}
+                                  onSave={(val) => handleInlineUpdate(deliverable.id, 'name', val as string)}
+                                  disabled={!canManage}
+                                  className={cn(deliverable.completed && "line-through")}
+                                />
+                              </TableCell>
+                            )}
+                            {isColumnVisible('status') && (
+                              <TableCell style={{ width: getColumnWidth('status') }} className="p-1">
+                                <MondayStatusCell
+                                  value={status}
+                                  options={Object.entries(DELIVERABLE_STATUS_COLORS).map(([value, c]) => ({
+                                    value,
+                                    label: c.label,
+                                    bg: c.bg,
+                                    text: c.text,
+                                  }))}
+                                  onSave={async (val) => {
+                                    const newCompleted = val === 'completed';
+                                    try {
+                                      const { error } = await supabase.from('deliverables').update({ completed: newCompleted }).eq('id', deliverable.id);
+                                      if (error) throw error;
+                                      fetchDeliverables();
+                                    } catch { toast.error('Σφάλμα'); }
+                                  }}
+                                  disabled={!canManage}
+                                />
+                              </TableCell>
+                            )}
+                            {isColumnVisible('assignee') && (
+                              <TableCell style={{ width: getColumnWidth('assignee') }}>
+                                {deliverable.assignee_profile ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <Avatar className="h-6 w-6">
+                                      {deliverable.assignee_profile.avatar_url && <AvatarImage src={deliverable.assignee_profile.avatar_url} />}
+                                      <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                                        {(deliverable.assignee_profile.full_name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <span className="text-xs truncate">{deliverable.assignee_profile.full_name}</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                            )}
+                            {isColumnVisible('team') && (
+                              <TableCell style={{ width: getColumnWidth('team') }}>
+                                <span className="text-xs text-muted-foreground">{deliverable.department_info?.name || '—'}</span>
+                              </TableCell>
+                            )}
+                            {isColumnVisible('budget') && (
+                              <TableCell style={{ width: getColumnWidth('budget') }}>
+                                <EnhancedInlineEditCell
+                                  value={Number(deliverable.budget) || 0}
+                                  onSave={(val) => handleInlineUpdate(deliverable.id, 'budget', Number(val) || 0)}
+                                  type="number"
+                                  disabled={!canManage}
+                                  displayValue={`€${(Number(deliverable.budget) || 0).toLocaleString()}`}
+                                />
+                              </TableCell>
+                            )}
+                            {isColumnVisible('cost') && (
+                              <TableCell style={{ width: getColumnWidth('cost') }}>
+                                <EnhancedInlineEditCell
+                                  value={Number(deliverable.cost) || 0}
+                                  onSave={(val) => handleInlineUpdate(deliverable.id, 'cost', Number(val) || 0)}
+                                  type="number"
+                                  disabled={!canManage}
+                                  displayValue={`€${(Number(deliverable.cost) || 0).toLocaleString()}`}
+                                />
+                              </TableCell>
+                            )}
+                            {isColumnVisible('due_date') && (
+                              <TableCell style={{ width: getColumnWidth('due_date') }}>
+                                <EnhancedInlineEditCell
+                                  value={deliverable.due_date || ''}
+                                  onSave={(val) => handleInlineUpdate(deliverable.id, 'due_date', val as string || null)}
+                                  type="date"
+                                  disabled={!canManage}
+                                  displayValue={deliverable.due_date ? format(parseISO(deliverable.due_date), 'd MMM yyyy', { locale: el }) : '-'}
+                                />
+                              </TableCell>
+                            )}
+                            {isColumnVisible('actions') && (
+                              <TableCell>
+                                {canManage && (
+                                  <EditDeleteActions
+                                    onEdit={() => handleEdit(deliverable)}
+                                    onDelete={() => handleDelete(deliverable.id)}
+                                    itemName={`το παραδοτέο "${deliverable.name}"`}
+                                  />
+                                )}
+                              </TableCell>
+                            )}
+                          </TableRow>
+                          <CollapsibleContent asChild>
+                            <tr>
+                              <td colSpan={visibleColumnCount + 1} className="p-0 border-b">
+                                <div className="bg-muted/20 border-l-2 border-foreground/10 ml-4">
+                                  <DeliverableTasksPanel deliverableId={deliverable.id} />
+                                </div>
+                              </td>
+                            </tr>
+                          </CollapsibleContent>
+                        </>
+                      </Collapsible>
+                    );
+                  })}
+                </Fragment>
+              ))}
             </TableBody>
           </Table>
         </div>

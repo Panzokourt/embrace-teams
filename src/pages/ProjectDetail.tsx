@@ -20,11 +20,13 @@ import { ProjectMediaPlansCard } from '@/components/projects/ProjectMediaPlansCa
 import { ProjectWorkflowTracker } from '@/components/projects/ProjectWorkflowTracker';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import {
   ArrowLeft, Calendar, DollarSign, Clock, Loader2, Megaphone, GitBranch,
   Palette, FolderInput, Timer, ListChecks, FileText, MessageSquare,
   Pencil, Save, X, ClipboardList, Sparkles, FolderOpen, Layers,
+  AlignLeft, Users, TrendingUp, Briefcase, Receipt, Activity,
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,

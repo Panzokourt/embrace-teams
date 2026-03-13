@@ -2,12 +2,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { usePagination } from '@/hooks/usePagination';
 import { useTimeTracking } from '@/hooks/useTimeTracking';
-import { useLeaveManagement } from '@/hooks/useLeaveManagement';
 import { useXPEngine } from '@/hooks/useXPEngine';
-import { useUserXP } from '@/hooks/useUserXP';
-import { XPBadge } from '@/components/gamification/XPBadge';
 import { LevelProgressBar } from '@/components/gamification/LevelProgressBar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,34 +12,22 @@ import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { PaginationControls } from '@/components/shared/PaginationControls';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
-import { briefDefinitions } from '@/components/blueprints/briefDefinitions';
-import { BriefFormDialog } from '@/components/blueprints/BriefFormDialog';
-import { getBriefDefinition } from '@/components/blueprints/briefDefinitions';
-import {
-  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragOverlay, rectIntersection,
-} from '@dnd-kit/core';
-import {
-  arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable,
-} from '@dnd-kit/sortable';
-import { useDroppable } from '@dnd-kit/core';
-import { CSS } from '@dnd-kit/utilities';
 import {
   CheckSquare, Clock, AlertTriangle, Play, Square, ArrowRight,
-  Plus, CalendarDays, Timer, FileText, FolderKanban,
-  ChevronRight, Palmtree, Check, X, GripVertical, ExternalLink,
-  Palette, Monitor, Globe, Calendar, MessageSquare, BarChart3,
-  FileArchive, Flag,
-  ChevronDown, Crosshair, Inbox, Zap,
+  Timer, ChevronRight, ChevronDown, ExternalLink, FolderKanban,
+  Package, ListChecks, Check, X, Flag, CalendarDays, Inbox,
+  Send, ClipboardCheck, Plus, StopCircle,
 } from 'lucide-react';
-import { format, isBefore, startOfDay, endOfWeek, startOfTomorrow, isAfter } from 'date-fns';
+import {
+  format, isBefore, startOfDay, startOfWeek, addDays, isToday, isSameDay,
+} from 'date-fns';
 import { el } from 'date-fns/locale';
-import { useFocusMode } from '@/contexts/FocusContext';
-import { PendingApprovalsCard } from '@/components/work/PendingApprovalsCard';
+import { STATUS_COLORS, PRIORITY_COLORS } from '@/components/shared/mondayStyleConfig';
 
 // ── Types ──────────────────────────────────────────
-interface TaskWithProject {
+interface TaskItem {
   id: string;
   title: string;
   status: string;
@@ -53,9 +37,8 @@ interface TaskWithProject {
   estimated_hours: number | null;
   actual_hours: number | null;
   progress: number | null;
-  task_type: string | null;
-  task_category: string | null;
   project_id: string;
+  deliverable_id: string | null;
   description?: string | null;
   assigned_to?: string | null;
   approver?: string | null;
@@ -64,448 +47,62 @@ interface TaskWithProject {
   assignee?: { full_name: string | null } | null;
 }
 
+interface DeliverableItem {
+  id: string;
+  name: string;
+  completed: boolean | null;
+  due_date: string | null;
+  project_id: string;
+}
+
 interface MyProject {
   id: string;
   name: string;
   status: string;
   progress: number | null;
+  parent_project_id: string | null;
   client?: { name: string } | null;
 }
 
-
-
-import { STATUS_COLORS, PRIORITY_COLORS } from '@/components/shared/mondayStyleConfig';
-
-const TASK_SELECT = 'id, title, status, priority, due_date, start_date, estimated_hours, actual_hours, progress, task_type, task_category, project_id, description, assigned_to, internal_reviewer, project:projects(name)';
-
-// ── Helpers ────────────────────────────────────────
-function getStatusLabel(s: string) {
-  return STATUS_COLORS[s]?.label || s;
+interface TimeEntryToday {
+  id: string;
+  duration_minutes: number;
+  description: string | null;
+  task?: { title: string } | null;
+  start_time: string;
 }
+
+const TASK_SELECT = 'id, title, status, priority, due_date, start_date, estimated_hours, actual_hours, progress, project_id, deliverable_id, description, assigned_to, internal_reviewer, approver, project:projects(name)';
+
+function getStatusLabel(s: string) { return STATUS_COLORS[s]?.label || s; }
 function getStatusStyle(s: string): React.CSSProperties {
-  const c = STATUS_COLORS[s];
-  return c ? { backgroundColor: c.bg, color: c.text } : {};
+  const c = STATUS_COLORS[s]; return c ? { backgroundColor: c.bg, color: c.text } : {};
 }
 function getPriorityStyle(p: string): React.CSSProperties {
-  const c = PRIORITY_COLORS[p];
-  return c ? { backgroundColor: c.bg, color: c.text } : {};
+  const c = PRIORITY_COLORS[p]; return c ? { backgroundColor: c.bg, color: c.text } : {};
 }
-function getOrderKey(userId: string) {
-  return `my-work-task-order-${userId}-${format(new Date(), 'yyyy-MM-dd')}`;
-}
-
-// ── Task Table Header ──────────────────────────────
-function TaskTableHeader({ draggable = false }: { draggable?: boolean }) {
-  return (
-    <thead>
-      <tr className="border-b border-border/50 text-xs text-muted-foreground">
-        {draggable && <th className="w-8 py-2 px-2" />}
-        <th className="w-8 py-2 px-2" />
-        <th className="py-2 px-2 text-left font-medium">Task</th>
-        <th className="py-2 px-2 text-left font-medium hidden md:table-cell">Έργο</th>
-        <th className="py-2 px-2 text-left font-medium hidden sm:table-cell">Έναρξη</th>
-        <th className="py-2 px-2 text-left font-medium hidden sm:table-cell">Λήξη</th>
-        <th className="py-2 px-2 text-left font-medium">Status</th>
-        <th className="py-2 px-2 text-left font-medium hidden sm:table-cell">Priority</th>
-        <th className="w-10 py-2 px-2" />
-        <th className="w-8 py-2 px-2" />
-      </tr>
-    </thead>
-  );
-}
-
-// ── Flag Button ────────────────────────────────────
-function FlagButton({ task, onToggle }: { task: TaskWithProject; onToggle: (task: TaskWithProject) => void }) {
-  const isUrgent = task.priority === 'urgent';
-  const isHigh = task.priority === 'high';
-  return (
-    <Button
-      size="icon"
-      variant="ghost"
-      className={`h-7 w-7 ${isUrgent ? 'text-destructive hover:text-destructive' : isHigh ? 'text-orange-500 hover:text-orange-500' : 'text-muted-foreground hover:text-muted-foreground'}`}
-      onClick={(e) => { e.stopPropagation(); onToggle(task); }}
-      title={isUrgent ? 'Αφαίρεση σήμανσης Επείγον' : 'Σήμανση ως Επείγον'}
-    >
-      <Flag className={`h-3.5 w-3.5 ${isUrgent ? 'fill-destructive' : ''}`} />
-    </Button>
-  );
-}
-
-// ── Sortable Task Row ──────────────────────────────
-function SortableTaskRow({
-  task, today, onComplete, onOpenSheet, activeTimer, startTimer, stopTimer, onFlagToggle, showDate = false, draggable = false,
-}: {
-  task: TaskWithProject; today: Date; onComplete: (t: TaskWithProject) => void;
-  onOpenSheet: (t: TaskWithProject) => void; activeTimer: any; startTimer: any; stopTimer: any;
-  onFlagToggle: (task: TaskWithProject) => void;
-  showDate?: boolean; draggable?: boolean;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
-  const style = draggable ? { transform: CSS.Transform.toString(transform), transition } : undefined;
-  const isOverdue = task.due_date && isBefore(new Date(task.due_date), today);
-
-  return (
-    <tr
-      ref={draggable ? setNodeRef : undefined}
-      style={style}
-      className={`border-b border-border/50 hover:bg-muted/30 transition-colors ${isDragging ? 'opacity-50 z-50' : ''}`}
-    >
-      {draggable && (
-        <td className="py-2.5 px-2 w-8">
-          <button {...attributes} {...listeners} className="cursor-grab touch-none text-muted-foreground hover:text-foreground">
-            <GripVertical className="h-4 w-4" />
-          </button>
-        </td>
-      )}
-      <td className="py-2.5 px-2 w-8">
-        <Checkbox className="h-4 w-4" onCheckedChange={() => onComplete(task)} />
-      </td>
-      <td className="py-2.5 px-2 cursor-pointer" onClick={() => onOpenSheet(task)}>
-        <span className="text-sm font-medium text-foreground hover:text-primary">{task.title}</span>
-      </td>
-      <td className="py-2.5 px-2 hidden md:table-cell">
-        <span className="text-xs text-muted-foreground truncate">{(task.project as any)?.name || '-'}</span>
-      </td>
-      <td className="py-2.5 px-2 hidden sm:table-cell">
-        <span className="text-xs text-muted-foreground">{task.start_date ? format(new Date(task.start_date), 'd/MM') : '-'}</span>
-      </td>
-      <td className="py-2.5 px-2 hidden sm:table-cell">
-        <span className={`text-xs ${isOverdue ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
-          {task.due_date ? format(new Date(task.due_date), 'd/MM') : '-'}
-        </span>
-      </td>
-      <td className="py-2.5 px-2">
-        <span className="text-[10px] font-medium rounded-full px-2 py-0.5" style={getStatusStyle(task.status)}>{getStatusLabel(task.status)}</span>
-      </td>
-      <td className="py-2.5 px-2 hidden sm:table-cell">
-        <span className="text-[10px] font-medium rounded-full px-2 py-0.5" style={getPriorityStyle(task.priority)}>{PRIORITY_COLORS[task.priority]?.label || task.priority}</span>
-      </td>
-      <td className="py-2.5 px-2 w-10">
-        {!activeTimer?.is_running || activeTimer.task_id !== task.id ? (
-          <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => startTimer(task.id, task.project_id)}>
-            <Play className="h-3.5 w-3.5" />
-          </Button>
-        ) : (
-          <Button size="icon" variant="ghost" className="h-7 w-7 text-primary" onClick={() => stopTimer()}>
-            <Square className="h-3.5 w-3.5" />
-          </Button>
-        )}
-      </td>
-      <td className="py-2.5 px-2 w-8">
-        <FlagButton task={task} onToggle={onFlagToggle} />
-      </td>
-    </tr>
-  );
-}
-
-// ── Backlog Task Row (simpler, draggable) ──────────
-function BacklogTaskRow({
-  task, today, onComplete, onOpenSheet, activeTimer, startTimer, stopTimer, onFlagToggle,
-}: {
-  task: TaskWithProject; today: Date; onComplete: (t: TaskWithProject) => void;
-  onOpenSheet: (t: TaskWithProject) => void; activeTimer: any; startTimer: any; stopTimer: any;
-  onFlagToggle: (task: TaskWithProject) => void;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
-  const style = { transform: CSS.Transform.toString(transform), transition };
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`flex items-center gap-2 px-3 py-2.5 border-b border-border/50 hover:bg-muted/30 transition-colors ${isDragging ? 'opacity-50 z-50' : ''}`}
-    >
-      <button {...attributes} {...listeners} className="cursor-grab touch-none text-muted-foreground hover:text-foreground shrink-0">
-        <GripVertical className="h-4 w-4" />
-      </button>
-      <Checkbox className="h-4 w-4 shrink-0" onCheckedChange={() => onComplete(task)} />
-      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onOpenSheet(task)}>
-        <p className="text-sm font-medium text-foreground hover:text-primary truncate">{task.title}</p>
-        <p className="text-xs text-muted-foreground truncate">{(task.project as any)?.name || '-'}</p>
-      </div>
-      <span className="text-[10px] font-medium rounded-full px-2 py-0.5 shrink-0 hidden sm:flex" style={getPriorityStyle(task.priority)}>{PRIORITY_COLORS[task.priority]?.label || task.priority}</span>
-      {!activeTimer?.is_running || activeTimer.task_id !== task.id ? (
-        <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-primary shrink-0" onClick={() => startTimer(task.id, task.project_id)}>
-          <Play className="h-3.5 w-3.5" />
-        </Button>
-      ) : (
-        <Button size="icon" variant="ghost" className="h-7 w-7 text-primary shrink-0" onClick={() => stopTimer()}>
-          <Square className="h-3.5 w-3.5" />
-        </Button>
-      )}
-    </div>
-  );
-}
-
-// ── Droppable Container ────────────────────────────
-function DroppableContainer({ id, children, className }: { id: string; children: React.ReactNode; className?: string }) {
-  const { setNodeRef, isOver } = useDroppable({ id });
-  return (
-    <div ref={setNodeRef} className={`min-h-[100px] transition-colors rounded-lg ${isOver ? 'bg-primary/5 ring-2 ring-primary/20' : ''} ${className || ''}`}>
-      {children}
-    </div>
-  );
-}
-
-// ── Attention Panel ────────────────────────────────
-function AttentionPanel({
-  overdueTasks, highPriorityTasks, internalReviewTasks, approvalTasks, attentionCount,
-  onOpenTask, onFlagToggle, onApproveInternal, onRejectInternal, onApproveClient, onRejectClient,
-  activeTimer, startTimer, stopTimer,
-}: {
-  overdueTasks: TaskWithProject[];
-  highPriorityTasks: TaskWithProject[];
-  internalReviewTasks: TaskWithProject[];
-  approvalTasks: TaskWithProject[];
-  attentionCount: number;
-  onOpenTask: (t: TaskWithProject) => void;
-  onFlagToggle: (t: TaskWithProject) => void;
-  onApproveInternal: (t: TaskWithProject) => void;
-  onRejectInternal: (t: TaskWithProject) => void;
-  onApproveClient: (t: TaskWithProject) => void;
-  onRejectClient: (t: TaskWithProject) => void;
-  activeTimer: any;
-  startTimer: any;
-  stopTimer: any;
-}) {
-  const [overdueOpen, setOverdueOpen] = useState(true);
-  const [highOpen, setHighOpen] = useState(true);
-
-  const overduePagination = usePagination(6);
-  const highPriorityPagination = usePagination(6);
-  const internalReviewPagination = usePagination(6);
-  const approvalPagination = usePagination(6);
-
-  useEffect(() => {
-    overduePagination.setTotalCount(overdueTasks.length);
-  }, [overdueTasks.length, overduePagination]);
-
-  useEffect(() => {
-    highPriorityPagination.setTotalCount(highPriorityTasks.length);
-  }, [highPriorityTasks.length, highPriorityPagination]);
-
-  useEffect(() => {
-    internalReviewPagination.setTotalCount(internalReviewTasks.length);
-  }, [internalReviewTasks.length, internalReviewPagination]);
-
-  useEffect(() => {
-    approvalPagination.setTotalCount(approvalTasks.length);
-  }, [approvalTasks.length, approvalPagination]);
-
-  const pagedOverdueTasks = useMemo(
-    () => overdueTasks.slice(overduePagination.from, overduePagination.to + 1),
-    [overdueTasks, overduePagination.from, overduePagination.to],
-  );
-
-  const pagedHighPriorityTasks = useMemo(
-    () => highPriorityTasks.slice(highPriorityPagination.from, highPriorityPagination.to + 1),
-    [highPriorityTasks, highPriorityPagination.from, highPriorityPagination.to],
-  );
-
-  const pagedInternalReviewTasks = useMemo(
-    () => internalReviewTasks.slice(internalReviewPagination.from, internalReviewPagination.to + 1),
-    [internalReviewTasks, internalReviewPagination.from, internalReviewPagination.to],
-  );
-
-  const pagedApprovalTasks = useMemo(
-    () => approvalTasks.slice(approvalPagination.from, approvalPagination.to + 1),
-    [approvalTasks, approvalPagination.from, approvalPagination.to],
-  );
-
-  const SectionHeader = ({ emoji, label, count, open, onToggle }: { emoji: string; label: string; count: number; open: boolean; onToggle: () => void }) => (
-    <button
-      onClick={onToggle}
-      className="w-full flex items-center gap-2 px-4 md:px-6 py-2 border-b border-border/50 hover:bg-muted/30 transition-colors text-left"
-    >
-      <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${open ? '' : '-rotate-90'}`} />
-      <span className="text-xs font-semibold">{emoji} {label} ({count})</span>
-    </button>
-  );
-
-  const TaskMiniRow = ({ task, isOverdue }: { task: TaskWithProject; isOverdue?: boolean }) => (
-    <div className="flex items-center gap-2 px-4 md:px-6 py-2.5 hover:bg-muted/30 transition-colors">
-      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onOpenTask(task)}>
-        <p className="text-sm font-medium text-foreground hover:text-primary truncate">{task.title}</p>
-        <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-xs text-muted-foreground">{(task.project as any)?.name || '-'}</span>
-          {task.due_date && (
-            <span className={`text-xs font-medium ${isOverdue ? 'text-destructive' : 'text-muted-foreground'}`}>
-              · {format(new Date(task.due_date), 'd/MM', { locale: el })}{isOverdue ? ' !!!' : ''}
-            </span>
-          )}
-        </div>
-      </div>
-      <span className="text-[10px] font-medium rounded-full px-2 py-0.5 hidden sm:flex" style={getStatusStyle(task.status)}>{getStatusLabel(task.status)}</span>
-      {!activeTimer?.is_running || activeTimer.task_id !== task.id ? (
-        <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-primary shrink-0" onClick={() => startTimer(task.id, task.project_id)}>
-          <Play className="h-3.5 w-3.5" />
-        </Button>
-      ) : (
-        <Button size="icon" variant="ghost" className="h-7 w-7 text-primary shrink-0" onClick={() => stopTimer()}>
-          <Square className="h-3.5 w-3.5" />
-        </Button>
-      )}
-      <FlagButton task={task} onToggle={onFlagToggle} />
-    </div>
-  );
-
-  return (
-    <Card className="border-destructive/20 border">
-      <CardHeader className="pb-3 border-b border-border/50">
-        <CardTitle className="text-base font-semibold flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-destructive" />
-          Απαιτούν Προσοχή
-          <Badge variant="destructive" className="text-xs ml-1">{attentionCount}</Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        {/* Εκπρόθεσμα */}
-        {overdueTasks.length > 0 && (
-          <>
-            <SectionHeader emoji="🔴" label="Εκπρόθεσμα" count={overdueTasks.length} open={overdueOpen} onToggle={() => setOverdueOpen(v => !v)} />
-            {overdueOpen && (
-              <>
-                <div className="max-h-72 overflow-y-auto">
-                  <div className="divide-y divide-border/50">
-                    {pagedOverdueTasks.map(task => <TaskMiniRow key={task.id} task={task} isOverdue />)}
-                  </div>
-                </div>
-                {overdueTasks.length > overduePagination.pageSize && (
-                  <div className="px-4 md:px-6 border-t border-border/50">
-                    <PaginationControls pagination={overduePagination} />
-                  </div>
-                )}
-              </>
-            )}
-          </>
-        )}
-
-        {/* Υψηλή Προτεραιότητα */}
-        {highPriorityTasks.length > 0 && (
-          <>
-            <SectionHeader emoji="🟠" label="Υψηλή Προτεραιότητα" count={highPriorityTasks.length} open={highOpen} onToggle={() => setHighOpen(v => !v)} />
-            {highOpen && (
-              <>
-                <div className="max-h-72 overflow-y-auto">
-                  <div className="divide-y divide-border/50">
-                    {pagedHighPriorityTasks.map(task => <TaskMiniRow key={task.id} task={task} />)}
-                  </div>
-                </div>
-                {highPriorityTasks.length > highPriorityPagination.pageSize && (
-                  <div className="px-4 md:px-6 border-t border-border/50">
-                    <PaginationControls pagination={highPriorityPagination} />
-                  </div>
-                )}
-              </>
-            )}
-          </>
-        )}
-
-        {/* Εσωτερική Έγκριση */}
-        {internalReviewTasks.length > 0 && (
-          <>
-            <div className="px-4 md:px-6 py-2 bg-muted/20 border-b border-border/50">
-              <span className="text-xs font-semibold">🏢 Εσωτερική Έγκριση ({internalReviewTasks.length})</span>
-            </div>
-            <div className="max-h-72 overflow-y-auto">
-              <div className="divide-y divide-border/50">
-                {pagedInternalReviewTasks.map(task => (
-                  <div key={task.id} className="flex items-center gap-3 px-4 md:px-6 py-3">
-                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onOpenTask(task)}>
-                      <p className="text-sm font-medium text-foreground hover:text-primary">{task.title}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
-                        {(task as any).assignee?.full_name && <span className="text-xs text-muted-foreground">· {(task as any).assignee.full_name}</span>}
-                      </div>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <Button size="icon" variant="ghost" className="h-7 w-7 text-success hover:text-success" onClick={() => onApproveInternal(task)}><Check className="h-4 w-4" /></Button>
-                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onRejectInternal(task)}><X className="h-4 w-4" /></Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            {internalReviewTasks.length > internalReviewPagination.pageSize && (
-              <div className="px-4 md:px-6 border-t border-border/50">
-                <PaginationControls pagination={internalReviewPagination} />
-              </div>
-            )}
-          </>
-        )}
-
-        {/* Έγκριση Πελάτη */}
-        {approvalTasks.length > 0 && (
-          <>
-            <div className="px-4 md:px-6 py-2 bg-muted/20 border-b border-border/50">
-              <span className="text-xs font-semibold">🤝 Έγκριση Πελάτη ({approvalTasks.length})</span>
-            </div>
-            <div className="max-h-72 overflow-y-auto">
-              <div className="divide-y divide-border/50">
-                {pagedApprovalTasks.map(task => (
-                  <div key={task.id} className="flex items-center gap-3 px-4 md:px-6 py-3">
-                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onOpenTask(task)}>
-                      <p className="text-sm font-medium text-foreground hover:text-primary">{task.title}</p>
-                      <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
-                    </div>
-                    <span className="text-[10px] font-medium rounded-full px-2 py-0.5" style={getPriorityStyle(task.priority)}>{PRIORITY_COLORS[task.priority]?.label || task.priority}</span>
-                    <div className="flex gap-1.5">
-                      <Button size="icon" variant="ghost" className="h-7 w-7 text-success hover:text-success" onClick={() => onApproveClient(task)}><Check className="h-4 w-4" /></Button>
-                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onRejectClient(task)}><X className="h-4 w-4" /></Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            {approvalTasks.length > approvalPagination.pageSize && (
-              <div className="px-4 md:px-6 border-t border-border/50">
-                <PaginationControls pagination={approvalPagination} />
-              </div>
-            )}
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-
 
 // ── Main Page ──────────────────────────────────────
 export default function MyWork() {
-  const { user, profile, isAdmin, isManager } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
-  const { enterFocus } = useFocusMode();
   const { activeTimer, elapsed, formatElapsed, startTimer, stopTimer } = useTimeTracking();
-  const { balances, pendingApprovals, approveRequest, rejectRequest } = useLeaveManagement();
   const { awardTaskXP } = useXPEngine();
 
-  const [todayTasks, setTodayTasks] = useState<TaskWithProject[]>([]);
-  const [weekTasks, setWeekTasks] = useState<TaskWithProject[]>([]);
-  const [upcomingTasks, setUpcomingTasks] = useState<TaskWithProject[]>([]);
-  const [backlogTasks, setBacklogTasks] = useState<TaskWithProject[]>([]);
-  const [approvalTasks, setApprovalTasks] = useState<TaskWithProject[]>([]);
-  const [internalReviewTasks, setInternalReviewTasks] = useState<TaskWithProject[]>([]);
   const [myProjects, setMyProjects] = useState<MyProject[]>([]);
+  const [projectTasks, setProjectTasks] = useState<Record<string, TaskItem[]>>({});
+  const [projectDeliverables, setProjectDeliverables] = useState<Record<string, DeliverableItem[]>>({});
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const [sentForApproval, setSentForApproval] = useState<TaskItem[]>([]);
+  const [needMyApproval, setNeedMyApproval] = useState<TaskItem[]>([]);
   const [todayHours, setTodayHours] = useState(0);
+  const [todayEntries, setTodayEntries] = useState<TimeEntryToday[]>([]);
+  const [allMyTasks, setAllMyTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [orderedIds, setOrderedIds] = useState<string[]>([]);
-  const [selectedTask, setSelectedTask] = useState<TaskWithProject | null>(null);
-  const [selectedBriefType, setSelectedBriefType] = useState<string | null>(null);
-  const [backlogOpen, setBacklogOpen] = useState(true);
-
-  const todayPagination = usePagination(10);
-  const backlogPagination = usePagination(10);
-  const weekPagination = usePagination(12);
-  const upcomingPagination = usePagination(10);
-  const projectsPagination = usePagination(5);
-  const leaveBalancePagination = usePagination(5);
-  const leaveApprovalsPagination = usePagination(6);
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
+  const [selectedItem, setSelectedItem] = useState<{ type: 'task' | 'deliverable'; data: any } | null>(null);
+  const [activeView, setActiveView] = useState<'projects' | 'calendar'>('projects');
+  const [calendarMode, setCalendarMode] = useState<'week' | 'day'>('week');
+  const [calendarDate, setCalendarDate] = useState(new Date());
 
   const greeting = useMemo(() => {
     const h = new Date().getHours();
@@ -514,764 +111,770 @@ export default function MyWork() {
 
   const firstName = profile?.full_name?.split(' ')[0] || 'User';
   const today = startOfDay(new Date());
-  const todayStr = format(new Date(), 'EEEE d MMMM yyyy', { locale: el });
+  const todayStr = format(new Date(), 'EEEE d MMMM', { locale: el });
 
+  // ── KPI calculations ─────────────────────────────
+  const overdueCount = useMemo(() =>
+    allMyTasks.filter(t => t.due_date && isBefore(startOfDay(new Date(t.due_date)), today) && t.status !== 'completed').length,
+    [allMyTasks, today]
+  );
+
+  const todayTaskCount = useMemo(() =>
+    allMyTasks.filter(t => {
+      if (t.status === 'completed') return false;
+      const dd = t.due_date ? startOfDay(new Date(t.due_date)) : null;
+      const sd = t.start_date ? startOfDay(new Date(t.start_date)) : null;
+      return (dd && dd.getTime() === today.getTime()) || (sd && sd.getTime() === today.getTime()) || (dd && isBefore(dd, today));
+    }).length,
+    [allMyTasks, today]
+  );
+
+  const approvalCount = sentForApproval.length + needMyApproval.length;
+
+  // ── Data Fetching ────────────────────────────────
   useEffect(() => { if (user) fetchAll(); }, [user]);
-
-  // Load order from localStorage when todayTasks change
-  useEffect(() => {
-    if (!user || todayTasks.length === 0) { setOrderedIds(todayTasks.map(t => t.id)); return; }
-    const saved = localStorage.getItem(getOrderKey(user.id));
-    if (saved) {
-      try {
-        const savedIds: string[] = JSON.parse(saved);
-        const currentIds = new Set(todayTasks.map(t => t.id));
-        const ordered = savedIds.filter(id => currentIds.has(id));
-        const newIds = todayTasks.map(t => t.id).filter(id => !new Set(ordered).has(id));
-        setOrderedIds([...ordered, ...newIds]);
-      } catch { setOrderedIds(todayTasks.map(t => t.id)); }
-    } else {
-      setOrderedIds(todayTasks.map(t => t.id));
-    }
-  }, [todayTasks, user]);
-
-  const orderedTodayTasks = useMemo(() => {
-    const map = new Map(todayTasks.map(t => [t.id, t]));
-    return orderedIds.map(id => map.get(id)).filter(Boolean) as TaskWithProject[];
-  }, [orderedIds, todayTasks]);
 
   async function fetchAll() {
     if (!user) return;
     setLoading(true);
 
-    const todayISO = format(today, 'yyyy-MM-dd');
-    const weekEnd = format(endOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd');
-    const tomorrowISO = format(startOfTomorrow(), 'yyyy-MM-dd');
-
-    const [allMyTasks, approvalRes, internalReviewRes, projects, timeEntries] = await Promise.all([
+    const [tasksRes, sentRes, needRes, projectsRes, timeRes, entriesRes] = await Promise.all([
       supabase.from('tasks').select(TASK_SELECT).eq('assigned_to', user.id).neq('status', 'completed').order('due_date', { ascending: true }),
-      supabase.from('tasks').select(TASK_SELECT + ', assignee:profiles!assigned_to(full_name)').eq('approver', user.id as any).in('status', ['review', 'client_review'] as any) as any,
-      supabase.from('tasks').select(TASK_SELECT + ', assignee:profiles!assigned_to(full_name)').eq('internal_reviewer', user.id as any).eq('status', 'internal_review' as any) as any,
-      supabase.from('project_user_access').select('project:projects(id, name, status, progress, client:clients(name))').eq('user_id', user.id),
+      supabase.from('tasks').select(TASK_SELECT).eq('assigned_to', user.id).in('status', ['internal_review', 'client_review', 'review'] as any),
+      supabase.from('tasks').select(TASK_SELECT + ', assignee:profiles!assigned_to(full_name)').or(`internal_reviewer.eq.${user.id},approver.eq.${user.id}`).in('status', ['internal_review', 'client_review', 'review'] as any) as any,
+      supabase.from('project_user_access').select('project:projects(id, name, status, progress, parent_project_id, client:clients(name))').eq('user_id', user.id),
       supabase.from('time_entries').select('duration_minutes').eq('user_id', user.id).gte('start_time', new Date(today).toISOString()).eq('is_running', false),
+      supabase.from('time_entries').select('id, duration_minutes, description, start_time, task:tasks(title)').eq('user_id', user.id).gte('start_time', new Date(today).toISOString()).eq('is_running', false).order('start_time', { ascending: false }),
     ]);
 
-    const allTasks = (allMyTasks.data || []) as TaskWithProject[];
-    setApprovalTasks((approvalRes.data || []) as TaskWithProject[]);
-    setInternalReviewTasks((internalReviewRes.data || []) as TaskWithProject[]);
+    setAllMyTasks((tasksRes.data || []) as TaskItem[]);
+    setSentForApproval((sentRes.data || []) as TaskItem[]);
+    setNeedMyApproval((needRes.data || []) as TaskItem[]);
 
-    const todayFiltered = allTasks.filter(t => {
-      const dd = t.due_date ? startOfDay(new Date(t.due_date)) : null;
-      const sd = t.start_date ? startOfDay(new Date(t.start_date)) : null;
-      if (dd && isBefore(dd, today)) return true;
-      if (dd && dd.getTime() === today.getTime()) return true;
-      if (sd && sd.getTime() === today.getTime()) return true;
-      return false;
-    });
+    const projects = (projectsRes.data || []).map((p: any) => p.project).filter((p: any) => p && p.status === 'active') as MyProject[];
+    setMyProjects(projects);
 
-    const todayIds = new Set(todayFiltered.map(t => t.id));
-    const weekFiltered = allTasks.filter(t => {
-      if (todayIds.has(t.id)) return false;
-      const dd = t.due_date ? startOfDay(new Date(t.due_date)) : null;
-      if (!dd) return false;
-      return dd >= startOfDay(new Date(tomorrowISO)) && dd <= startOfDay(new Date(weekEnd));
-    });
-
-    const weekIds = new Set(weekFiltered.map(t => t.id));
-    const upcomingFiltered = allTasks.filter(t => {
-      if (todayIds.has(t.id) || weekIds.has(t.id)) return false;
-      const dd = t.due_date ? startOfDay(new Date(t.due_date)) : null;
-      if (!dd) return false;
-      return isAfter(dd, startOfDay(new Date(weekEnd)));
-    });
-
-    // Backlog: tasks with no due_date
-    const backlogFiltered = allTasks.filter(t => !t.due_date && !todayIds.has(t.id));
-
-    setTodayTasks(todayFiltered);
-    setWeekTasks(weekFiltered);
-    setUpcomingTasks(upcomingFiltered);
-    setBacklogTasks(backlogFiltered);
-
-    const activeProjects = (projects.data || []).map((p: any) => p.project).filter((p: any) => p && p.status === 'active') as MyProject[];
-    setMyProjects(activeProjects);
-
-    const totalMin = (timeEntries.data || []).reduce((s: number, e: any) => s + (e.duration_minutes || 0), 0);
+    const totalMin = (timeRes.data || []).reduce((s: number, e: any) => s + (e.duration_minutes || 0), 0);
     setTodayHours(Math.round((totalMin / 60) * 10) / 10);
+    setTodayEntries((entriesRes.data || []) as TimeEntryToday[]);
+
     setLoading(false);
   }
 
-  const overdueCount = todayTasks.filter(t => t.due_date && isBefore(new Date(t.due_date), today)).length;
-  const overdueTasks = useMemo(() =>
-    [...todayTasks, ...weekTasks, ...upcomingTasks]
-      .filter(t => t.due_date && isBefore(startOfDay(new Date(t.due_date)), today))
-      .sort((a, b) => (a.due_date || '').localeCompare(b.due_date || '')),
-    [todayTasks, weekTasks, upcomingTasks, today]
-  );
+  // ── Expand project → fetch tasks + deliverables ──
+  async function toggleProject(projectId: string) {
+    const next = new Set(expandedProjects);
+    if (next.has(projectId)) {
+      next.delete(projectId);
+      setExpandedProjects(next);
+      return;
+    }
+    next.add(projectId);
+    setExpandedProjects(next);
 
-  const overdueIds = useMemo(() => new Set(overdueTasks.map(t => t.id)), [overdueTasks]);
+    if (!projectTasks[projectId]) {
+      const [tasksRes, delRes] = await Promise.all([
+        supabase.from('tasks').select('id, title, status, priority, due_date, start_date, estimated_hours, actual_hours, progress, project_id, deliverable_id, description, assigned_to').eq('project_id', projectId).eq('assigned_to', user!.id).neq('status', 'completed').order('due_date', { ascending: true }),
+        supabase.from('deliverables').select('id, name, completed, due_date, project_id').eq('project_id', projectId).order('name'),
+      ]);
+      setProjectTasks(prev => ({ ...prev, [projectId]: (tasksRes.data || []) as TaskItem[] }));
+      setProjectDeliverables(prev => ({ ...prev, [projectId]: (delRes.data || []) as DeliverableItem[] }));
+    }
+  }
 
-  const highPriorityTasks = useMemo(() => {
-    const allTasks = [...todayTasks, ...weekTasks, ...upcomingTasks];
-    return allTasks
-      .filter(t => (t.priority === 'urgent' || t.priority === 'high') && !overdueIds.has(t.id))
-      .sort((a, b) => {
-        const order: Record<string, number> = { urgent: 0, high: 1 };
-        return (order[a.priority] ?? 2) - (order[b.priority] ?? 2);
-      });
-  }, [todayTasks, weekTasks, upcomingTasks, overdueIds]);
-
-  const attentionCount = overdueTasks.length + highPriorityTasks.length + internalReviewTasks.length + approvalTasks.length;
-
-  async function toggleTaskComplete(task: TaskWithProject) {
+  async function toggleTaskComplete(task: TaskItem) {
     const { error } = await supabase.from('tasks').update({ status: 'completed' }).eq('id', task.id);
     if (!error) {
       toast.success('Task ολοκληρώθηκε!');
-      // Award XP for task completion
       if (user) await awardTaskXP(user.id, task.id, task.due_date);
-      fetchAll();
+      // Remove from local state
+      setProjectTasks(prev => {
+        const copy = { ...prev };
+        if (copy[task.project_id]) copy[task.project_id] = copy[task.project_id].filter(t => t.id !== task.id);
+        return copy;
+      });
+      setAllMyTasks(prev => prev.filter(t => t.id !== task.id));
     }
   }
 
-  async function approveTask(task: TaskWithProject) {
-    const { error } = await supabase.from('tasks').update({ status: 'completed' as any }).eq('id', task.id);
-    if (!error) {
-      toast.success('Task εγκρίθηκε!');
-      // Award XP — task is now completed
-      if (task.assigned_to) await awardTaskXP(task.assigned_to, task.id, task.due_date);
-      fetchAll();
-    }
-  }
-
-  async function approveInternalReview(task: TaskWithProject) {
-    const newStatus = task.approver ? 'client_review' : 'completed';
+  async function approveReviewTask(task: TaskItem) {
+    const newStatus = task.approver && task.status === 'internal_review' ? 'client_review' : 'completed';
     const { error } = await supabase.from('tasks').update({ status: newStatus as any }).eq('id', task.id);
     if (!error) {
-      toast.success(newStatus === 'client_review' ? 'Προχωρά σε Έγκριση Πελάτη!' : 'Task εγκρίθηκε!');
-      // Award XP if completed
+      toast.success(newStatus === 'completed' ? 'Εγκρίθηκε!' : 'Προχωρά σε Έγκριση Πελάτη');
       if (newStatus === 'completed' && task.assigned_to) await awardTaskXP(task.assigned_to, task.id, task.due_date);
       fetchAll();
     }
   }
 
-  async function rejectInternalReview(task: TaskWithProject) {
-    const { error } = await supabase.from('tasks').update({ status: 'in_progress' as any, internal_reviewer: null as any }).eq('id', task.id);
-    if (!error) { toast.success('Task απορρίφθηκε, επιστροφή σε Σε Εξέλιξη'); fetchAll(); }
-  }
-
-  async function rejectTask(task: TaskWithProject) {
+  async function rejectReviewTask(task: TaskItem) {
     const { error } = await supabase.from('tasks').update({ status: 'in_progress' as any }).eq('id', task.id);
-    if (!error) { toast.success('Task απορρίφθηκε, επιστροφή σε Σε Εξέλιξη'); fetchAll(); }
+    if (!error) { toast.success('Απορρίφθηκε, επιστροφή σε Σε Εξέλιξη'); fetchAll(); }
   }
 
-  async function toggleFlagPriority(task: TaskWithProject) {
-    const newPriority = task.priority === 'urgent' ? 'medium' : 'urgent';
-    const { error } = await supabase.from('tasks').update({ priority: newPriority } as any).eq('id', task.id);
+  async function updateTaskDueDate(taskId: string, newDate: string) {
+    const { error } = await supabase.from('tasks').update({ due_date: newDate } as any).eq('id', taskId);
     if (!error) {
-      toast.success(newPriority === 'urgent' ? '🚩 Σημάνθηκε ως Επείγον!' : 'Αφαιρέθηκε η σήμανση Επείγον');
-      fetchAll();
+      toast.success('Ημερομηνία ενημερώθηκε');
+      setAllMyTasks(prev => prev.map(t => t.id === taskId ? { ...t, due_date: newDate } : t));
     }
   }
 
-  // Unified drag handler for Today reorder + cross-container Backlog↔Today
-  function handleDragEnd(event: any) {
-    const { active, over } = event;
-    if (!active || !over) return;
+  // ── Sub-projects for a project ───────────────────
+  const getSubProjects = useCallback((parentId: string) =>
+    myProjects.filter(p => p.parent_project_id === parentId),
+    [myProjects]
+  );
 
-    const activeId = active.id as string;
-    const overId = over.id as string;
+  const topLevelProjects = useMemo(() =>
+    myProjects.filter(p => !p.parent_project_id || !myProjects.some(mp => mp.id === p.parent_project_id)),
+    [myProjects]
+  );
 
-    const isActiveInToday = orderedIds.includes(activeId);
-    const isActiveInBacklog = backlogTasks.some(t => t.id === activeId);
+  // ── Calendar data ────────────────────────────────
+  const weekStart = startOfWeek(calendarDate, { weekStartsOn: 1 });
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-    // Check if dropping onto a container
-    const isOverTodayContainer = overId === 'today-drop';
-    const isOverBacklogContainer = overId === 'backlog-drop';
-    const isOverInToday = orderedIds.includes(overId) || isOverTodayContainer;
-    const isOverInBacklog = backlogTasks.some(t => t.id === overId) || isOverBacklogContainer;
-
-    // Cross-container: Backlog → Today
-    if (isActiveInBacklog && isOverInToday) {
-      const task = backlogTasks.find(t => t.id === activeId);
-      if (!task) return;
-      const todayISO = format(new Date(), 'yyyy-MM-dd');
-      // Optimistic update
-      setBacklogTasks(prev => prev.filter(t => t.id !== activeId));
-      setTodayTasks(prev => [...prev, { ...task, due_date: todayISO }]);
-      // DB update
-      supabase.from('tasks').update({ due_date: todayISO } as any).eq('id', activeId).then(({ error }) => {
-        if (error) { toast.error('Σφάλμα ενημέρωσης'); fetchAll(); }
-        else toast.success('Task μεταφέρθηκε στο Σήμερα!');
-      });
-      return;
-    }
-
-    // Cross-container: Today → Backlog
-    if (isActiveInToday && isOverInBacklog) {
-      const task = todayTasks.find(t => t.id === activeId);
-      if (!task) return;
-      // Optimistic update
-      setTodayTasks(prev => prev.filter(t => t.id !== activeId));
-      setOrderedIds(prev => prev.filter(id => id !== activeId));
-      setBacklogTasks(prev => [...prev, { ...task, due_date: null }]);
-      // DB update
-      supabase.from('tasks').update({ due_date: null } as any).eq('id', activeId).then(({ error }) => {
-        if (error) { toast.error('Σφάλμα ενημέρωσης'); fetchAll(); }
-        else toast.success('Task μεταφέρθηκε στο Backlog!');
-      });
-      return;
-    }
-
-    // Same container reorder (Today only)
-    if (isActiveInToday && isOverInToday && activeId !== overId && !isOverTodayContainer) {
-      setOrderedIds(prev => {
-        const oldIdx = prev.indexOf(activeId);
-        const newIdx = prev.indexOf(overId);
-        if (oldIdx === -1 || newIdx === -1) return prev;
-        const newOrder = arrayMove(prev, oldIdx, newIdx);
-        if (user) localStorage.setItem(getOrderKey(user.id), JSON.stringify(newOrder));
-        return newOrder;
-      });
-    }
-  }
-
-  const weekTasksByDay = useMemo(() => {
-    const groups: Record<string, TaskWithProject[]> = {};
-    weekTasks.forEach(t => {
+  const tasksByDay = useMemo(() => {
+    const map: Record<string, TaskItem[]> = {};
+    allMyTasks.forEach(t => {
       if (!t.due_date) return;
-      const label = format(new Date(t.due_date), 'EEEE d/MM', { locale: el });
-      if (!groups[label]) groups[label] = [];
-      groups[label].push(t);
+      const key = format(new Date(t.due_date), 'yyyy-MM-dd');
+      if (!map[key]) map[key] = [];
+      map[key].push(t);
     });
-    return groups;
-  }, [weekTasks]);
+    return map;
+  }, [allMyTasks]);
 
-  const briefIcons: Record<string, any> = { Palette, Monitor, FileText, Globe, Calendar, MessageSquare };
-  const selectedDef = selectedBriefType ? getBriefDefinition(selectedBriefType) : null;
-
-  const pagedTodayTasks = useMemo(
-    () => orderedTodayTasks.slice(todayPagination.from, todayPagination.to + 1),
-    [orderedTodayTasks, todayPagination.from, todayPagination.to],
-  );
-  const pagedBacklogTasks = useMemo(
-    () => backlogTasks.slice(backlogPagination.from, backlogPagination.to + 1),
-    [backlogTasks, backlogPagination.from, backlogPagination.to],
-  );
-  const pagedWeekEntries = useMemo(
-    () => Object.entries(weekTasksByDay).slice(weekPagination.from, weekPagination.to + 1),
-    [weekTasksByDay, weekPagination.from, weekPagination.to],
-  );
-  const pagedUpcomingTasks = useMemo(
-    () => upcomingTasks.slice(upcomingPagination.from, upcomingPagination.to + 1),
-    [upcomingTasks, upcomingPagination.from, upcomingPagination.to],
-  );
-  const pagedProjects = useMemo(
-    () => myProjects.slice(projectsPagination.from, projectsPagination.to + 1),
-    [myProjects, projectsPagination.from, projectsPagination.to],
-  );
-  const pagedBalances = useMemo(
-    () => balances.slice(leaveBalancePagination.from, leaveBalancePagination.to + 1),
-    [balances, leaveBalancePagination.from, leaveBalancePagination.to],
-  );
-  const pagedLeaveApprovals = useMemo(
-    () => pendingApprovals.slice(leaveApprovalsPagination.from, leaveApprovalsPagination.to + 1),
-    [pendingApprovals, leaveApprovalsPagination.from, leaveApprovalsPagination.to],
-  );
-
-  const backlogIds = useMemo(() => pagedBacklogTasks.map(t => t.id), [pagedBacklogTasks]);
-
-  useEffect(() => {
-    todayPagination.setTotalCount(orderedTodayTasks.length);
-  }, [orderedTodayTasks.length, todayPagination]);
-
-  useEffect(() => {
-    backlogPagination.setTotalCount(backlogTasks.length);
-  }, [backlogTasks.length, backlogPagination]);
-
-  useEffect(() => {
-    weekPagination.setTotalCount(Object.keys(weekTasksByDay).length);
-  }, [weekTasksByDay, weekPagination]);
-
-  useEffect(() => {
-    upcomingPagination.setTotalCount(upcomingTasks.length);
-  }, [upcomingTasks.length, upcomingPagination]);
-
-  useEffect(() => {
-    projectsPagination.setTotalCount(myProjects.length);
-  }, [myProjects.length, projectsPagination]);
-
-  useEffect(() => {
-    leaveBalancePagination.setTotalCount(balances.length);
-  }, [balances.length, leaveBalancePagination]);
-
-  useEffect(() => {
-    leaveApprovalsPagination.setTotalCount(pendingApprovals.length);
-  }, [pendingApprovals.length, leaveApprovalsPagination]);
-
+  // ── Loading ──────────────────────────────────────
   if (loading) {
     return (
       <div className="flex-1 p-6 space-y-6 animate-pulse">
-        <div className="h-16 bg-muted/50 rounded-xl" />
-        <div className="grid grid-cols-3 gap-4">
-          <div className="h-24 bg-muted/50 rounded-xl" /><div className="h-24 bg-muted/50 rounded-xl" /><div className="h-24 bg-muted/50 rounded-xl" />
-        </div>
+        <div className="h-12 bg-muted/50 rounded-xl w-1/3" />
+        <div className="h-64 bg-muted/50 rounded-xl" />
       </div>
     );
   }
 
   return (
     <div className="flex-1 p-4 md:p-6 lg:p-8 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div>
+      {/* ── Header with inline KPI chips ── */}
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">{greeting}, {firstName}</h1>
-            <p className="text-muted-foreground capitalize">{todayStr}</p>
+            <p className="text-sm text-muted-foreground capitalize">{todayStr}</p>
           </div>
-        <div className="flex items-center gap-3">
-          {activeTimer && (
-            <div className="flex items-center gap-3 bg-primary/10 border border-primary/20 rounded-xl px-4 py-2.5">
-              <Timer className="h-4 w-4 text-primary animate-pulse" />
-              <div className="text-sm">
-                <span className="font-mono font-semibold text-primary">{formatElapsed(elapsed)}</span>
-                <span className="text-muted-foreground ml-2 hidden sm:inline">{activeTimer.task?.title || 'Timer'}</span>
-              </div>
-              <Button size="sm" variant="ghost" className="h-7 text-destructive" onClick={() => stopTimer()}>
-                <Square className="h-3.5 w-3.5 mr-1" /> Stop
-              </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge variant="secondary" className="gap-1.5 text-xs font-medium px-2.5 py-1">
+              <CheckSquare className="h-3 w-3" /> {todayTaskCount} tasks
+            </Badge>
+            <Badge variant="secondary" className="gap-1.5 text-xs font-medium px-2.5 py-1">
+              <Clock className="h-3 w-3" /> {todayHours}h
+            </Badge>
+            {overdueCount > 0 && (
+              <Badge variant="destructive" className="gap-1.5 text-xs font-medium px-2.5 py-1">
+                <AlertTriangle className="h-3 w-3" /> {overdueCount} εκπρόθεσμα
+              </Badge>
+            )}
+            {approvalCount > 0 && (
+              <Badge variant="outline" className="gap-1.5 text-xs font-medium px-2.5 py-1 border-primary/40 text-primary">
+                <ClipboardCheck className="h-3 w-3" /> {approvalCount} εγκρίσεις
+              </Badge>
+            )}
+            <div className="hidden sm:block w-32">
+              <LevelProgressBar userId={user?.id} />
             </div>
-          )}
+          </div>
         </div>
       </div>
 
-      {/* KPI Strip + XP */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-        <Card className="border-border/50">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center"><CheckSquare className="h-5 w-5 text-primary" /></div>
-            <div><p className="text-2xl font-bold text-foreground">{todayTasks.length}</p><p className="text-xs text-muted-foreground">Tasks σήμερα</p></div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-accent flex items-center justify-center"><Clock className="h-5 w-5 text-accent-foreground" /></div>
-            <div><p className="text-2xl font-bold text-foreground">{todayHours}h</p><p className="text-xs text-muted-foreground">Ώρες σήμερα</p></div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${overdueCount > 0 ? 'bg-destructive/10' : 'bg-muted/50'}`}>
-              <AlertTriangle className={`h-5 w-5 ${overdueCount > 0 ? 'text-destructive' : 'text-muted-foreground'}`} />
-            </div>
-            <div><p className="text-2xl font-bold text-foreground">{overdueCount}</p><p className="text-xs text-muted-foreground">Εκπρόθεσμα</p></div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${(internalReviewTasks.length + approvalTasks.length) > 0 ? 'bg-warning/10' : 'bg-muted/50'}`}>
-              <Flag className={`h-5 w-5 ${(internalReviewTasks.length + approvalTasks.length) > 0 ? 'text-warning' : 'text-muted-foreground'}`} />
-            </div>
-            <div><p className="text-2xl font-bold text-foreground">{internalReviewTasks.length + approvalTasks.length}</p><p className="text-xs text-muted-foreground">Προς Έγκριση</p></div>
-          </CardContent>
-        </Card>
-        {/* XP Card */}
-        <Card className="border-border/50 col-span-2 sm:col-span-1">
-          <CardContent className="p-4">
-            <LevelProgressBar userId={user?.id} />
-          </CardContent>
-        </Card>
+      {/* ── View Toggle ── */}
+      <div className="flex items-center gap-2">
+        <Button
+          variant={activeView === 'projects' ? 'default' : 'outline'}
+          size="sm" className="gap-1.5"
+          onClick={() => setActiveView('projects')}
+        >
+          <FolderKanban className="h-3.5 w-3.5" /> Έργα
+        </Button>
+        <Button
+          variant={activeView === 'calendar' ? 'default' : 'outline'}
+          size="sm" className="gap-1.5"
+          onClick={() => setActiveView('calendar')}
+        >
+          <CalendarDays className="h-3.5 w-3.5" /> Ημερολόγιο
+        </Button>
       </div>
 
-      {/* Απαιτούν Προσοχή — Unified Panel */}
-      {attentionCount > 0 && (
-        <AttentionPanel
-          overdueTasks={overdueTasks}
-          highPriorityTasks={highPriorityTasks}
-          internalReviewTasks={internalReviewTasks}
-          approvalTasks={approvalTasks}
-          attentionCount={attentionCount}
-          onOpenTask={setSelectedTask}
-          onFlagToggle={toggleFlagPriority}
-          onApproveInternal={approveInternalReview}
-          onRejectInternal={rejectInternalReview}
-          onApproveClient={approveTask}
-          onRejectClient={rejectTask}
-          activeTimer={activeTimer}
-          startTimer={startTimer}
-          stopTimer={stopTimer}
-        />
-      )}
-
-      {/* Today Tasks + Backlog - Drag & Drop */}
-      <DndContext sensors={sensors} collisionDetection={rectIntersection} onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Today Tasks */}
-          <Card className="border-border/50 lg:col-span-2">
-            <CardHeader className="pb-3 flex flex-row items-center justify-between">
-              <CardTitle className="text-base font-semibold">Tasks Σήμερα</CardTitle>
-              <Link to="/work?tab=tasks" className="text-xs text-primary hover:underline flex items-center gap-1">Δες όλα <ArrowRight className="h-3 w-3" /></Link>
-            </CardHeader>
-            <CardContent className="p-0">
-              <DroppableContainer id="today-drop">
-                {orderedTodayTasks.length === 0 ? (
-                  <p className="text-sm text-muted-foreground px-6 py-4">Κανένα task για σήμερα 🎉</p>
-                ) : (
-                  <>
-                    <ScrollArea className="max-h-[32rem]">
-                      <div className="overflow-x-auto">
-                        <SortableContext items={pagedTodayTasks.map(task => task.id)} strategy={verticalListSortingStrategy}>
-                          <table className="w-full text-sm">
-                            <TaskTableHeader draggable />
-                            <tbody>
-                              {pagedTodayTasks.map(task => (
-                                <SortableTaskRow
-                                  key={task.id} task={task} today={today} draggable
-                                  onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
-                                  activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
-                                  onFlagToggle={toggleFlagPriority}
-                                />
-                              ))}
-                            </tbody>
-                          </table>
-                        </SortableContext>
-                      </div>
-                    </ScrollArea>
-                    {orderedTodayTasks.length > todayPagination.pageSize && (
-                      <div className="px-4 md:px-6 border-t border-border/50">
-                        <PaginationControls pagination={todayPagination} />
-                      </div>
-                    )}
-                  </>
-                )}
-              </DroppableContainer>
-            </CardContent>
-          </Card>
-
-          {/* Backlog Panel */}
-          <Card className="border-border/50 border-dashed">
-            <CardHeader className="pb-3 flex flex-row items-center justify-between">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Inbox className="h-4 w-4 text-muted-foreground" />
-                Backlog
-                <Badge variant="secondary" className="text-xs ml-1">{backlogTasks.length}</Badge>
-              </CardTitle>
-              <button onClick={() => setBacklogOpen(v => !v)}>
-                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${backlogOpen ? '' : '-rotate-90'}`} />
-              </button>
-            </CardHeader>
-            {backlogOpen && (
-              <CardContent className="p-0">
-                <DroppableContainer id="backlog-drop">
-                  {backlogTasks.length === 0 ? (
-                    <p className="text-sm text-muted-foreground px-4 py-4">Κανένα task χωρίς ημερομηνία</p>
-                  ) : (
-                    <>
-                      <ScrollArea className="max-h-[32rem]">
-                        <SortableContext items={backlogIds} strategy={verticalListSortingStrategy}>
-                          {pagedBacklogTasks.map(task => (
-                            <BacklogTaskRow
-                              key={task.id} task={task} today={today}
-                              onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
-                              activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
-                              onFlagToggle={toggleFlagPriority}
-                            />
-                          ))}
-                        </SortableContext>
-                      </ScrollArea>
-                      {backlogTasks.length > backlogPagination.pageSize && (
-                        <div className="px-4 border-t border-border/50">
-                          <PaginationControls pagination={backlogPagination} />
-                        </div>
-                      )}
-                    </>
-                  )}
-                </DroppableContainer>
-              </CardContent>
-            )}
-          </Card>
-        </div>
-      </DndContext>
-
-      {/* Week Tasks */}
-      {Object.keys(weekTasksByDay).length > 0 && (
-        <Card className="border-border/50">
-          <CardHeader className="pb-3"><CardTitle className="text-base font-semibold">Αυτή την εβδομάδα</CardTitle></CardHeader>
-          <CardContent className="p-0">
-            <ScrollArea className="max-h-[32rem]">
-              <div className="overflow-x-auto">
-                {pagedWeekEntries.map(([day, tasks]) => (
-                  <div key={day}>
-                    <div className="px-4 md:px-6 py-2 bg-muted/30"><p className="text-xs font-medium text-muted-foreground capitalize">{day}</p></div>
-                    <table className="w-full text-sm">
-                      <TaskTableHeader />
-                      <tbody>
-                        {tasks.map(task => (
-                          <SortableTaskRow
-                            key={task.id} task={task} today={today} showDate
-                            onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
-                            activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
-                            onFlagToggle={toggleFlagPriority}
-                          />
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-            {Object.keys(weekTasksByDay).length > weekPagination.pageSize && (
-              <div className="px-4 md:px-6 border-t border-border/50">
-                <PaginationControls pagination={weekPagination} />
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Upcoming */}
-      {upcomingTasks.length > 0 && (
-        <Card className="border-border/50">
-          <CardHeader className="pb-3"><CardTitle className="text-base font-semibold">Επερχόμενα</CardTitle></CardHeader>
-          <CardContent className="p-0">
-            <ScrollArea className="max-h-[32rem]">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <TaskTableHeader />
-                  <tbody>
-                    {pagedUpcomingTasks.map(task => (
-                      <SortableTaskRow
-                        key={task.id} task={task} today={today} showDate
-                        onComplete={toggleTaskComplete} onOpenSheet={setSelectedTask}
-                        activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer}
-                        onFlagToggle={toggleFlagPriority}
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </ScrollArea>
-            {upcomingTasks.length > upcomingPagination.pageSize && (
-              <div className="px-4 md:px-6 border-t border-border/50">
-                <PaginationControls pagination={upcomingPagination} />
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* My Projects */}
-        <Card className="border-border/50">
-          <CardHeader className="pb-3"><CardTitle className="text-base font-semibold">Τα Έργα μου</CardTitle></CardHeader>
-          <CardContent className="p-0">
-            {myProjects.length === 0 ? (
-              <p className="text-sm text-muted-foreground px-6 py-4">Κανένα ενεργό έργο</p>
-            ) : (
-              <>
-                <ScrollArea className="max-h-72">
-                  <div className="space-y-3 px-6 py-4">
-                    {pagedProjects.map(project => (
-                      <Link key={project.id} to={`/projects/${project.id}`} className="flex items-center gap-3 group">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground group-hover:text-primary truncate">{project.name}</p>
-                          {project.client && <p className="text-xs text-muted-foreground truncate">{(project.client as any)?.name}</p>}
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Progress value={project.progress || 0} className="w-16 h-1.5" />
-                          <span className="text-xs text-muted-foreground w-8 text-right">{project.progress || 0}%</span>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </Link>
-                    ))}
-                  </div>
-                </ScrollArea>
-                {myProjects.length > projectsPagination.pageSize && (
-                  <div className="px-4 md:px-6 border-t border-border/50">
-                    <PaginationControls pagination={projectsPagination} />
-                  </div>
-                )}
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Quick Links + Leave */}
-        <div className="space-y-4">
-          <Card className="border-border/50">
-            <CardHeader className="pb-3"><CardTitle className="text-base font-semibold">Quick Links</CardTitle></CardHeader>
-            <CardContent className="grid grid-cols-2 gap-2">
-              <Button variant="outline" size="sm" className="justify-start gap-2 h-9" onClick={() => navigate('/projects?new=true')}>
-                <FolderKanban className="h-3.5 w-3.5" /> Νέο Έργο
-              </Button>
-              <Button variant="outline" size="sm" className="justify-start gap-2 h-9" onClick={() => navigate('/work?tab=tasks&new=true')}>
-                <Plus className="h-3.5 w-3.5" /> Νέο Task
-              </Button>
-              <Button variant="outline" size="sm" className="justify-start gap-2 h-9" onClick={() => navigate('/hr?tab=timesheets')}>
-                <Timer className="h-3.5 w-3.5" /> Χρόνος
-              </Button>
-              <Button variant="outline" size="sm" className="justify-start gap-2 h-9" onClick={() => navigate('/hr?tab=leaves')}>
-                <Palmtree className="h-3.5 w-3.5" /> Άδεια
-              </Button>
-              <Button variant="outline" size="sm" className="justify-start gap-2 h-9" onClick={() => navigate('/work?tab=calendar')}>
-                <CalendarDays className="h-3.5 w-3.5" /> Ημερολόγιο
-              </Button>
-              <Button variant="outline" size="sm" className="justify-start gap-2 h-9" onClick={() => navigate('/reports')}>
-                <BarChart3 className="h-3.5 w-3.5" /> Αναφορές
-              </Button>
-              <Button variant="outline" size="sm" className="justify-start gap-2 h-9" onClick={() => navigate('/files')}>
-                <FileArchive className="h-3.5 w-3.5" /> Αρχεία
-              </Button>
-              {briefDefinitions.map(def => {
-                const Icon = briefIcons[def.icon] || FileText;
-                return (
-                  <Button key={def.type} variant="outline" size="sm" className="justify-start gap-2 h-9 text-xs" onClick={() => setSelectedBriefType(def.type)}>
-                    <Icon className="h-3.5 w-3.5" /> {def.label}
-                  </Button>
-                );
-              })}
-            </CardContent>
-          </Card>
-
-          {/* Leave Balance */}
-          <Card className="border-border/50">
-            <CardHeader className="pb-3 flex flex-row items-center justify-between">
-              <CardTitle className="text-base font-semibold">Άδειες</CardTitle>
-              <Link to="/hr?tab=leaves" className="text-xs text-primary hover:underline">Δες όλα</Link>
-            </CardHeader>
-            <CardContent className="p-0">
-              {balances.length === 0 ? (
-                <p className="text-sm text-muted-foreground px-6 py-4">Δεν υπάρχουν δεδομένα αδειών</p>
-              ) : (
-                <>
-                  <ScrollArea className="max-h-56">
-                    <div className="space-y-2 px-6 py-4">
-                      {pagedBalances.map(b => (
-                        <div key={b.id} className="flex items-center justify-between text-sm">
-                          <span className="text-foreground">{b.leave_type?.name || 'Άδεια'}</span>
-                          <span className="text-muted-foreground font-mono text-xs">{b.used_days}/{b.entitled_days + b.carried_over} ημέρες</span>
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                  {balances.length > leaveBalancePagination.pageSize && (
-                    <div className="px-4 border-t border-border/50">
-                      <PaginationControls pagination={leaveBalancePagination} />
-                    </div>
-                  )}
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Pending Workflow Approvals */}
-      <PendingApprovalsCard />
-
-      {/* Leave Approvals (admin/manager) */}
-      {(isAdmin || isManager) && pendingApprovals.length > 0 && (
-        <Card className="border-border/50 border-warning/30">
+      {/* ── Main Content ── */}
+      {activeView === 'projects' ? (
+        <Card className="border-border/40">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-warning" />
-              Εκκρεμείς εγκρίσεις αδειών ({pendingApprovals.length})
+              <FolderKanban className="h-4 w-4 text-muted-foreground" />
+              Τα Ενεργά Έργα μου
+              <Badge variant="secondary" className="text-xs ml-1">{topLevelProjects.length}</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <ScrollArea className="max-h-72">
-              <div className="divide-y divide-border/50">
-                {pagedLeaveApprovals.map(req => (
-                  <div key={req.id} className="flex items-center gap-3 px-4 md:px-6 py-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground">{req.user?.full_name || 'Χρήστης'}</p>
-                      <p className="text-xs text-muted-foreground">{format(new Date(req.start_date), 'd/MM')} - {format(new Date(req.end_date), 'd/MM')} · {req.days_count} ημ.</p>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <Button size="icon" variant="ghost" className="h-7 w-7 text-success hover:text-success" onClick={() => approveRequest(req.id)}><Check className="h-4 w-4" /></Button>
-                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => rejectRequest(req.id)}><X className="h-4 w-4" /></Button>
-                    </div>
-                  </div>
+            {topLevelProjects.length === 0 ? (
+              <p className="text-sm text-muted-foreground px-6 py-6">Κανένα ενεργό έργο</p>
+            ) : (
+              <div className="divide-y divide-border/30">
+                {topLevelProjects.map(project => (
+                  <ProjectRow
+                    key={project.id}
+                    project={project}
+                    subProjects={getSubProjects(project.id)}
+                    expanded={expandedProjects.has(project.id)}
+                    onToggle={() => toggleProject(project.id)}
+                    tasks={projectTasks[project.id] || []}
+                    deliverables={projectDeliverables[project.id] || []}
+                    onTaskComplete={toggleTaskComplete}
+                    onItemClick={setSelectedItem}
+                    activeTimer={activeTimer}
+                    startTimer={startTimer}
+                    stopTimer={stopTimer}
+                    expandedProjects={expandedProjects}
+                    onToggleProject={toggleProject}
+                    projectTasks={projectTasks}
+                    projectDeliverables={projectDeliverables}
+                    myTasks={allMyTasks}
+                  />
                 ))}
               </div>
-            </ScrollArea>
-            {pendingApprovals.length > leaveApprovalsPagination.pageSize && (
-              <div className="px-4 md:px-6 border-t border-border/50">
-                <PaginationControls pagination={leaveApprovalsPagination} />
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        /* ── Calendar View ── */
+        <Card className="border-border/40">
+          <CardHeader className="pb-3 flex flex-row items-center justify-between">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <CalendarDays className="h-4 w-4 text-muted-foreground" />
+              {calendarMode === 'week' ? 'Εβδομαδιαία Προβολή' : format(calendarDate, 'EEEE d MMMM', { locale: el })}
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setCalendarDate(d => addDays(d, calendarMode === 'week' ? -7 : -1))}>←</Button>
+              <Button variant="ghost" size="sm" onClick={() => setCalendarDate(new Date())}>Σήμερα</Button>
+              <Button variant="ghost" size="sm" onClick={() => setCalendarDate(d => addDays(d, calendarMode === 'week' ? 7 : 1))}>→</Button>
+              <div className="border-l border-border/40 pl-2 ml-1 flex gap-1">
+                <Button variant={calendarMode === 'week' ? 'secondary' : 'ghost'} size="sm" onClick={() => setCalendarMode('week')}>Εβδ</Button>
+                <Button variant={calendarMode === 'day' ? 'secondary' : 'ghost'} size="sm" onClick={() => setCalendarMode('day')}>Ημέρα</Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            {calendarMode === 'week' ? (
+              <div className="grid grid-cols-7 border-t border-border/30">
+                {weekDays.map(day => {
+                  const key = format(day, 'yyyy-MM-dd');
+                  const dayTasks = tasksByDay[key] || [];
+                  const isCurrentDay = isToday(day);
+                  return (
+                    <div key={key} className={`border-r last:border-r-0 border-border/20 min-h-[200px] ${isCurrentDay ? 'bg-primary/5' : ''}`}>
+                      <div className={`px-2 py-2 text-center border-b border-border/20 ${isCurrentDay ? 'bg-primary/10' : 'bg-muted/30'}`}>
+                        <div className="text-[10px] text-muted-foreground uppercase">{format(day, 'EEE', { locale: el })}</div>
+                        <div className={`text-lg font-semibold ${isCurrentDay ? 'text-primary' : ''}`}>{format(day, 'd')}</div>
+                      </div>
+                      <div className="p-1 space-y-1">
+                        {dayTasks.map(task => (
+                          <CalendarTaskCard
+                            key={task.id}
+                            task={task}
+                            onComplete={() => toggleTaskComplete(task)}
+                            onClick={() => setSelectedItem({ type: 'task', data: task })}
+                            activeTimer={activeTimer}
+                            startTimer={startTimer}
+                            stopTimer={stopTimer}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* Day view */
+              <div className="p-4 space-y-2">
+                {(tasksByDay[format(calendarDate, 'yyyy-MM-dd')] || []).length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-6 text-center">Κανένα task για αυτή την ημέρα</p>
+                ) : (
+                  (tasksByDay[format(calendarDate, 'yyyy-MM-dd')] || []).map(task => (
+                    <CalendarTaskCard
+                      key={task.id}
+                      task={task}
+                      onComplete={() => toggleTaskComplete(task)}
+                      onClick={() => setSelectedItem({ type: 'task', data: task })}
+                      activeTimer={activeTimer}
+                      startTimer={startTimer}
+                      stopTimer={stopTimer}
+                      wide
+                    />
+                  ))
+                )}
               </div>
             )}
           </CardContent>
         </Card>
       )}
 
-      {/* Task Detail Sheet */}
-      <Sheet open={!!selectedTask} onOpenChange={open => !open && setSelectedTask(null)}>
-        <SheetContent className="sm:max-w-lg overflow-y-auto">
-          {selectedTask && (
-            <>
-              <SheetHeader>
-                <SheetTitle className="text-lg">{selectedTask.title}</SheetTitle>
-                <SheetDescription>{(selectedTask.project as any)?.name || 'Χωρίς project'}</SheetDescription>
-              </SheetHeader>
-              <div className="mt-6 space-y-4">
-                <table className="w-full text-sm">
-                  <tbody className="divide-y divide-border/50">
-                    <tr>
-                      <td className="py-2.5 pr-4 text-muted-foreground whitespace-nowrap w-28">Status</td>
-                      <td className="py-2.5"><span className="text-xs font-medium rounded-full px-2.5 py-1" style={getStatusStyle(selectedTask.status)}>{getStatusLabel(selectedTask.status)}</span></td>
-                    </tr>
-                    <tr>
-                      <td className="py-2.5 pr-4 text-muted-foreground whitespace-nowrap">Priority</td>
-                      <td className="py-2.5"><span className="text-xs font-medium rounded-full px-2.5 py-1" style={getPriorityStyle(selectedTask.priority)}>{PRIORITY_COLORS[selectedTask.priority]?.label || selectedTask.priority}</span></td>
-                    </tr>
-                    <tr>
-                      <td className="py-2.5 pr-4 text-muted-foreground whitespace-nowrap">Έναρξη</td>
-                      <td className="py-2.5">{selectedTask.start_date ? format(new Date(selectedTask.start_date), 'd MMM yyyy', { locale: el }) : '-'}</td>
-                    </tr>
-                    <tr>
-                      <td className="py-2.5 pr-4 text-muted-foreground whitespace-nowrap">Λήξη</td>
-                      <td className={`py-2.5 ${selectedTask.due_date && isBefore(new Date(selectedTask.due_date), today) ? 'text-destructive font-medium' : ''}`}>{selectedTask.due_date ? format(new Date(selectedTask.due_date), 'd MMM yyyy', { locale: el }) : '-'}</td>
-                    </tr>
-                    <tr>
-                      <td className="py-2.5 pr-4 text-muted-foreground whitespace-nowrap">Εκτ. Ώρες</td>
-                      <td className="py-2.5">{selectedTask.estimated_hours || '-'}h</td>
-                    </tr>
-                    <tr>
-                      <td className="py-2.5 pr-4 text-muted-foreground whitespace-nowrap">Πρόοδος</td>
-                      <td className="py-2.5"><div className="flex items-center gap-2"><Progress value={selectedTask.progress || 0} className="w-24 h-1.5" /><span className="text-xs text-muted-foreground">{selectedTask.progress || 0}%</span></div></td>
-                    </tr>
-                    {selectedTask.task_type && (
-                      <tr>
-                        <td className="py-2.5 pr-4 text-muted-foreground whitespace-nowrap">Τύπος</td>
-                        <td className="py-2.5">{selectedTask.task_type}</td>
-                      </tr>
-                    )}
-                    {selectedTask.task_category && (
-                      <tr>
-                        <td className="py-2.5 pr-4 text-muted-foreground whitespace-nowrap">Κατηγορία</td>
-                        <td className="py-2.5">{selectedTask.task_category}</td>
-                      </tr>
-                    )}
-                    {selectedTask.description && (
-                      <tr>
-                        <td className="py-2.5 pr-4 text-muted-foreground whitespace-nowrap align-top">Περιγραφή</td>
-                        <td className="py-2.5 whitespace-pre-wrap">{selectedTask.description}</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-                <Button className="w-full gap-2" onClick={() => { setSelectedTask(null); navigate(`/tasks/${selectedTask.id}`); }}>
-                  <ExternalLink className="h-4 w-4" /> Άνοιγμα σελίδας Task
+      {/* ── Bottom Strip: Approvals + Time Tracking ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Approvals */}
+        <Card className="border-border/40">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
+              Εγκρίσεις
+              {approvalCount > 0 && <Badge variant="secondary" className="text-xs">{approvalCount}</Badge>}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {approvalCount === 0 ? (
+              <p className="text-sm text-muted-foreground px-6 py-4">Δεν υπάρχουν εκκρεμείς εγκρίσεις 🎉</p>
+            ) : (
+              <div className="divide-y divide-border/30">
+                {/* Sent for approval */}
+                {sentForApproval.length > 0 && (
+                  <>
+                    <div className="px-4 py-2 bg-muted/20">
+                      <span className="text-xs font-semibold flex items-center gap-1.5">
+                        <Send className="h-3 w-3" /> Έστειλα για Έγκριση ({sentForApproval.length})
+                      </span>
+                    </div>
+                    {sentForApproval.slice(0, 5).map(task => (
+                      <div key={task.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30 transition-colors">
+                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setSelectedItem({ type: 'task', data: task })}>
+                          <p className="text-sm font-medium text-foreground truncate">{task.title}</p>
+                          <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
+                        </div>
+                        <span className="text-[10px] font-medium rounded-full px-2 py-0.5" style={getStatusStyle(task.status)}>{getStatusLabel(task.status)}</span>
+                      </div>
+                    ))}
+                  </>
+                )}
+                {/* Need my approval */}
+                {needMyApproval.length > 0 && (
+                  <>
+                    <div className="px-4 py-2 bg-muted/20">
+                      <span className="text-xs font-semibold flex items-center gap-1.5">
+                        <Inbox className="h-3 w-3" /> Πρέπει να Εγκρίνω ({needMyApproval.length})
+                      </span>
+                    </div>
+                    {needMyApproval.slice(0, 5).map(task => (
+                      <div key={task.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30 transition-colors">
+                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setSelectedItem({ type: 'task', data: task })}>
+                          <p className="text-sm font-medium text-foreground truncate">{task.title}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
+                            {(task as any).assignee?.full_name && <span className="text-xs text-muted-foreground">· {(task as any).assignee.full_name}</span>}
+                          </div>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button size="icon" variant="ghost" className="h-7 w-7 text-emerald-500 hover:text-emerald-600" onClick={() => approveReviewTask(task)}>
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => rejectReviewTask(task)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Time Tracking Widget */}
+        <Card className="border-border/40">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Timer className="h-4 w-4 text-muted-foreground" />
+              Time Tracking
+              <Badge variant="secondary" className="text-xs ml-auto">{todayHours}h σήμερα</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {/* Active Timer */}
+            {activeTimer?.is_running ? (
+              <div className="flex items-center gap-3 bg-primary/5 border border-primary/20 rounded-xl px-4 py-3">
+                <Timer className="h-4 w-4 text-primary animate-pulse shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{activeTimer.task?.title || 'Timer'}</p>
+                  <p className="text-lg font-mono font-bold text-primary">{formatElapsed(elapsed)}</p>
+                </div>
+                <Button size="sm" variant="destructive" className="gap-1.5 shrink-0" onClick={() => stopTimer()}>
+                  <StopCircle className="h-3.5 w-3.5" /> Stop
                 </Button>
               </div>
-            </>
+            ) : (
+              <div className="text-sm text-muted-foreground bg-muted/30 rounded-xl px-4 py-3 text-center">
+                Κανένα ενεργό timer
+              </div>
+            )}
+
+            {/* Today's entries */}
+            {todayEntries.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground font-medium">Σήμερα</p>
+                <ScrollArea className="max-h-32">
+                  {todayEntries.slice(0, 5).map(entry => (
+                    <div key={entry.id} className="flex items-center gap-2 py-1.5 text-sm">
+                      <span className="text-xs text-muted-foreground w-10">{format(new Date(entry.start_time), 'HH:mm')}</span>
+                      <span className="flex-1 truncate text-foreground">{entry.task?.title || entry.description || 'Timer'}</span>
+                      <span className="text-xs font-mono text-muted-foreground">{entry.duration_minutes}λ</span>
+                    </div>
+                  ))}
+                </ScrollArea>
+              </div>
+            )}
+
+            <Button variant="outline" size="sm" className="w-full gap-1.5" onClick={() => navigate('/timesheets')}>
+              <ArrowRight className="h-3.5 w-3.5" /> Timesheets
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Detail Sidebar Sheet ── */}
+      <Sheet open={!!selectedItem} onOpenChange={open => !open && setSelectedItem(null)}>
+        <SheetContent className="sm:max-w-lg overflow-y-auto">
+          {selectedItem?.type === 'task' && (
+            <TaskDetailSheet
+              task={selectedItem.data}
+              today={today}
+              onClose={() => setSelectedItem(null)}
+              navigate={navigate}
+              activeTimer={activeTimer}
+              startTimer={startTimer}
+              stopTimer={stopTimer}
+            />
+          )}
+          {selectedItem?.type === 'deliverable' && (
+            <DeliverableDetailSheet
+              deliverable={selectedItem.data}
+              onClose={() => setSelectedItem(null)}
+              navigate={navigate}
+            />
           )}
         </SheetContent>
       </Sheet>
-
-      {/* Brief Form Dialog */}
-      {selectedDef && (
-        <BriefFormDialog open={true} onOpenChange={() => setSelectedBriefType(null)} definition={selectedDef} />
-      )}
-
     </div>
+  );
+}
+
+// ── Project Row (expandable) ─────────────────────────
+function ProjectRow({
+  project, subProjects, expanded, onToggle, tasks, deliverables,
+  onTaskComplete, onItemClick, activeTimer, startTimer, stopTimer,
+  expandedProjects, onToggleProject, projectTasks, projectDeliverables, myTasks,
+}: {
+  project: MyProject;
+  subProjects: MyProject[];
+  expanded: boolean;
+  onToggle: () => void;
+  tasks: TaskItem[];
+  deliverables: DeliverableItem[];
+  onTaskComplete: (t: TaskItem) => void;
+  onItemClick: (item: { type: 'task' | 'deliverable'; data: any }) => void;
+  activeTimer: any;
+  startTimer: any;
+  stopTimer: any;
+  expandedProjects: Set<string>;
+  onToggleProject: (id: string) => void;
+  projectTasks: Record<string, TaskItem[]>;
+  projectDeliverables: Record<string, DeliverableItem[]>;
+  myTasks: TaskItem[];
+}) {
+  const projectTaskCount = myTasks.filter(t => t.project_id === project.id && t.status !== 'completed').length;
+
+  return (
+    <div>
+      {/* Project header row */}
+      <div
+        className="flex items-center gap-3 px-4 md:px-6 py-3 cursor-pointer hover:bg-muted/30 transition-colors"
+        onClick={onToggle}
+      >
+        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform shrink-0 ${expanded ? '' : '-rotate-90'}`} />
+        <FolderKanban className="h-4 w-4 text-muted-foreground shrink-0" />
+        <div className="flex-1 min-w-0">
+          <span className="text-sm font-semibold text-foreground">{project.name}</span>
+          {project.client && <span className="text-xs text-muted-foreground ml-2">{(project.client as any)?.name}</span>}
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          <Badge variant="secondary" className="text-[10px]">{projectTaskCount} tasks</Badge>
+          <div className="flex items-center gap-1.5">
+            <Progress value={project.progress || 0} className="w-16 h-1.5" />
+            <span className="text-xs text-muted-foreground w-8 text-right">{project.progress || 0}%</span>
+          </div>
+          <Link
+            to={`/projects/${project.id}`}
+            className="text-muted-foreground hover:text-primary"
+            onClick={e => e.stopPropagation()}
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      </div>
+
+      {/* Expanded content */}
+      {expanded && (
+        <div className="pl-6 md:pl-10 border-l-2 border-border/20 ml-6 md:ml-8 pb-2">
+          {/* Sub-projects */}
+          {subProjects.map(sub => (
+            <ProjectRow
+              key={sub.id}
+              project={sub}
+              subProjects={[]}
+              expanded={expandedProjects.has(sub.id)}
+              onToggle={() => onToggleProject(sub.id)}
+              tasks={projectTasks[sub.id] || []}
+              deliverables={projectDeliverables[sub.id] || []}
+              onTaskComplete={onTaskComplete}
+              onItemClick={onItemClick}
+              activeTimer={activeTimer}
+              startTimer={startTimer}
+              stopTimer={stopTimer}
+              expandedProjects={expandedProjects}
+              onToggleProject={onToggleProject}
+              projectTasks={projectTasks}
+              projectDeliverables={projectDeliverables}
+              myTasks={myTasks}
+            />
+          ))}
+
+          {/* Deliverables with their tasks */}
+          {deliverables.map(del => {
+            const delTasks = tasks.filter(t => t.deliverable_id === del.id);
+            return (
+              <div key={del.id}>
+                <div
+                  className="flex items-center gap-2 px-3 py-2 hover:bg-muted/20 rounded-lg cursor-pointer transition-colors"
+                  onClick={() => onItemClick({ type: 'deliverable', data: del })}
+                >
+                  <Package className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-sm text-foreground flex-1 truncate">{del.name}</span>
+                  <Badge variant={del.completed ? 'default' : 'outline'} className="text-[10px]">
+                    {del.completed ? 'Ολοκληρωμένο' : 'Σε εξέλιξη'}
+                  </Badge>
+                </div>
+                {delTasks.map(task => (
+                  <TaskRow
+                    key={task.id}
+                    task={task}
+                    indent
+                    onComplete={() => onTaskComplete(task)}
+                    onClick={() => onItemClick({ type: 'task', data: task })}
+                    activeTimer={activeTimer}
+                    startTimer={startTimer}
+                    stopTimer={stopTimer}
+                  />
+                ))}
+              </div>
+            );
+          })}
+
+          {/* Orphan tasks (no deliverable) */}
+          {tasks.filter(t => !t.deliverable_id).map(task => (
+            <TaskRow
+              key={task.id}
+              task={task}
+              onComplete={() => onTaskComplete(task)}
+              onClick={() => onItemClick({ type: 'task', data: task })}
+              activeTimer={activeTimer}
+              startTimer={startTimer}
+              stopTimer={stopTimer}
+            />
+          ))}
+
+          {tasks.length === 0 && deliverables.length === 0 && subProjects.length === 0 && (
+            <p className="text-xs text-muted-foreground px-3 py-2">Φόρτωση...</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Task Row (inline in tree) ────────────────────────
+function TaskRow({
+  task, indent, onComplete, onClick, activeTimer, startTimer, stopTimer,
+}: {
+  task: TaskItem;
+  indent?: boolean;
+  onComplete: () => void;
+  onClick: () => void;
+  activeTimer: any;
+  startTimer: any;
+  stopTimer: any;
+}) {
+  const isOverdue = task.due_date && isBefore(startOfDay(new Date(task.due_date)), startOfDay(new Date()));
+  const isRunning = activeTimer?.is_running && activeTimer.task_id === task.id;
+
+  return (
+    <div className={`flex items-center gap-2 px-3 py-2 hover:bg-muted/20 rounded-lg transition-colors ${indent ? 'ml-5' : ''}`}>
+      <Checkbox className="h-3.5 w-3.5 shrink-0" onCheckedChange={onComplete} />
+      <ListChecks className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+      <div className="flex-1 min-w-0 cursor-pointer" onClick={onClick}>
+        <span className="text-sm text-foreground hover:text-primary truncate block">{task.title}</span>
+      </div>
+      {task.due_date && (
+        <span className={`text-[10px] ${isOverdue ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
+          {format(new Date(task.due_date), 'd/MM')}
+        </span>
+      )}
+      <span className="text-[10px] font-medium rounded-full px-2 py-0.5 hidden sm:inline-flex" style={getStatusStyle(task.status)}>
+        {getStatusLabel(task.status)}
+      </span>
+      {!isRunning ? (
+        <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={e => { e.stopPropagation(); startTimer(task.id, task.project_id); }}>
+          <Play className="h-3 w-3" />
+        </Button>
+      ) : (
+        <Button size="icon" variant="ghost" className="h-6 w-6 text-primary" onClick={e => { e.stopPropagation(); stopTimer(); }}>
+          <Square className="h-3 w-3" />
+        </Button>
+      )}
+    </div>
+  );
+}
+
+// ── Calendar Task Card ───────────────────────────────
+function CalendarTaskCard({
+  task, onComplete, onClick, activeTimer, startTimer, stopTimer, wide,
+}: {
+  task: TaskItem;
+  onComplete: () => void;
+  onClick: () => void;
+  activeTimer: any;
+  startTimer: any;
+  stopTimer: any;
+  wide?: boolean;
+}) {
+  const isRunning = activeTimer?.is_running && activeTimer.task_id === task.id;
+  const isOverdue = task.due_date && isBefore(startOfDay(new Date(task.due_date)), startOfDay(new Date()));
+
+  return (
+    <div
+      className={`flex items-center gap-1.5 rounded-lg border border-border/30 px-2 py-1.5 hover:bg-muted/40 transition-colors cursor-pointer ${wide ? 'px-4 py-3' : ''} ${isOverdue ? 'border-destructive/30 bg-destructive/5' : 'bg-background'}`}
+      onClick={onClick}
+    >
+      <Checkbox className="h-3.5 w-3.5 shrink-0" onCheckedChange={e => { e && onComplete(); }} onClick={e => e.stopPropagation()} />
+      <span className={`flex-1 min-w-0 truncate ${wide ? 'text-sm' : 'text-[11px]'} text-foreground`}>{task.title}</span>
+      {!isRunning ? (
+        <Button size="icon" variant="ghost" className="h-5 w-5 text-muted-foreground hover:text-primary shrink-0" onClick={e => { e.stopPropagation(); startTimer(task.id, task.project_id); }}>
+          <Play className="h-2.5 w-2.5" />
+        </Button>
+      ) : (
+        <Button size="icon" variant="ghost" className="h-5 w-5 text-primary shrink-0" onClick={e => { e.stopPropagation(); stopTimer(); }}>
+          <Square className="h-2.5 w-2.5" />
+        </Button>
+      )}
+    </div>
+  );
+}
+
+// ── Task Detail Sheet Content ────────────────────────
+function TaskDetailSheet({ task, today, onClose, navigate, activeTimer, startTimer, stopTimer }: {
+  task: TaskItem; today: Date; onClose: () => void; navigate: any; activeTimer: any; startTimer: any; stopTimer: any;
+}) {
+  const isOverdue = task.due_date && isBefore(new Date(task.due_date), today);
+  const isRunning = activeTimer?.is_running && activeTimer.task_id === task.id;
+
+  return (
+    <>
+      <SheetHeader>
+        <SheetTitle className="text-lg">{task.title}</SheetTitle>
+        <SheetDescription>{(task.project as any)?.name || 'Χωρίς project'}</SheetDescription>
+      </SheetHeader>
+      <div className="mt-6 space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-muted/30 rounded-lg p-3">
+            <p className="text-[10px] text-muted-foreground uppercase mb-1">Status</p>
+            <span className="text-xs font-medium rounded-full px-2.5 py-1" style={getStatusStyle(task.status)}>{getStatusLabel(task.status)}</span>
+          </div>
+          <div className="bg-muted/30 rounded-lg p-3">
+            <p className="text-[10px] text-muted-foreground uppercase mb-1">Priority</p>
+            <span className="text-xs font-medium rounded-full px-2.5 py-1" style={getPriorityStyle(task.priority)}>{PRIORITY_COLORS[task.priority]?.label || task.priority}</span>
+          </div>
+          <div className="bg-muted/30 rounded-lg p-3">
+            <p className="text-[10px] text-muted-foreground uppercase mb-1">Έναρξη</p>
+            <p className="text-sm font-medium">{task.start_date ? format(new Date(task.start_date), 'd MMM yyyy', { locale: el }) : '-'}</p>
+          </div>
+          <div className="bg-muted/30 rounded-lg p-3">
+            <p className="text-[10px] text-muted-foreground uppercase mb-1">Λήξη</p>
+            <p className={`text-sm font-medium ${isOverdue ? 'text-destructive' : ''}`}>{task.due_date ? format(new Date(task.due_date), 'd MMM yyyy', { locale: el }) : '-'}</p>
+          </div>
+        </div>
+
+        <div className="bg-muted/30 rounded-lg p-3">
+          <p className="text-[10px] text-muted-foreground uppercase mb-1">Πρόοδος</p>
+          <div className="flex items-center gap-2">
+            <Progress value={task.progress || 0} className="flex-1 h-2" />
+            <span className="text-sm font-medium">{task.progress || 0}%</span>
+          </div>
+        </div>
+
+        {task.description && (
+          <div className="bg-muted/30 rounded-lg p-3">
+            <p className="text-[10px] text-muted-foreground uppercase mb-1">Περιγραφή</p>
+            <p className="text-sm whitespace-pre-wrap">{task.description}</p>
+          </div>
+        )}
+
+        {/* Timer control */}
+        <div className="flex gap-2">
+          {!isRunning ? (
+            <Button variant="outline" size="sm" className="flex-1 gap-1.5" onClick={() => startTimer(task.id, task.project_id)}>
+              <Play className="h-3.5 w-3.5" /> Εκκίνηση Timer
+            </Button>
+          ) : (
+            <Button variant="destructive" size="sm" className="flex-1 gap-1.5" onClick={() => stopTimer()}>
+              <Square className="h-3.5 w-3.5" /> Διακοπή Timer
+            </Button>
+          )}
+        </div>
+
+        <Button className="w-full gap-2" onClick={() => { onClose(); navigate(`/tasks/${task.id}`); }}>
+          <ExternalLink className="h-4 w-4" /> Άνοιγμα σελίδας Task
+        </Button>
+      </div>
+    </>
+  );
+}
+
+// ── Deliverable Detail Sheet Content ─────────────────
+function DeliverableDetailSheet({ deliverable, onClose, navigate }: {
+  deliverable: DeliverableItem; onClose: () => void; navigate: any;
+}) {
+  return (
+    <>
+      <SheetHeader>
+        <SheetTitle className="text-lg">{deliverable.name}</SheetTitle>
+        <SheetDescription>Παραδοτέο</SheetDescription>
+      </SheetHeader>
+      <div className="mt-6 space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-muted/30 rounded-lg p-3">
+            <p className="text-[10px] text-muted-foreground uppercase mb-1">Κατάσταση</p>
+            <Badge variant={deliverable.completed ? 'default' : 'outline'}>
+              {deliverable.completed ? 'Ολοκληρωμένο' : 'Σε εξέλιξη'}
+            </Badge>
+          </div>
+          <div className="bg-muted/30 rounded-lg p-3">
+            <p className="text-[10px] text-muted-foreground uppercase mb-1">Λήξη</p>
+            <p className="text-sm font-medium">{deliverable.due_date ? format(new Date(deliverable.due_date), 'd MMM yyyy', { locale: el }) : '-'}</p>
+          </div>
+        </div>
+
+        <Button className="w-full gap-2" onClick={() => { onClose(); navigate(`/projects/${deliverable.project_id}?tab=deliverables`); }}>
+          <ExternalLink className="h-4 w-4" /> Άνοιγμα στο Έργο
+        </Button>
+      </div>
+    </>
   );
 }

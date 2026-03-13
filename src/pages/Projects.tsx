@@ -712,7 +712,7 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
                   {!formData.is_internal && (
                     <div className="space-y-2">
                       <Label>Πελάτης {!formData.is_internal && '*'}</Label>
-                      <ClientSelector clients={clients} value={formData.client_id} onValueChange={(val) => setFormData(prev => ({ ...prev, client_id: val }))} />
+                      <ClientSelector clients={clients} value={formData.client_id} onValueChange={(val) => setFormData(prev => ({ ...prev, client_id: val }))} onClientCreated={(c) => setClients(prev => [...prev, c].sort((a, b) => a.name.localeCompare(b.name)))} />
                     </div>
                   )}
                   

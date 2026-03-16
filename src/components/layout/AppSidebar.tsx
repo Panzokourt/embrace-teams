@@ -361,7 +361,7 @@ export default function AppSidebar({
           <TooltipTrigger asChild>
             <button
             onClick={toggleTheme}
-            className={cn("flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 bg-primary-foreground text-primary border border-primary",
+            className={cn("flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 text-primary border border-primary bg-black",
 
             isMobile ?
             "text-muted-foreground hover:text-foreground hover:bg-muted/60" :

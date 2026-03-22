@@ -59,6 +59,7 @@ interface ProjectItem {
   folder_id: string | null;
   client_id: string | null;
   sidebar_sort_order: number;
+  is_internal?: boolean;
   client?: { id: string; name: string; sector: string | null } | null;
 }
 
@@ -302,13 +303,14 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
       if (mode === 'auto') {
         const { data, error } = await supabase
           .from('projects')
-          .select('id, name, status, folder_id, client_id, sidebar_sort_order, client:clients(id, name, sector)')
+          .select('id, name, status, folder_id, client_id, sidebar_sort_order, is_internal, client:clients(id, name, sector)')
           .eq('company_id', companyId)
           .order('name');
         if (error) throw error;
         return (data || []).map((d: any) => ({
           id: d.id, name: d.name, status: d.status, folder_id: d.folder_id,
           client_id: d.client_id, sidebar_sort_order: d.sidebar_sort_order ?? 0,
+          is_internal: d.is_internal || false,
           client: d.client,
         })) as ProjectItem[];
       } else {
@@ -594,9 +596,12 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
     categories.forEach(cat => categoryLookup.set(cat.name, { color: cat.color, sortOrder: cat.sort_order }));
 
     const dynamicCategories = new Map<string, { color: string | null; sortOrder: number; clients: Map<string, ProjectItem[]> }>();
+    const internalProjects: ProjectItem[] = [];
     const uncategorized: { clients: Map<string, ProjectItem[]>; orphans: ProjectItem[] } = { clients: new Map(), orphans: [] };
 
     projects.forEach(project => {
+      // Internal projects go to their own virtual folder
+      if (project.is_internal) { internalProjects.push(project); return; }
       if (!project.client) { uncategorized.orphans.push(project); return; }
       const clientName = project.client.name;
       const categoryName = sectorToCategory(project.client.sector);
@@ -638,6 +643,12 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
               </VirtualFolder>
             );
           })}
+
+          {internalProjects.length > 0 && (
+            <VirtualFolder name="Internal" color="#6B7280" open={expandedVirtual.has('cat::__internal__')} onToggle={() => toggleVirtual('cat::__internal__')}>
+              {internalProjects.map(p => <ProjectLink key={p.id} project={p} isActive={currentProjectId === p.id} />)}
+            </VirtualFolder>
+          )}
 
           {(uncategorized.clients.size > 0 || uncategorized.orphans.length > 0) && (
             <VirtualFolder name="Χωρίς Κατηγορία" color="#9CA3AF" open={expandedVirtual.has('cat::__uncategorized__')} onToggle={() => toggleVirtual('cat::__uncategorized__')}>

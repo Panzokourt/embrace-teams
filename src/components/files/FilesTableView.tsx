@@ -179,7 +179,7 @@ export function FilesTableView({
       
       switch (sortField) {
         case 'file_name':
-          comparison = a.file_name.localeCompare(b.file_name);
+          comparison = a.file_name.localeCompare(b.file_name, 'el', { numeric: true, sensitivity: 'base' });
           break;
         case 'file_size':
           comparison = (a.file_size || 0) - (b.file_size || 0);

@@ -255,6 +255,8 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
   const [expandedVirtual, setExpandedVirtual] = useState<Set<string>>(new Set());
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
+  const [creatingSubfolderId, setCreatingSubfolderId] = useState<string | null>(null);
+  const [newSubfolderName, setNewSubfolderName] = useState('');
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [activeDragId, setActiveDragId] = useState<string | null>(null);

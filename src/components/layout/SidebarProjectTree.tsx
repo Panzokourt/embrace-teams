@@ -617,7 +617,7 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
     });
 
     const sortedCategories = Array.from(dynamicCategories.entries())
-      .sort((a, b) => a[1].sortOrder - b[1].sortOrder || a[0].localeCompare(b[0]));
+      .sort((a, b) => a[1].sortOrder - b[1].sortOrder || a[0].localeCompare(b[0], 'el', { numeric: true, sensitivity: 'base' }));
 
     return (
       <div className="space-y-0.5 mt-1">
@@ -627,7 +627,7 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
             const catKey = `cat::${catName}`;
             return (
               <VirtualFolder key={catName} name={catName} color={catData.color} open={expandedVirtual.has(catKey)} onToggle={() => toggleVirtual(catKey)}>
-                {Array.from(catData.clients.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([clientName, clientProjects]) => {
+                {Array.from(catData.clients.entries()).sort((a, b) => a[0].localeCompare(b[0], 'el', { numeric: true, sensitivity: 'base' })).map(([clientName, clientProjects]) => {
                   const clientKey = `cat::${catName}::${clientName}`;
                   return (
                     <VirtualFolder key={clientName} name={clientName} open={expandedVirtual.has(clientKey)} onToggle={() => toggleVirtual(clientKey)}>
@@ -641,7 +641,7 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
 
           {(uncategorized.clients.size > 0 || uncategorized.orphans.length > 0) && (
             <VirtualFolder name="Χωρίς Κατηγορία" color="#9CA3AF" open={expandedVirtual.has('cat::__uncategorized__')} onToggle={() => toggleVirtual('cat::__uncategorized__')}>
-              {Array.from(uncategorized.clients.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([clientName, clientProjects]) => {
+              {Array.from(uncategorized.clients.entries()).sort((a, b) => a[0].localeCompare(b[0], 'el', { numeric: true, sensitivity: 'base' })).map(([clientName, clientProjects]) => {
                 const clientKey = `cat::__uncategorized__::${clientName}`;
                 return (
                   <VirtualFolder key={clientName} name={clientName} open={expandedVirtual.has(clientKey)} onToggle={() => toggleVirtual(clientKey)}>

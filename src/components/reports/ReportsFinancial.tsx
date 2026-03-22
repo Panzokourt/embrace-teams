@@ -30,7 +30,7 @@ export function ReportsFinancial({ data }: { data: ReportsData }) {
     if (!monthlyData[key]) monthlyData[key] = { revenue: 0, expenses: 0 };
     monthlyData[key].expenses += exp.amount || 0;
   });
-  const trendData = Object.entries(monthlyData).sort().map(([key, v]) => ({
+  const trendData = Object.entries(monthlyData).sort(([a], [b]) => a.localeCompare(b, 'el', { numeric: true })).map(([key, v]) => ({
     name: format(parseISO(key + '-01'), 'MMM yy', { locale: el }),
     Έσοδα: v.revenue,
     Έξοδα: v.expenses,

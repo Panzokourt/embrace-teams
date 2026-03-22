@@ -678,7 +678,7 @@ export default function TendersPage() {
                           onValueChange={(value) => setFormData(prev => ({ ...prev, client_id: value }))}
                           clients={clients}
                           onClientCreated={(newClient) => {
-                            setClients(prev => [...prev, newClient].sort((a, b) => a.name.localeCompare(b.name)));
+                            setClients(prev => [...prev, newClient].sort((a, b) => a.name.localeCompare(b.name, 'el', { numeric: true, sensitivity: 'base' })));
                           }}
                           placeholder="Επιλέξτε"
                         />

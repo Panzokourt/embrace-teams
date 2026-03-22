@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Search, UserPlus, ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { OrgPosition } from './types';
+import { naturalCompare } from '@/lib/utils';
 import { usePagination } from '@/hooks/usePagination';
 import { PaginationControls } from '@/components/shared/PaginationControls';
 
@@ -49,9 +50,9 @@ export function OrgListView({ positions, onNodeClick }: OrgListViewProps) {
     items.sort((a, b) => {
       let cmp = 0;
       switch (sortKey) {
-        case 'name': cmp = (a.user?.full_name || 'zzz').localeCompare(b.user?.full_name || 'zzz'); break;
-        case 'title': cmp = a.position_title.localeCompare(b.position_title); break;
-        case 'department': cmp = (a.department || 'zzz').localeCompare(b.department || 'zzz'); break;
+        case 'name': cmp = naturalCompare(a.user?.full_name || 'zzz', b.user?.full_name || 'zzz'); break;
+        case 'title': cmp = naturalCompare(a.position_title, b.position_title); break;
+        case 'department': cmp = naturalCompare(a.department || 'zzz', b.department || 'zzz'); break;
         case 'level': cmp = a.level - b.level; break;
       }
       return sortAsc ? cmp : -cmp;

@@ -179,7 +179,7 @@ export function FilesTableView({
       
       switch (sortField) {
         case 'file_name':
-          comparison = a.file_name.localeCompare(b.file_name);
+          comparison = a.file_name.localeCompare(b.file_name, 'el', { numeric: true, sensitivity: 'base' });
           break;
         case 'file_size':
           comparison = (a.file_size || 0) - (b.file_size || 0);
@@ -188,12 +188,12 @@ export function FilesTableView({
           comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
           break;
         case 'content_type':
-          comparison = (a.content_type || '').localeCompare(b.content_type || '');
+          comparison = (a.content_type || '').localeCompare(b.content_type || '', 'el', { numeric: true, sensitivity: 'base' });
           break;
         case 'folder':
           const folderA = folders.find(f => f.id === a.folder_id)?.name || '';
           const folderB = folders.find(f => f.id === b.folder_id)?.name || '';
-          comparison = folderA.localeCompare(folderB);
+          comparison = folderA.localeCompare(folderB, 'el', { numeric: true, sensitivity: 'base' });
           break;
       }
       

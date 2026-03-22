@@ -428,7 +428,7 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
       queryClient.invalidateQueries({ queryKey: ['project-folders'] });
       queryClient.invalidateQueries({ queryKey: ['sidebar-projects'] });
       toast.success('Φάκελος διαγράφηκε');
-    },
+    onError: (err: any) => toast.error(err?.message || 'Σφάλμα διαγραφής φακέλου'),
   });
 
   const moveProject = useMutation({

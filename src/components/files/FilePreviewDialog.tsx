@@ -91,9 +91,9 @@ export function FilePreviewDialog({ open, onOpenChange, filePath, fileName, cont
             />
           )}
 
-          {!loading && signedUrl && previewType === 'pdf' && (
+          {!loading && signedUrl && previewType === 'pdf' && googleViewerUrl && (
             <iframe
-              src={signedUrl}
+              src={googleViewerUrl}
               title={fileName}
               className="w-full h-full border-0"
             />

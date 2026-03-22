@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
 import {
@@ -334,8 +334,7 @@ export default function MyWork() {
               {todayTasks.length === 0 ? (
                 <p className="text-sm text-muted-foreground px-6 py-6">Κανένα task για σήμερα 🎉</p>
               ) : (
-                <ScrollArea className="max-h-[500px]">
-                  <div className="divide-y divide-border/30">
+                <div className="overflow-y-auto max-h-[60vh] divide-y divide-border/30">
                     {todayTasks.map(task => (
                       <TaskRow
                         key={task.id}
@@ -348,8 +347,7 @@ export default function MyWork() {
                         showProject
                       />
                     ))}
-                  </div>
-                </ScrollArea>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -367,8 +365,7 @@ export default function MyWork() {
               {topLevelProjects.length === 0 ? (
                 <p className="text-sm text-muted-foreground px-6 py-6">Κανένα ενεργό έργο</p>
               ) : (
-                <ScrollArea className="max-h-[500px]">
-                  <div className="divide-y divide-border/30">
+                <div className="overflow-y-auto max-h-[60vh] divide-y divide-border/30">
                     {topLevelProjects.map(project => (
                       <ProjectRow
                         key={project.id}
@@ -390,8 +387,7 @@ export default function MyWork() {
                         myTasks={allMyTasks}
                       />
                     ))}
-                  </div>
-                </ScrollArea>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -484,7 +480,7 @@ export default function MyWork() {
             {approvalCount === 0 ? (
               <p className="text-sm text-muted-foreground px-6 py-4">Δεν υπάρχουν εκκρεμείς εγκρίσεις 🎉</p>
             ) : (
-              <div className="divide-y divide-border/30">
+              <div className="overflow-y-auto max-h-[40vh] divide-y divide-border/30">
                 {/* Sent for approval */}
                 {sentForApproval.length > 0 && (
                   <>
@@ -570,7 +566,7 @@ export default function MyWork() {
             {todayEntries.length > 0 && (
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground font-medium">Σήμερα</p>
-                <ScrollArea className="max-h-32">
+                <div className="overflow-y-auto max-h-32">
                   {todayEntries.slice(0, 5).map(entry => (
                     <div key={entry.id} className="flex items-center gap-2 py-1.5 text-sm">
                       <span className="text-xs text-muted-foreground w-10">{format(new Date(entry.start_time), 'HH:mm')}</span>
@@ -578,7 +574,7 @@ export default function MyWork() {
                       <span className="text-xs font-mono text-muted-foreground">{entry.duration_minutes}λ</span>
                     </div>
                   ))}
-                </ScrollArea>
+                </div>
               </div>
             )}
 

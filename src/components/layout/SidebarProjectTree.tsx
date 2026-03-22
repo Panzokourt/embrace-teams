@@ -665,11 +665,144 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
             );
           })}
 
-          {internalProjects.length > 0 && (
-            <VirtualFolder name="Internal" color="#6B7280" open={expandedVirtual.has('cat::__internal__')} onToggle={() => toggleVirtual('cat::__internal__')}>
-              {internalProjects.map(p => <ProjectLink key={p.id} project={p} isActive={currentProjectId === p.id} />)}
-            </VirtualFolder>
-          )}
+          {(() => {
+            // Find the Internal root folder from DB
+            const internalRootFolder = folders.find(f => f.name === 'Internal' && !f.parent_folder_id);
+            const internalSubfolders = internalRootFolder 
+              ? folders.filter(f => f.parent_folder_id === internalRootFolder.id)
+              : [];
+            const internalOpen = expandedVirtual.has('cat::__internal__');
+            
+            // Group internal projects by subfolder
+            const internalBySubfolder = new Map<string | null, ProjectItem[]>();
+            internalProjects.forEach(p => {
+              // Check if project is in a subfolder of Internal
+              const subKey = internalSubfolders.find(sf => sf.id === p.folder_id)?.id || null;
+              if (!internalBySubfolder.has(subKey)) internalBySubfolder.set(subKey, []);
+              internalBySubfolder.get(subKey)!.push(p);
+            });
+            const rootInternalProjects = internalBySubfolder.get(null) || [];
+
+            return (
+              <div>
+                <ContextMenu>
+                  <ContextMenuTrigger asChild>
+                    <button
+                      onClick={() => toggleVirtual('cat::__internal__')}
+                      className="flex items-center gap-2 w-full rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+                    >
+                      <ChevronRight className={cn("h-3 w-3 transition-transform duration-200 shrink-0", internalOpen && "rotate-90")} />
+                      {internalOpen ? (
+                        <FolderOpen className="h-3.5 w-3.5 shrink-0" style={{ color: '#6B7280' }} />
+                      ) : (
+                        <Folder className="h-3.5 w-3.5 shrink-0" style={{ color: '#6B7280' }} />
+                      )}
+                      <span className="truncate text-xs font-medium">Internal</span>
+                      <span className="ml-auto text-[10px] text-muted-foreground/40">{internalProjects.length}</span>
+                    </button>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent>
+                    <ContextMenuItem onClick={() => {
+                      if (internalRootFolder) {
+                        setCreatingSubfolderId(internalRootFolder.id);
+                        setNewSubfolderName('');
+                      }
+                    }}>
+                      <Plus className="h-3.5 w-3.5 mr-2" />Νέος Υποφάκελος
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
+
+                {internalOpen && (
+                  <div className="ml-4 pl-2 border-l border-border/20 space-y-0.5">
+                    {/* Subfolder creation input */}
+                    {creatingSubfolderId && internalRootFolder && creatingSubfolderId === internalRootFolder.id && (
+                      <form onSubmit={e => { e.preventDefault(); if (newSubfolderName.trim()) createSubfolder.mutate({ name: newSubfolderName.trim(), parentId: internalRootFolder.id }); }} className="flex items-center gap-1 px-2">
+                        <Input autoFocus value={newSubfolderName} onChange={e => setNewSubfolderName(e.target.value)} onBlur={() => { if (!newSubfolderName.trim()) setCreatingSubfolderId(null); }} placeholder="Υποφάκελος..." className="h-6 text-xs" />
+                      </form>
+                    )}
+
+                    {/* Subfolders */}
+                    {internalSubfolders.map(sf => {
+                      const sfProjects = internalBySubfolder.get(sf.id) || [];
+                      const sfOpen = expandedFolders.has(sf.id);
+                      return (
+                        <div key={sf.id}>
+                          <ContextMenu>
+                            <ContextMenuTrigger asChild>
+                              <button
+                                onClick={() => toggleFolder(sf.id)}
+                                className="flex items-center gap-2 w-full rounded-lg px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-colors"
+                              >
+                                <ChevronRight className={cn("h-3 w-3 transition-transform duration-200 shrink-0", sfOpen && "rotate-90")} />
+                                {sfOpen ? <FolderOpen className="h-3 w-3 shrink-0" style={{ color: sf.color || '#6B7280' }} /> : <Folder className="h-3 w-3 shrink-0" style={{ color: sf.color || '#6B7280' }} />}
+                                {renamingId === sf.id ? (
+                                  <form onSubmit={e => { e.preventDefault(); renameFolder.mutate({ id: sf.id, name: renameValue }); }} onClick={e => e.stopPropagation()}>
+                                    <Input autoFocus value={renameValue} onChange={e => setRenameValue(e.target.value)} onBlur={() => setRenamingId(null)} className="h-5 text-xs px-1" />
+                                  </form>
+                                ) : (
+                                  <span className="truncate">{sf.name}</span>
+                                )}
+                                <span className="ml-auto text-[10px] text-muted-foreground/40">{sfProjects.length}</span>
+                              </button>
+                            </ContextMenuTrigger>
+                            <ContextMenuContent>
+                              <ContextMenuItem onClick={() => { setCreatingSubfolderId(sf.id); setNewSubfolderName(''); }}>
+                                <Plus className="h-3.5 w-3.5 mr-2" />Νέος Υποφάκελος
+                              </ContextMenuItem>
+                              <ContextMenuItem onClick={() => { setRenamingId(sf.id); setRenameValue(sf.name); }}>
+                                <Pencil className="h-3.5 w-3.5 mr-2" />Μετονομασία
+                              </ContextMenuItem>
+                              <ContextMenuItem onClick={() => deleteFolder.mutate(sf.id)} className="text-destructive">
+                                <Trash2 className="h-3.5 w-3.5 mr-2" />Διαγραφή
+                              </ContextMenuItem>
+                            </ContextMenuContent>
+                          </ContextMenu>
+
+                          {/* Subfolder creation inside subfolder */}
+                          {creatingSubfolderId === sf.id && (
+                            <div className="ml-4 pl-2">
+                              <form onSubmit={e => { e.preventDefault(); if (newSubfolderName.trim()) createSubfolder.mutate({ name: newSubfolderName.trim(), parentId: sf.id }); }} className="flex items-center gap-1 px-2">
+                                <Input autoFocus value={newSubfolderName} onChange={e => setNewSubfolderName(e.target.value)} onBlur={() => { if (!newSubfolderName.trim()) setCreatingSubfolderId(null); }} placeholder="Υποφάκελος..." className="h-6 text-xs" />
+                              </form>
+                            </div>
+                          )}
+
+                          {sfOpen && (
+                            <div className="ml-4 pl-2 border-l border-border/20 space-y-0.5">
+                              {/* Nested subfolders */}
+                              {folders.filter(nsf => nsf.parent_folder_id === sf.id).map(nsf => {
+                                const nsfProjects = internalProjects.filter(p => p.folder_id === nsf.id);
+                                const nsfOpen = expandedFolders.has(nsf.id);
+                                return (
+                                  <div key={nsf.id}>
+                                    <button onClick={() => toggleFolder(nsf.id)} className="flex items-center gap-2 w-full rounded-lg px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-colors">
+                                      <ChevronRight className={cn("h-3 w-3 transition-transform duration-200 shrink-0", nsfOpen && "rotate-90")} />
+                                      <Folder className="h-3 w-3 shrink-0" style={{ color: nsf.color || '#6B7280' }} />
+                                      <span className="truncate">{nsf.name}</span>
+                                    </button>
+                                    {nsfOpen && nsfProjects.length > 0 && (
+                                      <div className="ml-4 pl-2 border-l border-border/20 space-y-0.5">
+                                        {nsfProjects.map(p => <ProjectLink key={p.id} project={p} isActive={currentProjectId === p.id} />)}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              {sfProjects.map(p => <ProjectLink key={p.id} project={p} isActive={currentProjectId === p.id} />)}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {/* Root-level internal projects (in the Internal folder directly) */}
+                    {rootInternalProjects.map(p => <ProjectLink key={p.id} project={p} isActive={currentProjectId === p.id} />)}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {(uncategorized.clients.size > 0 || uncategorized.orphans.length > 0) && (
             <VirtualFolder name="Χωρίς Κατηγορία" color="#9CA3AF" open={expandedVirtual.has('cat::__uncategorized__')} onToggle={() => toggleVirtual('cat::__uncategorized__')}>

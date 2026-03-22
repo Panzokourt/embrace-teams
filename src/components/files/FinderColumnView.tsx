@@ -581,39 +581,39 @@ export function FinderColumnView({
 
         {/* Preview panel */}
         {selectedFile && (
-          <div className="w-[320px] shrink-0 border-l border-border bg-muted/20 flex flex-col">
+          <div className="w-[360px] shrink-0 border-l border-border bg-muted/20 flex flex-col">
             <ScrollArea className="flex-1">
               <div className="p-4 flex flex-col items-center gap-4">
                 <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center">
                   <FileIcon className="h-10 w-10 text-muted-foreground" />
                 </div>
-                <h3 className="text-sm font-semibold text-center break-words leading-tight max-w-full">
+                <h3 className="text-sm font-semibold text-center leading-tight w-full break-all px-1">
                   {selectedFile.file_name}
                 </h3>
                 <Separator />
                 <div className="w-full space-y-3 text-xs">
-                  <div className="flex justify-between gap-2">
-                    <span className="text-muted-foreground shrink-0">Τύπος</span>
-                    <span className="text-foreground font-medium truncate text-right" title={selectedFile.content_type || ''}>
-                      {selectedFile.content_type?.split('/').pop()?.toUpperCase() || '—'}
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-muted-foreground">Τύπος</span>
+                    <span className="text-foreground font-medium break-all">
+                      {selectedFile.content_type || '—'}
                     </span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex flex-col gap-0.5">
                     <span className="text-muted-foreground">Μέγεθος</span>
                     <span className="text-foreground font-medium">
                       {formatFileSize(selectedFile.file_size)}
                     </span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex flex-col gap-0.5">
                     <span className="text-muted-foreground">Ημερομηνία</span>
                     <span className="text-foreground font-medium">
-                      {format(new Date(selectedFile.created_at), 'dd MMM yyyy', { locale: el })}
+                      {format(new Date(selectedFile.created_at), 'dd MMM yyyy, HH:mm', { locale: el })}
                     </span>
                   </div>
                   {selectedFile.uploader && (
-                    <div className="flex justify-between gap-2">
-                      <span className="text-muted-foreground shrink-0">Από</span>
-                      <span className="text-foreground font-medium truncate text-right">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-muted-foreground">Από</span>
+                      <span className="text-foreground font-medium break-all">
                         {selectedFile.uploader.full_name || selectedFile.uploader.email}
                       </span>
                     </div>

@@ -627,7 +627,7 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
             const catKey = `cat::${catName}`;
             return (
               <VirtualFolder key={catName} name={catName} color={catData.color} open={expandedVirtual.has(catKey)} onToggle={() => toggleVirtual(catKey)}>
-                {Array.from(catData.clients.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([clientName, clientProjects]) => {
+                {Array.from(catData.clients.entries()).sort((a, b) => a[0].localeCompare(b[0], 'el', { numeric: true, sensitivity: 'base' })).map(([clientName, clientProjects]) => {
                   const clientKey = `cat::${catName}::${clientName}`;
                   return (
                     <VirtualFolder key={clientName} name={clientName} open={expandedVirtual.has(clientKey)} onToggle={() => toggleVirtual(clientKey)}>

@@ -385,6 +385,22 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
     onError: () => toast.error('Σφάλμα δημιουργίας φακέλου'),
   });
 
+  const createSubfolder = useMutation({
+    mutationFn: async ({ name, parentId }: { name: string; parentId: string }) => {
+      const { error } = await supabase.from('project_folders').insert({ 
+        company_id: companyId!, name, parent_folder_id: parentId, sort_order: 0 
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project-folders'] });
+      toast.success('Υποφάκελος δημιουργήθηκε');
+      setCreatingSubfolderId(null);
+      setNewSubfolderName('');
+    },
+    onError: () => toast.error('Σφάλμα δημιουργίας υποφακέλου'),
+  });
+
   const renameFolder = useMutation({
     mutationFn: async ({ id, name }: { id: string; name: string }) => {
       const { error } = await supabase.from('project_folders').update({ name }).eq('id', id);

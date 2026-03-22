@@ -25,6 +25,7 @@ import {
 } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { STATUS_COLORS, PRIORITY_COLORS } from '@/components/shared/mondayStyleConfig';
+import { naturalCompare } from '@/lib/utils';
 
 // ── Types ──────────────────────────────────────────
 interface TaskItem {
@@ -163,7 +164,9 @@ export default function MyWork() {
         projectMap.set(p.id, p);
       }
     });
-    setMyProjects(Array.from(projectMap.values()));
+    setMyProjects(
+      Array.from(projectMap.values()).sort((a, b) => naturalCompare(a.name || '', b.name || ''))
+    );
 
     const totalMin = (timeRes.data || []).reduce((s: number, e: any) => s + (e.duration_minutes || 0), 0);
     setTodayHours(Math.round((totalMin / 60) * 10) / 10);
@@ -233,12 +236,16 @@ export default function MyWork() {
 
   // ── Sub-projects for a project ───────────────────
   const getSubProjects = useCallback((parentId: string) =>
-    myProjects.filter(p => p.parent_project_id === parentId),
+    myProjects
+      .filter(p => p.parent_project_id === parentId)
+      .sort((a, b) => naturalCompare(a.name || '', b.name || '')),
     [myProjects]
   );
 
   const topLevelProjects = useMemo(() =>
-    myProjects.filter(p => !p.parent_project_id || !myProjects.some(mp => mp.id === p.parent_project_id)),
+    myProjects
+      .filter(p => !p.parent_project_id || !myProjects.some(mp => mp.id === p.parent_project_id))
+      .sort((a, b) => naturalCompare(a.name || '', b.name || '')),
     [myProjects]
   );
 

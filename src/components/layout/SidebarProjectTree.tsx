@@ -293,7 +293,7 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
       if (error) throw error;
       return data as ProjectFolder[];
     },
-    enabled: !!companyId && mode === 'manual',
+    enabled: !!companyId,
   });
 
   const { data: projects = [] } = useQuery({

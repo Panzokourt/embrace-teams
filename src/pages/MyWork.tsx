@@ -318,44 +318,82 @@ export default function MyWork() {
 
       {/* ── Main Content ── */}
       {activeView === 'projects' ? (
-        <Card className="border-border/40">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <FolderKanban className="h-4 w-4 text-muted-foreground" />
-              Τα Ενεργά Έργα μου
-              <Badge variant="secondary" className="text-xs ml-1">{topLevelProjects.length}</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {topLevelProjects.length === 0 ? (
-              <p className="text-sm text-muted-foreground px-6 py-6">Κανένα ενεργό έργο</p>
-            ) : (
-              <div className="divide-y divide-border/30">
-                {topLevelProjects.map(project => (
-                  <ProjectRow
-                    key={project.id}
-                    project={project}
-                    subProjects={getSubProjects(project.id)}
-                    expanded={expandedProjects.has(project.id)}
-                    onToggle={() => toggleProject(project.id)}
-                    tasks={projectTasks[project.id] || []}
-                    deliverables={projectDeliverables[project.id] || []}
-                    onTaskComplete={toggleTaskComplete}
-                    onItemClick={setSelectedItem}
-                    activeTimer={activeTimer}
-                    startTimer={startTimer}
-                    stopTimer={stopTimer}
-                    expandedProjects={expandedProjects}
-                    onToggleProject={toggleProject}
-                    projectTasks={projectTasks}
-                    projectDeliverables={projectDeliverables}
-                    myTasks={allMyTasks}
-                  />
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+          {/* Today's Tasks */}
+          <Card className="border-border/40 lg:col-span-2">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <CheckSquare className="h-4 w-4 text-muted-foreground" />
+                Tasks Σήμερα
+                <Badge variant="secondary" className="text-xs ml-1">{todayTasks.length}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {todayTasks.length === 0 ? (
+                <p className="text-sm text-muted-foreground px-6 py-6">Κανένα task για σήμερα 🎉</p>
+              ) : (
+                <ScrollArea className="max-h-[500px]">
+                  <div className="divide-y divide-border/30">
+                    {todayTasks.map(task => (
+                      <TaskRow
+                        key={task.id}
+                        task={task}
+                        onComplete={() => toggleTaskComplete(task)}
+                        onClick={() => setSelectedItem({ type: 'task', data: task })}
+                        activeTimer={activeTimer}
+                        startTimer={startTimer}
+                        stopTimer={stopTimer}
+                        showProject
+                      />
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Active Projects */}
+          <Card className="border-border/40 lg:col-span-3">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <FolderKanban className="h-4 w-4 text-muted-foreground" />
+                Τα Ενεργά Έργα μου
+                <Badge variant="secondary" className="text-xs ml-1">{topLevelProjects.length}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {topLevelProjects.length === 0 ? (
+                <p className="text-sm text-muted-foreground px-6 py-6">Κανένα ενεργό έργο</p>
+              ) : (
+                <ScrollArea className="max-h-[500px]">
+                  <div className="divide-y divide-border/30">
+                    {topLevelProjects.map(project => (
+                      <ProjectRow
+                        key={project.id}
+                        project={project}
+                        subProjects={getSubProjects(project.id)}
+                        expanded={expandedProjects.has(project.id)}
+                        onToggle={() => toggleProject(project.id)}
+                        tasks={projectTasks[project.id] || []}
+                        deliverables={projectDeliverables[project.id] || []}
+                        onTaskComplete={toggleTaskComplete}
+                        onItemClick={setSelectedItem}
+                        activeTimer={activeTimer}
+                        startTimer={startTimer}
+                        stopTimer={stopTimer}
+                        expandedProjects={expandedProjects}
+                        onToggleProject={toggleProject}
+                        projectTasks={projectTasks}
+                        projectDeliverables={projectDeliverables}
+                        myTasks={allMyTasks}
+                      />
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       ) : (
         /* ── Calendar View ── */
         <Card className="border-border/40">

@@ -700,30 +700,42 @@ function ProjectRow({
           {deliverables.map(del => {
             const delTasks = tasks.filter(t => t.deliverable_id === del.id);
             return (
-              <div key={del.id}>
-                <div
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-muted/20 rounded-lg cursor-pointer transition-colors"
-                  onClick={() => onItemClick({ type: 'deliverable', data: del })}
-                >
+              <Collapsible key={del.id}>
+                <div className="flex items-center gap-2 px-3 py-2 hover:bg-muted/20 rounded-lg transition-colors">
+                  {delTasks.length > 0 && (
+                    <CollapsibleTrigger asChild>
+                      <button className="shrink-0">
+                        <ChevronRight className="h-3 w-3 text-muted-foreground transition-transform [[data-state=open]>>&]:rotate-90" />
+                      </button>
+                    </CollapsibleTrigger>
+                  )}
                   <Package className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <span className="text-sm text-foreground flex-1 truncate">{del.name}</span>
+                  <span
+                    className="text-sm text-foreground flex-1 truncate cursor-pointer hover:text-primary"
+                    onClick={() => onItemClick({ type: 'deliverable', data: del })}
+                  >{del.name}</span>
                   <Badge variant={del.completed ? 'default' : 'outline'} className="text-[10px]">
                     {del.completed ? 'Ολοκληρωμένο' : 'Σε εξέλιξη'}
                   </Badge>
+                  {delTasks.length > 0 && (
+                    <span className="text-[10px] text-muted-foreground">{delTasks.length} tasks</span>
+                  )}
                 </div>
-                {delTasks.map(task => (
-                  <TaskRow
-                    key={task.id}
-                    task={task}
-                    indent
-                    onComplete={() => onTaskComplete(task)}
-                    onClick={() => onItemClick({ type: 'task', data: task })}
-                    activeTimer={activeTimer}
-                    startTimer={startTimer}
-                    stopTimer={stopTimer}
-                  />
-                ))}
-              </div>
+                <CollapsibleContent>
+                  {delTasks.map(task => (
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      indent
+                      onComplete={() => onTaskComplete(task)}
+                      onClick={() => onItemClick({ type: 'task', data: task })}
+                      activeTimer={activeTimer}
+                      startTimer={startTimer}
+                      stopTimer={stopTimer}
+                    />
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
             );
           })}
 

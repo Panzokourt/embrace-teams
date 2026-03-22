@@ -751,7 +751,7 @@ function ProjectRow({
 
 // ── Task Row (inline in tree) ────────────────────────
 function TaskRow({
-  task, indent, onComplete, onClick, activeTimer, startTimer, stopTimer,
+  task, indent, onComplete, onClick, activeTimer, startTimer, stopTimer, showProject,
 }: {
   task: TaskItem;
   indent?: boolean;
@@ -760,6 +760,7 @@ function TaskRow({
   activeTimer: any;
   startTimer: any;
   stopTimer: any;
+  showProject?: boolean;
 }) {
   const isOverdue = task.due_date && isBefore(startOfDay(new Date(task.due_date)), startOfDay(new Date()));
   const isRunning = activeTimer?.is_running && activeTimer.task_id === task.id;
@@ -770,6 +771,9 @@ function TaskRow({
       <ListChecks className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
       <div className="flex-1 min-w-0 cursor-pointer" onClick={onClick}>
         <span className="text-sm text-foreground hover:text-primary truncate block">{task.title}</span>
+        {showProject && (task.project as any)?.name && (
+          <span className="text-[10px] text-muted-foreground truncate block">{(task.project as any).name}</span>
+        )}
       </div>
       {task.due_date && (
         <span className={`text-[10px] ${isOverdue ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>

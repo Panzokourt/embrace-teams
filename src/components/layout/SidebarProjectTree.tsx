@@ -347,7 +347,10 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
     const ap = projects.find(p => p.id === currentProjectId);
     if (!ap) return;
     const keys: string[] = [];
-    if (ap.client) {
+    if (ap.is_internal) {
+      keys.push('cat::__internal__');
+      if (ap.folder_id) keys.push(ap.folder_id);
+    } else if (ap.client) {
       const cat = sectorToCategory(ap.client.sector);
       const cn = ap.client.name;
       if (cat) { keys.push(`cat::${cat}`, `cat::${cat}::${cn}`); }

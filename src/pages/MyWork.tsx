@@ -119,15 +119,17 @@ export default function MyWork() {
     [allMyTasks, today]
   );
 
-  const todayTaskCount = useMemo(() =>
+  const todayTasks = useMemo(() =>
     allMyTasks.filter(t => {
       if (t.status === 'completed') return false;
       const dd = t.due_date ? startOfDay(new Date(t.due_date)) : null;
       const sd = t.start_date ? startOfDay(new Date(t.start_date)) : null;
       return (dd && dd.getTime() === today.getTime()) || (sd && sd.getTime() === today.getTime()) || (dd && isBefore(dd, today));
-    }).length,
+    }),
     [allMyTasks, today]
   );
+
+  const todayTaskCount = todayTasks.length;
 
   const approvalCount = sentForApproval.length + needMyApproval.length;
 

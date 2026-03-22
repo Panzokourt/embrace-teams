@@ -443,6 +443,7 @@ export function CentralFileExplorer() {
         onRenameFolder={handleRenameFolder}
         onDeleteFolder={handleDeleteFolder}
         onMoveFile={isVirtualMode ? undefined : handleMoveFile}
+        onMoveFolder={isVirtualMode ? undefined : handleMoveFolder}
         canManage={isVirtualMode ? false : canManage}
         loading={loading}
         uploading={uploading}

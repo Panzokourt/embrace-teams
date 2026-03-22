@@ -596,9 +596,12 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
     categories.forEach(cat => categoryLookup.set(cat.name, { color: cat.color, sortOrder: cat.sort_order }));
 
     const dynamicCategories = new Map<string, { color: string | null; sortOrder: number; clients: Map<string, ProjectItem[]> }>();
+    const internalProjects: ProjectItem[] = [];
     const uncategorized: { clients: Map<string, ProjectItem[]>; orphans: ProjectItem[] } = { clients: new Map(), orphans: [] };
 
     projects.forEach(project => {
+      // Internal projects go to their own virtual folder
+      if (project.is_internal) { internalProjects.push(project); return; }
       if (!project.client) { uncategorized.orphans.push(project); return; }
       const clientName = project.client.name;
       const categoryName = sectorToCategory(project.client.sector);

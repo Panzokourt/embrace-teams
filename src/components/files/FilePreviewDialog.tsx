@@ -65,11 +65,11 @@ export function FilePreviewDialog({ open, onOpenChange, filePath, fileName, cont
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[92vw] max-h-[92vh] w-[92vw] h-[92vh] p-0 gap-0 overflow-hidden rounded-2xl">
+      <DialogContent className="max-w-[92vw] max-h-[92vh] w-[92vw] h-[92vh] p-0 gap-0 overflow-hidden rounded-2xl flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/30 shrink-0">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30 flex-none">
           <h3 className="text-sm font-semibold truncate max-w-[70%]">{fileName}</h3>
-          <Button variant="ghost" size="sm" onClick={handleDownload} className="gap-1.5 shrink-0">
+          <Button variant="ghost" size="sm" onClick={handleDownload} className="gap-1.5 flex-none">
             <Download className="h-3.5 w-3.5" /> Λήψη
           </Button>
         </div>

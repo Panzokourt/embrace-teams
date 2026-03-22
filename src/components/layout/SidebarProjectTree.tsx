@@ -644,6 +644,12 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
             );
           })}
 
+          {internalProjects.length > 0 && (
+            <VirtualFolder name="Internal" color="#6B7280" open={expandedVirtual.has('cat::__internal__')} onToggle={() => toggleVirtual('cat::__internal__')}>
+              {internalProjects.map(p => <ProjectLink key={p.id} project={p} isActive={currentProjectId === p.id} />)}
+            </VirtualFolder>
+          )}
+
           {(uncategorized.clients.size > 0 || uncategorized.orphans.length > 0) && (
             <VirtualFolder name="Χωρίς Κατηγορία" color="#9CA3AF" open={expandedVirtual.has('cat::__uncategorized__')} onToggle={() => toggleVirtual('cat::__uncategorized__')}>
               {Array.from(uncategorized.clients.entries()).sort((a, b) => a[0].localeCompare(b[0], 'el', { numeric: true, sensitivity: 'base' })).map(([clientName, clientProjects]) => {

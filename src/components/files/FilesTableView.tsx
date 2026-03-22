@@ -188,7 +188,7 @@ export function FilesTableView({
           comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
           break;
         case 'content_type':
-          comparison = (a.content_type || '').localeCompare(b.content_type || '');
+          comparison = (a.content_type || '').localeCompare(b.content_type || '', 'el', { numeric: true, sensitivity: 'base' });
           break;
         case 'folder':
           const folderA = folders.find(f => f.id === a.folder_id)?.name || '';

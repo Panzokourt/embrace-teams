@@ -193,7 +193,7 @@ export function FilesTableView({
         case 'folder':
           const folderA = folders.find(f => f.id === a.folder_id)?.name || '';
           const folderB = folders.find(f => f.id === b.folder_id)?.name || '';
-          comparison = folderA.localeCompare(folderB);
+          comparison = folderA.localeCompare(folderB, 'el', { numeric: true, sensitivity: 'base' });
           break;
       }
       

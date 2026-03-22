@@ -189,7 +189,7 @@ export default function ClientsPage() {
 
         if (error) throw error;
 
-        setClients(prev => [...prev, { ...data, projectCount: 0 }].sort((a, b) => a.name.localeCompare(b.name)));
+        setClients(prev => [...prev, { ...data, projectCount: 0 }].sort((a, b) => a.name.localeCompare(b.name, 'el', { numeric: true, sensitivity: 'base' })));
         toast.success('Ο πελάτης δημιουργήθηκε!');
         logCreate('client', data.id, formData.name);
       }

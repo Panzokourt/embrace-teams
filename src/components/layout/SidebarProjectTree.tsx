@@ -641,7 +641,7 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
 
           {(uncategorized.clients.size > 0 || uncategorized.orphans.length > 0) && (
             <VirtualFolder name="Χωρίς Κατηγορία" color="#9CA3AF" open={expandedVirtual.has('cat::__uncategorized__')} onToggle={() => toggleVirtual('cat::__uncategorized__')}>
-              {Array.from(uncategorized.clients.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([clientName, clientProjects]) => {
+              {Array.from(uncategorized.clients.entries()).sort((a, b) => a[0].localeCompare(b[0], 'el', { numeric: true, sensitivity: 'base' })).map(([clientName, clientProjects]) => {
                 const clientKey = `cat::__uncategorized__::${clientName}`;
                 return (
                   <VirtualFolder key={clientName} name={clientName} open={expandedVirtual.has(clientKey)} onToggle={() => toggleVirtual(clientKey)}>

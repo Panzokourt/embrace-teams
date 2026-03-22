@@ -136,7 +136,7 @@ export default function PricingDashboard() {
       if (p.status === 'won') months[key].won += p.total_revenue || 0;
     });
     return Object.entries(months)
-      .sort(([a], [b]) => a.localeCompare(b))
+      .sort(([a], [b]) => a.localeCompare(b, 'el', { numeric: true }))
       .slice(-6)
       .map(([month, data]) => ({
         month: new Date(month + '-01').toLocaleDateString('el-GR', { month: 'short' }),

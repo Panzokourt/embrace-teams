@@ -103,7 +103,7 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
 
   const fetchJobTitles = async () => {
     const { data } = await supabase.from('profiles').select('job_title').not('job_title', 'is', null);
-    const titles = [...new Set((data || []).map(p => p.job_title).filter(Boolean) as string[])].sort();
+    const titles = [...new Set((data || []).map(p => p.job_title).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b, 'el', { numeric: true, sensitivity: 'base' }));
     setJobTitleOptions(titles);
   };
 

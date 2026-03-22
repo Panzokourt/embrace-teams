@@ -110,7 +110,7 @@ export function FinderColumnView({
     // Always show files belonging to this folder (no flat fallback)
     const childFiles = filteredFiles
       .filter((f) => f.folder_id === parentId)
-      .sort((a, b) => a.file_name.localeCompare(b.file_name))
+      .sort((a, b) => a.file_name.localeCompare(b.file_name, 'el', { numeric: true, sensitivity: 'base' }))
       .map((f) => ({ kind: 'file' as const, data: f }));
 
     return [...childFolders, ...childFiles];

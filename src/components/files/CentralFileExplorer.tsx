@@ -233,7 +233,7 @@ export function CentralFileExplorer() {
         }
       });
 
-      const sortedMonths = [...monthGroups.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+      const sortedMonths = [...monthGroups.entries()].sort((a, b) => b[0].localeCompare(a[0], 'el', { numeric: true }));
       sortedMonths.forEach(([key, label]) => {
         vFolders.push({
           id: `vd-${key}`,

@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Search, UserPlus, ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { OrgPosition } from './types';
+import { naturalCompare } from '@/lib/utils';
 import { usePagination } from '@/hooks/usePagination';
 import { PaginationControls } from '@/components/shared/PaginationControls';
 

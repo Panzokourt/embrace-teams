@@ -303,13 +303,14 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
       if (mode === 'auto') {
         const { data, error } = await supabase
           .from('projects')
-          .select('id, name, status, folder_id, client_id, sidebar_sort_order, client:clients(id, name, sector)')
+          .select('id, name, status, folder_id, client_id, sidebar_sort_order, is_internal, client:clients(id, name, sector)')
           .eq('company_id', companyId)
           .order('name');
         if (error) throw error;
         return (data || []).map((d: any) => ({
           id: d.id, name: d.name, status: d.status, folder_id: d.folder_id,
           client_id: d.client_id, sidebar_sort_order: d.sidebar_sort_order ?? 0,
+          is_internal: d.is_internal || false,
           client: d.client,
         })) as ProjectItem[];
       } else {

@@ -119,15 +119,17 @@ export default function MyWork() {
     [allMyTasks, today]
   );
 
-  const todayTaskCount = useMemo(() =>
+  const todayTasks = useMemo(() =>
     allMyTasks.filter(t => {
       if (t.status === 'completed') return false;
       const dd = t.due_date ? startOfDay(new Date(t.due_date)) : null;
       const sd = t.start_date ? startOfDay(new Date(t.start_date)) : null;
       return (dd && dd.getTime() === today.getTime()) || (sd && sd.getTime() === today.getTime()) || (dd && isBefore(dd, today));
-    }).length,
+    }),
     [allMyTasks, today]
   );
+
+  const todayTaskCount = todayTasks.length;
 
   const approvalCount = sentForApproval.length + needMyApproval.length;
 
@@ -318,44 +320,82 @@ export default function MyWork() {
 
       {/* ── Main Content ── */}
       {activeView === 'projects' ? (
-        <Card className="border-border/40">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <FolderKanban className="h-4 w-4 text-muted-foreground" />
-              Τα Ενεργά Έργα μου
-              <Badge variant="secondary" className="text-xs ml-1">{topLevelProjects.length}</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {topLevelProjects.length === 0 ? (
-              <p className="text-sm text-muted-foreground px-6 py-6">Κανένα ενεργό έργο</p>
-            ) : (
-              <div className="divide-y divide-border/30">
-                {topLevelProjects.map(project => (
-                  <ProjectRow
-                    key={project.id}
-                    project={project}
-                    subProjects={getSubProjects(project.id)}
-                    expanded={expandedProjects.has(project.id)}
-                    onToggle={() => toggleProject(project.id)}
-                    tasks={projectTasks[project.id] || []}
-                    deliverables={projectDeliverables[project.id] || []}
-                    onTaskComplete={toggleTaskComplete}
-                    onItemClick={setSelectedItem}
-                    activeTimer={activeTimer}
-                    startTimer={startTimer}
-                    stopTimer={stopTimer}
-                    expandedProjects={expandedProjects}
-                    onToggleProject={toggleProject}
-                    projectTasks={projectTasks}
-                    projectDeliverables={projectDeliverables}
-                    myTasks={allMyTasks}
-                  />
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+          {/* Today's Tasks */}
+          <Card className="border-border/40 lg:col-span-2">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <CheckSquare className="h-4 w-4 text-muted-foreground" />
+                Tasks Σήμερα
+                <Badge variant="secondary" className="text-xs ml-1">{todayTasks.length}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {todayTasks.length === 0 ? (
+                <p className="text-sm text-muted-foreground px-6 py-6">Κανένα task για σήμερα 🎉</p>
+              ) : (
+                <ScrollArea className="max-h-[500px]">
+                  <div className="divide-y divide-border/30">
+                    {todayTasks.map(task => (
+                      <TaskRow
+                        key={task.id}
+                        task={task}
+                        onComplete={() => toggleTaskComplete(task)}
+                        onClick={() => setSelectedItem({ type: 'task', data: task })}
+                        activeTimer={activeTimer}
+                        startTimer={startTimer}
+                        stopTimer={stopTimer}
+                        showProject
+                      />
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Active Projects */}
+          <Card className="border-border/40 lg:col-span-3">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <FolderKanban className="h-4 w-4 text-muted-foreground" />
+                Τα Ενεργά Έργα μου
+                <Badge variant="secondary" className="text-xs ml-1">{topLevelProjects.length}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {topLevelProjects.length === 0 ? (
+                <p className="text-sm text-muted-foreground px-6 py-6">Κανένα ενεργό έργο</p>
+              ) : (
+                <ScrollArea className="max-h-[500px]">
+                  <div className="divide-y divide-border/30">
+                    {topLevelProjects.map(project => (
+                      <ProjectRow
+                        key={project.id}
+                        project={project}
+                        subProjects={getSubProjects(project.id)}
+                        expanded={expandedProjects.has(project.id)}
+                        onToggle={() => toggleProject(project.id)}
+                        tasks={projectTasks[project.id] || []}
+                        deliverables={projectDeliverables[project.id] || []}
+                        onTaskComplete={toggleTaskComplete}
+                        onItemClick={setSelectedItem}
+                        activeTimer={activeTimer}
+                        startTimer={startTimer}
+                        stopTimer={stopTimer}
+                        expandedProjects={expandedProjects}
+                        onToggleProject={toggleProject}
+                        projectTasks={projectTasks}
+                        projectDeliverables={projectDeliverables}
+                        myTasks={allMyTasks}
+                      />
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       ) : (
         /* ── Calendar View ── */
         <Card className="border-border/40">
@@ -660,30 +700,42 @@ function ProjectRow({
           {deliverables.map(del => {
             const delTasks = tasks.filter(t => t.deliverable_id === del.id);
             return (
-              <div key={del.id}>
-                <div
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-muted/20 rounded-lg cursor-pointer transition-colors"
-                  onClick={() => onItemClick({ type: 'deliverable', data: del })}
-                >
+              <Collapsible key={del.id}>
+                <div className="flex items-center gap-2 px-3 py-2 hover:bg-muted/20 rounded-lg transition-colors">
+                  {delTasks.length > 0 && (
+                    <CollapsibleTrigger asChild>
+                      <button className="shrink-0 [&[data-state=open]>svg]:rotate-90">
+                        <ChevronRight className="h-3 w-3 text-muted-foreground transition-transform" />
+                      </button>
+                    </CollapsibleTrigger>
+                  )}
                   <Package className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <span className="text-sm text-foreground flex-1 truncate">{del.name}</span>
+                  <span
+                    className="text-sm text-foreground flex-1 truncate cursor-pointer hover:text-primary"
+                    onClick={() => onItemClick({ type: 'deliverable', data: del })}
+                  >{del.name}</span>
                   <Badge variant={del.completed ? 'default' : 'outline'} className="text-[10px]">
                     {del.completed ? 'Ολοκληρωμένο' : 'Σε εξέλιξη'}
                   </Badge>
+                  {delTasks.length > 0 && (
+                    <span className="text-[10px] text-muted-foreground">{delTasks.length} tasks</span>
+                  )}
                 </div>
-                {delTasks.map(task => (
-                  <TaskRow
-                    key={task.id}
-                    task={task}
-                    indent
-                    onComplete={() => onTaskComplete(task)}
-                    onClick={() => onItemClick({ type: 'task', data: task })}
-                    activeTimer={activeTimer}
-                    startTimer={startTimer}
-                    stopTimer={stopTimer}
-                  />
-                ))}
-              </div>
+                <CollapsibleContent>
+                  {delTasks.map(task => (
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      indent
+                      onComplete={() => onTaskComplete(task)}
+                      onClick={() => onItemClick({ type: 'task', data: task })}
+                      activeTimer={activeTimer}
+                      startTimer={startTimer}
+                      stopTimer={stopTimer}
+                    />
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
             );
           })}
 
@@ -711,7 +763,7 @@ function ProjectRow({
 
 // ── Task Row (inline in tree) ────────────────────────
 function TaskRow({
-  task, indent, onComplete, onClick, activeTimer, startTimer, stopTimer,
+  task, indent, onComplete, onClick, activeTimer, startTimer, stopTimer, showProject,
 }: {
   task: TaskItem;
   indent?: boolean;
@@ -720,6 +772,7 @@ function TaskRow({
   activeTimer: any;
   startTimer: any;
   stopTimer: any;
+  showProject?: boolean;
 }) {
   const isOverdue = task.due_date && isBefore(startOfDay(new Date(task.due_date)), startOfDay(new Date()));
   const isRunning = activeTimer?.is_running && activeTimer.task_id === task.id;
@@ -730,6 +783,9 @@ function TaskRow({
       <ListChecks className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
       <div className="flex-1 min-w-0 cursor-pointer" onClick={onClick}>
         <span className="text-sm text-foreground hover:text-primary truncate block">{task.title}</span>
+        {showProject && (task.project as any)?.name && (
+          <span className="text-[10px] text-muted-foreground truncate block">{(task.project as any).name}</span>
+        )}
       </div>
       {task.due_date && (
         <span className={`text-[10px] ${isOverdue ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>

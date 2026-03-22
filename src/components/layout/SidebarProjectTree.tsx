@@ -617,7 +617,7 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
     });
 
     const sortedCategories = Array.from(dynamicCategories.entries())
-      .sort((a, b) => a[1].sortOrder - b[1].sortOrder || a[0].localeCompare(b[0]));
+      .sort((a, b) => a[1].sortOrder - b[1].sortOrder || a[0].localeCompare(b[0], 'el', { numeric: true, sensitivity: 'base' }));
 
     return (
       <div className="space-y-0.5 mt-1">

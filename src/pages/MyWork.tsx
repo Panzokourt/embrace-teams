@@ -480,7 +480,7 @@ export default function MyWork() {
             {approvalCount === 0 ? (
               <p className="text-sm text-muted-foreground px-6 py-4">Δεν υπάρχουν εκκρεμείς εγκρίσεις 🎉</p>
             ) : (
-              <div className="divide-y divide-border/30">
+              <div className="overflow-y-auto max-h-[40vh] divide-y divide-border/30">
                 {/* Sent for approval */}
                 {sentForApproval.length > 0 && (
                   <>

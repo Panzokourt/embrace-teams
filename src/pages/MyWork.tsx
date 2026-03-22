@@ -704,8 +704,8 @@ function ProjectRow({
                 <div className="flex items-center gap-2 px-3 py-2 hover:bg-muted/20 rounded-lg transition-colors">
                   {delTasks.length > 0 && (
                     <CollapsibleTrigger asChild>
-                      <button className="shrink-0">
-                        <ChevronRight className="h-3 w-3 text-muted-foreground transition-transform [[data-state=open]>>&]:rotate-90" />
+                      <button className="shrink-0 [&[data-state=open]>svg]:rotate-90">
+                        <ChevronRight className="h-3 w-3 text-muted-foreground transition-transform" />
                       </button>
                     </CollapsibleTrigger>
                   )}

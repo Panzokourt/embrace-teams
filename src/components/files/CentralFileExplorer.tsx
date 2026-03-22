@@ -357,6 +357,20 @@ export function CentralFileExplorer() {
     }
   };
 
+  const handleMoveFolder = async (folderId: string, targetParentId: string | null) => {
+    try {
+      const { error } = await supabase.from('file_folders').update({ parent_folder_id: targetParentId }).eq('id', folderId);
+      if (error) throw error;
+      const folderName = folders.find((f) => f.id === folderId)?.name;
+      const targetName = targetParentId ? folders.find((f) => f.id === targetParentId)?.name : 'Ρίζα';
+      toast.success(`"${folderName}" → "${targetName}"`);
+      await fetchFolders();
+    } catch (error) {
+      console.error('Error moving folder:', error);
+      toast.error('Σφάλμα κατά τη μετακίνηση φακέλου');
+    }
+  };
+
   const isVirtualMode = viewMode !== 'all';
 
   return (
@@ -429,6 +443,7 @@ export function CentralFileExplorer() {
         onRenameFolder={handleRenameFolder}
         onDeleteFolder={handleDeleteFolder}
         onMoveFile={isVirtualMode ? undefined : handleMoveFile}
+        onMoveFolder={isVirtualMode ? undefined : handleMoveFolder}
         canManage={isVirtualMode ? false : canManage}
         loading={loading}
         uploading={uploading}

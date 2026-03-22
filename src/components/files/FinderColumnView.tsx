@@ -16,14 +16,25 @@ import {
   FolderPlus,
   Loader2,
   X,
+  Pencil,
+  Move,
+  FolderInput,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { FilePreviewDialog } from './FilePreviewDialog';
 import type { FileFolder } from './FolderTree';
 import type { FileAttachment } from './FilesTableView';
 
@@ -36,6 +47,7 @@ interface FinderColumnViewProps {
   onRenameFolder: (folderId: string, newName: string) => Promise<void>;
   onDeleteFolder: (folderId: string) => Promise<void>;
   onMoveFile?: (fileId: string, folderId: string | null) => Promise<void>;
+  onMoveFolder?: (folderId: string, targetParentId: string | null) => Promise<void>;
   canManage: boolean;
   loading?: boolean;
   uploading?: boolean;
@@ -72,6 +84,7 @@ export function FinderColumnView({
   onRenameFolder,
   onDeleteFolder,
   onMoveFile,
+  onMoveFolder,
   canManage,
   loading,
   uploading,
@@ -82,14 +95,34 @@ export function FinderColumnView({
   const [creatingInColumn, setCreatingInColumn] = useState<number | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
   const [dragOverColumn, setDragOverColumn] = useState<number | null>(null);
+  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
+  const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [previewOpen, setPreviewOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
     }
   }, [path]);
+
+  // Space key for preview
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && selectedItem?.kind === 'file' && !previewOpen) {
+        e.preventDefault();
+        setPreviewOpen(true);
+      }
+    };
+    const el = containerRef.current;
+    if (el) {
+      el.addEventListener('keydown', handler);
+      return () => el.removeEventListener('keydown', handler);
+    }
+  }, [selectedItem, previewOpen]);
 
   const filteredFiles = useMemo(() => {
     if (!searchQuery?.trim()) return files;
@@ -107,7 +140,6 @@ export function FinderColumnView({
       .sort((a, b) => a.name.localeCompare(b.name, 'el', { numeric: true, sensitivity: 'base' }))
       .map((f) => ({ kind: 'folder' as const, data: f }));
 
-    // Always show files belonging to this folder (no flat fallback)
     const childFiles = filteredFiles
       .filter((f) => f.folder_id === parentId)
       .sort((a, b) => a.file_name.localeCompare(b.file_name, 'el', { numeric: true, sensitivity: 'base' }))
@@ -141,30 +173,56 @@ export function FinderColumnView({
     e.target.value = '';
   }
 
-  // Drag & drop handlers
-  const handleDragOver = useCallback((e: React.DragEvent, colIndex: number) => {
+  // --- Internal DnD handlers ---
+  const handleDragStart = useCallback((e: React.DragEvent, item: ColumnItem) => {
+    if (item.kind === 'file') {
+      e.dataTransfer.setData('application/x-file-id', (item.data as FileAttachment).id);
+    } else {
+      e.dataTransfer.setData('application/x-folder-id', item.data.id);
+    }
+    e.dataTransfer.effectAllowed = 'move';
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent, colIndex: number, targetFolderId?: string) => {
     e.preventDefault();
     e.stopPropagation();
     setDragOverColumn(colIndex);
+    setDragOverFolderId(targetFolderId ?? null);
   }, []);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setDragOverColumn(null);
+    setDragOverFolderId(null);
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent, colIndex: number) => {
+  const handleDrop = useCallback((e: React.DragEvent, colIndex: number, targetFolderId?: string) => {
     e.preventDefault();
     e.stopPropagation();
     setDragOverColumn(null);
+    setDragOverFolderId(null);
 
+    const fileId = e.dataTransfer.getData('application/x-file-id');
+    const folderId = e.dataTransfer.getData('application/x-folder-id');
+    const dropTarget = targetFolderId ?? path[colIndex] ?? null;
+
+    if (fileId && onMoveFile) {
+      onMoveFile(fileId, dropTarget);
+      return;
+    }
+    if (folderId && onMoveFolder && dropTarget !== folderId) {
+      onMoveFolder(folderId, dropTarget);
+      return;
+    }
+
+    // OS file drop
     const droppedFiles = e.dataTransfer.files;
     if (droppedFiles && droppedFiles.length > 0) {
-      const folderId = path[colIndex] ?? null;
-      onUpload(droppedFiles, folderId);
+      const folder = dropTarget;
+      onUpload(droppedFiles, folder);
     }
-  }, [path, onUpload]);
+  }, [path, onUpload, onMoveFile, onMoveFolder]);
 
   async function handleCreateFolder(columnIndex: number) {
     if (!newFolderName.trim()) return;
@@ -185,6 +243,19 @@ export function FinderColumnView({
     } catch {
       toast.error('Σφάλμα κατά τη λήψη');
     }
+  }
+
+  function startRenameFolder(folder: FileFolder) {
+    setRenamingFolderId(folder.id);
+    setRenameValue(folder.name);
+  }
+
+  async function submitRenameFolder() {
+    if (renamingFolderId && renameValue.trim()) {
+      await onRenameFolder(renamingFolderId, renameValue.trim());
+    }
+    setRenamingFolderId(null);
+    setRenameValue('');
   }
 
   const breadcrumb = useMemo(() => {
@@ -211,7 +282,11 @@ export function FinderColumnView({
   const FileIcon = selectedFile ? getFileIcon(selectedFile.content_type) : File;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-12rem)] border border-border rounded-xl bg-card overflow-hidden">
+    <div
+      ref={containerRef}
+      tabIndex={0}
+      className="flex flex-col h-[calc(100vh-12rem)] border border-border rounded-xl bg-card overflow-hidden outline-none"
+    >
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-muted/30">
         <div className="flex items-center gap-1 text-sm min-w-0 flex-1">
@@ -275,149 +350,251 @@ export function FinderColumnView({
           {path.map((folderId, colIndex) => {
             const items = getColumnItems(folderId);
             const isLastColumn = colIndex === path.length - 1;
-            const isDragOver = dragOverColumn === colIndex;
+            const isDragOver = dragOverColumn === colIndex && !dragOverFolderId;
 
             return (
-              <div
-                key={`col-${colIndex}-${folderId}`}
-                className={cn(
-                  'flex flex-col min-w-[220px] w-[220px] border-r border-border shrink-0 transition-colors',
-                  isLastColumn && 'flex-1 min-w-[220px] w-auto',
-                  isDragOver && 'bg-primary/5 border-primary/30'
-                )}
-                onDragOver={(e) => handleDragOver(e, colIndex)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, colIndex)}
-              >
-                <ScrollArea className="flex-1">
-                  <div className="py-1">
-                    {/* New folder input */}
-                    {creatingInColumn === colIndex && (
-                      <div className="px-2 py-1">
-                        <form
-                          onSubmit={(e) => {
-                            e.preventDefault();
-                            handleCreateFolder(colIndex);
-                          }}
-                          className="flex gap-1"
-                        >
-                          <Input
-                            value={newFolderName}
-                            onChange={(e) => setNewFolderName(e.target.value)}
-                            placeholder="Όνομα φακέλου..."
-                            className="h-7 text-xs"
-                            autoFocus
-                          />
-                          <Button type="submit" size="sm" className="h-7 px-2 text-xs">
-                            OK
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => setCreatingInColumn(null)}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </form>
-                      </div>
+              <ContextMenu key={`col-${colIndex}-${folderId}`}>
+                <ContextMenuTrigger asChild>
+                  <div
+                    className={cn(
+                      'flex flex-col min-w-[220px] w-[220px] border-r border-border shrink-0 transition-colors',
+                      isLastColumn && 'flex-1 min-w-[220px] w-auto',
+                      isDragOver && 'bg-primary/5 border-primary/30'
                     )}
+                    onDragOver={(e) => handleDragOver(e, colIndex)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, colIndex)}
+                  >
+                    <ScrollArea className="flex-1">
+                      <div className="py-1">
+                        {/* New folder input */}
+                        {creatingInColumn === colIndex && (
+                          <div className="px-2 py-1">
+                            <form
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                handleCreateFolder(colIndex);
+                              }}
+                              className="flex gap-1"
+                            >
+                              <Input
+                                value={newFolderName}
+                                onChange={(e) => setNewFolderName(e.target.value)}
+                                placeholder="Όνομα φακέλου..."
+                                className="h-7 text-xs"
+                                autoFocus
+                              />
+                              <Button type="submit" size="sm" className="h-7 px-2 text-xs">
+                                OK
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => setCreatingInColumn(null)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </form>
+                          </div>
+                        )}
 
-                    {items.length === 0 && !isDragOver && (
-                      <div className="px-3 py-8 text-center text-xs text-muted-foreground">
-                        Κενός φάκελος
+                        {items.length === 0 && !isDragOver && (
+                          <div className="px-3 py-8 text-center text-xs text-muted-foreground">
+                            Κενός φάκελος
+                          </div>
+                        )}
+
+                        {items.length === 0 && isDragOver && (
+                          <div className="px-3 py-8 text-center">
+                            <Upload className="h-6 w-6 mx-auto mb-2 text-primary/60" />
+                            <p className="text-xs text-primary/80 font-medium">
+                              Αφήστε αρχεία εδώ
+                            </p>
+                          </div>
+                        )}
+
+                        {isDragOver && items.length > 0 && (
+                          <div className="px-3 py-2 text-center border-b border-dashed border-primary/30">
+                            <p className="text-xs text-primary/80 font-medium flex items-center justify-center gap-1">
+                              <Upload className="h-3 w-3" />
+                              Αφήστε αρχεία εδώ
+                            </p>
+                          </div>
+                        )}
+
+                        {items.map((item) => {
+                          const isSelected =
+                            selectedItem &&
+                            ((item.kind === 'folder' &&
+                              selectedItem.kind === 'folder' &&
+                              item.data.id === selectedItem.data.id) ||
+                              (item.kind === 'file' &&
+                                selectedItem.kind === 'file' &&
+                                item.data.id === (selectedItem.data as FileAttachment).id));
+
+                          const isDrilledInto =
+                            item.kind === 'folder' && path.includes(item.data.id);
+
+                          const isFolderDragTarget =
+                            item.kind === 'folder' && dragOverFolderId === item.data.id;
+
+                          if (item.kind === 'folder') {
+                            const folder = item.data;
+
+                            if (renamingFolderId === folder.id) {
+                              return (
+                                <div key={folder.id} className="px-2 py-1">
+                                  <form
+                                    onSubmit={(e) => { e.preventDefault(); submitRenameFolder(); }}
+                                    className="flex gap-1"
+                                  >
+                                    <Input
+                                      value={renameValue}
+                                      onChange={(e) => setRenameValue(e.target.value)}
+                                      className="h-7 text-xs"
+                                      autoFocus
+                                      onBlur={() => submitRenameFolder()}
+                                    />
+                                  </form>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <ContextMenu key={folder.id}>
+                                <ContextMenuTrigger asChild>
+                                  <button
+                                    draggable={canManage}
+                                    onDragStart={(e) => handleDragStart(e, item)}
+                                    onDragOver={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setDragOverFolderId(folder.id);
+                                      setDragOverColumn(colIndex);
+                                    }}
+                                    onDragLeave={(e) => {
+                                      e.stopPropagation();
+                                      setDragOverFolderId(null);
+                                    }}
+                                    onDrop={(e) => handleDrop(e, colIndex, folder.id)}
+                                    onClick={() => handleSelectItem(item, colIndex)}
+                                    className={cn(
+                                      'w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-muted/60 transition-colors',
+                                      (isSelected || isDrilledInto) && 'bg-primary/10 text-primary',
+                                      isFolderDragTarget && 'bg-primary/20 ring-1 ring-primary/40'
+                                    )}
+                                  >
+                                    <Folder className="h-4 w-4 shrink-0 text-primary/70" />
+                                    <span className="truncate flex-1">{folder.name}</span>
+                                    <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+                                  </button>
+                                </ContextMenuTrigger>
+                                {canManage && (
+                                  <ContextMenuContent className="w-48">
+                                    <ContextMenuItem onClick={() => handleUploadToColumn(folder.id)}>
+                                      <Upload className="h-3.5 w-3.5 mr-2" /> Ανέβασμα αρχείου
+                                    </ContextMenuItem>
+                                    <ContextMenuItem onClick={() => {
+                                      setCreatingInColumn(path.indexOf(folder.id) >= 0 ? path.indexOf(folder.id) : colIndex);
+                                      setNewFolderName('');
+                                    }}>
+                                      <FolderPlus className="h-3.5 w-3.5 mr-2" /> Νέος υποφάκελος
+                                    </ContextMenuItem>
+                                    <ContextMenuSeparator />
+                                    <ContextMenuItem onClick={() => startRenameFolder(folder)}>
+                                      <Pencil className="h-3.5 w-3.5 mr-2" /> Μετονομασία
+                                    </ContextMenuItem>
+                                    <ContextMenuItem onClick={() => onDeleteFolder(folder.id)} className="text-destructive">
+                                      <Trash2 className="h-3.5 w-3.5 mr-2" /> Διαγραφή
+                                    </ContextMenuItem>
+                                  </ContextMenuContent>
+                                )}
+                              </ContextMenu>
+                            );
+                          }
+
+                          const fileData = item.data as FileAttachment;
+                          const Icon = getFileIcon(fileData.content_type);
+
+                          return (
+                            <ContextMenu key={fileData.id}>
+                              <ContextMenuTrigger asChild>
+                                <button
+                                  draggable={canManage}
+                                  onDragStart={(e) => handleDragStart(e, item)}
+                                  onClick={() => handleSelectItem(item, colIndex)}
+                                  className={cn(
+                                    'w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-muted/60 transition-colors',
+                                    isSelected && 'bg-primary/10 text-primary'
+                                  )}
+                                >
+                                  <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                  <span className="truncate flex-1">{fileData.file_name}</span>
+                                </button>
+                              </ContextMenuTrigger>
+                              <ContextMenuContent className="w-48">
+                                <ContextMenuItem onClick={() => {
+                                  setSelectedItem(item);
+                                  setPreviewOpen(true);
+                                }}>
+                                  <Eye className="h-3.5 w-3.5 mr-2" /> Προεπισκόπηση
+                                </ContextMenuItem>
+                                <ContextMenuItem onClick={() => handleDownload(fileData)}>
+                                  <Download className="h-3.5 w-3.5 mr-2" /> Λήψη
+                                </ContextMenuItem>
+                                {canManage && (
+                                  <>
+                                    <ContextMenuSeparator />
+                                    <ContextMenuItem onClick={() => onDelete(fileData)} className="text-destructive">
+                                      <Trash2 className="h-3.5 w-3.5 mr-2" /> Διαγραφή
+                                    </ContextMenuItem>
+                                  </>
+                                )}
+                              </ContextMenuContent>
+                            </ContextMenu>
+                          );
+                        })}
                       </div>
-                    )}
-
-                    {items.length === 0 && isDragOver && (
-                      <div className="px-3 py-8 text-center">
-                        <Upload className="h-6 w-6 mx-auto mb-2 text-primary/60" />
-                        <p className="text-xs text-primary/80 font-medium">
-                          Αφήστε αρχεία εδώ
-                        </p>
-                      </div>
-                    )}
-
-                    {isDragOver && items.length > 0 && (
-                      <div className="px-3 py-2 text-center border-b border-dashed border-primary/30">
-                        <p className="text-xs text-primary/80 font-medium flex items-center justify-center gap-1">
-                          <Upload className="h-3 w-3" />
-                          Αφήστε αρχεία εδώ
-                        </p>
-                      </div>
-                    )}
-
-                    {items.map((item) => {
-                      const isSelected =
-                        selectedItem &&
-                        ((item.kind === 'folder' &&
-                          selectedItem.kind === 'folder' &&
-                          item.data.id === selectedItem.data.id) ||
-                          (item.kind === 'file' &&
-                            selectedItem.kind === 'file' &&
-                            item.data.id === (selectedItem.data as FileAttachment).id));
-
-                      const isDrilledInto =
-                        item.kind === 'folder' && path.includes(item.data.id);
-
-                      if (item.kind === 'folder') {
-                        return (
-                          <button
-                            key={item.data.id}
-                            onClick={() => handleSelectItem(item, colIndex)}
-                            className={cn(
-                              'w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-muted/60 transition-colors',
-                              (isSelected || isDrilledInto) && 'bg-primary/10 text-primary'
-                            )}
-                          >
-                            <Folder className="h-4 w-4 shrink-0 text-primary/70" />
-                            <span className="truncate flex-1">{item.data.name}</span>
-                            <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
-                          </button>
-                        );
-                      }
-
-                      const fileData = item.data as FileAttachment;
-                      const Icon = getFileIcon(fileData.content_type);
-
-                      return (
-                        <button
-                          key={fileData.id}
-                          onClick={() => handleSelectItem(item, colIndex)}
-                          className={cn(
-                            'w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-muted/60 transition-colors',
-                            isSelected && 'bg-primary/10 text-primary'
-                          )}
-                        >
-                          <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                          <span className="truncate flex-1">{fileData.file_name}</span>
-                        </button>
-                      );
-                    })}
+                    </ScrollArea>
                   </div>
-                </ScrollArea>
-              </div>
+                </ContextMenuTrigger>
+                {/* Empty area context menu */}
+                {canManage && (
+                  <ContextMenuContent className="w-48">
+                    <ContextMenuItem onClick={() => handleUploadToColumn(folderId)}>
+                      <Upload className="h-3.5 w-3.5 mr-2" /> Ανέβασμα αρχείου
+                    </ContextMenuItem>
+                    <ContextMenuItem onClick={() => {
+                      setCreatingInColumn(colIndex);
+                      setNewFolderName('');
+                    }}>
+                      <FolderPlus className="h-3.5 w-3.5 mr-2" /> Νέος φάκελος
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                )}
+              </ContextMenu>
             );
           })}
         </div>
 
         {/* Preview panel */}
         {selectedFile && (
-          <div className="w-[280px] shrink-0 border-l border-border bg-muted/20 flex flex-col">
+          <div className="w-[320px] shrink-0 border-l border-border bg-muted/20 flex flex-col">
             <ScrollArea className="flex-1">
               <div className="p-4 flex flex-col items-center gap-4">
                 <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center">
                   <FileIcon className="h-10 w-10 text-muted-foreground" />
                 </div>
-                <h3 className="text-sm font-semibold text-center break-all leading-tight">
+                <h3 className="text-sm font-semibold text-center break-words leading-tight max-w-full">
                   {selectedFile.file_name}
                 </h3>
                 <Separator />
                 <div className="w-full space-y-3 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Τύπος</span>
-                    <span className="text-foreground font-medium truncate ml-2">
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Τύπος</span>
+                    <span className="text-foreground font-medium truncate text-right" title={selectedFile.content_type || ''}>
                       {selectedFile.content_type?.split('/').pop()?.toUpperCase() || '—'}
                     </span>
                   </div>
@@ -434,9 +611,9 @@ export function FinderColumnView({
                     </span>
                   </div>
                   {selectedFile.uploader && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Από</span>
-                      <span className="text-foreground font-medium truncate ml-2">
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground shrink-0">Από</span>
+                      <span className="text-foreground font-medium truncate text-right">
                         {selectedFile.uploader.full_name || selectedFile.uploader.email}
                       </span>
                     </div>
@@ -456,7 +633,7 @@ export function FinderColumnView({
                     variant="outline"
                     size="sm"
                     className="w-full justify-start gap-2"
-                    onClick={() => handleDownload(selectedFile)}
+                    onClick={() => setPreviewOpen(true)}
                   >
                     <Eye className="h-4 w-4" /> Προεπισκόπηση
                   </Button>
@@ -484,6 +661,15 @@ export function FinderColumnView({
         multiple
         className="hidden"
         onChange={handleFileInputChange}
+      />
+
+      {/* Preview Dialog */}
+      <FilePreviewDialog
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        filePath={selectedFile?.file_path ?? null}
+        fileName={selectedFile?.file_name ?? ''}
+        contentType={selectedFile?.content_type ?? null}
       />
     </div>
   );

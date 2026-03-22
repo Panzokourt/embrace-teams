@@ -347,6 +347,14 @@ export function FileExplorer({ tenderId, projectId }: FileExplorerProps) {
         files={files} folders={folders} onUpload={handleUpload} onDelete={handleDeleteFile}
         onCreateFolder={handleCreateFolder} onRenameFolder={handleRenameFolder}
         onDeleteFolder={handleDeleteFolder} onMoveFile={handleMoveFile}
+        onMoveFolder={async (folderId, targetParentId) => {
+          try {
+            const { error } = await supabase.from('file_folders').update({ parent_folder_id: targetParentId }).eq('id', folderId);
+            if (error) throw error;
+            toast.success('Ο φάκελος μετακινήθηκε!');
+            await fetchFolders();
+          } catch { toast.error('Σφάλμα μετακίνησης φακέλου'); }
+        }}
         canManage={canManage} loading={loading} uploading={uploading} searchQuery={searchQuery}
       />
 

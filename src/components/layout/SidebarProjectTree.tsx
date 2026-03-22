@@ -415,6 +415,11 @@ export function SidebarProjectTree({ collapsed }: { collapsed: boolean }) {
 
   const deleteFolder = useMutation({
     mutationFn: async (id: string) => {
+      // Prevent deletion of the Internal root folder
+      const folder = folders.find(f => f.id === id);
+      if (folder?.name === 'Internal' && !folder.parent_folder_id) {
+        throw new Error('Ο φάκελος Internal δεν μπορεί να διαγραφεί');
+      }
       await supabase.from('projects').update({ folder_id: null }).eq('folder_id', id);
       const { error } = await supabase.from('project_folders').delete().eq('id', id);
       if (error) throw error;

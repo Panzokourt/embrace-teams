@@ -59,6 +59,7 @@ interface ProjectItem {
   folder_id: string | null;
   client_id: string | null;
   sidebar_sort_order: number;
+  is_internal?: boolean;
   client?: { id: string; name: string; sector: string | null } | null;
 }
 

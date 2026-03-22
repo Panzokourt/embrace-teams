@@ -566,7 +566,7 @@ export default function MyWork() {
             {todayEntries.length > 0 && (
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground font-medium">Σήμερα</p>
-                <ScrollArea className="max-h-32">
+                <div className="overflow-y-auto max-h-32">
                   {todayEntries.slice(0, 5).map(entry => (
                     <div key={entry.id} className="flex items-center gap-2 py-1.5 text-sm">
                       <span className="text-xs text-muted-foreground w-10">{format(new Date(entry.start_time), 'HH:mm')}</span>
@@ -574,7 +574,7 @@ export default function MyWork() {
                       <span className="text-xs font-mono text-muted-foreground">{entry.duration_minutes}λ</span>
                     </div>
                   ))}
-                </ScrollArea>
+                </div>
               </div>
             )}
 

@@ -795,7 +795,7 @@ function TaskRow({
   const isRunning = activeTimer?.is_running && activeTimer.task_id === task.id;
 
   return (
-    <div className={`flex items-center gap-2 px-3 py-2 hover:bg-muted/20 rounded-lg transition-colors ${indent ? 'ml-5' : ''}`}>
+    <div className={`flex items-center gap-2 px-3 py-2 hover:bg-accent/20 rounded-[10px] transition-colors ${indent ? 'ml-5' : ''}`}>
       <Checkbox className="h-3.5 w-3.5 shrink-0" onCheckedChange={onComplete} />
       <ListChecks className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
       <div className="flex-1 min-w-0 cursor-pointer" onClick={onClick}>

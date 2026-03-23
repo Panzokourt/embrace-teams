@@ -487,7 +487,7 @@ export default function AppSidebar({
                 <SidebarLink to="/media-planning" icon={<MonitorPlay className="h-[18px] w-[18px]" />} label="Media Planning" active={location.pathname.startsWith('/media-planning')} collapsed={false} onClick={() => {onItemClick?.();}} />
               </> :
 
-        categoryNavItems[flyoutCategory || activeCategory]?.filter(canAccess).map((item) => {
+        (flyoutCategory || activeCategory) ? categoryNavItems[(flyoutCategory || activeCategory) as CategoryId]?.filter(canAccess).map((item) => {
           const isActiveItem = item.href.includes('?') ?
           location.pathname + location.search === item.href :
           location.pathname === item.href;

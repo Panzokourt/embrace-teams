@@ -432,9 +432,9 @@ export default function MyWork() {
                   const dayTasks = tasksByDay[key] || [];
                   const isCurrentDay = isToday(day);
                   return (
-                    <div key={key} className={`border-r last:border-r-0 border-border/20 min-h-[200px] ${isCurrentDay ? 'bg-primary/5' : ''}`}>
-                      <div className={`px-2 py-2 text-center border-b border-border/20 ${isCurrentDay ? 'bg-primary/10' : 'bg-muted/30'}`}>
-                        <div className="text-[10px] text-muted-foreground uppercase">{format(day, 'EEE', { locale: el })}</div>
+                    <div key={key} className={`border-r last:border-r-0 border-border/20 min-h-[200px] transition-colors ${isCurrentDay ? 'bg-primary/5' : 'hover:bg-accent/10'}`}>
+                      <div className={`px-2 py-2 text-center border-b border-border/20 ${isCurrentDay ? 'bg-primary/10' : 'bg-muted/20'}`}>
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wide">{format(day, 'EEE', { locale: el })}</div>
                         <div className={`text-lg font-semibold ${isCurrentDay ? 'text-primary' : ''}`}>{format(day, 'd')}</div>
                       </div>
                       <div className="p-1 space-y-1">

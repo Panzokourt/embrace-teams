@@ -36,13 +36,13 @@ export function PageHeader({
   children,
 }: PageHeaderProps) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       {/* Breadcrumbs */}
       {breadcrumbs.length > 0 && (
         <Breadcrumb>
-          <BreadcrumbList className="text-xs">
+          <BreadcrumbList className="text-[11px] tracking-wide uppercase text-muted-foreground/60">
             <BreadcrumbItem>
-              <BreadcrumbLink href="/">Dashboard</BreadcrumbLink>
+              <BreadcrumbLink href="/">Home</BreadcrumbLink>
             </BreadcrumbItem>
             {breadcrumbs.map((crumb, idx) => (
               <Fragment key={idx}>

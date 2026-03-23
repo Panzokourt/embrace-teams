@@ -309,17 +309,17 @@ export default function MyWork() {
       </div>
 
       {/* ── View Toggle ── */}
-      <div className="flex items-center gap-2">
+      <div className="inline-flex items-center gap-1 p-1 rounded-[10px] bg-muted/50">
         <Button
-          variant={activeView === 'projects' ? 'default' : 'outline'}
-          size="sm" className="gap-1.5"
+          variant={activeView === 'projects' ? 'default' : 'ghost'}
+          size="sm" className="gap-1.5 rounded-[8px] h-8 px-3 text-[13px]"
           onClick={() => setActiveView('projects')}
         >
           <FolderKanban className="h-3.5 w-3.5" /> Έργα
         </Button>
         <Button
-          variant={activeView === 'calendar' ? 'default' : 'outline'}
-          size="sm" className="gap-1.5"
+          variant={activeView === 'calendar' ? 'default' : 'ghost'}
+          size="sm" className="gap-1.5 rounded-[8px] h-8 px-3 text-[13px]"
           onClick={() => setActiveView('calendar')}
         >
           <CalendarDays className="h-3.5 w-3.5" /> Ημερολόγιο

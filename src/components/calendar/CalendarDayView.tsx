@@ -56,12 +56,12 @@ export function CalendarDayView({ date, events, onTimeSlotClick, onEventClick, o
                 key={`${hour}-${half}`}
                 className={cn(
                   'grid grid-cols-[60px_1fr] min-h-[40px] border-b',
-                  half ? 'border-border/5' : 'border-border/15'
+                  half ? 'border-border/5' : 'border-border/20'
                 )}
               >
                 <div className="px-2 text-right pr-3 -mt-1.5">
                   {!half && (
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="text-[11px] text-muted-foreground/70 tabular-nums">
                       {String(hour).padStart(2, '0')}:00
                     </span>
                   )}

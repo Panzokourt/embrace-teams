@@ -1,7 +1,6 @@
 import { cn } from '@/lib/utils';
 import { CalendarEvent } from '@/hooks/useCalendarEvents';
 import { format } from 'date-fns';
-import { el } from 'date-fns/locale';
 import { Video, MapPin, Phone, Calendar as CalIcon, CheckSquare, Package, FolderKanban, Bell, Megaphone } from 'lucide-react';
 
 const typeIcons: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -51,7 +50,7 @@ export function CalendarEventCard({ event, compact, onClick, onContextMenu }: Pr
         onClick={() => onClick?.(event)}
         onContextMenu={(e) => onContextMenu?.(e, event)}
         className={cn(
-          'w-full text-left text-[10px] leading-tight px-1 py-0.5 rounded border truncate',
+          'w-full text-left text-[10px] leading-tight px-1 py-0.5 rounded-[4px] border truncate transition-colors hover:brightness-95',
           colorClass
         )}
         style={customStyle}
@@ -66,8 +65,8 @@ export function CalendarEventCard({ event, compact, onClick, onContextMenu }: Pr
       onClick={() => onClick?.(event)}
       onContextMenu={(e) => onContextMenu?.(e, event)}
       className={cn(
-        'w-full text-left px-2.5 py-1.5 rounded-lg border transition-all duration-150',
-        'hover:shadow-sm active:scale-[0.98]',
+        'w-full text-left px-2.5 py-1.5 rounded-[10px] border border-l-[3px] transition-all duration-150',
+        'hover:shadow-sm hover:brightness-95',
         colorClass
       )}
       style={customStyle}
@@ -77,7 +76,7 @@ export function CalendarEventCard({ event, compact, onClick, onContextMenu }: Pr
         <span className="text-xs font-medium truncate">{event.title}</span>
       </div>
       {!event.all_day && (
-        <div className="text-[10px] opacity-60 mt-0.5">
+        <div className="text-[10px] opacity-60 mt-0.5 tabular-nums">
           {format(new Date(event.start_time), 'HH:mm')} – {format(new Date(event.end_time), 'HH:mm')}
         </div>
       )}

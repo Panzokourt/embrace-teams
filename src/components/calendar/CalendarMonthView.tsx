@@ -72,9 +72,9 @@ export function CalendarMonthView({ date, events, onDayClick, onEventClick, onEv
                 <div
                   key={key}
                   className={cn(
-                    'relative border-r border-border/20 last:border-r-0 p-1.5 cursor-pointer transition-colors overflow-hidden',
-                    'hover:bg-accent/30',
-                    !inMonth && 'opacity-35 bg-muted/20'
+                    'relative border-r border-border/20 last:border-r-0 p-1.5 cursor-pointer transition-colors overflow-hidden rounded-lg',
+                    'hover:bg-accent/20',
+                    !inMonth && 'opacity-40 bg-muted/20'
                   )}
                   onClick={() => onDayClick(day)}
                   onDoubleClick={(e) => {
@@ -84,7 +84,7 @@ export function CalendarMonthView({ date, events, onDayClick, onEventClick, onEv
                 >
                   <div className={cn(
                     'text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full mb-0.5',
-                    isToday(day) && 'bg-primary text-primary-foreground font-bold',
+                    isToday(day) && 'bg-primary text-primary-foreground font-bold shadow-sm',
                   )}>
                     {format(day, 'd')}
                   </div>

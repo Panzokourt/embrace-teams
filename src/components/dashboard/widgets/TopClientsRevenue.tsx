@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Users } from 'lucide-react';
+import { WIDGET_CARD_CLASS, WIDGET_ICON_CLASS, WIDGET_TITLE_CLASS } from '../chartStyles';
 
 interface ClientRev { name: string; revenue: number }
 
@@ -27,11 +28,9 @@ export default function TopClientsRevenue() {
   }, []);
 
   return (
-    <div className="rounded-2xl border border-border/50 bg-card p-6 animate-fade-in shadow-soft h-full">
-      <h3 className="text-base font-semibold flex items-center gap-2 mb-4 text-foreground">
-        <span className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
-          <Users className="h-4 w-4 text-foreground" />
-        </span>
+    <div className={WIDGET_CARD_CLASS}>
+      <h3 className={WIDGET_TITLE_CLASS}>
+        <span className={WIDGET_ICON_CLASS}><Users className="h-4 w-4 text-primary" /></span>
         Top Πελάτες
       </h3>
       <div className="space-y-3">
@@ -41,10 +40,10 @@ export default function TopClientsRevenue() {
           clients.map((c, i) => (
             <div key={c.name} className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
-                <span className="text-xs font-medium text-muted-foreground w-4">{i + 1}.</span>
+                <span className="text-xs font-medium text-muted-foreground w-4 tabular-nums">{i + 1}.</span>
                 <span className="text-sm font-medium truncate text-foreground/90">{c.name}</span>
               </div>
-              <span className="text-sm font-semibold text-foreground shrink-0">€{c.revenue.toLocaleString()}</span>
+              <span className="text-sm font-semibold text-foreground shrink-0 tabular-nums">€{c.revenue.toLocaleString()}</span>
             </div>
           ))
         )}

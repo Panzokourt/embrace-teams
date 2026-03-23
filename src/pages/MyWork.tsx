@@ -947,8 +947,8 @@ function DeliverableDetailSheet({ deliverable, onClose, navigate }: {
               {deliverable.completed ? 'Ολοκληρωμένο' : 'Σε εξέλιξη'}
             </Badge>
           </div>
-          <div className="bg-muted/30 rounded-lg p-3">
-            <p className="text-[10px] text-muted-foreground uppercase mb-1">Λήξη</p>
+          <div className="bg-muted/30 rounded-[12px] p-3">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Λήξη</p>
             <p className="text-sm font-medium">{deliverable.due_date ? format(new Date(deliverable.due_date), 'd MMM yyyy', { locale: el }) : '-'}</p>
           </div>
         </div>

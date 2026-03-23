@@ -317,7 +317,7 @@ export function QuickNotes() {
                     </div>
 
                     {/* Footer */}
-                    <div className="px-3 py-1.5 border-t border-border/30 shrink-0">
+                    <div className="px-3 py-1.5 border-t border-border/20 shrink-0">
                       <p className="text-[10px] text-muted-foreground">
                         Τελ. ενημέρωση: {format(new Date(selectedNote.updated_at), 'd MMM, HH:mm', { locale: el })}
                       </p>

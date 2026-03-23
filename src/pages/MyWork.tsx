@@ -418,9 +418,9 @@ export default function MyWork() {
               <Button variant="ghost" size="sm" onClick={() => setCalendarDate(d => addDays(d, calendarMode === 'week' ? -7 : -1))}>←</Button>
               <Button variant="ghost" size="sm" onClick={() => setCalendarDate(new Date())}>Σήμερα</Button>
               <Button variant="ghost" size="sm" onClick={() => setCalendarDate(d => addDays(d, calendarMode === 'week' ? 7 : 1))}>→</Button>
-              <div className="border-l border-border/40 pl-2 ml-1 flex gap-1">
-                <Button variant={calendarMode === 'week' ? 'secondary' : 'ghost'} size="sm" onClick={() => setCalendarMode('week')}>Εβδ</Button>
-                <Button variant={calendarMode === 'day' ? 'secondary' : 'ghost'} size="sm" onClick={() => setCalendarMode('day')}>Ημέρα</Button>
+              <div className="border-l border-border/30 pl-2 ml-1 inline-flex gap-1 p-0.5 rounded-[8px] bg-muted/50">
+                <Button variant={calendarMode === 'week' ? 'default' : 'ghost'} size="sm" className="h-7 rounded-[6px] text-[12px]" onClick={() => setCalendarMode('week')}>Εβδ</Button>
+                <Button variant={calendarMode === 'day' ? 'default' : 'ghost'} size="sm" className="h-7 rounded-[6px] text-[12px]" onClick={() => setCalendarMode('day')}>Ημέρα</Button>
               </div>
             </div>
           </CardHeader>

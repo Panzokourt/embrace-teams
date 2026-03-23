@@ -94,13 +94,14 @@ export default {
   				border: 'hsl(var(--sidebar-border))',
   				ring: 'hsl(var(--sidebar-ring))'
   			},
-  			chart: {
-  				'1': 'hsl(var(--chart-1))',
-  				'2': 'hsl(var(--chart-2))',
-  				'3': 'hsl(var(--chart-3))',
-  				'4': 'hsl(var(--chart-4))',
-  				'5': 'hsl(var(--chart-5))'
-  			}
+			chart: {
+				'1': 'hsl(var(--chart-1))',
+				'2': 'hsl(var(--chart-2))',
+				'3': 'hsl(var(--chart-3))',
+				'4': 'hsl(var(--chart-4))',
+				'5': 'hsl(var(--chart-5))',
+				'6': 'hsl(var(--chart-6))'
+			}
   		},
   		borderRadius: {
   			'3xl': 'calc(var(--radius) + 8px)',
@@ -190,16 +191,28 @@ export default {
   					transform: 'translateX(100%)'
   				}
   			},
-  			shimmer: {
-  				'0%': {
-  					backgroundPosition: '-200% 0'
-  				},
-  				'100%': {
-  					backgroundPosition: '200% 0'
-  				}
-  			}
-  		},
-  		animation: {
+			shimmer: {
+				'0%': {
+					backgroundPosition: '-200% 0'
+				},
+				'100%': {
+					backgroundPosition: '200% 0'
+				}
+			},
+			'slide-up': {
+				from: { opacity: '0', transform: 'translateY(12px)' },
+				to: { opacity: '1', transform: 'translateY(0)' }
+			},
+			'slide-down': {
+				from: { opacity: '0', transform: 'translateY(-12px)' },
+				to: { opacity: '1', transform: 'translateY(0)' }
+			},
+			bounce: {
+				'0%, 100%': { transform: 'translateY(0)' },
+				'50%': { transform: 'translateY(-4px)' }
+			}
+		},
+		animation: {
   			'accordion-down': 'accordion-down 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
   			'accordion-up': 'accordion-up 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
   			'fade-in': 'fade-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
@@ -207,8 +220,11 @@ export default {
   			'scale-in': 'scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards',
   			'slide-in-right': 'slide-in-right 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
   			'slide-out-right': 'slide-out-right 0.2s ease-out',
-  			shimmer: 'shimmer 2s linear infinite'
-  		},
+			shimmer: 'shimmer 2s linear infinite',
+			'slide-up': 'slide-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+			'slide-down': 'slide-down 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+			bounce: 'bounce 0.5s cubic-bezier(0.16, 1, 0.3, 1)'
+		},
   		transitionTimingFunction: {
   			apple: 'cubic-bezier(0.16, 1, 0.3, 1)'
   		}

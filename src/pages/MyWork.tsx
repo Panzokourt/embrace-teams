@@ -406,10 +406,12 @@ export default function MyWork() {
         </div>
       ) : (
         /* ── Calendar View ── */
-        <Card className="border-border/40">
-          <CardHeader className="pb-3 flex flex-row items-center justify-between">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <CalendarDays className="h-4 w-4 text-muted-foreground" />
+        <Card className="border-border/30 shadow-sm">
+          <CardHeader className="pb-3 px-5 flex flex-row items-center justify-between">
+            <CardTitle className="text-[13px] font-semibold tracking-tight flex items-center gap-2.5">
+              <span className="h-7 w-7 rounded-lg bg-primary/8 flex items-center justify-center">
+                <CalendarDays className="h-3.5 w-3.5 text-primary" />
+              </span>
               {calendarMode === 'week' ? 'Εβδομαδιαία Προβολή' : format(calendarDate, 'EEEE d MMMM', { locale: el })}
             </CardTitle>
             <div className="flex items-center gap-2">

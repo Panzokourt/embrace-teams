@@ -470,7 +470,7 @@ export default function AppSidebar({
       <>
             {(flyoutCategory || activeCategory) === 'work' ?
         <>
-                <SidebarLink to="/my-work" icon={<LayoutList className="h-[18px] w-[18px]" />} label="My Work" active={location.pathname === '/my-work'} collapsed={false} onClick={() => {onItemClick?.();}} />
+                <SidebarLink to="/" icon={<LayoutList className="h-[18px] w-[18px]" />} label="My Work" active={location.pathname === '/' || location.pathname === '/my-work'} collapsed={false} onClick={() => {onItemClick?.();}} />
                 <SidebarNavGroup id="work" icon={<Briefcase className="h-[18px] w-[18px]" />} label="Projects" collapsed={false} isActive={location.pathname === '/work' || location.pathname.startsWith('/projects/') || location.pathname.startsWith('/tasks/')} defaultOpen>
                   <SidebarSubLink to="/work?tab=projects" icon={<FolderKanban className="h-4 w-4" />} label="Projects" active={location.pathname === '/work' && (!location.search || location.search.includes('tab=projects'))} onClick={() => {navigate('/work?tab=projects');onItemClick?.();}} />
                   <SidebarProjectTree collapsed={false} />

@@ -80,8 +80,10 @@ const App = () => (
                 <Route path="/welcome" element={<WelcomeWizard />} />
                 <Route path="/platform-admin" element={<PlatformAdmin />} />
                 <Route element={<AppLayout />}>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/dashboard/:templateId" element={<Dashboard />} />
+                <Route path="/" element={<MyWork />} />
+                <Route path="/dashboards" element={<Dashboard />} />
+                <Route path="/dashboards/:templateId" element={<Dashboard />} />
+                <Route path="/dashboard/:templateId" element={<Navigate to="/dashboards" replace />} />
                   <Route path="/my-work" element={<MyWork />} />
                   <Route path="/work" element={<Work />} />
                   <Route path="/projects" element={<Navigate to="/work?tab=projects" replace />} />

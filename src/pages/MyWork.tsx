@@ -593,7 +593,10 @@ export default function MyWork() {
         </Card>
       </div>
 
-      {/* ── Detail Sidebar Sheet ── */}
+      {/* ── Quick Notes ── */}
+      <QuickNotes />
+
+
       <Sheet open={!!selectedItem} onOpenChange={open => !open && setSelectedItem(null)}>
         <SheetContent className="sm:max-w-lg overflow-y-auto">
           {selectedItem?.type === 'task' && (

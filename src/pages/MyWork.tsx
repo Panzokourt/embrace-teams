@@ -482,12 +482,14 @@ export default function MyWork() {
       {/* ── Bottom Strip: Approvals + Time Tracking ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Approvals */}
-        <Card className="border-border/40">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
+        <Card className="border-border/30 shadow-sm">
+          <CardHeader className="pb-3 px-5">
+            <CardTitle className="text-[13px] font-semibold tracking-tight flex items-center gap-2.5">
+              <span className="h-7 w-7 rounded-lg bg-primary/8 flex items-center justify-center">
+                <ClipboardCheck className="h-3.5 w-3.5 text-primary" />
+              </span>
               Εγκρίσεις
-              {approvalCount > 0 && <Badge variant="secondary" className="text-xs">{approvalCount}</Badge>}
+              {approvalCount > 0 && <Badge variant="secondary" className="text-[10px]">{approvalCount}</Badge>}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">

@@ -519,8 +519,8 @@ export default function MyWork() {
                 {/* Need my approval */}
                 {needMyApproval.length > 0 && (
                   <>
-                    <div className="px-4 py-2 bg-muted/20">
-                      <span className="text-xs font-semibold flex items-center gap-1.5">
+                    <div className="px-4 py-2 bg-muted/30 rounded-[10px] mx-2 mt-1">
+                      <span className="text-[11px] font-semibold flex items-center gap-1.5">
                         <Inbox className="h-3 w-3" /> Πρέπει να Εγκρίνω ({needMyApproval.length})
                       </span>
                     </div>

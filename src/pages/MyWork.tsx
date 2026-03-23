@@ -587,9 +587,9 @@ export default function MyWork() {
                 <div className="overflow-y-auto max-h-32">
                   {todayEntries.slice(0, 5).map(entry => (
                     <div key={entry.id} className="flex items-center gap-2 py-1.5 text-sm">
-                      <span className="text-xs text-muted-foreground w-10">{format(new Date(entry.start_time), 'HH:mm')}</span>
-                      <span className="flex-1 truncate text-foreground">{entry.task?.title || entry.description || 'Timer'}</span>
-                      <span className="text-xs font-mono text-muted-foreground">{entry.duration_minutes}λ</span>
+                      <span className="text-xs text-muted-foreground tabular-nums w-10">{format(new Date(entry.start_time), 'HH:mm')}</span>
+                      <span className="flex-1 truncate text-foreground text-sm">{entry.task?.title || entry.description || 'Timer'}</span>
+                      <span className="text-xs font-mono text-muted-foreground tabular-nums">{entry.duration_minutes}λ</span>
                     </div>
                   ))}
                 </div>

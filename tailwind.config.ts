@@ -220,8 +220,11 @@ export default {
   			'scale-in': 'scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards',
   			'slide-in-right': 'slide-in-right 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
   			'slide-out-right': 'slide-out-right 0.2s ease-out',
-  			shimmer: 'shimmer 2s linear infinite'
-  		},
+			shimmer: 'shimmer 2s linear infinite',
+			'slide-up': 'slide-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+			'slide-down': 'slide-down 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+			bounce: 'bounce 0.5s cubic-bezier(0.16, 1, 0.3, 1)'
+		},
   		transitionTimingFunction: {
   			apple: 'cubic-bezier(0.16, 1, 0.3, 1)'
   		}

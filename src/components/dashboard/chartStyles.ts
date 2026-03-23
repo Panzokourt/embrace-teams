@@ -1,4 +1,5 @@
 // Shared chart styling — Apple-inspired Design System Phase 4
+import type React from 'react';
 
 export const chartTooltipStyle: React.CSSProperties = {
   borderRadius: '12px',

@@ -564,7 +564,7 @@ export default function MyWork() {
           <CardContent className="space-y-3">
             {/* Active Timer */}
             {activeTimer?.is_running ? (
-              <div className="flex items-center gap-3 bg-primary/5 border border-primary/20 rounded-xl px-4 py-3">
+              <div className="flex items-center gap-3 bg-primary/5 border border-primary/15 rounded-[12px] px-4 py-3">
                 <Timer className="h-4 w-4 text-primary animate-pulse shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{activeTimer.task?.title || 'Timer'}</p>

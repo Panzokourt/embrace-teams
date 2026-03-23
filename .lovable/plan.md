@@ -1,54 +1,51 @@
 
 
-# Plan: Files/Αρχεία — UI Fix, Preview, Drag & Drop, Move, Context Menu
+# Plan: My Work as Default Page, Sidebar Changes & Quick Notes
 
-## Issues & Solutions
+## 1. Make My Work the default route (`/`)
 
-### 1. Preview panel (right side) — truncated details
-The preview panel is `w-[280px]` which clips long filenames and type labels. Fix: increase width to `w-[320px]`, use `break-words` on filename, truncate type with tooltip, ensure all detail rows wrap properly.
+- **`src/App.tsx`**: Change `<Route path="/" element={<Dashboard />} />` to render `<MyWork />`. Move Dashboard to `/dashboards` and `/dashboards/:templateId`.
+- **`src/components/layout/AppSidebar.tsx`**: 
+  - Add a dedicated **My Work** icon button at the **top of the Icon Rail** (above all categories, below logo), navigating to `/`.
+  - Rename the `overview` category label from "Overview" to "Dashboards".
+  - Update `categoryNavItems.overview` hrefs from `/` → `/dashboards`, `/dashboard/finance` → `/dashboards/finance`, etc.
+  - Update `categories` routePrefixes: remove `/` from overview, add `/` to work (or handle separately since My Work is now standalone in the rail).
+  - Update `detectCategory` to map `/` to a special "my-work" standalone (or simply route to `work` category).
 
-### 2. In-app file preview (not download)
-Currently both "Λήψη" and "Προεπισκόπηση" call `handleDownload` which opens a new tab. Fix: create a **FilePreviewDialog** component:
-- For images: render `<img>` with the signed URL
-- For PDFs: render `<iframe>` with signed URL
-- For video/audio: render `<video>`/`<audio>` tags
-- For other types: show "Preview not available" + download button
-- Trigger via "Προεπισκόπηση" button + keyboard **Space** press when a file is selected
-- Dialog uses full-screen overlay with close button
+## 2. Rename "Overview" → "Dashboards"
 
-### 3. External drag & drop (from OS)
-Already partially implemented (`onDragOver`/`onDrop` on columns handles `e.dataTransfer.files`). Need to:
-- Add a **global drop zone overlay** on the entire FinderColumnView — when dragging from OS, show a full-area overlay "Αφήστε αρχεία εδώ"
-- Ensure the drop target resolves to the correct folder based on which column receives the drop
+- In `categories` array: change `label: 'Overview'` to `label: 'Dashboards'`, keep `id: 'overview'`.
+- Update routePrefixes to `['/dashboards']`.
 
-### 4. Internal drag & drop — move files/folders between folders
-New functionality:
-- Make file/folder rows **draggable** (`draggable="true"`)
-- On drag start, store the item type + ID in `dataTransfer`
-- On drop onto a folder row or column, call `onMoveFile(fileId, targetFolderId)` or a new `onMoveFolder(folderId, targetFolderId)` prop
-- Visual feedback: highlight target folder on dragover
-- Add `onMoveFolder` prop to `FinderColumnView` (and wire in `CentralFileExplorer`)
+## 3. Quick Notes Feature
 
-### 5. Context menu (right-click)
-Add a **ContextMenu** (from shadcn/ui) on file and folder rows:
-- **Files**: Λήψη, Προεπισκόπηση, Μετονομασία, Μετακίνηση σε…, Διαγραφή
-- **Folders**: Ανέβασμα αρχείου, Νέος υποφάκελος, Μετονομασία, Διαγραφή
-- **Empty area**: Ανέβασμα αρχείου, Νέος φάκελος
-- Reuse existing handler functions, add rename file support
+### Database
+- New table `quick_notes` with columns: `id`, `user_id` (references auth.users), `company_id`, `title`, `content` (text/HTML), `date` (date, defaults to today), `linked_entity_type` (nullable: project/task/deliverable/meeting), `linked_entity_id` (nullable uuid), `created_at`, `updated_at`.
+- RLS: users can only CRUD their own notes.
 
-## Files to Create/Edit
+### UI Component (`src/components/my-work/QuickNotes.tsx`)
+- macOS Notes-inspired layout: left panel with note list (grouped by date), right panel with rich text editor.
+- Create/delete notes, search notes.
+- Each note has a toolbar with AI actions: "Convert to Task", "Convert to Deliverable", "Link to Project", "Create Meeting".
+- Bulk AI action: select multiple notes → AI processes them into structured items.
+
+### AI Edge Function (`supabase/functions/notes-ai-action/index.ts`)
+- Takes note content + action type (create_task, create_deliverable, link_project, create_meeting).
+- Uses Lovable AI to extract structured data (title, description, dates, priority) from note text.
+- Returns structured suggestion for user confirmation before creating.
+
+### Integration in My Work
+- Add a new section/card in the My Work page below existing content or as a toggleable panel.
+- Collapsible card with title "Quick Notes" and a notebook icon.
+
+## Files to Create/Modify
 
 | File | Action |
 |------|--------|
-| `src/components/files/FilePreviewDialog.tsx` | **New** — modal for in-app file preview (img/pdf/video/audio) |
-| `src/components/files/FinderColumnView.tsx` | Fix preview panel width, add Space key handler, internal DnD for files/folders, context menus on rows, global OS drop overlay |
-| `src/components/files/CentralFileExplorer.tsx` | Add `onMoveFolder` handler, wire `FilePreviewDialog` |
-
-## Implementation Details
-
-- **FilePreviewDialog**: Uses shadcn `Dialog` with `DialogContent` set to `max-w-[90vw] max-h-[90vh]`. Gets a signed URL via `supabase.storage.from('project-files').createSignedUrl()`. Renders content based on MIME type.
-- **Space key**: Add `onKeyDown` listener on the FinderColumnView container — when Space is pressed and a file is selected, open preview dialog.
-- **Internal DnD**: Use native HTML5 drag/drop (not dnd-kit) to keep it simple. Set `dataTransfer.setData('application/x-file-id', id)` on drag start. On folder drop, check for this data type first (before checking `dataTransfer.files` for OS drops).
-- **Context menu**: Use shadcn `ContextMenu` component wrapping each row. Different menu items for files vs folders vs empty areas.
-- **Move folder**: New DB update `file_folders` set `parent_folder_id` = target. Wire through props.
+| `src/App.tsx` | Change `/` to MyWork, move Dashboard to `/dashboards` |
+| `src/components/layout/AppSidebar.tsx` | Add My Work to rail top, rename Overview→Dashboards, update routes |
+| `src/components/my-work/QuickNotes.tsx` | **New** — macOS-style notes UI |
+| `supabase/functions/notes-ai-action/index.ts` | **New** — AI processing of notes |
+| `src/pages/MyWork.tsx` | Add QuickNotes section |
+| Migration SQL | Create `quick_notes` table with RLS |
 

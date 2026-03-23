@@ -63,8 +63,8 @@ export function PageHeader({
       {/* Title row */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="h-9 w-9 rounded-xl bg-muted flex items-center justify-center shrink-0">
-            <Icon className="h-[18px] w-[18px]" />
+          <div className="h-9 w-9 rounded-[10px] bg-primary/8 flex items-center justify-center shrink-0">
+            <Icon className="h-[18px] w-[18px] text-primary" />
           </div>
           <div className="min-w-0">
             <h1 className="text-xl font-semibold tracking-tight truncate">{title}</h1>

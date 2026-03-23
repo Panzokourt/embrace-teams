@@ -528,7 +528,7 @@ export default function AppSidebar({
         <IconRail />
 
         {/* Expanded panel — only when sidebar is expanded */}
-        {!isEffectivelyCollapsed && <CategoryPanelContent />}
+        {!isEffectivelyCollapsed && activeCategory && <CategoryPanelContent />}
       </div>
 
       {/* Ephemeral flyout panel — fixed positioning outside overflow */}

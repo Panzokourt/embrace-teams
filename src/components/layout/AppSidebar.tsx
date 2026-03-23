@@ -157,7 +157,7 @@ export default function AppSidebar({
   const containerRef = useRef<HTMLDivElement>(null);
 
   const detectedCategory = useMemo(() => detectCategory(location.pathname), [location.pathname]);
-  const [activeCategory, setActiveCategory] = useState<CategoryId>(detectedCategory);
+  const [activeCategory, setActiveCategory] = useState<CategoryIdOrNull>(detectedCategory);
 
   useMemo(() => {
     setActiveCategory(detectCategory(location.pathname));

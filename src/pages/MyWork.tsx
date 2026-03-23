@@ -377,7 +377,7 @@ export default function MyWork() {
               {topLevelProjects.length === 0 ? (
                 <p className="text-sm text-muted-foreground px-6 py-6">Κανένα ενεργό έργο</p>
               ) : (
-                <div className="overflow-y-auto max-h-[60vh] divide-y divide-border/30">
+                <div className="overflow-y-auto max-h-[60vh] divide-y divide-border/20">
                     {topLevelProjects.map(project => (
                       <ProjectRow
                         key={project.id}

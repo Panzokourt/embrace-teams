@@ -809,7 +809,7 @@ function TaskRow({
           {format(new Date(task.due_date), 'd/MM')}
         </span>
       )}
-      <span className="text-[10px] font-medium rounded-full px-2 py-0.5 hidden sm:inline-flex" style={getStatusStyle(task.status)}>
+      <span className="text-[10px] font-medium rounded-[6px] px-2 py-0.5 hidden sm:inline-flex" style={getStatusStyle(task.status)}>
         {getStatusLabel(task.status)}
       </span>
       {!isRunning ? (

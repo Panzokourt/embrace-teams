@@ -363,12 +363,14 @@ export default function MyWork() {
           </Card>
 
           {/* Active Projects */}
-          <Card className="border-border/40 lg:col-span-3">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <FolderKanban className="h-4 w-4 text-muted-foreground" />
+          <Card className="border-border/30 shadow-sm lg:col-span-3">
+            <CardHeader className="pb-3 px-5">
+              <CardTitle className="text-[13px] font-semibold tracking-tight flex items-center gap-2.5">
+                <span className="h-7 w-7 rounded-lg bg-primary/8 flex items-center justify-center">
+                  <FolderKanban className="h-3.5 w-3.5 text-primary" />
+                </span>
                 Τα Ενεργά Έργα μου
-                <Badge variant="secondary" className="text-xs ml-1">{topLevelProjects.length}</Badge>
+                <Badge variant="secondary" className="text-[10px] ml-1">{topLevelProjects.length}</Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">

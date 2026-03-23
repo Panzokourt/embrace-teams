@@ -534,10 +534,10 @@ export default function MyWork() {
                           </div>
                         </div>
                         <div className="flex gap-1">
-                          <Button size="icon" variant="ghost" className="h-7 w-7 text-emerald-500 hover:text-emerald-600" onClick={() => approveReviewTask(task)}>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 rounded-[10px] text-success hover:text-success hover:bg-success/10" onClick={() => approveReviewTask(task)}>
                             <Check className="h-4 w-4" />
                           </Button>
-                          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => rejectReviewTask(task)}>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 rounded-[10px] text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => rejectReviewTask(task)}>
                             <X className="h-4 w-4" />
                           </Button>
                         </div>

@@ -842,7 +842,7 @@ function CalendarTaskCard({
 
   return (
     <div
-      className={`flex items-center gap-1.5 rounded-lg border border-border/30 px-2 py-1.5 hover:bg-muted/40 transition-colors cursor-pointer ${wide ? 'px-4 py-3' : ''} ${isOverdue ? 'border-destructive/30 bg-destructive/5' : 'bg-background'}`}
+      className={`flex items-center gap-1.5 rounded-[10px] border border-border/30 px-2 py-1.5 hover:bg-accent/20 transition-colors cursor-pointer ${wide ? 'px-4 py-3' : ''} ${isOverdue ? 'border-destructive/30 bg-destructive/5' : 'bg-card'}`}
       onClick={onClick}
     >
       <Checkbox className="h-3.5 w-3.5 shrink-0" onCheckedChange={e => { e && onComplete(); }} onClick={e => e.stopPropagation()} />

@@ -662,7 +662,7 @@ function ProjectRow({
     <div>
       {/* Project header row */}
       <div
-        className="flex items-center gap-3 px-4 md:px-6 py-3 cursor-pointer hover:bg-muted/30 transition-colors"
+        className="flex items-center gap-3 px-4 md:px-6 py-3 cursor-pointer hover:bg-accent/30 transition-colors"
         onClick={onToggle}
       >
         <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform shrink-0 ${expanded ? '' : '-rotate-90'}`} />

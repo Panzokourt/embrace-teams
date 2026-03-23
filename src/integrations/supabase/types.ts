@@ -5123,6 +5123,53 @@ export type Database = {
           },
         ]
       }
+      quick_notes: {
+        Row: {
+          company_id: string
+          content: string
+          created_at: string
+          date: string
+          id: string
+          linked_entity_id: string | null
+          linked_entity_type: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          content?: string
+          created_at?: string
+          date?: string
+          id?: string
+          linked_entity_id?: string | null
+          linked_entity_type?: string | null
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          content?: string
+          created_at?: string
+          date?: string
+          id?: string
+          linked_entity_id?: string | null
+          linked_entity_type?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quick_notes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rbac_audit_log: {
         Row: {
           action: string

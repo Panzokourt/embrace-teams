@@ -66,12 +66,13 @@
     --sidebar-border: 240 6% 90%;
     --sidebar-ring: 211 100% 50%;
 
-    /* Charts — blue-based palette */
+    /* Charts — 6-color Apple palette */
     --chart-1: 211 100% 50%;
-    --chart-2: 199 89% 48%;
-    --chart-3: 172 66% 50%;
-    --chart-4: 142 71% 45%;
-    --chart-5: 240 4% 46%;
+    --chart-2: 172 66% 50%;
+    --chart-3: 280 65% 60%;
+    --chart-4: 35 92% 50%;
+    --chart-5: 0 84% 60%;
+    --chart-6: 142 71% 45%;
     --sidebar: 0 0% 100%;
 
     /* Apple-style layered shadows */

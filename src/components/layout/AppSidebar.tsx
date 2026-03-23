@@ -48,6 +48,7 @@ interface NavItem {
 }
 
 type CategoryId = 'overview' | 'work' | 'clients' | 'communication' | 'revenue' | 'operations' | 'intelligence' | 'governance' | 'settings';
+type CategoryIdOrNull = CategoryId | null;
 
 interface Category {
   id: CategoryId;
@@ -114,8 +115,9 @@ const categoryNavItems: Record<CategoryId, NavItem[]> = {
 
 };
 
-function detectCategory(pathname: string): CategoryId {
-  if (pathname === '/' || pathname === '/my-work' || pathname.startsWith('/work') || pathname.startsWith('/projects') || pathname.startsWith('/tasks') || pathname.startsWith('/calendar') || pathname.startsWith('/files') || pathname.startsWith('/blueprints') || pathname.startsWith('/workflows') || pathname.startsWith('/media-planning')) return 'work';
+function detectCategory(pathname: string): CategoryIdOrNull {
+  if (pathname === '/' || pathname === '/my-work') return null;
+  if (pathname.startsWith('/work') || pathname.startsWith('/projects') || pathname.startsWith('/tasks') || pathname.startsWith('/calendar') || pathname.startsWith('/files') || pathname.startsWith('/blueprints') || pathname.startsWith('/workflows') || pathname.startsWith('/media-planning')) return 'work';
   if (pathname.startsWith('/clients') || pathname.startsWith('/contacts')) return 'clients';
   if (pathname.startsWith('/chat') || pathname.startsWith('/inbox')) return 'communication';
   if (pathname.startsWith('/financials') || pathname.startsWith('/pricing')) return 'revenue';
@@ -124,7 +126,7 @@ function detectCategory(pathname: string): CategoryId {
   if (pathname.startsWith('/governance')) return 'governance';
   if (pathname.startsWith('/settings')) return 'settings';
   if (pathname.startsWith('/dashboards')) return 'overview';
-  return 'work';
+  return null;
 }
 
 const briefIcons: Record<string, React.ComponentType<{className?: string;}>> = {
@@ -155,7 +157,7 @@ export default function AppSidebar({
   const containerRef = useRef<HTMLDivElement>(null);
 
   const detectedCategory = useMemo(() => detectCategory(location.pathname), [location.pathname]);
-  const [activeCategory, setActiveCategory] = useState<CategoryId>(detectedCategory);
+  const [activeCategory, setActiveCategory] = useState<CategoryIdOrNull>(detectedCategory);
 
   useMemo(() => {
     setActiveCategory(detectCategory(location.pathname));
@@ -250,7 +252,7 @@ export default function AppSidebar({
       <Tooltip delayDuration={300}>
         <TooltipTrigger asChild>
           <button
-            onClick={() => { navigate('/'); handleNavClick(); setFlyoutCategory(null); }}
+            onClick={() => { navigate('/'); handleNavClick(); setFlyoutCategory(null); setActiveCategory(null); }}
             className={cn(
               "relative flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 mb-1",
               isMobile
@@ -485,14 +487,14 @@ export default function AppSidebar({
                 <SidebarLink to="/media-planning" icon={<MonitorPlay className="h-[18px] w-[18px]" />} label="Media Planning" active={location.pathname.startsWith('/media-planning')} collapsed={false} onClick={() => {onItemClick?.();}} />
               </> :
 
-        categoryNavItems[flyoutCategory || activeCategory]?.filter(canAccess).map((item) => {
+        (flyoutCategory || activeCategory) ? categoryNavItems[(flyoutCategory || activeCategory) as CategoryId]?.filter(canAccess).map((item) => {
           const isActiveItem = item.href.includes('?') ?
           location.pathname + location.search === item.href :
           location.pathname === item.href;
           return (
             <SidebarLink key={item.href} to={item.href} icon={<item.icon className="h-[18px] w-[18px]" />} label={item.title} active={isActiveItem} collapsed={false} onClick={() => {onItemClick?.();}} />);
 
-        })
+        }) : null
         }
           </>
       }
@@ -526,7 +528,7 @@ export default function AppSidebar({
         <IconRail />
 
         {/* Expanded panel — only when sidebar is expanded */}
-        {!isEffectivelyCollapsed && <CategoryPanelContent />}
+        {!isEffectivelyCollapsed && activeCategory && <CategoryPanelContent />}
       </div>
 
       {/* Ephemeral flyout panel — fixed positioning outside overflow */}

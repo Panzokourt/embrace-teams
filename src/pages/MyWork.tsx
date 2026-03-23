@@ -679,7 +679,7 @@ function ProjectRow({
           </div>
           <Link
             to={`/projects/${project.id}`}
-            className="text-muted-foreground hover:text-primary"
+            className="text-muted-foreground hover:text-primary transition-colors"
             onClick={e => e.stopPropagation()}
           >
             <ExternalLink className="h-3.5 w-3.5" />

@@ -551,12 +551,14 @@ export default function MyWork() {
         </Card>
 
         {/* Time Tracking Widget */}
-        <Card className="border-border/40">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Timer className="h-4 w-4 text-muted-foreground" />
+        <Card className="border-border/30 shadow-sm">
+          <CardHeader className="pb-3 px-5">
+            <CardTitle className="text-[13px] font-semibold tracking-tight flex items-center gap-2.5">
+              <span className="h-7 w-7 rounded-lg bg-primary/8 flex items-center justify-center">
+                <Timer className="h-3.5 w-3.5 text-primary" />
+              </span>
               Time Tracking
-              <Badge variant="secondary" className="text-xs ml-auto">{todayHours}h σήμερα</Badge>
+              <Badge variant="secondary" className="text-[10px] ml-auto">{todayHours}h σήμερα</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">

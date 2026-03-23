@@ -35,7 +35,7 @@ interface QuickNote {
 }
 
 export function QuickNotes() {
-  const { profile } = useAuth();
+  const { profile, companyRole } = useAuth();
   const [notes, setNotes] = useState<QuickNote[]>([]);
   const [selectedNote, setSelectedNote] = useState<QuickNote | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -46,7 +46,7 @@ export function QuickNotes() {
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const titleRef = useRef<HTMLInputElement>(null);
 
-  const companyId = profile?.company_id;
+  const companyId = companyRole?.company_id;
 
   // Fetch notes
   const fetchNotes = useCallback(async () => {

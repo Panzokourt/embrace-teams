@@ -281,23 +281,23 @@ export default function MyWork() {
       <div className="flex flex-col gap-2">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground">{greeting}, {firstName}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">{greeting}, {firstName}</h1>
             <p className="text-sm text-muted-foreground capitalize">{todayStr}</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="secondary" className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 h-7 rounded-full whitespace-nowrap">
+            <Badge variant="secondary" className="inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 h-7 rounded-[10px] whitespace-nowrap bg-muted/50">
               <CheckSquare className="h-3.5 w-3.5 shrink-0" /> {todayTaskCount} tasks
             </Badge>
-            <Badge variant="secondary" className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 h-7 rounded-full whitespace-nowrap">
+            <Badge variant="secondary" className="inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 h-7 rounded-[10px] whitespace-nowrap bg-muted/50">
               <Clock className="h-3.5 w-3.5 shrink-0" /> {todayHours}h
             </Badge>
             {overdueCount > 0 && (
-              <Badge className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 h-7 rounded-full whitespace-nowrap bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/15">
+              <Badge className="inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 h-7 rounded-[10px] whitespace-nowrap bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/15">
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {overdueCount} εκπρόθεσμα
               </Badge>
             )}
             {approvalCount > 0 && (
-              <Badge variant="outline" className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 h-7 rounded-full whitespace-nowrap border-border">
+              <Badge variant="outline" className="inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 h-7 rounded-[10px] whitespace-nowrap border-border">
                 <ClipboardCheck className="h-3.5 w-3.5 shrink-0" /> {approvalCount} εγκρίσεις
               </Badge>
             )}

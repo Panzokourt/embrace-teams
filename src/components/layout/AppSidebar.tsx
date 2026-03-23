@@ -494,7 +494,7 @@ export default function AppSidebar({
           return (
             <SidebarLink key={item.href} to={item.href} icon={<item.icon className="h-[18px] w-[18px]" />} label={item.title} active={isActiveItem} collapsed={false} onClick={() => {onItemClick?.();}} />);
 
-        })
+        }) : null
         }
           </>
       }

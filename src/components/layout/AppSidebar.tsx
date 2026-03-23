@@ -70,10 +70,10 @@ const categories: Category[] = [
 
 const categoryNavItems: Record<CategoryId, NavItem[]> = {
   overview: [
-  { title: 'Executive', href: '/', icon: LayoutDashboard },
-  { title: 'Finance', href: '/dashboard/finance', icon: DollarSign },
-  { title: 'Operations', href: '/dashboard/operations', icon: Users },
-  { title: 'Sales & Pipeline', href: '/dashboard/sales', icon: BarChart3 }],
+  { title: 'Executive', href: '/dashboards', icon: LayoutDashboard },
+  { title: 'Finance', href: '/dashboards/finance', icon: DollarSign },
+  { title: 'Operations', href: '/dashboards/operations', icon: Users },
+  { title: 'Sales & Pipeline', href: '/dashboards/sales', icon: BarChart3 }],
 
   work: [],
   clients: [

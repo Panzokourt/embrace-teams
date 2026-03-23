@@ -246,6 +246,28 @@ export default function AppSidebar({
       }
       </div>
 
+      {/* My Work standalone button */}
+      <Tooltip delayDuration={300}>
+        <TooltipTrigger asChild>
+          <button
+            onClick={() => { navigate('/'); handleNavClick(); setFlyoutCategory(null); }}
+            className={cn(
+              "relative flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 mb-1",
+              isMobile
+                ? (location.pathname === '/' || location.pathname === '/my-work') ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                : (location.pathname === '/' || location.pathname === '/my-work') ? "bg-white/15 text-white" : "text-white/50 hover:text-white hover:bg-white/10"
+            )}>
+            {(location.pathname === '/' || location.pathname === '/my-work') && !isMobile && (
+              <span className="absolute left-0.5 top-1/2 -translate-y-1/2 w-[3px] h-3 rounded-full bg-primary" />
+            )}
+            <LayoutList className="h-[18px] w-[18px]" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="right" sideOffset={8}>My Work</TooltipContent>
+      </Tooltip>
+
+      <div className="w-6 h-px bg-white/10 mb-1" />
+
       {/* Category icons */}
       <div className="flex-1 flex flex-col items-center gap-0.5">
         {categories.map((cat) => {

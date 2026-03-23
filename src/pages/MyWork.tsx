@@ -875,26 +875,26 @@ function TaskDetailSheet({ task, today, onClose, navigate, activeTimer, startTim
       </SheetHeader>
       <div className="mt-6 space-y-4">
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-muted/30 rounded-lg p-3">
-            <p className="text-[10px] text-muted-foreground uppercase mb-1">Status</p>
-            <span className="text-xs font-medium rounded-full px-2.5 py-1" style={getStatusStyle(task.status)}>{getStatusLabel(task.status)}</span>
+          <div className="bg-muted/30 rounded-[12px] p-3">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Status</p>
+            <span className="text-xs font-medium rounded-[6px] px-2.5 py-1" style={getStatusStyle(task.status)}>{getStatusLabel(task.status)}</span>
           </div>
-          <div className="bg-muted/30 rounded-lg p-3">
-            <p className="text-[10px] text-muted-foreground uppercase mb-1">Priority</p>
-            <span className="text-xs font-medium rounded-full px-2.5 py-1" style={getPriorityStyle(task.priority)}>{PRIORITY_COLORS[task.priority]?.label || task.priority}</span>
+          <div className="bg-muted/30 rounded-[12px] p-3">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Priority</p>
+            <span className="text-xs font-medium rounded-[6px] px-2.5 py-1" style={getPriorityStyle(task.priority)}>{PRIORITY_COLORS[task.priority]?.label || task.priority}</span>
           </div>
-          <div className="bg-muted/30 rounded-lg p-3">
-            <p className="text-[10px] text-muted-foreground uppercase mb-1">Έναρξη</p>
+          <div className="bg-muted/30 rounded-[12px] p-3">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Έναρξη</p>
             <p className="text-sm font-medium">{task.start_date ? format(new Date(task.start_date), 'd MMM yyyy', { locale: el }) : '-'}</p>
           </div>
-          <div className="bg-muted/30 rounded-lg p-3">
-            <p className="text-[10px] text-muted-foreground uppercase mb-1">Λήξη</p>
+          <div className="bg-muted/30 rounded-[12px] p-3">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Λήξη</p>
             <p className={`text-sm font-medium ${isOverdue ? 'text-destructive' : ''}`}>{task.due_date ? format(new Date(task.due_date), 'd MMM yyyy', { locale: el }) : '-'}</p>
           </div>
         </div>
 
-        <div className="bg-muted/30 rounded-lg p-3">
-          <p className="text-[10px] text-muted-foreground uppercase mb-1">Πρόοδος</p>
+        <div className="bg-muted/30 rounded-[12px] p-3">
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Πρόοδος</p>
           <div className="flex items-center gap-2">
             <Progress value={task.progress || 0} className="flex-1 h-2" />
             <span className="text-sm font-medium">{task.progress || 0}%</span>

@@ -176,12 +176,14 @@ export function QuickNotes() {
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <Card className="border-border/50">
+      <Card className="border-border/30 shadow-sm">
         <CollapsibleTrigger asChild>
-          <CardHeader className="cursor-pointer hover:bg-muted/30 transition-colors py-3 px-4">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              <StickyNote className="h-4 w-4 text-amber-500" />
+          <CardHeader className="cursor-pointer hover:bg-accent/20 transition-colors py-3 px-5">
+            <CardTitle className="text-[13px] font-semibold tracking-tight flex items-center gap-2.5">
+              {isOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+              <span className="h-7 w-7 rounded-lg bg-primary/8 flex items-center justify-center">
+                <StickyNote className="h-3.5 w-3.5 text-primary" />
+              </span>
               Quick Notes
               <Badge variant="secondary" className="ml-auto text-[10px] h-5 px-1.5">{notes.length}</Badge>
             </CardTitle>

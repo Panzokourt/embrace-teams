@@ -813,11 +813,11 @@ function TaskRow({
         {getStatusLabel(task.status)}
       </span>
       {!isRunning ? (
-        <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={e => { e.stopPropagation(); startTimer(task.id, task.project_id); }}>
+        <Button size="icon" variant="ghost" className="h-6 w-6 rounded-[10px] text-muted-foreground hover:text-primary" onClick={e => { e.stopPropagation(); startTimer(task.id, task.project_id); }}>
           <Play className="h-3 w-3" />
         </Button>
       ) : (
-        <Button size="icon" variant="ghost" className="h-6 w-6 text-primary" onClick={e => { e.stopPropagation(); stopTimer(); }}>
+        <Button size="icon" variant="ghost" className="h-6 w-6 rounded-[10px] text-primary" onClick={e => { e.stopPropagation(); stopTimer(); }}>
           <Square className="h-3 w-3" />
         </Button>
       )}

@@ -57,7 +57,7 @@ interface Category {
 }
 
 const categories: Category[] = [
-{ id: 'overview', icon: LayoutDashboard, label: 'Overview', routePrefixes: ['/my-work', '/', '/dashboard'] },
+{ id: 'overview', icon: LayoutDashboard, label: 'Dashboards', routePrefixes: ['/dashboards'] },
 { id: 'work', icon: Briefcase, label: 'Work', routePrefixes: ['/work', '/projects', '/tasks', '/calendar', '/files', '/blueprints', '/workflows', '/media-planning'] },
 { id: 'clients', icon: Building2, label: 'Clients', routePrefixes: ['/clients', '/contacts'] },
 { id: 'communication', icon: MessageSquare, label: 'Communication', routePrefixes: ['/chat', '/inbox'] },

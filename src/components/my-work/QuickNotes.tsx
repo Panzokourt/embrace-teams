@@ -258,7 +258,7 @@ export function QuickNotes() {
                     <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border/30 shrink-0">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" disabled={aiLoading}>
+                          <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5 rounded-[10px]" disabled={aiLoading}>
                             {aiLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3 text-amber-500" />}
                             AI Actions
                           </Button>

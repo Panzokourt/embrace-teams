@@ -941,8 +941,8 @@ function DeliverableDetailSheet({ deliverable, onClose, navigate }: {
       </SheetHeader>
       <div className="mt-6 space-y-4">
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-muted/30 rounded-lg p-3">
-            <p className="text-[10px] text-muted-foreground uppercase mb-1">Κατάσταση</p>
+          <div className="bg-muted/30 rounded-[12px] p-3">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Κατάσταση</p>
             <Badge variant={deliverable.completed ? 'default' : 'outline'}>
               {deliverable.completed ? 'Ολοκληρωμένο' : 'Σε εξέλιξη'}
             </Badge>

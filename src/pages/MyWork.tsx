@@ -284,23 +284,23 @@ export default function MyWork() {
             <p className="text-sm text-muted-foreground capitalize">{todayStr}</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="secondary" className="gap-1.5 text-xs font-medium px-2.5 py-1">
-              <CheckSquare className="h-3 w-3" /> {todayTaskCount} tasks
+            <Badge variant="secondary" className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 h-7 rounded-full whitespace-nowrap">
+              <CheckSquare className="h-3.5 w-3.5 shrink-0" /> {todayTaskCount} tasks
             </Badge>
-            <Badge variant="secondary" className="gap-1.5 text-xs font-medium px-2.5 py-1">
-              <Clock className="h-3 w-3" /> {todayHours}h
+            <Badge variant="secondary" className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 h-7 rounded-full whitespace-nowrap">
+              <Clock className="h-3.5 w-3.5 shrink-0" /> {todayHours}h
             </Badge>
             {overdueCount > 0 && (
-              <Badge variant="destructive" className="gap-1.5 text-xs font-medium px-2.5 py-1">
-                <AlertTriangle className="h-3 w-3" /> {overdueCount} εκπρόθεσμα
+              <Badge className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 h-7 rounded-full whitespace-nowrap bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/15">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {overdueCount} εκπρόθεσμα
               </Badge>
             )}
             {approvalCount > 0 && (
-              <Badge variant="outline" className="gap-1.5 text-xs font-medium px-2.5 py-1 border-primary/40 text-primary">
-                <ClipboardCheck className="h-3 w-3" /> {approvalCount} εγκρίσεις
+              <Badge variant="outline" className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 h-7 rounded-full whitespace-nowrap border-border">
+                <ClipboardCheck className="h-3.5 w-3.5 shrink-0" /> {approvalCount} εγκρίσεις
               </Badge>
             )}
-            <div className="hidden sm:block w-32">
+            <div className="hidden sm:flex items-center">
               <LevelProgressBar userId={user?.id} />
             </div>
           </div>

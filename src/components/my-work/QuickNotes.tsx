@@ -229,8 +229,8 @@ export function QuickNotes() {
                           <button
                             key={note.id}
                             onClick={() => setSelectedNote(note)}
-                            className={`w-full text-left rounded-lg px-2.5 py-2 mb-0.5 transition-colors text-xs group ${
-                              selectedNote?.id === note.id ? 'bg-accent text-foreground' : 'hover:bg-muted/50 text-muted-foreground'
+                            className={`w-full text-left rounded-[10px] px-2.5 py-2 mb-0.5 transition-colors text-xs group ${
+                              selectedNote?.id === note.id ? 'bg-accent text-foreground' : 'hover:bg-accent/30 text-muted-foreground'
                             }`}
                           >
                             <p className="font-medium truncate text-foreground">{note.title || 'Χωρίς τίτλο'}</p>

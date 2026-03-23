@@ -48,6 +48,7 @@ interface NavItem {
 }
 
 type CategoryId = 'overview' | 'work' | 'clients' | 'communication' | 'revenue' | 'operations' | 'intelligence' | 'governance' | 'settings';
+type CategoryIdOrNull = CategoryId | null;
 
 interface Category {
   id: CategoryId;

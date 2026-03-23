@@ -252,7 +252,7 @@ export default function AppSidebar({
       <Tooltip delayDuration={300}>
         <TooltipTrigger asChild>
           <button
-            onClick={() => { navigate('/'); handleNavClick(); setFlyoutCategory(null); }}
+            onClick={() => { navigate('/'); handleNavClick(); setFlyoutCategory(null); setActiveCategory(null); }}
             className={cn(
               "relative flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 mb-1",
               isMobile

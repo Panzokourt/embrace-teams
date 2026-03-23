@@ -57,7 +57,7 @@ interface Category {
 }
 
 const categories: Category[] = [
-{ id: 'overview', icon: LayoutDashboard, label: 'Overview', routePrefixes: ['/my-work', '/', '/dashboard'] },
+{ id: 'overview', icon: LayoutDashboard, label: 'Dashboards', routePrefixes: ['/dashboards'] },
 { id: 'work', icon: Briefcase, label: 'Work', routePrefixes: ['/work', '/projects', '/tasks', '/calendar', '/files', '/blueprints', '/workflows', '/media-planning'] },
 { id: 'clients', icon: Building2, label: 'Clients', routePrefixes: ['/clients', '/contacts'] },
 { id: 'communication', icon: MessageSquare, label: 'Communication', routePrefixes: ['/chat', '/inbox'] },
@@ -70,10 +70,10 @@ const categories: Category[] = [
 
 const categoryNavItems: Record<CategoryId, NavItem[]> = {
   overview: [
-  { title: 'Executive', href: '/', icon: LayoutDashboard },
-  { title: 'Finance', href: '/dashboard/finance', icon: DollarSign },
-  { title: 'Operations', href: '/dashboard/operations', icon: Users },
-  { title: 'Sales & Pipeline', href: '/dashboard/sales', icon: BarChart3 }],
+  { title: 'Executive', href: '/dashboards', icon: LayoutDashboard },
+  { title: 'Finance', href: '/dashboards/finance', icon: DollarSign },
+  { title: 'Operations', href: '/dashboards/operations', icon: Users },
+  { title: 'Sales & Pipeline', href: '/dashboards/sales', icon: BarChart3 }],
 
   work: [],
   clients: [
@@ -115,7 +115,7 @@ const categoryNavItems: Record<CategoryId, NavItem[]> = {
 };
 
 function detectCategory(pathname: string): CategoryId {
-  if (pathname === '/my-work' || pathname.startsWith('/work') || pathname.startsWith('/projects') || pathname.startsWith('/tasks') || pathname.startsWith('/calendar') || pathname.startsWith('/files') || pathname.startsWith('/blueprints') || pathname.startsWith('/workflows') || pathname.startsWith('/media-planning')) return 'work';
+  if (pathname === '/' || pathname === '/my-work' || pathname.startsWith('/work') || pathname.startsWith('/projects') || pathname.startsWith('/tasks') || pathname.startsWith('/calendar') || pathname.startsWith('/files') || pathname.startsWith('/blueprints') || pathname.startsWith('/workflows') || pathname.startsWith('/media-planning')) return 'work';
   if (pathname.startsWith('/clients') || pathname.startsWith('/contacts')) return 'clients';
   if (pathname.startsWith('/chat') || pathname.startsWith('/inbox')) return 'communication';
   if (pathname.startsWith('/financials') || pathname.startsWith('/pricing')) return 'revenue';
@@ -123,8 +123,8 @@ function detectCategory(pathname: string): CategoryId {
   if (pathname.startsWith('/reports') || pathname.startsWith('/brain')) return 'intelligence';
   if (pathname.startsWith('/governance')) return 'governance';
   if (pathname.startsWith('/settings')) return 'settings';
-  if (pathname === '/' || pathname.startsWith('/dashboard')) return 'overview';
-  return 'overview';
+  if (pathname.startsWith('/dashboards')) return 'overview';
+  return 'work';
 }
 
 const briefIcons: Record<string, React.ComponentType<{className?: string;}>> = {
@@ -245,6 +245,28 @@ export default function AppSidebar({
           </Tooltip>
       }
       </div>
+
+      {/* My Work standalone button */}
+      <Tooltip delayDuration={300}>
+        <TooltipTrigger asChild>
+          <button
+            onClick={() => { navigate('/'); handleNavClick(); setFlyoutCategory(null); }}
+            className={cn(
+              "relative flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 mb-1",
+              isMobile
+                ? (location.pathname === '/' || location.pathname === '/my-work') ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                : (location.pathname === '/' || location.pathname === '/my-work') ? "bg-white/15 text-white" : "text-white/50 hover:text-white hover:bg-white/10"
+            )}>
+            {(location.pathname === '/' || location.pathname === '/my-work') && !isMobile && (
+              <span className="absolute left-0.5 top-1/2 -translate-y-1/2 w-[3px] h-3 rounded-full bg-primary" />
+            )}
+            <LayoutList className="h-[18px] w-[18px]" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="right" sideOffset={8}>My Work</TooltipContent>
+      </Tooltip>
+
+      <div className="w-6 h-px bg-white/10 mb-1" />
 
       {/* Category icons */}
       <div className="flex-1 flex flex-col items-center gap-0.5">
@@ -448,7 +470,7 @@ export default function AppSidebar({
       <>
             {(flyoutCategory || activeCategory) === 'work' ?
         <>
-                <SidebarLink to="/my-work" icon={<LayoutList className="h-[18px] w-[18px]" />} label="My Work" active={location.pathname === '/my-work'} collapsed={false} onClick={() => {onItemClick?.();}} />
+                <SidebarLink to="/" icon={<LayoutList className="h-[18px] w-[18px]" />} label="My Work" active={location.pathname === '/' || location.pathname === '/my-work'} collapsed={false} onClick={() => {onItemClick?.();}} />
                 <SidebarNavGroup id="work" icon={<Briefcase className="h-[18px] w-[18px]" />} label="Projects" collapsed={false} isActive={location.pathname === '/work' || location.pathname.startsWith('/projects/') || location.pathname.startsWith('/tasks/')} defaultOpen>
                   <SidebarSubLink to="/work?tab=projects" icon={<FolderKanban className="h-4 w-4" />} label="Projects" active={location.pathname === '/work' && (!location.search || location.search.includes('tab=projects'))} onClick={() => {navigate('/work?tab=projects');onItemClick?.();}} />
                   <SidebarProjectTree collapsed={false} />

@@ -9,6 +9,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import Auth from "@/pages/Auth";
 import Dashboard from "@/pages/Dashboard";
 import MyWork from "@/pages/MyWork";
+
 import Work from "@/pages/Work";
 import ProjectDetail from "@/pages/ProjectDetail";
 import TaskDetail from "@/pages/TaskDetail";
@@ -79,9 +80,11 @@ const App = () => (
                 <Route path="/welcome" element={<WelcomeWizard />} />
                 <Route path="/platform-admin" element={<PlatformAdmin />} />
                 <Route element={<AppLayout />}>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/dashboard/:templateId" element={<Dashboard />} />
-                  <Route path="/my-work" element={<MyWork />} />
+                <Route path="/" element={<MyWork />} />
+                <Route path="/dashboards" element={<Dashboard />} />
+                <Route path="/dashboards/:templateId" element={<Dashboard />} />
+                <Route path="/dashboard/:templateId" element={<Navigate to="/dashboards" replace />} />
+                  <Route path="/my-work" element={<Navigate to="/" replace />} />
                   <Route path="/work" element={<Work />} />
                   <Route path="/projects" element={<Navigate to="/work?tab=projects" replace />} />
                   <Route path="/projects/:id" element={<ProjectDetail />} />

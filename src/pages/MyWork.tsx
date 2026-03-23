@@ -25,6 +25,7 @@ import {
 } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { STATUS_COLORS, PRIORITY_COLORS } from '@/components/shared/mondayStyleConfig';
+import { QuickNotes } from '@/components/my-work/QuickNotes';
 import { naturalCompare } from '@/lib/utils';
 
 // ── Types ──────────────────────────────────────────
@@ -592,7 +593,10 @@ export default function MyWork() {
         </Card>
       </div>
 
-      {/* ── Detail Sidebar Sheet ── */}
+      {/* ── Quick Notes ── */}
+      <QuickNotes />
+
+
       <Sheet open={!!selectedItem} onOpenChange={open => !open && setSelectedItem(null)}>
         <SheetContent className="sm:max-w-lg overflow-y-auto">
           {selectedItem?.type === 'task' && (

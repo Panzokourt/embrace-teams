@@ -902,8 +902,8 @@ function TaskDetailSheet({ task, today, onClose, navigate, activeTimer, startTim
         </div>
 
         {task.description && (
-          <div className="bg-muted/30 rounded-lg p-3">
-            <p className="text-[10px] text-muted-foreground uppercase mb-1">Περιγραφή</p>
+          <div className="bg-muted/30 rounded-[12px] p-3">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Περιγραφή</p>
             <p className="text-sm whitespace-pre-wrap">{task.description}</p>
           </div>
         )}

@@ -575,7 +575,7 @@ export default function MyWork() {
                 </Button>
               </div>
             ) : (
-              <div className="text-sm text-muted-foreground bg-muted/30 rounded-xl px-4 py-3 text-center">
+              <div className="text-sm text-muted-foreground bg-muted/30 rounded-[12px] px-4 py-3 text-center">
                 Κανένα ενεργό timer
               </div>
             )}

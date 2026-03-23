@@ -115,7 +115,7 @@ const categoryNavItems: Record<CategoryId, NavItem[]> = {
 };
 
 function detectCategory(pathname: string): CategoryId {
-  if (pathname === '/my-work' || pathname.startsWith('/work') || pathname.startsWith('/projects') || pathname.startsWith('/tasks') || pathname.startsWith('/calendar') || pathname.startsWith('/files') || pathname.startsWith('/blueprints') || pathname.startsWith('/workflows') || pathname.startsWith('/media-planning')) return 'work';
+  if (pathname === '/' || pathname === '/my-work' || pathname.startsWith('/work') || pathname.startsWith('/projects') || pathname.startsWith('/tasks') || pathname.startsWith('/calendar') || pathname.startsWith('/files') || pathname.startsWith('/blueprints') || pathname.startsWith('/workflows') || pathname.startsWith('/media-planning')) return 'work';
   if (pathname.startsWith('/clients') || pathname.startsWith('/contacts')) return 'clients';
   if (pathname.startsWith('/chat') || pathname.startsWith('/inbox')) return 'communication';
   if (pathname.startsWith('/financials') || pathname.startsWith('/pricing')) return 'revenue';
@@ -123,8 +123,8 @@ function detectCategory(pathname: string): CategoryId {
   if (pathname.startsWith('/reports') || pathname.startsWith('/brain')) return 'intelligence';
   if (pathname.startsWith('/governance')) return 'governance';
   if (pathname.startsWith('/settings')) return 'settings';
-  if (pathname === '/' || pathname.startsWith('/dashboard')) return 'overview';
-  return 'overview';
+  if (pathname.startsWith('/dashboards')) return 'overview';
+  return 'work';
 }
 
 const briefIcons: Record<string, React.ComponentType<{className?: string;}>> = {

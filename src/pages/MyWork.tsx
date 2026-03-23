@@ -344,7 +344,7 @@ export default function MyWork() {
               {todayTasks.length === 0 ? (
                 <p className="text-sm text-muted-foreground px-6 py-6">Κανένα task για σήμερα 🎉</p>
               ) : (
-                <div className="overflow-y-auto max-h-[60vh] divide-y divide-border/30">
+                <div className="overflow-y-auto max-h-[60vh] divide-y divide-border/20">
                     {todayTasks.map(task => (
                       <TaskRow
                         key={task.id}

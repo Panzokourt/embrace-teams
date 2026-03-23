@@ -176,12 +176,14 @@ export function QuickNotes() {
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <Card className="border-border/50">
+      <Card className="border-border/30 shadow-sm">
         <CollapsibleTrigger asChild>
-          <CardHeader className="cursor-pointer hover:bg-muted/30 transition-colors py-3 px-4">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              <StickyNote className="h-4 w-4 text-amber-500" />
+          <CardHeader className="cursor-pointer hover:bg-accent/20 transition-colors py-3 px-5">
+            <CardTitle className="text-[13px] font-semibold tracking-tight flex items-center gap-2.5">
+              {isOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+              <span className="h-7 w-7 rounded-lg bg-primary/8 flex items-center justify-center">
+                <StickyNote className="h-3.5 w-3.5 text-primary" />
+              </span>
               Quick Notes
               <Badge variant="secondary" className="ml-auto text-[10px] h-5 px-1.5">{notes.length}</Badge>
             </CardTitle>
@@ -227,8 +229,8 @@ export function QuickNotes() {
                           <button
                             key={note.id}
                             onClick={() => setSelectedNote(note)}
-                            className={`w-full text-left rounded-lg px-2.5 py-2 mb-0.5 transition-colors text-xs group ${
-                              selectedNote?.id === note.id ? 'bg-accent text-foreground' : 'hover:bg-muted/50 text-muted-foreground'
+                            className={`w-full text-left rounded-[10px] px-2.5 py-2 mb-0.5 transition-colors text-xs group ${
+                              selectedNote?.id === note.id ? 'bg-accent text-foreground' : 'hover:bg-accent/30 text-muted-foreground'
                             }`}
                           >
                             <p className="font-medium truncate text-foreground">{note.title || 'Χωρίς τίτλο'}</p>
@@ -253,10 +255,10 @@ export function QuickNotes() {
                 {selectedNote ? (
                   <>
                     {/* Toolbar */}
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border/30 shrink-0">
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border/20 shrink-0">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" disabled={aiLoading}>
+                          <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5 rounded-[10px]" disabled={aiLoading}>
                             {aiLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3 text-amber-500" />}
                             AI Actions
                           </Button>
@@ -315,7 +317,7 @@ export function QuickNotes() {
                     </div>
 
                     {/* Footer */}
-                    <div className="px-3 py-1.5 border-t border-border/30 shrink-0">
+                    <div className="px-3 py-1.5 border-t border-border/20 shrink-0">
                       <p className="text-[10px] text-muted-foreground">
                         Τελ. ενημέρωση: {format(new Date(selectedNote.updated_at), 'd MMM, HH:mm', { locale: el })}
                       </p>

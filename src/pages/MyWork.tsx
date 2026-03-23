@@ -281,23 +281,23 @@ export default function MyWork() {
       <div className="flex flex-col gap-2">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground">{greeting}, {firstName}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">{greeting}, {firstName}</h1>
             <p className="text-sm text-muted-foreground capitalize">{todayStr}</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="secondary" className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 h-7 rounded-full whitespace-nowrap">
+            <Badge variant="secondary" className="inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 h-7 rounded-[10px] whitespace-nowrap bg-muted/50">
               <CheckSquare className="h-3.5 w-3.5 shrink-0" /> {todayTaskCount} tasks
             </Badge>
-            <Badge variant="secondary" className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 h-7 rounded-full whitespace-nowrap">
+            <Badge variant="secondary" className="inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 h-7 rounded-[10px] whitespace-nowrap bg-muted/50">
               <Clock className="h-3.5 w-3.5 shrink-0" /> {todayHours}h
             </Badge>
             {overdueCount > 0 && (
-              <Badge className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 h-7 rounded-full whitespace-nowrap bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/15">
+              <Badge className="inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 h-7 rounded-[10px] whitespace-nowrap bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/15">
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {overdueCount} εκπρόθεσμα
               </Badge>
             )}
             {approvalCount > 0 && (
-              <Badge variant="outline" className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 h-7 rounded-full whitespace-nowrap border-border">
+              <Badge variant="outline" className="inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 h-7 rounded-[10px] whitespace-nowrap border-border">
                 <ClipboardCheck className="h-3.5 w-3.5 shrink-0" /> {approvalCount} εγκρίσεις
               </Badge>
             )}
@@ -309,17 +309,17 @@ export default function MyWork() {
       </div>
 
       {/* ── View Toggle ── */}
-      <div className="flex items-center gap-2">
+      <div className="inline-flex items-center gap-1 p-1 rounded-[10px] bg-muted/50">
         <Button
-          variant={activeView === 'projects' ? 'default' : 'outline'}
-          size="sm" className="gap-1.5"
+          variant={activeView === 'projects' ? 'default' : 'ghost'}
+          size="sm" className="gap-1.5 rounded-[8px] h-8 px-3 text-[13px]"
           onClick={() => setActiveView('projects')}
         >
           <FolderKanban className="h-3.5 w-3.5" /> Έργα
         </Button>
         <Button
-          variant={activeView === 'calendar' ? 'default' : 'outline'}
-          size="sm" className="gap-1.5"
+          variant={activeView === 'calendar' ? 'default' : 'ghost'}
+          size="sm" className="gap-1.5 rounded-[8px] h-8 px-3 text-[13px]"
           onClick={() => setActiveView('calendar')}
         >
           <CalendarDays className="h-3.5 w-3.5" /> Ημερολόγιο
@@ -330,19 +330,21 @@ export default function MyWork() {
       {activeView === 'projects' ? (
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
           {/* Today's Tasks */}
-          <Card className="border-border/40 lg:col-span-2">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <CheckSquare className="h-4 w-4 text-muted-foreground" />
+          <Card className="border-border/30 shadow-sm lg:col-span-2">
+            <CardHeader className="pb-3 px-5">
+              <CardTitle className="text-[13px] font-semibold tracking-tight flex items-center gap-2.5">
+                <span className="h-7 w-7 rounded-lg bg-primary/8 flex items-center justify-center">
+                  <CheckSquare className="h-3.5 w-3.5 text-primary" />
+                </span>
                 Tasks Σήμερα
-                <Badge variant="secondary" className="text-xs ml-1">{todayTasks.length}</Badge>
+                <Badge variant="secondary" className="text-[10px] ml-1">{todayTasks.length}</Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               {todayTasks.length === 0 ? (
                 <p className="text-sm text-muted-foreground px-6 py-6">Κανένα task για σήμερα 🎉</p>
               ) : (
-                <div className="overflow-y-auto max-h-[60vh] divide-y divide-border/30">
+                <div className="overflow-y-auto max-h-[60vh] divide-y divide-border/20">
                     {todayTasks.map(task => (
                       <TaskRow
                         key={task.id}
@@ -361,19 +363,21 @@ export default function MyWork() {
           </Card>
 
           {/* Active Projects */}
-          <Card className="border-border/40 lg:col-span-3">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <FolderKanban className="h-4 w-4 text-muted-foreground" />
+          <Card className="border-border/30 shadow-sm lg:col-span-3">
+            <CardHeader className="pb-3 px-5">
+              <CardTitle className="text-[13px] font-semibold tracking-tight flex items-center gap-2.5">
+                <span className="h-7 w-7 rounded-lg bg-primary/8 flex items-center justify-center">
+                  <FolderKanban className="h-3.5 w-3.5 text-primary" />
+                </span>
                 Τα Ενεργά Έργα μου
-                <Badge variant="secondary" className="text-xs ml-1">{topLevelProjects.length}</Badge>
+                <Badge variant="secondary" className="text-[10px] ml-1">{topLevelProjects.length}</Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               {topLevelProjects.length === 0 ? (
                 <p className="text-sm text-muted-foreground px-6 py-6">Κανένα ενεργό έργο</p>
               ) : (
-                <div className="overflow-y-auto max-h-[60vh] divide-y divide-border/30">
+                <div className="overflow-y-auto max-h-[60vh] divide-y divide-border/20">
                     {topLevelProjects.map(project => (
                       <ProjectRow
                         key={project.id}
@@ -402,19 +406,21 @@ export default function MyWork() {
         </div>
       ) : (
         /* ── Calendar View ── */
-        <Card className="border-border/40">
-          <CardHeader className="pb-3 flex flex-row items-center justify-between">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <CalendarDays className="h-4 w-4 text-muted-foreground" />
+        <Card className="border-border/30 shadow-sm">
+          <CardHeader className="pb-3 px-5 flex flex-row items-center justify-between">
+            <CardTitle className="text-[13px] font-semibold tracking-tight flex items-center gap-2.5">
+              <span className="h-7 w-7 rounded-lg bg-primary/8 flex items-center justify-center">
+                <CalendarDays className="h-3.5 w-3.5 text-primary" />
+              </span>
               {calendarMode === 'week' ? 'Εβδομαδιαία Προβολή' : format(calendarDate, 'EEEE d MMMM', { locale: el })}
             </CardTitle>
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="sm" onClick={() => setCalendarDate(d => addDays(d, calendarMode === 'week' ? -7 : -1))}>←</Button>
               <Button variant="ghost" size="sm" onClick={() => setCalendarDate(new Date())}>Σήμερα</Button>
               <Button variant="ghost" size="sm" onClick={() => setCalendarDate(d => addDays(d, calendarMode === 'week' ? 7 : 1))}>→</Button>
-              <div className="border-l border-border/40 pl-2 ml-1 flex gap-1">
-                <Button variant={calendarMode === 'week' ? 'secondary' : 'ghost'} size="sm" onClick={() => setCalendarMode('week')}>Εβδ</Button>
-                <Button variant={calendarMode === 'day' ? 'secondary' : 'ghost'} size="sm" onClick={() => setCalendarMode('day')}>Ημέρα</Button>
+              <div className="border-l border-border/30 pl-2 ml-1 inline-flex gap-1 p-0.5 rounded-[8px] bg-muted/50">
+                <Button variant={calendarMode === 'week' ? 'default' : 'ghost'} size="sm" className="h-7 rounded-[6px] text-[12px]" onClick={() => setCalendarMode('week')}>Εβδ</Button>
+                <Button variant={calendarMode === 'day' ? 'default' : 'ghost'} size="sm" className="h-7 rounded-[6px] text-[12px]" onClick={() => setCalendarMode('day')}>Ημέρα</Button>
               </div>
             </div>
           </CardHeader>
@@ -426,9 +432,9 @@ export default function MyWork() {
                   const dayTasks = tasksByDay[key] || [];
                   const isCurrentDay = isToday(day);
                   return (
-                    <div key={key} className={`border-r last:border-r-0 border-border/20 min-h-[200px] ${isCurrentDay ? 'bg-primary/5' : ''}`}>
-                      <div className={`px-2 py-2 text-center border-b border-border/20 ${isCurrentDay ? 'bg-primary/10' : 'bg-muted/30'}`}>
-                        <div className="text-[10px] text-muted-foreground uppercase">{format(day, 'EEE', { locale: el })}</div>
+                    <div key={key} className={`border-r last:border-r-0 border-border/20 min-h-[200px] transition-colors ${isCurrentDay ? 'bg-primary/5' : 'hover:bg-accent/10'}`}>
+                      <div className={`px-2 py-2 text-center border-b border-border/20 ${isCurrentDay ? 'bg-primary/10' : 'bg-muted/20'}`}>
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wide">{format(day, 'EEE', { locale: el })}</div>
                         <div className={`text-lg font-semibold ${isCurrentDay ? 'text-primary' : ''}`}>{format(day, 'd')}</div>
                       </div>
                       <div className="p-1 space-y-1">
@@ -476,24 +482,26 @@ export default function MyWork() {
       {/* ── Bottom Strip: Approvals + Time Tracking ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Approvals */}
-        <Card className="border-border/40">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
+        <Card className="border-border/30 shadow-sm">
+          <CardHeader className="pb-3 px-5">
+            <CardTitle className="text-[13px] font-semibold tracking-tight flex items-center gap-2.5">
+              <span className="h-7 w-7 rounded-lg bg-primary/8 flex items-center justify-center">
+                <ClipboardCheck className="h-3.5 w-3.5 text-primary" />
+              </span>
               Εγκρίσεις
-              {approvalCount > 0 && <Badge variant="secondary" className="text-xs">{approvalCount}</Badge>}
+              {approvalCount > 0 && <Badge variant="secondary" className="text-[10px]">{approvalCount}</Badge>}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {approvalCount === 0 ? (
               <p className="text-sm text-muted-foreground px-6 py-4">Δεν υπάρχουν εκκρεμείς εγκρίσεις 🎉</p>
             ) : (
-              <div className="overflow-y-auto max-h-[40vh] divide-y divide-border/30">
+              <div className="overflow-y-auto max-h-[40vh] divide-y divide-border/20">
                 {/* Sent for approval */}
                 {sentForApproval.length > 0 && (
                   <>
-                    <div className="px-4 py-2 bg-muted/20">
-                      <span className="text-xs font-semibold flex items-center gap-1.5">
+                    <div className="px-4 py-2 bg-muted/30 rounded-[10px] mx-2 mt-1">
+                      <span className="text-[11px] font-semibold flex items-center gap-1.5">
                         <Send className="h-3 w-3" /> Έστειλα για Έγκριση ({sentForApproval.length})
                       </span>
                     </div>
@@ -511,8 +519,8 @@ export default function MyWork() {
                 {/* Need my approval */}
                 {needMyApproval.length > 0 && (
                   <>
-                    <div className="px-4 py-2 bg-muted/20">
-                      <span className="text-xs font-semibold flex items-center gap-1.5">
+                    <div className="px-4 py-2 bg-muted/30 rounded-[10px] mx-2 mt-1">
+                      <span className="text-[11px] font-semibold flex items-center gap-1.5">
                         <Inbox className="h-3 w-3" /> Πρέπει να Εγκρίνω ({needMyApproval.length})
                       </span>
                     </div>
@@ -526,10 +534,10 @@ export default function MyWork() {
                           </div>
                         </div>
                         <div className="flex gap-1">
-                          <Button size="icon" variant="ghost" className="h-7 w-7 text-emerald-500 hover:text-emerald-600" onClick={() => approveReviewTask(task)}>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 rounded-[10px] text-success hover:text-success hover:bg-success/10" onClick={() => approveReviewTask(task)}>
                             <Check className="h-4 w-4" />
                           </Button>
-                          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => rejectReviewTask(task)}>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 rounded-[10px] text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => rejectReviewTask(task)}>
                             <X className="h-4 w-4" />
                           </Button>
                         </div>
@@ -543,18 +551,20 @@ export default function MyWork() {
         </Card>
 
         {/* Time Tracking Widget */}
-        <Card className="border-border/40">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Timer className="h-4 w-4 text-muted-foreground" />
+        <Card className="border-border/30 shadow-sm">
+          <CardHeader className="pb-3 px-5">
+            <CardTitle className="text-[13px] font-semibold tracking-tight flex items-center gap-2.5">
+              <span className="h-7 w-7 rounded-lg bg-primary/8 flex items-center justify-center">
+                <Timer className="h-3.5 w-3.5 text-primary" />
+              </span>
               Time Tracking
-              <Badge variant="secondary" className="text-xs ml-auto">{todayHours}h σήμερα</Badge>
+              <Badge variant="secondary" className="text-[10px] ml-auto">{todayHours}h σήμερα</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {/* Active Timer */}
             {activeTimer?.is_running ? (
-              <div className="flex items-center gap-3 bg-primary/5 border border-primary/20 rounded-xl px-4 py-3">
+              <div className="flex items-center gap-3 bg-primary/5 border border-primary/15 rounded-[12px] px-4 py-3">
                 <Timer className="h-4 w-4 text-primary animate-pulse shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{activeTimer.task?.title || 'Timer'}</p>
@@ -565,7 +575,7 @@ export default function MyWork() {
                 </Button>
               </div>
             ) : (
-              <div className="text-sm text-muted-foreground bg-muted/30 rounded-xl px-4 py-3 text-center">
+              <div className="text-sm text-muted-foreground bg-muted/30 rounded-[12px] px-4 py-3 text-center">
                 Κανένα ενεργό timer
               </div>
             )}
@@ -577,9 +587,9 @@ export default function MyWork() {
                 <div className="overflow-y-auto max-h-32">
                   {todayEntries.slice(0, 5).map(entry => (
                     <div key={entry.id} className="flex items-center gap-2 py-1.5 text-sm">
-                      <span className="text-xs text-muted-foreground w-10">{format(new Date(entry.start_time), 'HH:mm')}</span>
-                      <span className="flex-1 truncate text-foreground">{entry.task?.title || entry.description || 'Timer'}</span>
-                      <span className="text-xs font-mono text-muted-foreground">{entry.duration_minutes}λ</span>
+                      <span className="text-xs text-muted-foreground tabular-nums w-10">{format(new Date(entry.start_time), 'HH:mm')}</span>
+                      <span className="flex-1 truncate text-foreground text-sm">{entry.task?.title || entry.description || 'Timer'}</span>
+                      <span className="text-xs font-mono text-muted-foreground tabular-nums">{entry.duration_minutes}λ</span>
                     </div>
                   ))}
                 </div>
@@ -652,7 +662,7 @@ function ProjectRow({
     <div>
       {/* Project header row */}
       <div
-        className="flex items-center gap-3 px-4 md:px-6 py-3 cursor-pointer hover:bg-muted/30 transition-colors"
+        className="flex items-center gap-3 px-4 md:px-6 py-3 cursor-pointer hover:bg-accent/30 transition-colors"
         onClick={onToggle}
       >
         <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform shrink-0 ${expanded ? '' : '-rotate-90'}`} />
@@ -669,7 +679,7 @@ function ProjectRow({
           </div>
           <Link
             to={`/projects/${project.id}`}
-            className="text-muted-foreground hover:text-primary"
+            className="text-muted-foreground hover:text-primary transition-colors"
             onClick={e => e.stopPropagation()}
           >
             <ExternalLink className="h-3.5 w-3.5" />
@@ -785,7 +795,7 @@ function TaskRow({
   const isRunning = activeTimer?.is_running && activeTimer.task_id === task.id;
 
   return (
-    <div className={`flex items-center gap-2 px-3 py-2 hover:bg-muted/20 rounded-lg transition-colors ${indent ? 'ml-5' : ''}`}>
+    <div className={`flex items-center gap-2 px-3 py-2 hover:bg-accent/20 rounded-[10px] transition-colors ${indent ? 'ml-5' : ''}`}>
       <Checkbox className="h-3.5 w-3.5 shrink-0" onCheckedChange={onComplete} />
       <ListChecks className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
       <div className="flex-1 min-w-0 cursor-pointer" onClick={onClick}>
@@ -799,15 +809,15 @@ function TaskRow({
           {format(new Date(task.due_date), 'd/MM')}
         </span>
       )}
-      <span className="text-[10px] font-medium rounded-full px-2 py-0.5 hidden sm:inline-flex" style={getStatusStyle(task.status)}>
+      <span className="text-[10px] font-medium rounded-[6px] px-2 py-0.5 hidden sm:inline-flex" style={getStatusStyle(task.status)}>
         {getStatusLabel(task.status)}
       </span>
       {!isRunning ? (
-        <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={e => { e.stopPropagation(); startTimer(task.id, task.project_id); }}>
+        <Button size="icon" variant="ghost" className="h-6 w-6 rounded-[10px] text-muted-foreground hover:text-primary" onClick={e => { e.stopPropagation(); startTimer(task.id, task.project_id); }}>
           <Play className="h-3 w-3" />
         </Button>
       ) : (
-        <Button size="icon" variant="ghost" className="h-6 w-6 text-primary" onClick={e => { e.stopPropagation(); stopTimer(); }}>
+        <Button size="icon" variant="ghost" className="h-6 w-6 rounded-[10px] text-primary" onClick={e => { e.stopPropagation(); stopTimer(); }}>
           <Square className="h-3 w-3" />
         </Button>
       )}
@@ -832,7 +842,7 @@ function CalendarTaskCard({
 
   return (
     <div
-      className={`flex items-center gap-1.5 rounded-lg border border-border/30 px-2 py-1.5 hover:bg-muted/40 transition-colors cursor-pointer ${wide ? 'px-4 py-3' : ''} ${isOverdue ? 'border-destructive/30 bg-destructive/5' : 'bg-background'}`}
+      className={`flex items-center gap-1.5 rounded-[10px] border border-border/30 px-2 py-1.5 hover:bg-accent/20 transition-colors cursor-pointer ${wide ? 'px-4 py-3' : ''} ${isOverdue ? 'border-destructive/30 bg-destructive/5' : 'bg-card'}`}
       onClick={onClick}
     >
       <Checkbox className="h-3.5 w-3.5 shrink-0" onCheckedChange={e => { e && onComplete(); }} onClick={e => e.stopPropagation()} />
@@ -865,26 +875,26 @@ function TaskDetailSheet({ task, today, onClose, navigate, activeTimer, startTim
       </SheetHeader>
       <div className="mt-6 space-y-4">
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-muted/30 rounded-lg p-3">
-            <p className="text-[10px] text-muted-foreground uppercase mb-1">Status</p>
-            <span className="text-xs font-medium rounded-full px-2.5 py-1" style={getStatusStyle(task.status)}>{getStatusLabel(task.status)}</span>
+          <div className="bg-muted/30 rounded-[12px] p-3">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Status</p>
+            <span className="text-xs font-medium rounded-[6px] px-2.5 py-1" style={getStatusStyle(task.status)}>{getStatusLabel(task.status)}</span>
           </div>
-          <div className="bg-muted/30 rounded-lg p-3">
-            <p className="text-[10px] text-muted-foreground uppercase mb-1">Priority</p>
-            <span className="text-xs font-medium rounded-full px-2.5 py-1" style={getPriorityStyle(task.priority)}>{PRIORITY_COLORS[task.priority]?.label || task.priority}</span>
+          <div className="bg-muted/30 rounded-[12px] p-3">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Priority</p>
+            <span className="text-xs font-medium rounded-[6px] px-2.5 py-1" style={getPriorityStyle(task.priority)}>{PRIORITY_COLORS[task.priority]?.label || task.priority}</span>
           </div>
-          <div className="bg-muted/30 rounded-lg p-3">
-            <p className="text-[10px] text-muted-foreground uppercase mb-1">Έναρξη</p>
+          <div className="bg-muted/30 rounded-[12px] p-3">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Έναρξη</p>
             <p className="text-sm font-medium">{task.start_date ? format(new Date(task.start_date), 'd MMM yyyy', { locale: el }) : '-'}</p>
           </div>
-          <div className="bg-muted/30 rounded-lg p-3">
-            <p className="text-[10px] text-muted-foreground uppercase mb-1">Λήξη</p>
+          <div className="bg-muted/30 rounded-[12px] p-3">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Λήξη</p>
             <p className={`text-sm font-medium ${isOverdue ? 'text-destructive' : ''}`}>{task.due_date ? format(new Date(task.due_date), 'd MMM yyyy', { locale: el }) : '-'}</p>
           </div>
         </div>
 
-        <div className="bg-muted/30 rounded-lg p-3">
-          <p className="text-[10px] text-muted-foreground uppercase mb-1">Πρόοδος</p>
+        <div className="bg-muted/30 rounded-[12px] p-3">
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Πρόοδος</p>
           <div className="flex items-center gap-2">
             <Progress value={task.progress || 0} className="flex-1 h-2" />
             <span className="text-sm font-medium">{task.progress || 0}%</span>
@@ -892,8 +902,8 @@ function TaskDetailSheet({ task, today, onClose, navigate, activeTimer, startTim
         </div>
 
         {task.description && (
-          <div className="bg-muted/30 rounded-lg p-3">
-            <p className="text-[10px] text-muted-foreground uppercase mb-1">Περιγραφή</p>
+          <div className="bg-muted/30 rounded-[12px] p-3">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Περιγραφή</p>
             <p className="text-sm whitespace-pre-wrap">{task.description}</p>
           </div>
         )}
@@ -931,14 +941,14 @@ function DeliverableDetailSheet({ deliverable, onClose, navigate }: {
       </SheetHeader>
       <div className="mt-6 space-y-4">
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-muted/30 rounded-lg p-3">
-            <p className="text-[10px] text-muted-foreground uppercase mb-1">Κατάσταση</p>
+          <div className="bg-muted/30 rounded-[12px] p-3">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Κατάσταση</p>
             <Badge variant={deliverable.completed ? 'default' : 'outline'}>
               {deliverable.completed ? 'Ολοκληρωμένο' : 'Σε εξέλιξη'}
             </Badge>
           </div>
-          <div className="bg-muted/30 rounded-lg p-3">
-            <p className="text-[10px] text-muted-foreground uppercase mb-1">Λήξη</p>
+          <div className="bg-muted/30 rounded-[12px] p-3">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Λήξη</p>
             <p className="text-sm font-medium">{deliverable.due_date ? format(new Date(deliverable.due_date), 'd MMM yyyy', { locale: el }) : '-'}</p>
           </div>
         </div>

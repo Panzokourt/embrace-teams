@@ -1,38 +1,68 @@
 
 
-# Phase 5: Final Sweep — Missing Updates + Animations & Micro-interactions
+# Plan: My Work Page — Apple Design System Refresh
 
-## Gaps Found in Phases 2-4
+Η σελίδα MyWork χρειάζεται ενημέρωση ώστε να ακολουθεί τα design tokens του Apple-inspired system (rounded-[16px] cards, border-border/30, p-5, icon boxes bg-primary/8, text-[13px] titles, shadows, spacing).
 
-| Component | Issue |
-|-----------|-------|
-| `chartStyles.ts` | Missing `import React` — TS error on `React.CSSProperties` |
-| `tailwind.config.ts` | Chart color `6` missing from tailwind colors map |
-| `alert-dialog.tsx` | Old style: `bg-black/80` overlay, `sm:rounded-lg`, plain border |
-| `hover-card.tsx` | Old: `rounded-md`, no `backdrop-blur-xl`, plain border |
-| `navigation-menu.tsx` | Viewport: `rounded-md`, plain border/shadow |
-| `drawer.tsx` | Overlay: `bg-black/80`, no blur; handle bar too wide |
-| `accordion.tsx` | Trigger has `hover:underline` — should be `hover:text-foreground` |
+## Changes
 
-## Phase 5: Animations & Micro-interactions
+### `src/pages/MyWork.tsx`
 
-Add refined Apple-style motion to the system:
-- **Page transition wrapper** utility class in `index.css`
-- **Stagger animation** utilities (already partially exist, ensure in tailwind config)
-- **Spring easing** — already have `cubic-bezier(0.16, 1, 0.3, 1)`, add a bounce variant
-- **Skeleton shimmer** — already exists, verify it works with new bg
+**Header Section:**
+- Greeting: `text-2xl font-semibold tracking-tight` (not bold, tighter)
+- Date subtitle: keep `text-sm text-muted-foreground`
+- KPI chips: add `bg-muted/50` backdrop, consistent `rounded-[10px]` pill shape
 
-## Files to Modify
+**View Toggle:**
+- Use segment-control style (pill bg-muted container with active pill bg-card shadow-sm), matching Phase 2 tabs
 
-| File | Changes |
-|------|---------|
-| `src/components/dashboard/chartStyles.ts` | Add missing React import |
-| `tailwind.config.ts` | Add `chart-6` color, add `bounce` keyframe, add `slide-up`/`slide-down` keyframes |
-| `src/components/ui/alert-dialog.tsx` | Apple overlay (`bg-black/40 backdrop-blur-xl`), `rounded-[20px]`, `border-border/30` |
-| `src/components/ui/hover-card.tsx` | `rounded-xl`, `border-border/30`, `backdrop-blur-xl`, `shadow-lg` |
-| `src/components/ui/navigation-menu.tsx` | Viewport: `rounded-xl`, `border-border/30`, trigger: `rounded-[10px]` |
-| `src/components/ui/drawer.tsx` | Overlay: `bg-black/40 backdrop-blur-xl`, handle: `w-10 h-1 bg-muted-foreground/30` |
-| `src/components/ui/accordion.tsx` | Remove `hover:underline`, add `hover:text-foreground transition-colors`, subtler border |
-| `src/index.css` | Add `.animate-stagger` utility, refine existing animation classes |
+**Cards (Today's Tasks, Active Projects, Approvals, Time Tracking):**
+- Replace `border-border/40` → `border-border/30`
+- Add `rounded-[16px] shadow-sm`
+- CardHeader titles: icon in `h-7 w-7 rounded-lg bg-primary/8 text-primary` box + `text-[13px] font-semibold tracking-tight`
+- CardContent padding: `p-5` where appropriate
+- Dividers: `divide-border/20` (subtler)
 
-All changes are className-level only — no API or structural changes.
+**Project Row:**
+- Hover: `hover:bg-accent/30` (softer)
+- Progress bar: already uses Phase 3 component
+- External link icon: `hover:text-primary transition-colors`
+
+**Task Row:**
+- Rounded: `rounded-[10px]` hover state
+- Play/stop buttons: `rounded-[10px]`
+- Status pill: `rounded-[6px]`
+
+**Calendar View:**
+- Day cells: `rounded-[10px]` hover, `bg-primary/5` for today
+- Week header: softer `bg-muted/20`
+
+**Approvals section:**
+- Section headers: `bg-muted/30 rounded-[10px]` instead of plain `bg-muted/20`
+- Approve/reject buttons: already good, add `rounded-[10px]`
+
+**Time Tracking widget:**
+- Active timer: `rounded-[12px]`, `bg-primary/5 border-primary/15`
+- Entry list: `tabular-nums` on times
+
+**Task Detail Sheet:**
+- Info cards: `rounded-[12px]` instead of `rounded-lg`
+- Labels: `text-[11px]` uppercase tracking
+
+**Quick Notes (`src/components/my-work/QuickNotes.tsx`):**
+- Outer card: `rounded-[16px] border-border/30 shadow-sm`
+- Header: icon box `bg-primary/8 text-primary`, title `text-[13px] font-semibold tracking-tight`
+- Note list items: `rounded-[10px]` hover/active states
+- Editor area: cleaner borders, match input styles
+- AI Actions button: `rounded-[10px]`
+- Search input: already Phase 1 styled
+
+### Files to Modify
+
+| File | Scope |
+|------|-------|
+| `src/pages/MyWork.tsx` | Full page: header, cards, rows, calendar, sheets |
+| `src/components/my-work/QuickNotes.tsx` | Card, list items, editor toolbar |
+
+All changes are className-level only — no logic or API changes.
+

@@ -351,7 +351,7 @@ export default function AppSidebar({
                 quickOpen && "[&>svg]:rotate-45"
                 )}>
                 
-                  <Plus className="h-[18px] w-[18px] transition-transform duration-200 text-lime-300" />
+                  <Plus className="h-[18px] w-[18px] transition-transform duration-200 text-primary" />
                 </button>
               </PopoverTrigger>
             </TooltipTrigger>

@@ -330,12 +330,14 @@ export default function MyWork() {
       {activeView === 'projects' ? (
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
           {/* Today's Tasks */}
-          <Card className="border-border/40 lg:col-span-2">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <CheckSquare className="h-4 w-4 text-muted-foreground" />
+          <Card className="border-border/30 shadow-sm lg:col-span-2">
+            <CardHeader className="pb-3 px-5">
+              <CardTitle className="text-[13px] font-semibold tracking-tight flex items-center gap-2.5">
+                <span className="h-7 w-7 rounded-lg bg-primary/8 flex items-center justify-center">
+                  <CheckSquare className="h-3.5 w-3.5 text-primary" />
+                </span>
                 Tasks Σήμερα
-                <Badge variant="secondary" className="text-xs ml-1">{todayTasks.length}</Badge>
+                <Badge variant="secondary" className="text-[10px] ml-1">{todayTasks.length}</Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">

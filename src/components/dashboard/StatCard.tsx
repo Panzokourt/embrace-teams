@@ -22,7 +22,7 @@ export default function StatCard({
   variant = 'default',
 }: StatCardProps) {
   const variantStyles = {
-    default: 'bg-card border-border/40',
+    default: 'bg-card border-border/30',
     primary: 'bg-card border-primary/20',
     success: 'bg-card border-success/20',
     warning: 'bg-card border-warning/20',
@@ -31,7 +31,7 @@ export default function StatCard({
 
   const iconStyles = {
     default: 'bg-muted text-muted-foreground',
-    primary: 'bg-primary/10 text-primary-foreground',
+    primary: 'bg-primary/8 text-primary',
     success: 'bg-success/10 text-success',
     warning: 'bg-warning/10 text-warning',
     destructive: 'bg-destructive/10 text-destructive',
@@ -39,17 +39,17 @@ export default function StatCard({
 
   return (
     <div className={cn(
-      "group relative rounded-3xl border p-6 transition-all duration-300 ease-apple",
-      "hover:shadow-soft hover:border-border hover:-translate-y-0.5",
+      "group relative rounded-[16px] border p-5 transition-all duration-300 ease-apple",
+      "hover:shadow-sm hover:border-border hover:-translate-y-0.5",
       "animate-fade-in",
       variantStyles[variant]
     )}>
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1.5">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
             {title}
           </p>
-          <p className="text-2xl font-bold tracking-tight text-foreground">
+          <p className="text-2xl font-bold tracking-tight text-foreground tabular-nums">
             {value}
           </p>
           {subtitle && (
@@ -60,7 +60,7 @@ export default function StatCard({
               "flex items-center gap-1.5 text-xs font-medium pt-1",
               trend.positive ? "text-success" : "text-destructive"
             )}>
-              <span className="inline-flex items-center gap-0.5">
+              <span className="inline-flex items-center gap-0.5 tabular-nums">
                 {trend.positive ? '↑' : '↓'} {Math.abs(trend.value)}%
               </span>
               <span className="text-muted-foreground font-normal">vs προηγούμενο</span>
@@ -68,7 +68,7 @@ export default function StatCard({
           )}
         </div>
         <div className={cn(
-          "h-11 w-11 rounded-2xl flex items-center justify-center flex-shrink-0",
+          "h-10 w-10 rounded-[10px] flex items-center justify-center flex-shrink-0",
           "transition-transform duration-300 ease-apple group-hover:scale-105",
           iconStyles[variant]
         )}>

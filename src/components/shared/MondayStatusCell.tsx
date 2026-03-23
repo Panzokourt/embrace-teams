@@ -48,9 +48,9 @@ export function MondayStatusCell({
   if (disabled) {
     return (
       <div
-        className="flex items-center justify-center py-1.5 px-2 rounded text-xs font-medium min-h-[28px]"
+        className="flex items-center justify-center py-1.5 px-2 rounded-[6px] text-xs font-medium min-h-[28px]"
         style={{
-          backgroundColor: current?.bg || '#c4c4c4',
+          backgroundColor: current?.bg || '#8E8E93',
           color: current?.text || '#ffffff',
         }}
       >
@@ -64,11 +64,11 @@ export function MondayStatusCell({
       <PopoverTrigger asChild>
         <button
           className={cn(
-            "w-full flex items-center justify-center py-1.5 px-2 rounded text-xs font-medium min-h-[28px] transition-opacity cursor-pointer",
+            "w-full flex items-center justify-center py-1.5 px-2 rounded-[6px] text-xs font-medium min-h-[28px] transition-all cursor-pointer",
             saving && "opacity-60"
           )}
           style={{
-            backgroundColor: current?.bg || '#c4c4c4',
+            backgroundColor: current?.bg || '#8E8E93',
             color: current?.text || '#ffffff',
           }}
           disabled={saving}
@@ -82,8 +82,8 @@ export function MondayStatusCell({
             <button
               key={option.value}
               className={cn(
-                "w-full py-1.5 px-2 rounded text-xs font-medium text-center transition-transform hover:scale-105",
-                option.value === value && "ring-2 ring-foreground/20"
+                "w-full py-1.5 px-2 rounded-[6px] text-xs font-medium text-center transition-all hover:brightness-95",
+                option.value === value && "ring-2 ring-white/30"
               )}
               style={{
                 backgroundColor: option.bg,

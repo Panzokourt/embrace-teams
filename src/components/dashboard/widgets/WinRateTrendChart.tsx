@@ -1,5 +1,6 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { TrendingUp } from 'lucide-react';
+import { chartTooltipStyle, WIDGET_CARD_CLASS, WIDGET_ICON_CLASS, WIDGET_TITLE_CLASS } from '../chartStyles';
 
 const PLACEHOLDER = [
   { month: 'Ιαν', rate: 45 },
@@ -12,11 +13,9 @@ const PLACEHOLDER = [
 
 export default function WinRateTrendChart() {
   return (
-    <div className="rounded-2xl border border-border/50 bg-card p-6 animate-fade-in shadow-soft h-full">
-      <h3 className="text-base font-semibold flex items-center gap-2 mb-4 text-foreground">
-        <span className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
-          <TrendingUp className="h-4 w-4 text-foreground" />
-        </span>
+    <div className={WIDGET_CARD_CLASS}>
+      <h3 className={WIDGET_TITLE_CLASS}>
+        <span className={WIDGET_ICON_CLASS}><TrendingUp className="h-4 w-4 text-primary" /></span>
         Win Rate Trend
       </h3>
       <div className="h-52">
@@ -25,7 +24,7 @@ export default function WinRateTrendChart() {
             <CartesianGrid strokeDasharray="3 3" className="stroke-border/30" />
             <XAxis dataKey="month" tick={{ fontSize: 11 }} />
             <YAxis tick={{ fontSize: 11 }} domain={[0, 100]} tickFormatter={v => `${v}%`} />
-            <Tooltip formatter={(v: number) => [`${v}%`, 'Win Rate']} contentStyle={{ borderRadius: '12px', border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))', fontSize: '12px' }} />
+            <Tooltip formatter={(v: number) => [`${v}%`, 'Win Rate']} contentStyle={chartTooltipStyle} />
             <Line type="monotone" dataKey="rate" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={{ r: 3 }} />
           </LineChart>
         </ResponsiveContainer>

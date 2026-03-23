@@ -1,5 +1,6 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { PieChart as PieIcon } from 'lucide-react';
+import { chartTooltipStyle, CHART_COLORS, WIDGET_CARD_CLASS, WIDGET_ICON_CLASS, WIDGET_TITLE_CLASS } from '../chartStyles';
 
 const PLACEHOLDER = [
   { name: 'Μισθοί', value: 45000 },
@@ -8,20 +9,11 @@ const PLACEHOLDER = [
   { name: 'Λοιπά', value: 8000 },
 ];
 
-const COLORS = [
-  'hsl(var(--primary))',
-  'hsl(var(--chart-2))',
-  'hsl(var(--chart-3))',
-  'hsl(var(--chart-4))',
-];
-
 export default function CostBreakdownChart() {
   return (
-    <div className="rounded-2xl border border-border/50 bg-card p-6 animate-fade-in shadow-soft h-full">
-      <h3 className="text-base font-semibold flex items-center gap-2 mb-4 text-foreground">
-        <span className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
-          <PieIcon className="h-4 w-4 text-foreground" />
-        </span>
+    <div className={WIDGET_CARD_CLASS}>
+      <h3 className={WIDGET_TITLE_CLASS}>
+        <span className={WIDGET_ICON_CLASS}><PieIcon className="h-4 w-4 text-primary" /></span>
         Ανάλυση Κόστους
       </h3>
       <div className="h-52">
@@ -29,10 +21,10 @@ export default function CostBreakdownChart() {
           <PieChart>
             <Pie data={PLACEHOLDER} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" paddingAngle={3}>
               {PLACEHOLDER.map((_, i) => (
-                <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
               ))}
             </Pie>
-            <Tooltip formatter={(v: number) => `€${v.toLocaleString()}`} contentStyle={{ borderRadius: '12px', border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))', fontSize: '12px' }} />
+            <Tooltip formatter={(v: number) => `€${v.toLocaleString()}`} contentStyle={chartTooltipStyle} />
             <Legend iconType="circle" wrapperStyle={{ fontSize: '11px' }} />
           </PieChart>
         </ResponsiveContainer>

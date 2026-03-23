@@ -66,12 +66,13 @@
     --sidebar-border: 240 6% 90%;
     --sidebar-ring: 211 100% 50%;
 
-    /* Charts — blue-based palette */
+    /* Charts — 6-color Apple palette */
     --chart-1: 211 100% 50%;
-    --chart-2: 199 89% 48%;
-    --chart-3: 172 66% 50%;
-    --chart-4: 142 71% 45%;
-    --chart-5: 240 4% 46%;
+    --chart-2: 172 66% 50%;
+    --chart-3: 280 65% 60%;
+    --chart-4: 35 92% 50%;
+    --chart-5: 0 84% 60%;
+    --chart-6: 142 71% 45%;
     --sidebar: 0 0% 100%;
 
     /* Apple-style layered shadows */
@@ -142,12 +143,13 @@
     --sidebar-border: 240 4% 22%;
     --sidebar-ring: 211 100% 64%;
 
-    /* Charts */
+    /* Charts — 6-color Apple palette (dark) */
     --chart-1: 211 100% 64%;
-    --chart-2: 199 89% 58%;
-    --chart-3: 172 66% 55%;
-    --chart-4: 142 60% 55%;
-    --chart-5: 240 4% 40%;
+    --chart-2: 172 66% 55%;
+    --chart-3: 280 60% 68%;
+    --chart-4: 35 82% 58%;
+    --chart-5: 0 72% 65%;
+    --chart-6: 142 60% 55%;
     --sidebar: 240 5% 14%;
 
     --shadow-2xs: 0 1px 2px 0 hsl(0 0% 0% / 0.1);

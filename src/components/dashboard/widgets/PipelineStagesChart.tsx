@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Activity } from 'lucide-react';
+import { chartTooltipStyle, WIDGET_CARD_CLASS, WIDGET_ICON_CLASS, WIDGET_TITLE_CLASS } from '../chartStyles';
 
 interface StageData { stage: string; count: number; value: number }
 
@@ -34,11 +35,9 @@ export default function PipelineStagesChart() {
   }, []);
 
   return (
-    <div className="rounded-2xl border border-border/50 bg-card p-6 animate-fade-in shadow-soft h-full">
-      <h3 className="text-base font-semibold flex items-center gap-2 mb-4 text-foreground">
-        <span className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
-          <Activity className="h-4 w-4 text-foreground" />
-        </span>
+    <div className={WIDGET_CARD_CLASS}>
+      <h3 className={WIDGET_TITLE_CLASS}>
+        <span className={WIDGET_ICON_CLASS}><Activity className="h-4 w-4 text-primary" /></span>
         Pipeline Stages
       </h3>
       <div className="h-52">
@@ -47,8 +46,8 @@ export default function PipelineStagesChart() {
             <CartesianGrid strokeDasharray="3 3" className="stroke-border/30" />
             <XAxis dataKey="stage" tick={{ fontSize: 10 }} />
             <YAxis tick={{ fontSize: 11 }} />
-            <Tooltip formatter={(v: number) => [v, 'Τεμ.']} contentStyle={{ borderRadius: '12px', border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))', fontSize: '12px' }} />
-            <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+            <Tooltip formatter={(v: number) => [v, 'Τεμ.']} contentStyle={chartTooltipStyle} />
+            <Bar dataKey="count" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>

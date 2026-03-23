@@ -2,14 +2,15 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { CheckSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { WIDGET_CARD_CLASS, WIDGET_ICON_CLASS, WIDGET_TITLE_CLASS } from '../chartStyles';
 
 interface StatusCount { status: string; count: number; color: string }
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
-  todo: { label: 'To Do', color: 'bg-muted-foreground/20' },
-  in_progress: { label: 'In Progress', color: 'bg-primary/60' },
-  review: { label: 'Review', color: 'bg-warning/60' },
-  completed: { label: 'Completed', color: 'bg-success/60' },
+  todo: { label: 'To Do', color: 'bg-[#8E8E93]/40' },
+  in_progress: { label: 'In Progress', color: 'bg-[#FF9F0A]/60' },
+  review: { label: 'Review', color: 'bg-[#FF375F]/50' },
+  completed: { label: 'Completed', color: 'bg-[#30D158]/60' },
 };
 
 export default function TasksByStatus() {
@@ -32,11 +33,9 @@ export default function TasksByStatus() {
   }, []);
 
   return (
-    <div className="rounded-2xl border border-border/50 bg-card p-6 animate-fade-in shadow-soft h-full">
-      <h3 className="text-base font-semibold flex items-center gap-2 mb-4 text-foreground">
-        <span className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
-          <CheckSquare className="h-4 w-4 text-foreground" />
-        </span>
+    <div className={WIDGET_CARD_CLASS}>
+      <h3 className={WIDGET_TITLE_CLASS}>
+        <span className={WIDGET_ICON_CLASS}><CheckSquare className="h-4 w-4 text-primary" /></span>
         Tasks ανά Status
       </h3>
       <div className="space-y-3">
@@ -44,7 +43,7 @@ export default function TasksByStatus() {
           <div key={d.status} className="space-y-1">
             <div className="flex items-center justify-between text-sm">
               <span className="text-foreground/80">{d.status}</span>
-              <span className="font-medium text-foreground">{d.count}</span>
+              <span className="font-medium text-foreground tabular-nums">{d.count}</span>
             </div>
             <div className="h-2 rounded-full bg-muted overflow-hidden">
               <div

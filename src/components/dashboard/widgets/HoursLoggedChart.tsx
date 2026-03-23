@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Clock } from 'lucide-react';
+import { chartTooltipStyle, WIDGET_CARD_CLASS, WIDGET_ICON_CLASS, WIDGET_TITLE_CLASS } from '../chartStyles';
 
 interface WeekData { week: string; hours: number }
 
@@ -33,11 +34,9 @@ export default function HoursLoggedChart() {
   }, []);
 
   return (
-    <div className="rounded-2xl border border-border/50 bg-card p-6 animate-fade-in shadow-soft h-full">
-      <h3 className="text-base font-semibold flex items-center gap-2 mb-4 text-foreground">
-        <span className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
-          <Clock className="h-4 w-4 text-foreground" />
-        </span>
+    <div className={WIDGET_CARD_CLASS}>
+      <h3 className={WIDGET_TITLE_CLASS}>
+        <span className={WIDGET_ICON_CLASS}><Clock className="h-4 w-4 text-primary" /></span>
         Ώρες Εργασίας (Trend)
       </h3>
       <div className="h-52">
@@ -46,8 +45,8 @@ export default function HoursLoggedChart() {
             <CartesianGrid strokeDasharray="3 3" className="stroke-border/30" />
             <XAxis dataKey="week" tick={{ fontSize: 11 }} />
             <YAxis tick={{ fontSize: 11 }} />
-            <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))', fontSize: '12px' }} />
-            <Area type="monotone" dataKey="hours" stroke="hsl(var(--primary))" fill="hsl(var(--primary)/0.15)" strokeWidth={2} />
+            <Tooltip contentStyle={chartTooltipStyle} />
+            <Area type="monotone" dataKey="hours" stroke="hsl(var(--chart-1))" fill="hsl(var(--chart-1)/0.15)" strokeWidth={2} />
           </AreaChart>
         </ResponsiveContainer>
       </div>

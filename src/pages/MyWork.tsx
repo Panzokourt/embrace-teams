@@ -301,7 +301,7 @@ export default function MyWork() {
               </Badge>
             )}
             <div className="hidden sm:flex items-center">
-              <LevelProgressBar userId={user?.id} />
+              <LevelProgressBar userId={user?.id} variant="compact" />
             </div>
           </div>
         </div>

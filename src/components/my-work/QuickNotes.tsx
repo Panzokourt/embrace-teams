@@ -255,7 +255,7 @@ export function QuickNotes() {
                 {selectedNote ? (
                   <>
                     {/* Toolbar */}
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border/30 shrink-0">
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border/20 shrink-0">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5 rounded-[10px]" disabled={aiLoading}>

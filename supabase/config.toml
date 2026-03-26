@@ -1,55 +1,41 @@
 project_id = "qsykyiqplslvmxdfudxq"
 
-[functions.analyze-project-files]
-verify_jwt = false
-
-[functions.generate-media-plan]
-verify_jwt = false
-
-[functions.parse-document]
-verify_jwt = false
-
-[functions.create-user]
-verify_jwt = false
-
-[functions.my-work-ai-chat]
-verify_jwt = false
-
-[functions.seed-dummy-data]
-verify_jwt = false
-
-[functions.secretary-agent]
-verify_jwt = false
-
-[functions.chat-ai-assistant]
-verify_jwt = false
-
-[functions.email-fetch]
-verify_jwt = false
-
-[functions.email-send]
-verify_jwt = false
-
-[functions.gmail-auth-start]
-verify_jwt = false
-
-[functions.gmail-auth-callback]
-verify_jwt = false
-
-[functions.send-invitation]
-verify_jwt = false
-
-[functions.brain-analyze]
-verify_jwt = false
-
-[functions.brain-deep-analyze]
-verify_jwt = false
-
-[functions.analyze-document]
-verify_jwt = false
-
-[functions.analyze-media-plan-excel]
-verify_jwt = false
-
-[functions.process-email-queue]
-verify_jwt = true
+[functions]
+  [functions.analyze-document]
+    verify_jwt = false
+  [functions.analyze-media-plan-excel]
+    verify_jwt = false
+  [functions.analyze-project-files]
+    verify_jwt = false
+  [functions.auth-email-hook]
+    verify_jwt = false
+  [functions.brain-analyze]
+    verify_jwt = false
+  [functions.brain-deep-analyze]
+    verify_jwt = false
+  [functions.chat-ai-assistant]
+    verify_jwt = false
+  [functions.create-user]
+    verify_jwt = false
+  [functions.email-fetch]
+    verify_jwt = false
+  [functions.email-send]
+    verify_jwt = false
+  [functions.generate-media-plan]
+    verify_jwt = false
+  [functions.gmail-auth-callback]
+    verify_jwt = false
+  [functions.gmail-auth-start]
+    verify_jwt = false
+  [functions.my-work-ai-chat]
+    verify_jwt = false
+  [functions.parse-document]
+    verify_jwt = false
+  [functions.process-email-queue]
+    verify_jwt = true
+  [functions.secretary-agent]
+    verify_jwt = false
+  [functions.seed-dummy-data]
+    verify_jwt = false
+  [functions.send-invitation]
+    verify_jwt = false

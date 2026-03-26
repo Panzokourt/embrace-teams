@@ -221,7 +221,7 @@ export default function AppSidebar({
   const IconRail = ({ isMobile = false }: {isMobile?: boolean;}) =>
   <div
     className={cn(
-      "flex flex-col items-center py-3 gap-1 shrink-0 w-12",
+      "flex flex-col items-center py-3 gap-1 shrink-0 w-12 shadow-none",
       isMobile ?
       "bg-card border-r border-border/30" :
       "my-2 ml-2 rounded-2xl bg-[#1A1A1A] shadow-lg"

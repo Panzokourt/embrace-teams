@@ -315,15 +315,6 @@ export default function Onboarding() {
                           onChange={(e) => setCompanyName(e.target.value)}
                         />
                       </div>
-                      <div className="space-y-2">
-                        <Label>Domain</Label>
-                        <Input
-                          placeholder={emailDomain || 'company.com'}
-                          value={companyDomain}
-                          onChange={(e) => setCompanyDomain(e.target.value)}
-                        />
-                        <p className="text-xs text-muted-foreground">Για αυτόματη αναγνώριση νέων μελών</p>
-                      </div>
                       <Button
                         className="w-full"
                         onClick={handleCreateCompany}

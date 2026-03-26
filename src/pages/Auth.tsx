@@ -313,18 +313,6 @@ export default function Auth() {
 
 // --- Sub-components ---
 
-function Feature({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
-  return (
-    <div className="flex gap-4">
-      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">{icon}</div>
-      <div>
-        <h3 className="font-semibold text-sidebar-foreground">{title}</h3>
-        <p className="text-sidebar-foreground/60 text-sm">{description}</p>
-      </div>
-    </div>
-  );
-}
-
 function GoogleButton({ onClick, loading, label }: { onClick: () => void; loading: boolean; label: string }) {
   return (
     <Button variant="outline" className="w-full gap-2" onClick={onClick} disabled={loading}>

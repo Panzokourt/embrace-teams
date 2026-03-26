@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { Loader2, Shield, Users, BarChart3, Building2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { z } from 'zod';
 import olsenyLogo from '@/assets/olseny-logo.png';
 import PasswordStrengthBar, { getPasswordScore } from '@/components/auth/PasswordStrengthBar';

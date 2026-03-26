@@ -129,14 +129,26 @@ export default function Onboarding() {
     if (!companyName.trim()) return;
     setLoading(true);
     try {
+      // Auto-generate domain: corporate email → emailDomain, personal → unique slug
+      const autoDomain = isPersonalEmail
+        ? `${companyName.trim().toLowerCase().replace(/\s+/g, '-')}-${user!.id.slice(0, 8)}.personal`
+        : emailDomain || 'default.com';
+
       const { error } = await supabase.rpc('create_company_with_owner', {
         _name: companyName.trim(),
-        _domain: companyDomain.trim() || emailDomain || 'default.com'
+        _domain: autoDomain,
       });
-      if (error) throw error;
+      if (error) {
+        if (error.code === '23505') {
+          toast.error('Υπάρχει ήδη εταιρεία με αυτό το domain. Ζητήστε πρόσβαση από τον διαχειριστή.');
+        } else {
+          throw error;
+        }
+        return;
+      }
       toast.success('Η εταιρεία δημιουργήθηκε!');
       await refreshUserData();
-      goNext(); // Go to profile step
+      goNext();
     } catch (error: any) {
       toast.error(error.message || 'Σφάλμα δημιουργίας');
     } finally {

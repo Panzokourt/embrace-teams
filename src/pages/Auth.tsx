@@ -305,9 +305,9 @@ export default function Auth() {
               </Card>
             </TabsContent>
           </Tabs>
+          <p className="text-center text-muted-foreground text-xs mt-6">© 2026 Olseny. All rights reserved.</p>
         </div>
       </div>
-    </div>
   );
 }
 

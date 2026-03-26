@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { Loader2, Shield, Users, BarChart3, Building2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { z } from 'zod';
 import olsenyLogo from '@/assets/olseny-logo.png';
 import PasswordStrengthBar, { getPasswordScore } from '@/components/auth/PasswordStrengthBar';
@@ -188,37 +188,12 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left Side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-sidebar p-12 flex-col justify-between">
-        <div>
-          <div className="flex items-center gap-3 mb-16">
-            <img src={olsenyLogo} alt="Olseny" className="h-10 w-10 rounded-lg" />
-            <span className="text-2xl font-bold text-sidebar-foreground tracking-tight">OLSENY</span>
-          </div>
-          <h1 className="text-4xl font-bold text-sidebar-foreground mb-6 leading-tight">
-            Διαχείριση Εταιρείας<br /><span className="text-primary">& Έργων</span>
-          </h1>
-          <p className="text-sidebar-foreground/70 text-lg mb-12 max-w-md">
-            Enterprise platform για τη διαχείριση ομάδων, έργων, πελατών και οικονομικών σε ένα μέρος.
-          </p>
-          <div className="space-y-6">
-            <Feature icon={<Building2 className="h-5 w-5" />} title="Multi-tenant" description="Ξεχωριστό περιβάλλον για κάθε εταιρεία" />
-            <Feature icon={<Users className="h-5 w-5" />} title="Role-based Access" description="Owner, Admin, Manager, Member, Viewer, Billing" />
-            <Feature icon={<Shield className="h-5 w-5" />} title="Enterprise Security" description="Domain verification, SSO, audit logging" />
-            <Feature icon={<BarChart3 className="h-5 w-5" />} title="Πλήρης Διαχείριση" description="Projects, tasks, financials, HR σε ένα dashboard" />
-          </div>
+    <div className="force-light min-h-screen flex items-center justify-center p-8 bg-background">
+      <div className="w-full max-w-md">
+        <div className="flex items-center gap-3 mb-8 justify-center">
+          <img src={olsenyLogo} alt="Olseny" className="h-10 w-10 rounded-lg" />
+          <span className="text-2xl font-bold text-foreground tracking-tight">OLSENY</span>
         </div>
-        <p className="text-sidebar-foreground/40 text-sm">© 2026 Olseny. All rights reserved.</p>
-      </div>
-
-      {/* Right Side - Auth Forms */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-background">
-        <div className="w-full max-w-md">
-          <div className="flex items-center gap-3 mb-8 lg:hidden">
-            <img src={olsenyLogo} alt="Olseny" className="h-8 w-8 rounded-lg" />
-            <span className="text-xl font-bold text-foreground">OLSENY</span>
-          </div>
 
           <Tabs defaultValue="signin" className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-6">
@@ -330,25 +305,13 @@ export default function Auth() {
               </Card>
             </TabsContent>
           </Tabs>
+          <p className="text-center text-muted-foreground text-xs mt-6">© 2026 Olseny. All rights reserved.</p>
         </div>
       </div>
-    </div>
   );
 }
 
 // --- Sub-components ---
-
-function Feature({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
-  return (
-    <div className="flex gap-4">
-      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">{icon}</div>
-      <div>
-        <h3 className="font-semibold text-sidebar-foreground">{title}</h3>
-        <p className="text-sidebar-foreground/60 text-sm">{description}</p>
-      </div>
-    </div>
-  );
-}
 
 function GoogleButton({ onClick, loading, label }: { onClick: () => void; loading: boolean; label: string }) {
   return (

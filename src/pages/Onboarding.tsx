@@ -129,14 +129,26 @@ export default function Onboarding() {
     if (!companyName.trim()) return;
     setLoading(true);
     try {
+      // Auto-generate domain: corporate email → emailDomain, personal → unique slug
+      const autoDomain = isPersonalEmail
+        ? `${companyName.trim().toLowerCase().replace(/\s+/g, '-')}-${user!.id.slice(0, 8)}.personal`
+        : emailDomain || 'default.com';
+
       const { error } = await supabase.rpc('create_company_with_owner', {
         _name: companyName.trim(),
-        _domain: companyDomain.trim() || emailDomain || 'default.com'
+        _domain: autoDomain,
       });
-      if (error) throw error;
+      if (error) {
+        if (error.code === '23505') {
+          toast.error('Υπάρχει ήδη εταιρεία με αυτό το domain. Ζητήστε πρόσβαση από τον διαχειριστή.');
+        } else {
+          throw error;
+        }
+        return;
+      }
       toast.success('Η εταιρεία δημιουργήθηκε!');
       await refreshUserData();
-      goNext(); // Go to profile step
+      goNext();
     } catch (error: any) {
       toast.error(error.message || 'Σφάλμα δημιουργίας');
     } finally {
@@ -187,7 +199,7 @@ export default function Onboarding() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6">
+    <div className="force-light min-h-screen bg-background flex items-center justify-center p-6">
       <div className="w-full max-w-lg">
         {/* Logo */}
         <div className="flex items-center gap-3 mb-8 justify-center">
@@ -314,15 +326,6 @@ export default function Onboarding() {
                           value={companyName}
                           onChange={(e) => setCompanyName(e.target.value)}
                         />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Domain</Label>
-                        <Input
-                          placeholder={emailDomain || 'company.com'}
-                          value={companyDomain}
-                          onChange={(e) => setCompanyDomain(e.target.value)}
-                        />
-                        <p className="text-xs text-muted-foreground">Για αυτόματη αναγνώριση νέων μελών</p>
                       </div>
                       <Button
                         className="w-full"

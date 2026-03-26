@@ -52,7 +52,7 @@ export default function ResetPassword() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-8 bg-background">
+    <div className="force-light min-h-screen flex items-center justify-center p-8 bg-background">
       <div className="w-full max-w-md">
         <div className="flex items-center gap-3 mb-8">
           <img src={olsenyLogo} alt="Olseny" className="h-8 w-8 rounded-lg" />

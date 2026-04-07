@@ -123,6 +123,10 @@ const STATUS_OPTIONS = [
   { value: 'completed', label: 'Ολοκληρώθηκε', color: 'hsl(var(--success))' },
 ];
 
+const STATUS_PROGRESS: Record<string, number> = {
+  todo: 0, in_progress: 20, review: 50, internal_review: 65, client_review: 80, completed: 100,
+};
+
 const PRIORITY_OPTIONS = [
   { value: 'low', label: 'Χαμηλή', color: '#22c55e' },
   { value: 'medium', label: 'Μεσαία', color: '#f59e0b' },

@@ -252,7 +252,6 @@ export function ProjectTasksManager({ projectId }: ProjectTasksManagerProps) {
             const updatedSiblings = siblings.map(s => 
               s.id === taskId ? { ...s, status: newStatus } : s
             );
-            const { computeParentStatus } = await import('@/utils/subtaskProgress');
             const parentStatus = computeParentStatus(updatedSiblings);
             
             await supabase

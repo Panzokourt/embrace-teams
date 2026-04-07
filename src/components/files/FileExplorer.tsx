@@ -84,7 +84,8 @@ export function FileExplorer({ tenderId, projectId, taskId }: FileExplorerProps)
 
   const fetchFiles = async () => {
     let query = supabase.from('file_attachments').select('*').order('created_at', { ascending: false });
-    if (tenderId) query = query.eq('tender_id', tenderId);
+    if (taskId) query = query.eq('task_id', taskId);
+    else if (tenderId) query = query.eq('tender_id', tenderId);
     else if (projectId) query = query.eq('project_id', projectId);
     const { data, error } = await query;
     if (error) throw error;

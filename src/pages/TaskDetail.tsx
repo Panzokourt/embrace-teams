@@ -798,6 +798,29 @@ export default function TaskDetailPage() {
               </CardContent>
             </Card>
 
+            {/* Dependencies Card */}
+            <TaskDependenciesCard taskId={task.id} />
+
+            {/* Recurrence Card */}
+            <TaskRecurrenceCard
+              taskId={task.id}
+              isRecurring={task.is_recurring || false}
+              recurrencePattern={task.recurrence_pattern}
+              recurrenceEndDate={task.recurrence_end_date}
+              onUpdate={fetchTask}
+            />
+
+            {/* Review/Approval Card */}
+            <TaskReviewCard
+              taskId={task.id}
+              taskStatus={task.status}
+              profiles={profiles}
+              internalReviewerId={task.internal_reviewer}
+              approverId={task.approver}
+              onStatusChange={(s) => handleStatusChange(s as TaskStatus)}
+              onUpdate={fetchTask}
+            />
+
             {/* Media Plan Source Card */}
             <TaskMediaSourceCard taskId={task.id} />
           </div>

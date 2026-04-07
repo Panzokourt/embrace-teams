@@ -500,9 +500,13 @@ export function MyWorkCalendar({
       }
 
       await Promise.all(
-        assignments.map((a: { task_id: string; due_date: string }) =>
-          supabase.from('tasks').update({ due_date: a.due_date } as any).eq('id', a.task_id)
-        )
+        assignments.map((a: { task_id: string; due_date: string }) => {
+          const task = tasks.find(t => t.id === a.task_id);
+          return supabase.from('tasks').update({
+            due_date: a.due_date,
+            rescheduled_from: task?.due_date || null,
+          } as any).eq('id', a.task_id);
+        })
       );
 
       toast.success(`${assignments.length} tasks τοποθετήθηκαν!`);

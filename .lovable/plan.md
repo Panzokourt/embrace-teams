@@ -1,46 +1,96 @@
 
 
-# Secretary Page — ChatGPT-style Redesign
+# Μετάβαση σε Claude (Anthropic) — Όλα τα AI Edge Functions
 
-## Τρέχουσα κατάσταση
-- Messages σε bubbles (user = primary bg, assistant = card with border)
-- Full-width message area
-- Header bar με Bot icon + "Νέα συνομιλία" button
-- Input stuck to bottom with border-top
-- Sidebar = light, 256px wide
+## Τι αλλάζει
 
-## ChatGPT Pattern — Τι αλλάζει
+Αντικατάσταση του Lovable AI Gateway (`ai.gateway.lovable.dev`) με απευθείας κλήσεις στο **Anthropic Messages API** (`api.anthropic.com/v1/messages`) σε **12 edge functions**, χρησιμοποιώντας το μοντέλο **claude-sonnet-4-20250514**.
 
-### Layout
-- Messages σε **centered column** (`max-w-3xl mx-auto`) αντί full-width
-- **Αφαίρεση header bar** — ο τίτλος/new chat button μετακομίζει στο sidebar
-- Input area: centered στο κάτω μέρος, `max-w-3xl`, με **shadow + rounded-2xl border**, χωρίς border-top στο container
+## Βήμα 1: Προσθήκη ANTHROPIC_API_KEY
 
-### Messages
-- **User messages**: Απλό text, `bg-muted/50 rounded-2xl px-4 py-3` (subtle γκρι background, όχι primary color)
-- **Assistant messages**: Χωρίς border/card background — plain text με μικρό icon αριστερά
-- Αφαίρεση `justify-end` / `justify-start` — όλα aligned αριστερά στο centered column
+Θα χρειαστεί να εισάγεις το Anthropic API key σου. Μπορείς να το βρεις στο [console.anthropic.com](https://console.anthropic.com/) → API Keys.
 
-### Empty State
-- Μεγαλύτερο greeting χωρίς Bot icon box
-- Quick actions σε **2x grid** αντί flex-wrap, με `border rounded-xl p-4` κάρτες (τίτλος + description style)
+## Βήμα 2: Αλλαγές σε Edge Functions
 
-### Input
-- Rounded container με `shadow-lg border bg-background rounded-2xl`
-- Quick action chips μέσα στο input container (πάνω από το textarea)
-- Send button μέσα στο container, δεξιά
+Κάθε function αλλάζει από:
+```typescript
+// ΠΡΙΝ
+const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  headers: { Authorization: `Bearer ${LOVABLE_API_KEY}` },
+  body: JSON.stringify({ model: "google/gemini-...", messages, stream: true })
+});
+```
 
-### Sidebar
-- Σκούρο background (ήδη inverted από Luma tokens — χρησιμοποιεί `--sidebar-*`)
-- Πιο minimal styling
+σε:
+```typescript
+// ΜΕΤΑ
+const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+const response = await fetch("https://api.anthropic.com/v1/messages", {
+  method: "POST",
+  headers: {
+    "x-api-key": ANTHROPIC_API_KEY,
+    "anthropic-version": "2023-06-01",
+    "content-type": "application/json",
+  },
+  body: JSON.stringify({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 4096,
+    system: systemPrompt,
+    messages: [...],
+    stream: true, // where applicable
+  })
+});
+```
 
-## Files to Modify
+**Response parsing** αλλάζει επίσης — Anthropic χρησιμοποιεί διαφορετικό format:
+- Non-streaming: `response.content[0].text` αντί `choices[0].message.content`
+- Streaming: SSE events `content_block_delta` με `delta.text` αντί `choices[0].delta.content`
+- Tool calling: `tool_use` content blocks αντί OpenAI-style tool_calls
 
-| File | Changes |
-|------|---------|
-| `src/components/secretary/SecretaryChat.tsx` | Centered column, remove header, ChatGPT message layout, new input container, grid quick actions |
-| `src/components/secretary/MentionInput.tsx` | Remove outer gap layout, adapt to fit inside the new container |
-| `src/components/secretary/ConversationSidebar.tsx` | Dark bg using sidebar tokens, minimal tweaks |
+### Affected Functions (12)
 
-All className-level changes. No API or logic changes.
+| Function | Streaming | Tool Calling |
+|----------|-----------|-------------|
+| `secretary-agent` | ✅ | ✅ (πολλά tools) |
+| `my-work-ai-chat` | ✅ | ❌ |
+| `chat-ai-assistant` | ❌ | ❌ |
+| `notes-ai-action` | ❌ | ❌ |
+| `analyze-document` | ❌ | ❌ |
+| `analyze-project-files` | ❌ | ❌ |
+| `analyze-media-plan-excel` | ❌ | ❌ |
+| `generate-media-plan` | ❌ | ❌ |
+| `brain-analyze` | ❌ | ✅ (structured output) |
+| `brain-deep-analyze` | ❌ | ❌ |
+| `parse-document` | ❌ | ❌ (vision/multimodal) |
+| `suggest-package` | ❌ | ❌ |
+
+### Ειδικές περιπτώσεις
+
+- **`parse-document`**: Χρησιμοποιεί vision (εικόνες base64). Claude υποστηρίζει images μέσω `image` content blocks.
+- **`secretary-agent`**: Πολύπλοκο agent loop με tool calling — απαιτεί μετατροπή tool format σε Anthropic style.
+- **`brain-analyze`**: Structured output μέσω tool calling — μετατροπή σε Anthropic tool_use format.
+- **Streaming functions**: Ο SSE parser στο frontend (`SecretaryChat`, `MyWorkAIChat`) πρέπει να ενημερωθεί για το Anthropic SSE format, ή εναλλακτικά κάνουμε transform στο edge function ώστε να στέλνει OpenAI-compatible SSE στον client (λιγότερες client αλλαγές).
+
+### Approach για streaming
+
+Θα κάνουμε **server-side transform** — το edge function θα διαβάζει Anthropic SSE και θα τα μετατρέπει σε OpenAI-compatible format πριν τα στείλει στον client. Έτσι δεν αλλάζει κανένα frontend component.
+
+## Files to Modify (12 edge functions)
+
+| File | Scope |
+|------|-------|
+| `supabase/functions/secretary-agent/index.ts` | Gateway → Anthropic, tool calling format, SSE transform |
+| `supabase/functions/my-work-ai-chat/index.ts` | Gateway → Anthropic, SSE transform |
+| `supabase/functions/chat-ai-assistant/index.ts` | Gateway → Anthropic, response parsing |
+| `supabase/functions/notes-ai-action/index.ts` | Gateway → Anthropic, response parsing |
+| `supabase/functions/analyze-document/index.ts` | Gateway → Anthropic, response parsing |
+| `supabase/functions/analyze-project-files/index.ts` | Gateway → Anthropic, response parsing |
+| `supabase/functions/analyze-media-plan-excel/index.ts` | Gateway → Anthropic, response parsing |
+| `supabase/functions/generate-media-plan/index.ts` | Gateway → Anthropic, response parsing |
+| `supabase/functions/brain-analyze/index.ts` | Gateway → Anthropic, tool calling format |
+| `supabase/functions/brain-deep-analyze/index.ts` | Gateway → Anthropic, response parsing |
+| `supabase/functions/parse-document/index.ts` | Gateway → Anthropic, vision format |
+| `supabase/functions/suggest-package/index.ts` | Gateway → Anthropic, response parsing |
+
+Καμία αλλαγή σε frontend components — μόνο backend edge functions.
 

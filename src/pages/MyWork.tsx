@@ -27,6 +27,7 @@ import { el } from 'date-fns/locale';
 import { STATUS_COLORS, PRIORITY_COLORS } from '@/components/shared/mondayStyleConfig';
 import { QuickNotes } from '@/components/my-work/QuickNotes';
 import { TodayTasksCard } from '@/components/my-work/TodayTasksCard';
+import { MyWorkCalendar } from '@/components/my-work/MyWorkCalendar';
 import { naturalCompare } from '@/lib/utils';
 
 // ── Types ──────────────────────────────────────────

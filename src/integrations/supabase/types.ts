@@ -5954,6 +5954,7 @@ export type Database = {
           project_id: string
           recurrence_end_date: string | null
           recurrence_pattern: string | null
+          rescheduled_from: string | null
           start_date: string | null
           status: Database["public"]["Enums"]["task_status"]
           task_category: string | null
@@ -5983,6 +5984,7 @@ export type Database = {
           project_id: string
           recurrence_end_date?: string | null
           recurrence_pattern?: string | null
+          rescheduled_from?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           task_category?: string | null
@@ -6012,6 +6014,7 @@ export type Database = {
           project_id?: string
           recurrence_end_date?: string | null
           recurrence_pattern?: string | null
+          rescheduled_from?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           task_category?: string | null

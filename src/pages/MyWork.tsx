@@ -249,20 +249,6 @@ export default function MyWork() {
     [myProjects]
   );
 
-  // ── Calendar data ────────────────────────────────
-  const weekStart = startOfWeek(calendarDate, { weekStartsOn: 1 });
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-
-  const tasksByDay = useMemo(() => {
-    const map: Record<string, TaskItem[]> = {};
-    allMyTasks.forEach(t => {
-      if (!t.due_date) return;
-      const key = format(new Date(t.due_date), 'yyyy-MM-dd');
-      if (!map[key]) map[key] = [];
-      map[key].push(t);
-    });
-    return map;
-  }, [allMyTasks]);
 
   // ── Loading ──────────────────────────────────────
   if (loading) {

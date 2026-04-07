@@ -314,7 +314,7 @@ async function parseDocument(
       console.log("DOCX text seems garbled, trying AI parsing...");
       const bytes = new Uint8Array(arrayBuffer.slice(0, Math.min(MAX_FILE_SIZE, arrayBuffer.byteLength)));
       const base64 = btoa(String.fromCharCode.apply(null, Array.from(bytes)));
-      const aiText = await parseDocumentWithGemini(base64, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', fileName);
+      const aiText = await parseDocumentWithClaude(base64, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', fileName);
       if (aiText.length > text.length) {
         text = aiText;
         usedOcr = true;

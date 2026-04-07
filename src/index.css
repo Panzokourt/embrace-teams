@@ -56,24 +56,24 @@
     /* Radius */
     --radius: 0.625rem;
 
-    /* Sidebar */
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 240 6% 10%;
-    --sidebar-primary: 211 100% 50%;
+    /* Sidebar — inverted dark */
+    --sidebar-background: 240 6% 10%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 84 81% 44%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 5% 96%;
-    --sidebar-accent-foreground: 240 6% 10%;
-    --sidebar-border: 240 6% 90%;
-    --sidebar-ring: 211 100% 50%;
+    --sidebar-accent: 240 4% 20%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 240 4% 22%;
+    --sidebar-ring: 84 81% 44%;
 
-    /* Charts — 6-color Apple palette */
-    --chart-1: 211 100% 50%;
-    --chart-2: 172 66% 50%;
-    --chart-3: 280 65% 60%;
-    --chart-4: 35 92% 50%;
-    --chart-5: 0 84% 60%;
-    --chart-6: 142 71% 45%;
-    --sidebar: 0 0% 100%;
+    /* Charts — neutral gray palette */
+    --chart-1: 240 6% 10%;
+    --chart-2: 240 4% 30%;
+    --chart-3: 240 4% 46%;
+    --chart-4: 240 5% 65%;
+    --chart-5: 240 5% 80%;
+    --chart-6: 240 5% 90%;
+    --sidebar: 240 6% 10%;
 
     /* Apple-style layered shadows */
     --shadow-2xs: 0 1px 2px 0 hsl(0 0% 0% / 0.03);

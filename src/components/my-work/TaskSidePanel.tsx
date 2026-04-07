@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { cn } from '@/lib/utils';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -20,14 +21,7 @@ import { format, isBefore, startOfDay } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { STATUS_COLORS, PRIORITY_COLORS } from '@/components/shared/mondayStyleConfig';
 
-const STATUS_PROGRESS: Record<string, number> = {
-  todo: 0,
-  in_progress: 20,
-  review: 50,
-  internal_review: 65,
-  client_review: 80,
-  completed: 100,
-};
+import { STATUS_PROGRESS, computeParentStatus, computeSubtaskProgress } from '@/utils/subtaskProgress';
 
 interface TaskSidePanelProps {
   taskId: string;
@@ -208,8 +202,18 @@ export function TaskSidePanel({ taskId, onClose, activeTimer, startTimer, stopTi
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">Status</p>
-            <Select value={task.status} onValueChange={v => updateField('status', v)}>
-              <SelectTrigger className="h-8 text-xs rounded-lg">
+            <Select
+              value={task.status}
+              onValueChange={v => {
+                if (subtasks.length > 0) {
+                  toast.warning('Η κατάσταση καθορίζεται από τα subtasks');
+                  return;
+                }
+                updateField('status', v);
+              }}
+              disabled={subtasks.length > 0}
+            >
+              <SelectTrigger className={cn("h-8 text-xs rounded-lg", subtasks.length > 0 && "opacity-60 cursor-not-allowed")}>
                 <span className="inline-flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full" style={{ backgroundColor: STATUS_COLORS[task.status]?.text }} />
                   <SelectValue />
@@ -226,6 +230,9 @@ export function TaskSidePanel({ taskId, onClose, activeTimer, startTimer, stopTi
                 ))}
               </SelectContent>
             </Select>
+            {subtasks.length > 0 && (
+              <p className="text-[10px] text-muted-foreground">Αυτόματα από subtasks</p>
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -292,13 +299,29 @@ export function TaskSidePanel({ taskId, onClose, activeTimer, startTimer, stopTi
           </div>
         </div>
 
-        {/* Progress (auto-calculated from status) */}
+        {/* Progress (auto-calculated) */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">Πρόοδος</p>
-            <span className="text-xs font-medium text-foreground">{STATUS_PROGRESS[task.status as keyof typeof STATUS_PROGRESS] ?? 0}%</span>
+            <span className="text-xs font-medium text-foreground">
+              {subtasks.length > 0
+                ? `${computeSubtaskProgress(subtasks)}%`
+                : `${STATUS_PROGRESS[task.status as keyof typeof STATUS_PROGRESS] ?? 0}%`
+              }
+            </span>
           </div>
-          <Progress value={STATUS_PROGRESS[task.status as keyof typeof STATUS_PROGRESS] ?? 0} className="w-full" />
+          <Progress
+            value={subtasks.length > 0
+              ? computeSubtaskProgress(subtasks)
+              : (STATUS_PROGRESS[task.status as keyof typeof STATUS_PROGRESS] ?? 0)
+            }
+            className="w-full"
+          />
+          {subtasks.length > 0 && (
+            <p className="text-[10px] text-muted-foreground">
+              Βασισμένο σε {subtasks.length} subtask{subtasks.length > 1 ? 's' : ''}
+            </p>
+          )}
         </div>
 
         <Separator className="bg-border/30" />

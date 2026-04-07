@@ -96,14 +96,7 @@ const STATUS_CONFIG: Record<TaskStatus, { icon: React.ReactNode; label: string; 
 
 const STATUS_ORDER: TaskStatus[] = ['todo', 'in_progress', 'review', 'internal_review', 'client_review', 'completed'];
 
-const STATUS_PROGRESS: Record<TaskStatus, number> = {
-  todo: 0,
-  in_progress: 20,
-  review: 50,
-  internal_review: 65,
-  client_review: 80,
-  completed: 100,
-};
+import { STATUS_PROGRESS, computeParentStatus, computeSubtaskProgress } from '@/utils/subtaskProgress';
 
 const PRIORITY_OPTIONS = [
   { value: 'low', label: 'Χαμηλή', color: 'hsl(var(--success))' },
@@ -245,8 +238,17 @@ export default function TaskDetailPage() {
     toast.success('Ενημερώθηκε!');
   };
 
+  const hasSubtasks = subtasks.length > 0;
+
   const handleStatusChange = async (newStatus: TaskStatus) => {
     if (!task) return;
+    
+    // Block manual status change when subtasks exist
+    if (hasSubtasks) {
+      toast.warning('Η κατάσταση καθορίζεται αυτόματα από τα subtasks');
+      return;
+    }
+    
     try {
       let updateData: Record<string, string | null> = { status: newStatus };
 
@@ -313,10 +315,18 @@ export default function TaskDetailPage() {
   };
 
   const toggleSubtaskStatus = async (subtask: TaskData) => {
-    const newStatus: TaskStatus = subtask.status === 'completed' ? 'todo' : 'completed';
+    const newSubStatus: TaskStatus = subtask.status === 'completed' ? 'todo' : 'completed';
     try {
-      const { error } = await supabase.from('tasks').update({ status: newStatus }).eq('id', subtask.id);
+      const { error } = await supabase.from('tasks').update({ status: newSubStatus }).eq('id', subtask.id);
       if (error) throw error;
+      
+      // Auto-update parent status based on new subtask states
+      const updatedSubtasks = subtasks.map(s => s.id === subtask.id ? { ...s, status: newSubStatus } : s);
+      const newParentStatus = computeParentStatus(updatedSubtasks);
+      if (task && newParentStatus !== task.status) {
+        await supabase.from('tasks').update({ status: newParentStatus }).eq('id', task.id);
+      }
+      
       fetchTask();
     } catch {
       toast.error('Σφάλμα');
@@ -337,8 +347,9 @@ export default function TaskDetailPage() {
 
   // Subtask progress calculation
   const completedSubtasks = subtasks.filter(s => s.status === 'completed').length;
-  const subtaskProgress = subtasks.length > 0 ? Math.round((completedSubtasks / subtasks.length) * 100) : null;
-  const displayProgress = subtaskProgress !== null ? subtaskProgress : STATUS_PROGRESS[task?.status || 'todo'];
+  const displayProgress = hasSubtasks
+    ? computeSubtaskProgress(subtasks)
+    : STATUS_PROGRESS[task?.status as TaskStatus || 'todo'];
 
   if (loading) {
     return (
@@ -483,12 +494,14 @@ export default function TaskDetailPage() {
             return (
               <div key={s} className="flex items-center flex-1 last:flex-none">
                 <button
-                  onClick={() => handleStatusChange(s)}
+                  onClick={() => !hasSubtasks && handleStatusChange(s)}
                   className={cn(
                     "flex flex-col items-center gap-1 group relative z-10 min-w-0",
-                    isLast ? "px-1" : "px-1 flex-1"
+                    isLast ? "px-1" : "px-1 flex-1",
+                    hasSubtasks && "cursor-not-allowed opacity-60"
                   )}
-                  title={conf.label}
+                  title={hasSubtasks ? 'Η κατάσταση καθορίζεται από τα subtasks' : conf.label}
+                  disabled={hasSubtasks}
                 >
                   <div className={cn(
                     "h-6 w-6 rounded-full flex items-center justify-center shrink-0 transition-all border-2",

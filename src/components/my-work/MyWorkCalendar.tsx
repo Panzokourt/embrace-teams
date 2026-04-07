@@ -661,31 +661,38 @@ export function MyWorkCalendar({
                         onDrop={e => handleDrop(e, day, hour)}
                         onClick={() => handleSlotClick(day, hour)}
                       >
-                        {/* Task blocks (planned work) */}
-                        {dayBlocks.map((block, idx) => {
-                          const blockH = Math.max(block.hours, 0.5) * ROW_HEIGHT;
-                          const minuteOffset = (block.startMinute / 60) * ROW_HEIGHT;
-                          return (
-                            <div
-                              key={`${block.taskId}-${idx}`}
-                              className="absolute left-0.5 right-0.5 z-10"
-                              style={{ top: minuteOffset, height: blockH - 2 }}
-                            >
-                              <MultiHourTaskBlock
-                                task={block.task}
-                                height={blockH - 2}
-                                hours={block.hours}
-                                isContinuation={block.isContinuation}
-                                remainingHours={Math.max(0, ((block.task as any).estimated_hours || 1) - (totalLoggedByTask[block.taskId] || 0))}
-                                onDragStart={e => handleDragStart(e, block.taskId)}
-                                onClick={e => { e.stopPropagation(); onTaskClick(block.task); }}
-                                activeTimer={activeTimer}
-                                startTimer={startTimer}
-                                stopTimer={stopTimer}
-                              />
-                            </div>
-                          );
-                        })}
+                        {/* Task blocks (planned work) — stacked side-by-side when overlapping */}
+                        {(() => {
+                          // Collect ALL blocks starting at this cell for overlap layout
+                          const allBlocksForDay = blocksByDay[key] || [];
+                          const colCount = dayBlocks.length;
+                          return dayBlocks.map((block, idx) => {
+                            const blockH = Math.max(block.hours, 0.5) * ROW_HEIGHT;
+                            const minuteOffset = (block.startMinute / 60) * ROW_HEIGHT;
+                            const colWidth = colCount > 1 ? `calc((100% - 4px) / ${colCount})` : 'calc(100% - 4px)';
+                            const colLeft = colCount > 1 ? `calc(2px + ${idx} * (100% - 4px) / ${colCount})` : '2px';
+                            return (
+                              <div
+                                key={`${block.taskId}-${idx}`}
+                                className="absolute z-10"
+                                style={{ top: minuteOffset, height: blockH - 2, left: colLeft, width: colWidth }}
+                              >
+                                <MultiHourTaskBlock
+                                  task={block.task}
+                                  height={blockH - 2}
+                                  hours={block.hours}
+                                  isContinuation={block.isContinuation}
+                                  remainingHours={Math.max(0, ((block.task as any).estimated_hours || 1) - (totalLoggedByTask[block.taskId] || 0))}
+                                  onDragStart={e => handleDragStart(e, block.taskId)}
+                                  onClick={e => { e.stopPropagation(); onTaskClick(block.task); }}
+                                  activeTimer={activeTimer}
+                                  startTimer={startTimer}
+                                  stopTimer={stopTimer}
+                                />
+                              </div>
+                            );
+                          });
+                        })()}
 
                         {/* Time entry blocks (logged work) */}
                         {dayTimeEntries.map(te => {

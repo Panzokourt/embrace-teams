@@ -284,19 +284,13 @@ export function TaskSidePanel({ taskId, onClose, activeTimer, startTimer, stopTi
           </div>
         </div>
 
-        {/* Progress */}
+        {/* Progress (auto-calculated from status) */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">Πρόοδος</p>
-            <span className="text-xs font-medium text-foreground">{task.progress || 0}%</span>
+            <span className="text-xs font-medium text-foreground">{STATUS_PROGRESS[task.status as keyof typeof STATUS_PROGRESS] ?? 0}%</span>
           </div>
-          <Slider
-            value={[task.progress || 0]}
-            max={100}
-            step={5}
-            onValueCommit={([v]) => updateField('progress', v)}
-            className="w-full"
-          />
+          <Progress value={STATUS_PROGRESS[task.status as keyof typeof STATUS_PROGRESS] ?? 0} className="w-full" />
         </div>
 
         <Separator className="bg-border/30" />

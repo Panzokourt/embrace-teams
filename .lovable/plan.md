@@ -1,57 +1,58 @@
 
 
-# Task Progress Auto-Calculation & Unified Status/Progress Bar
+# Task Progress & Status — Subtask-Driven Logic
+
+## Κανόνες
+
+1. **Χωρίς subtasks**: Η πρόοδος βασίζεται στο `STATUS_PROGRESS[status]` (ήδη λειτουργεί)
+2. **Με subtasks**: Η πρόοδος υπολογίζεται ως μέσος όρος `STATUS_PROGRESS` των subtasks
+3. **Αυτόματο parent status**: Όταν αλλάζει κατάσταση ενός subtask:
+   - Αν **όλα** τα subtasks = `completed` → parent γίνεται `completed`
+   - Αν **κάποιο** subtask δεν είναι `todo` → parent γίνεται `in_progress`
+   - Αν **όλα** `todo` → parent μένει `todo`
+4. **Block status change**: Αν υπάρχουν subtasks, ο χρήστης **δεν μπορεί** να αλλάξει χειροκίνητα το status του parent (εκτός αν όλα τα subtasks είναι completed)
 
 ## Αλλαγές
 
-### 1. Auto-calculated progress based on status
-Αντί χειροκίνητης εισαγωγής, η πρόοδος υπολογίζεται αυτόματα:
+### `src/pages/TaskDetail.tsx`
+- **`handleStatusChange`**: Αν υπάρχουν subtasks, block αλλαγές με toast warning ("Η κατάσταση καθορίζεται από τα subtasks") εκτός αν status → completed και όλα τα subtasks completed
+- **`toggleSubtaskStatus`** & stepper/status UI στα subtasks: Μετά την αλλαγή status subtask, υπολογίζει αυτόματα το parent status και κάνει update
+- **`displayProgress`**: Αντί completed/total, χρησιμοποιεί `avg(STATUS_PROGRESS[subtask.status])` για πιο granular πρόοδο
+- **Stepper bar**: Disable click αν `subtasks.length > 0` (visual indication: cursor-not-allowed, opacity)
+- **Status popover στο action bar**: Ίδια λογική — disabled αν υπάρχουν subtasks
 
-| Status | Progress |
-|--------|----------|
-| todo | 0% |
-| in_progress | 20% |
-| review | 50% |
-| internal_review | 65% |
-| client_review | 80% |
-| completed | 100% |
+### `src/components/my-work/TaskSidePanel.tsx`
+- Ίδια λογική: αν task έχει subtasks, progress = avg(STATUS_PROGRESS) των subtasks, status read-only
 
-Αν υπάρχουν subtasks, η πρόοδος υπολογίζεται από αυτά (completed/total). Αφαίρεση του manual progress slider από τη σελίδα.
+### `src/components/tasks/TasksTableView.tsx`
+- Για tasks με subtasks, fetch subtask statuses και υπολόγισε progress από αυτά (ή fallback σε STATUS_PROGRESS[parent.status])
 
-### 2. Unified Status Flow + Progress Bar (full-width, top)
-Αντικατάσταση του vertical "Ροή Κατάστασης" card (αριστερή στήλη) και της μικρής progress bar (subtasks) με ένα **οριζόντιο interactive stepper** που θα μπαίνει κάτω από τη sticky action bar και πάνω από το 3-column grid, πιάνοντας ολόκληρο το πλάτος.
-
-```text
-┌─────────────────────────────────────────────────────────┐
-│  Back │ Title │ Timer │ ... │ Status │ Due │ ✓         │  ← Sticky bar
-├─────────────────────────────────────────────────────────┤
-│  ●───────●───────●───────●───────●───────○    87%      │  ← NEW: Status stepper
-│  Προς    Σε      Αναθ.   Εσωτ.   Πελάτης  Ολοκλ.     │
-├─────────────────────────────────────────────────────────┤
-│  LEFT     │     CENTER      │       RIGHT              │
-│  col-3    │     col-5       │       col-4              │
-```
-
-- Κάθε στάδιο είναι **clickable** — πατώντας αλλάζει το status
-- Η μπάρα μεταξύ των σταδίων γεμίζει χρωματιστά μέχρι το τρέχον στάδιο
-- Δεξιά εμφανίζεται το ποσοστό πρόοδου
-
-### 3. Cleanup
-- Αφαίρεση του "Ροή Κατάστασης" card από την αριστερή στήλη
-- Αφαίρεση του manual progress slider (αν υπάρχει)
-- Η progress bar στα subtasks παραμένει ως secondary indicator (subtask-only)
+### `src/components/projects/ProjectTasksManager.tsx`
+- Ίδια λογική: μετά αλλαγή status, αν είναι subtask → auto-update parent
 
 ## Technical Details
 
-- Νέο `STATUS_PROGRESS` map στο TaskDetail.tsx
-- `displayProgress` = subtasks.length > 0 ? subtaskProgress : STATUS_PROGRESS[status]
-- Ο stepper χρησιμοποιεί τα υπάρχοντα `STATUS_ORDER` και `STATUS_CONFIG`
-- Κάθε κόμβος καλεί `handleStatusChange(s)` (ήδη υπάρχει)
-- Η μπάρα DB update: η στήλη `progress` δεν αλλάζει (backward compatible), απλά δεν εμφανίζεται στο UI
+```typescript
+// Helper function
+const computeParentStatus = (subtasks: {status: TaskStatus}[]): TaskStatus => {
+  if (subtasks.every(s => s.status === 'completed')) return 'completed';
+  if (subtasks.some(s => s.status !== 'todo')) return 'in_progress';
+  return 'todo';
+};
+
+const computeSubtaskProgress = (subtasks: {status: TaskStatus}[]): number => {
+  if (subtasks.length === 0) return 0;
+  const total = subtasks.reduce((sum, s) => sum + (STATUS_PROGRESS[s.status] ?? 0), 0);
+  return Math.round(total / subtasks.length);
+};
+```
 
 ## Files
 
 | File | Αλλαγή |
 |------|--------|
-| `src/pages/TaskDetail.tsx` | Add STATUS_PROGRESS map, add full-width stepper below action bar, remove "Ροή Κατάστασης" card, remove manual progress input |
+| `src/pages/TaskDetail.tsx` | Block parent status change when subtasks exist, auto-update parent on subtask change, granular progress |
+| `src/components/my-work/TaskSidePanel.tsx` | Read-only status when subtasks exist, subtask-based progress |
+| `src/components/projects/ProjectTasksManager.tsx` | Auto-update parent after subtask status change |
+| `src/components/tasks/TasksTableView.tsx` | Subtask-aware progress calculation |
 

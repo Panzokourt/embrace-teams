@@ -96,6 +96,15 @@ const STATUS_CONFIG: Record<TaskStatus, { icon: React.ReactNode; label: string; 
 
 const STATUS_ORDER: TaskStatus[] = ['todo', 'in_progress', 'review', 'internal_review', 'client_review', 'completed'];
 
+const STATUS_PROGRESS: Record<TaskStatus, number> = {
+  todo: 0,
+  in_progress: 20,
+  review: 50,
+  internal_review: 65,
+  client_review: 80,
+  completed: 100,
+};
+
 const PRIORITY_OPTIONS = [
   { value: 'low', label: 'Χαμηλή', color: 'hsl(var(--success))' },
   { value: 'medium', label: 'Μεσαία', color: 'hsl(var(--warning))' },
@@ -329,7 +338,7 @@ export default function TaskDetailPage() {
   // Subtask progress calculation
   const completedSubtasks = subtasks.filter(s => s.status === 'completed').length;
   const subtaskProgress = subtasks.length > 0 ? Math.round((completedSubtasks / subtasks.length) * 100) : null;
-  const displayProgress = subtaskProgress !== null ? subtaskProgress : (task?.progress || 0);
+  const displayProgress = subtaskProgress !== null ? subtaskProgress : STATUS_PROGRESS[task?.status || 'todo'];
 
   if (loading) {
     return (
@@ -462,6 +471,61 @@ export default function TaskDetailPage() {
         </div>
       </div>
 
+      {/* ===== STATUS STEPPER BAR ===== */}
+      <div className="border-b bg-card px-4 lg:px-5 py-3">
+        <div className="flex items-center gap-1">
+          {STATUS_ORDER.map((s, i) => {
+            const conf = STATUS_CONFIG[s];
+            const currentIdx = STATUS_ORDER.indexOf(task.status);
+            const isCurrent = task.status === s;
+            const isPast = currentIdx > i;
+            const isLast = i === STATUS_ORDER.length - 1;
+            return (
+              <div key={s} className="flex items-center flex-1 last:flex-none">
+                <button
+                  onClick={() => handleStatusChange(s)}
+                  className={cn(
+                    "flex flex-col items-center gap-1 group relative z-10 min-w-0",
+                    isLast ? "px-1" : "px-1 flex-1"
+                  )}
+                  title={conf.label}
+                >
+                  <div className={cn(
+                    "h-6 w-6 rounded-full flex items-center justify-center shrink-0 transition-all border-2",
+                    isCurrent && "border-primary bg-primary text-primary-foreground scale-110 shadow-md",
+                    isPast && !isCurrent && "border-green-500 bg-green-500/20 text-green-600",
+                    !isCurrent && !isPast && "border-border bg-muted text-muted-foreground group-hover:border-muted-foreground"
+                  )}>
+                    {isPast && !isCurrent && <Check className="h-3.5 w-3.5" />}
+                    {isCurrent && <div className="h-2 w-2 rounded-full bg-primary-foreground" />}
+                  </div>
+                  <span className={cn(
+                    "text-[10px] leading-tight text-center truncate max-w-[80px]",
+                    isCurrent && "font-semibold text-foreground",
+                    isPast && !isCurrent && "text-green-600 font-medium",
+                    !isCurrent && !isPast && "text-muted-foreground"
+                  )}>
+                    {conf.label}
+                  </span>
+                </button>
+                {!isLast && (
+                  <div className={cn(
+                    "h-0.5 flex-1 -mx-1 mt-[-14px]",
+                    isPast ? "bg-green-500/40" : "bg-border"
+                  )} />
+                )}
+              </div>
+            );
+          })}
+          <div className="ml-3 pl-3 border-l flex items-center gap-2 shrink-0">
+            <div className="w-20">
+              <Progress value={displayProgress} className="h-2" />
+            </div>
+            <span className="text-xs font-semibold text-foreground tabular-nums">{displayProgress}%</span>
+          </div>
+        </div>
+      </div>
+
       {/* ===== THREE-COLUMN LAYOUT ===== */}
       <div className="flex-1 overflow-auto">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 p-4 lg:p-5 items-start">
@@ -514,52 +578,7 @@ export default function TaskDetailPage() {
               </CardContent>
             </Card>
 
-            {/* Status Flow Card */}
-            <Card>
-              <CardContent className="p-4">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">Ροή Κατάστασης</h4>
-                <div className="flex flex-col gap-0">
-                  {STATUS_ORDER.map((s, i) => {
-                    const conf = STATUS_CONFIG[s];
-                    const isCurrent = task.status === s;
-                    const isPast = STATUS_ORDER.indexOf(task.status) > i;
-                    const isLast = i === STATUS_ORDER.length - 1;
-                    return (
-                      <div key={s} className="flex items-stretch gap-3">
-                        <div className="flex flex-col items-center w-5">
-                          <button
-                            onClick={() => handleStatusChange(s)}
-                            className={cn(
-                              "h-5 w-5 rounded-full flex items-center justify-center shrink-0 transition-all border-2",
-                              isCurrent && "border-primary bg-primary text-primary-foreground scale-110 shadow-sm",
-                              isPast && !isCurrent && "border-success bg-success/20 text-success",
-                              !isCurrent && !isPast && "border-border bg-muted text-muted-foreground hover:border-muted-foreground"
-                            )}
-                          >
-                            {isPast && !isCurrent && <Check className="h-3 w-3" />}
-                            {isCurrent && <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground" />}
-                          </button>
-                          {!isLast && (
-                            <div className={cn(
-                              "w-0.5 flex-1 min-h-[16px]",
-                              isPast ? "bg-success/40" : "bg-border"
-                            )} />
-                          )}
-                        </div>
-                        <div className={cn(
-                          "pb-3 text-xs pt-0.5",
-                          isCurrent && "font-semibold text-foreground",
-                          isPast && !isCurrent && "text-success font-medium",
-                          !isCurrent && !isPast && "text-muted-foreground"
-                        )}>
-                          {conf.label}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+            {/* Status Flow Card removed — now in horizontal stepper above */}
 
             {/* Properties Card */}
             <Card>

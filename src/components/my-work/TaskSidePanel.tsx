@@ -75,15 +75,20 @@ export function TaskSidePanel({ taskId, onClose, activeTimer, startTimer, stopTi
     const [taskRes, subRes] = await Promise.all([
       supabase.from('tasks').select(`
         id, title, status, priority, due_date, start_date, estimated_hours, actual_hours, progress, project_id, description, assigned_to,
-        project:projects(id, name, client_id, client:clients(id, name)),
-        assignee:profiles!tasks_assigned_to_fkey(id, full_name, avatar_url)
+        project:projects(id, name, client_id, client:clients(id, name))
       `).eq('id', taskId).single(),
       supabase.from('tasks').select('id, title, status').eq('parent_task_id', taskId).order('created_at'),
     ]);
 
     if (taskRes.data) {
       const t = taskRes.data as any;
-      setTask(t);
+      // Fetch assignee separately since there's no FK
+      let assignee = null;
+      if (t.assigned_to) {
+        const { data: profileData } = await supabase.from('profiles').select('id, full_name, avatar_url').eq('id', t.assigned_to).single();
+        assignee = profileData;
+      }
+      setTask({ ...t, assignee });
       setTitleValue(t.title);
       setDescValue(t.description || '');
     }

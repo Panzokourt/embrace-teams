@@ -28,7 +28,7 @@ interface SelectOption {
 interface EnhancedInlineEditCellProps {
   value: string | number | null;
   onSave: (newValue: string | number | null) => Promise<void>;
-  type?: 'text' | 'number' | 'date' | 'select' | 'progress' | 'avatar-select';
+  type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'progress' | 'avatar-select';
   options?: SelectOption[];
   className?: string;
   displayValue?: string;
@@ -135,6 +135,68 @@ export function EnhancedInlineEditCell({
             }}
             initialFocus
           />
+        </PopoverContent>
+      </Popover>
+    );
+  }
+
+  // DateTime picker type (date + time)
+  if (type === 'datetime') {
+    const dateValue = value ? (typeof value === 'string' ? parseISO(value) : new Date(value)) : undefined;
+    const formattedDate = dateValue 
+      ? format(dateValue, 'd MMM yyyy, HH:mm', { locale: el }) 
+      : placeholder;
+    const timeValue = dateValue ? format(dateValue, 'HH:mm') : '09:00';
+
+    return (
+      <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+        <PopoverTrigger asChild>
+          <button
+            className={cn(
+              "flex items-center gap-1 px-2 py-1 rounded text-sm hover:bg-muted transition-colors cursor-pointer -mx-1",
+              !value && "text-muted-foreground",
+              className
+            )}
+            style={{ minWidth }}
+          >
+            <Calendar className="h-3 w-3 text-muted-foreground" />
+            {formattedDate}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <CalendarComponent
+            mode="single"
+            selected={dateValue}
+            onSelect={async (date) => {
+              if (!date) {
+                setCalendarOpen(false);
+                await handleSave(null);
+                return;
+              }
+              const existingDate = dateValue || new Date();
+              const [hours, minutes] = (dateValue ? format(existingDate, 'HH:mm') : '09:00').split(':').map(Number);
+              date.setHours(hours, minutes, 0, 0);
+              const newValue = date.toISOString();
+              setCalendarOpen(false);
+              await handleSave(newValue);
+            }}
+            initialFocus
+          />
+          <div className="border-t px-3 py-2 flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Ώρα:</span>
+            <Input
+              type="time"
+              value={timeValue}
+              onChange={async (e) => {
+                if (!dateValue) return;
+                const [hours, minutes] = e.target.value.split(':').map(Number);
+                const updated = new Date(dateValue);
+                updated.setHours(hours, minutes, 0, 0);
+                await handleSave(updated.toISOString());
+              }}
+              className="h-7 w-24 text-sm"
+            />
+          </div>
         </PopoverContent>
       </Popover>
     );

@@ -730,7 +730,7 @@ export function TasksTableView({
           {/* Due Date */}
           {isColumnVisible('due_date') && (
             <TableCell style={{ width: getColumnWidth('due_date') }}>
-              <div className={cn(dueDateInfo?.isOverdue && "text-destructive font-medium")}>
+              <div className={cn("flex items-center gap-1", dueDateInfo?.isOverdue && "text-destructive font-medium")}>
                 <EnhancedInlineEditCell
                   value={task.due_date}
                   onSave={(val) => onInlineUpdate(task.id, 'due_date', val)}
@@ -738,6 +738,18 @@ export function TasksTableView({
                   displayValue={dueDateInfo?.label}
                   disabled={!canManage}
                 />
+                {(task as any).rescheduled_from && (
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <RefreshCw className="h-3 w-3 text-amber-500 shrink-0" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs">
+                        Μεταφέρθηκε από {format(parseISO((task as any).rescheduled_from), 'd MMM yyyy', { locale: el })}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
               </div>
             </TableCell>
           )}

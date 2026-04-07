@@ -5783,6 +5783,54 @@ export type Database = {
           },
         ]
       }
+      task_reviews: {
+        Row: {
+          comment: string | null
+          created_at: string | null
+          id: string
+          resolved_at: string | null
+          review_type: string
+          reviewer_id: string
+          status: string
+          task_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string | null
+          id?: string
+          resolved_at?: string | null
+          review_type?: string
+          reviewer_id: string
+          status?: string
+          task_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string | null
+          id?: string
+          resolved_at?: string | null
+          review_type?: string
+          reviewer_id?: string
+          status?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_reviews_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_reviews_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_templates: {
         Row: {
           assigned_role: string | null

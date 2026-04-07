@@ -1,97 +1,51 @@
 
 
-# Calendar: Multi-Day Task Spanning, Time Entry Integration & Remaining Hours
+# Fix Smart Reschedule & Add Rescheduled Indicator
 
-## Πρόβλημα
-Τώρα ένα task με 10 estimated hours εμφανίζεται ως ένα μεγάλο block που ξεπερνάει τις εργάσιμες ώρες χωρίς να "σπάει" στην επόμενη μέρα. Επίσης οι καταγεγραμμένες ώρες (time entries) δεν φαίνονται στο ημερολόγιο και δεν αφαιρούνται από τις estimated hours.
+## Problems
+1. **AI modifies estimated_hours**: The system prompt tells the AI to split tasks across days using estimated_hours, but the tool schema only has `task_id` and `due_date`. The user reports estimated_hours being changed — this is likely the AI returning extra fields or the frontend misinterpreting data. Need to add explicit instruction "NEVER modify estimated_hours" to the prompt and ensure the frontend only updates `due_date`.
+2. **No visual indicator for rescheduled tasks**: When overdue tasks get moved to new dates, there's no trace of the original date or indication that the task was rescheduled.
 
-## Λύση
+## Changes
 
-### 1. Fetch time entries στο ημερολόγιο
-Το `MyWorkCalendar` θα κάνει fetch τα `time_entries` του χρήστη (με `start_time`, `duration_minutes`, `task_id`) για τις ημέρες που εμφανίζονται. Αυτά θα εμφανίζονται ως **ξεχωριστά blocks** στο ημερολόγιο, στην ώρα/ημέρα που καταγράφηκαν, με διαφορετική απόχρωση (π.χ. `bg-emerald-500/10` — "logged time").
+### 1. Database: Add `rescheduled_from` column to tasks
+Add a nullable `rescheduled_from` timestamp column to the `tasks` table. When smart reschedule moves a task, the original `due_date` is stored here.
 
-### 2. Υπολογισμός remaining hours
-Για κάθε task: `remainingHours = max(0, estimatedHours - totalLoggedHours)`. Το `totalLoggedHours` υπολογίζεται από τα completed time entries (`is_running = false`) του task.
-
-### 3. Multi-day task spanning
-Αντί να render ένα τεράστιο block, ο calendar θα "σπάει" ένα task σε πολλαπλά blocks:
-- Υπολογίζει τις διαθέσιμες εργάσιμες ώρες από το `start_time` του task μέχρι το τέλος εκείνης της εργάσιμης ημέρας
-- Αν `remainingHours > availableHoursToday`, τοποθετεί ένα block μέχρι το τέλος του ωραρίου και μεταφέρει τις υπόλοιπες ώρες στην επόμενη εργάσιμη ημέρα (στην αρχή του ωραρίου)
-- Συνεχίζει μέχρι εξαντλήσει τις remaining hours
-
-### 4. Time entries ως blocks στο ημερολόγιο (real-time)
-Κάθε completed time entry εμφανίζεται ως ξεχωριστό block (πράσινη απόχρωση) στην ώρα `start_time`, με ύψος ανάλογο `duration_minutes / 60 * ROW_HEIGHT`. Εμφανίζει τίτλο task + διάρκεια. Realtime subscription στον πίνακα `time_entries` ώστε μόλις καταγραφεί νέο entry να εμφανιστεί αμέσως.
-
-### 5. Ενημέρωση Props
-Η `TaskItem` interface δεν αλλάζει. Τα time entries είναι ξεχωριστό dataset.
-
-## Technical Details
-
-```text
-Task: "Website Redesign" | estimated: 10h | logged: 2h | remaining: 8h
-Work schedule: 09:00–17:00 (8h/day)
-
-Day 1 (task starts 09:00):
-  [09:00–17:00] ──── 8h planned block ────
-Day 2 (continuation):
-  [09:00–09:00] ──── 0h (remaining 0) ────
-  
-If logged 2h already:
-  remaining = 10 - 2 = 8h
-Day 1: [09:00–17:00] 8h
-Day 2: No spillover needed
+```sql
+ALTER TABLE public.tasks ADD COLUMN rescheduled_from timestamptz DEFAULT NULL;
 ```
 
-### Splitting algorithm
+### 2. Edge Function: Reinforce no estimated_hours modification
+Update the system prompt in `smart-reschedule/index.ts`:
+- Add explicit rule: "NEVER change estimated_hours — use the provided values as-is for scheduling duration, but do NOT return them"
+- Ensure the tool schema remains `task_id` + `due_date` only (already correct)
+
+### 3. Frontend: Store original date on reschedule
+In `MyWorkCalendar.tsx` `handleSmartReschedule`, when updating tasks:
+- Save the old `due_date` as `rescheduled_from` before setting the new one
+- Only update `due_date` (not estimated_hours — already the case, but verify)
+
 ```typescript
-function splitTaskIntoBlocks(task, startDate, workScheduleMap, loggedHours) {
-  const remaining = Math.max(0, (task.estimated_hours || 1) - loggedHours);
-  const blocks = [];
-  let hoursLeft = remaining;
-  let currentDay = startDate;
-  
-  while (hoursLeft > 0) {
-    const ws = workScheduleMap[currentDay.getDay()];
-    if (!ws?.is_working_day) { currentDay = addDays(currentDay, 1); continue; }
-    
-    const startH = parseInt(ws.start_time.split(':')[0]);
-    const endH = parseInt(ws.end_time.split(':')[0]);
-    const taskStartH = blocks.length === 0 ? parseTaskDate(task.due_date).getHours() || startH : startH;
-    const available = endH - taskStartH;
-    const blockHours = Math.min(hoursLeft, available);
-    
-    blocks.push({ taskId: task.id, day: currentDay, startHour: taskStartH, hours: blockHours });
-    hoursLeft -= blockHours;
-    currentDay = addDays(currentDay, 1);
-  }
-  return blocks;
-}
+// For each assignment, store original due_date
+const task = allTasks.find(t => t.id === a.task_id);
+await supabase.from('tasks').update({
+  due_date: a.due_date,
+  rescheduled_from: task?.due_date || null,
+}).eq('id', a.task_id);
 ```
 
-### Time entries rendering
-```typescript
-// Fetch
-const { data } = await supabase.from('time_entries')
-  .select('id, task_id, start_time, duration_minutes, task:tasks(title)')
-  .eq('user_id', user.id)
-  .eq('is_running', false)
-  .gte('start_time', weekStartISO)
-  .lte('start_time', weekEndISO);
+### 4. Calendar: Rescheduled indicator
+In the calendar task block rendering, if a task has `rescheduled_from`, show a small icon (e.g. `↻` or a `RefreshCw` icon) with a tooltip showing the original date.
 
-// Render as blocks at their start_time with height = (duration_minutes/60)*ROW_HEIGHT
-```
-
-### Realtime subscription
-```typescript
-supabase.channel('time-entries-calendar')
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'time_entries', filter: `user_id=eq.${user.id}` }, () => {
-    fetchTimeEntries();
-  }).subscribe();
-```
+### 5. Tasks views: Rescheduled badge
+In task list/table views, show a small "Μεταφέρθηκε" badge or icon next to tasks that have `rescheduled_from` set, with the original date in a tooltip.
 
 ## Files
 
-| File | Αλλαγή |
+| File | Change |
 |------|--------|
-| `src/components/my-work/MyWorkCalendar.tsx` | Fetch time entries, split tasks into multi-day blocks based on work schedule and remaining hours, render time entry blocks with green styling, add realtime subscription |
+| Migration | Add `rescheduled_from` column to `tasks` |
+| `supabase/functions/smart-reschedule/index.ts` | Add "NEVER modify estimated_hours" to prompt |
+| `src/components/my-work/MyWorkCalendar.tsx` | Save `rescheduled_from` on reschedule, show `↻` icon on rescheduled task blocks |
+| `src/components/tasks/TasksTableView.tsx` | Show rescheduled indicator in task rows |
 

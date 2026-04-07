@@ -28,7 +28,7 @@ interface SelectOption {
 interface EnhancedInlineEditCellProps {
   value: string | number | null;
   onSave: (newValue: string | number | null) => Promise<void>;
-  type?: 'text' | 'number' | 'date' | 'select' | 'progress' | 'avatar-select';
+  type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'progress' | 'avatar-select';
   options?: SelectOption[];
   className?: string;
   displayValue?: string;

@@ -72,15 +72,11 @@ export default function MentionInput({ value, onChange, onSend, disabled, placeh
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     onChange(val);
-
-    // Detect @ trigger
     const cursorPos = e.target.selectionStart || 0;
     const textBeforeCursor = val.slice(0, cursorPos);
     const lastAtIndex = textBeforeCursor.lastIndexOf("@");
-
     if (lastAtIndex >= 0) {
       const textAfterAt = textBeforeCursor.slice(lastAtIndex + 1);
-      // Only trigger if @ is at start or preceded by whitespace, and no space in query
       const charBefore = lastAtIndex > 0 ? val[lastAtIndex - 1] : " ";
       if ((charBefore === " " || charBefore === "\n" || lastAtIndex === 0) && !textAfterAt.includes(" ")) {
         setMentionOpen(true);
@@ -131,7 +127,6 @@ export default function MentionInput({ value, onChange, onSend, disabled, placeh
     }
   };
 
-  // Auto-resize textarea
   const autoResize = () => {
     const t = textareaRef.current;
     if (t) {
@@ -145,7 +140,7 @@ export default function MentionInput({ value, onChange, onSend, disabled, placeh
   }, [value]);
 
   return (
-    <div className="flex gap-2 items-end relative">
+    <div className="flex items-end gap-2 px-3 py-2 relative">
       {onSendMessage && onFileUpload && (
         <QuickActionsMenu
           disabled={disabled}
@@ -160,10 +155,10 @@ export default function MentionInput({ value, onChange, onSend, disabled, placeh
             value={value}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
-            placeholder={placeholder || "Γράψε μήνυμα... (@ για mention)"}
+            placeholder={placeholder || "Γράψε μήνυμα..."}
             rows={1}
             disabled={disabled}
-            className="flex-1 resize-none rounded-xl border border-border/60 bg-background px-4 py-3 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 max-h-32 min-h-[44px] disabled:opacity-50"
+            className="flex-1 resize-none bg-transparent px-1 py-2 text-sm placeholder:text-muted-foreground/50 focus:outline-none max-h-32 min-h-[36px] disabled:opacity-50"
           />
         </PopoverAnchor>
         <PopoverContent
@@ -207,7 +202,7 @@ export default function MentionInput({ value, onChange, onSend, disabled, placeh
         onClick={onSend}
         disabled={!value.trim() || disabled}
         size="icon"
-        className="h-11 w-11 rounded-xl flex-shrink-0"
+        className="h-9 w-9 rounded-full flex-shrink-0"
       >
         {disabled ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
       </Button>
@@ -241,12 +236,12 @@ function VoiceMicButton({ disabled, onTranscript }: { disabled?: boolean; onTran
       disabled={disabled}
       onClick={toggle}
       className={cn(
-        "h-11 w-11 rounded-xl flex-shrink-0 relative",
+        "h-9 w-9 rounded-full flex-shrink-0 relative",
         isListening && "text-destructive"
       )}
       title={isListening ? "Σταμάτα ηχογράφηση" : "Φωνητική εντολή"}
     >
-      {isListening && <span className="absolute inset-0 rounded-xl bg-destructive/10 animate-pulse" />}
+      {isListening && <span className="absolute inset-0 rounded-full bg-destructive/10 animate-pulse" />}
       {isListening ? <MicOff className="h-4 w-4 relative z-10" /> : <Mic className="h-4 w-4" />}
     </Button>
   );

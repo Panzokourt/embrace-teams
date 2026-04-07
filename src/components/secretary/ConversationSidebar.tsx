@@ -75,12 +75,12 @@ export default function ConversationSidebar({
   const groups = groupConversations();
 
   return (
-    <div className="w-64 border-r border-border/40 flex flex-col h-full bg-card/30">
-      <div className="p-3 border-b border-border/40">
+    <div className="w-64 border-r border-sidebar-border flex flex-col h-full bg-sidebar text-sidebar-foreground">
+      <div className="p-3 border-b border-sidebar-border">
         <Button
           variant="outline"
           size="sm"
-          className="w-full gap-2 rounded-lg"
+          className="w-full gap-2 rounded-full border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent"
           onClick={onNewConversation}
         >
           <Plus className="h-4 w-4" />
@@ -97,7 +97,7 @@ export default function ConversationSidebar({
           )}
 
           {!loading && conversations.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-4">Χωρίς ιστορικό</p>
+            <p className="text-xs text-sidebar-foreground/40 text-center py-4">Χωρίς ιστορικό</p>
           )}
 
           {groups.today.length > 0 && (
@@ -148,7 +148,7 @@ function ConversationGroup({
 }) {
   return (
     <div className="space-y-0.5">
-      <p className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider px-2 pt-2 pb-1">
+      <p className="text-[10px] font-medium text-sidebar-foreground/40 uppercase tracking-wider px-2 pt-2 pb-1">
         {label}
       </p>
       {items.map((c) => (
@@ -158,8 +158,8 @@ function ConversationGroup({
           className={cn(
             "group w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left text-sm transition-colors",
             activeId === c.id
-              ? "bg-accent text-foreground"
-              : "text-foreground/80 hover:bg-accent/50"
+              ? "bg-sidebar-accent text-sidebar-accent-foreground"
+              : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50"
           )}
         >
           <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-60" />

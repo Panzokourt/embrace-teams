@@ -669,7 +669,7 @@ export default function TaskDetailPage() {
                   <EnhancedInlineEditCell
                     value={task.start_date}
                     onSave={async (v) => { await updateField('start_date', v); }}
-                    type="date"
+                    type="datetime"
                     placeholder="—"
                   />
                 </MetaRow>
@@ -677,7 +677,7 @@ export default function TaskDetailPage() {
                   <EnhancedInlineEditCell
                     value={task.due_date}
                     onSave={async (v) => { await updateField('due_date', v); }}
-                    type="date"
+                    type="datetime"
                     placeholder="—"
                   />
                 </MetaRow>

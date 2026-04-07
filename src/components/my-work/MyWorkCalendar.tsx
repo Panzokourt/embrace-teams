@@ -852,6 +852,7 @@ function MultiHourTaskBlock({ task, height, hours, isContinuation, remainingHour
   const dateStr = getTaskDate(task);
   const isOverdue = dateStr && isBefore(startOfDay(parseTaskDate(dateStr)), startOfDay(new Date())) && task.status !== 'completed';
   const estH = (task as any).estimated_hours || 1;
+  const isRescheduled = !!task.rescheduled_from;
 
   return (
     <div
@@ -873,6 +874,18 @@ function MultiHourTaskBlock({ task, height, hours, isContinuation, remainingHour
         <span className="flex-1 min-w-0 truncate font-medium">
           {isContinuation && '↳ '}{task.title}
         </span>
+        {isRescheduled && !isContinuation && (
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <RefreshCw className="h-3 w-3 text-amber-500 shrink-0" />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                Μεταφέρθηκε από {format(new Date(task.rescheduled_from!), 'd MMM yyyy, HH:mm', { locale: el })}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
         {dateStr && !isContinuation && <span className="text-[9px] text-muted-foreground tabular-nums shrink-0">{format(parseTaskDate(dateStr), 'HH:mm')}</span>}
         {!isRunning ? (
           <button className="h-4 w-4 flex items-center justify-center text-muted-foreground hover:text-primary shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"

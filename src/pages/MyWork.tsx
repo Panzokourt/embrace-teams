@@ -278,7 +278,7 @@ export default function MyWork() {
 
   return (
     <div className="flex-1 flex overflow-hidden">
-      <div className={`flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-6 transition-all duration-200 ${selectedItem ? 'mr-0' : ''}`}>
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-6">
       {/* ── Header with inline KPI chips ── */}
       <div className="flex flex-col gap-2">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">

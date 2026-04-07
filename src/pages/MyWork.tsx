@@ -389,77 +389,18 @@ export default function MyWork() {
         </div>
       ) : (
         /* ── Calendar View ── */
-        <Card className="border-border/30 shadow-sm">
-          <CardHeader className="pb-3 px-5 flex flex-row items-center justify-between">
-            <CardTitle className="text-[13px] font-semibold tracking-tight flex items-center gap-2.5">
-              <span className="h-7 w-7 rounded-lg bg-primary/8 flex items-center justify-center">
-                <CalendarDays className="h-3.5 w-3.5 text-primary" />
-              </span>
-              {calendarMode === 'week' ? 'Εβδομαδιαία Προβολή' : format(calendarDate, 'EEEE d MMMM', { locale: el })}
-            </CardTitle>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setCalendarDate(d => addDays(d, calendarMode === 'week' ? -7 : -1))}>←</Button>
-              <Button variant="ghost" size="sm" onClick={() => setCalendarDate(new Date())}>Σήμερα</Button>
-              <Button variant="ghost" size="sm" onClick={() => setCalendarDate(d => addDays(d, calendarMode === 'week' ? 7 : 1))}>→</Button>
-              <div className="border-l border-border/30 pl-2 ml-1 inline-flex gap-1 p-0.5 rounded-[8px] bg-muted/50">
-                <Button variant={calendarMode === 'week' ? 'default' : 'ghost'} size="sm" className="h-7 rounded-[6px] text-[12px]" onClick={() => setCalendarMode('week')}>Εβδ</Button>
-                <Button variant={calendarMode === 'day' ? 'default' : 'ghost'} size="sm" className="h-7 rounded-[6px] text-[12px]" onClick={() => setCalendarMode('day')}>Ημέρα</Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            {calendarMode === 'week' ? (
-              <div className="grid grid-cols-7 border-t border-border/30">
-                {weekDays.map(day => {
-                  const key = format(day, 'yyyy-MM-dd');
-                  const dayTasks = tasksByDay[key] || [];
-                  const isCurrentDay = isToday(day);
-                  return (
-                    <div key={key} className={`border-r last:border-r-0 border-border/20 min-h-[200px] transition-colors ${isCurrentDay ? 'bg-primary/5' : 'hover:bg-accent/10'}`}>
-                      <div className={`px-2 py-2 text-center border-b border-border/20 ${isCurrentDay ? 'bg-primary/10' : 'bg-muted/20'}`}>
-                        <div className="text-[10px] text-muted-foreground uppercase tracking-wide">{format(day, 'EEE', { locale: el })}</div>
-                        <div className={`text-lg font-semibold ${isCurrentDay ? 'text-primary' : ''}`}>{format(day, 'd')}</div>
-                      </div>
-                      <div className="p-1 space-y-1">
-                        {dayTasks.map(task => (
-                          <CalendarTaskCard
-                            key={task.id}
-                            task={task}
-                            onComplete={() => toggleTaskComplete(task)}
-                            onClick={() => setSelectedItem({ type: 'task', data: task })}
-                            activeTimer={activeTimer}
-                            startTimer={startTimer}
-                            stopTimer={stopTimer}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              /* Day view */
-              <div className="p-4 space-y-2">
-                {(tasksByDay[format(calendarDate, 'yyyy-MM-dd')] || []).length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-6 text-center">Κανένα task για αυτή την ημέρα</p>
-                ) : (
-                  (tasksByDay[format(calendarDate, 'yyyy-MM-dd')] || []).map(task => (
-                    <CalendarTaskCard
-                      key={task.id}
-                      task={task}
-                      onComplete={() => toggleTaskComplete(task)}
-                      onClick={() => setSelectedItem({ type: 'task', data: task })}
-                      activeTimer={activeTimer}
-                      startTimer={startTimer}
-                      stopTimer={stopTimer}
-                      wide
-                    />
-                  ))
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <MyWorkCalendar
+          tasks={allMyTasks}
+          calendarDate={calendarDate}
+          calendarMode={calendarMode}
+          onCalendarDateChange={setCalendarDate}
+          onCalendarModeChange={setCalendarMode}
+          onTaskClick={(task) => setSelectedItem({ type: 'task', data: task })}
+          onTaskUpdated={() => fetchAll()}
+          activeTimer={activeTimer}
+          startTimer={startTimer}
+          stopTimer={stopTimer}
+        />
       )}
 
       {/* ── Bottom Strip: Approvals + Time Tracking ── */}

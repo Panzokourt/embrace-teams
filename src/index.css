@@ -2,7 +2,6 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
 
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

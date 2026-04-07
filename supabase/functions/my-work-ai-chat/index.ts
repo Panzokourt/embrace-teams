@@ -6,11 +6,61 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Transform Anthropic SSE stream to OpenAI-compatible SSE stream
+function transformAnthropicStream(anthropicBody: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  return new ReadableStream({
+    async start(controller) {
+      const reader = anthropicBody.getReader();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            controller.close();
+            break;
+          }
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              const jsonStr = line.slice(6).trim();
+              if (!jsonStr) continue;
+              try {
+                const event = JSON.parse(jsonStr);
+                if (event.type === "content_block_delta" && event.delta?.type === "text_delta") {
+                  const openaiChunk = {
+                    choices: [{ delta: { content: event.delta.text } }],
+                  };
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(openaiChunk)}\n\n`));
+                } else if (event.type === "message_stop") {
+                  controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+                  controller.close();
+                  return;
+                }
+              } catch {
+                // skip unparseable lines
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Stream transform error:", e);
+        controller.close();
+      }
+    },
+  });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    // Validate authentication first
     const authHeader = req.headers.get("Authorization") || "";
     if (!authHeader.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -37,13 +87,12 @@ serve(async (req) => {
     const userId = claimsData.claims.sub as string;
 
     const { messages } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not configured");
 
     let contextInfo = "";
 
     if (userId) {
-      // Fetch user's tasks and projects for context
       const [tasksRes, projectsRes, profileRes] = await Promise.all([
         supabase
           .from("tasks")
@@ -96,18 +145,26 @@ ${projects.map((p: any) => `- ${p.name} (Status: ${p.status}, Progress: ${p.prog
 
 ${contextInfo}`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    // Convert messages to Anthropic format (filter out system messages)
+    const anthropicMessages = (messages || [])
+      .filter((m: any) => m.role !== "system")
+      .map((m: any) => ({
+        role: m.role === "assistant" ? "assistant" : "user",
+        content: m.content,
+      }));
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...messages,
-        ],
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4096,
+        system: systemPrompt,
+        messages: anthropicMessages,
         stream: true,
       }),
     });
@@ -126,14 +183,17 @@ ${contextInfo}`;
         });
       }
       const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
+      console.error("Anthropic API error:", response.status, t);
       return new Response(JSON.stringify({ error: "AI error" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    return new Response(response.body, {
+    // Transform Anthropic SSE to OpenAI-compatible SSE
+    const transformedStream = transformAnthropicStream(response.body!);
+
+    return new Response(transformedStream, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (e) {

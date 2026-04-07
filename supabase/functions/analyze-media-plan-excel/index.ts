@@ -35,8 +35,8 @@ serve(async (req) => {
       });
     }
 
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!lovableApiKey) throw new Error("LOVABLE_API_KEY not configured");
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
 
     const { fileContents, planContext } = await req.json();
 
@@ -51,7 +51,6 @@ serve(async (req) => {
       .map((f: { name: string; content: string }) => `=== File: ${f.name} ===\n${f.content}`)
       .join("\n\n");
 
-    // Truncate to ~100K chars to avoid token limits
     const truncated = combinedContent.slice(0, 100000);
 
     const systemPrompt = `You are a media planning data extraction expert. Analyze the uploaded spreadsheet data and extract structured media plan items.
@@ -89,25 +88,26 @@ Rules:
 
 ${planContext ? `Context: ${planContext}\n\n` : ''}${truncated}`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${lovableApiKey}`,
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4096,
+        system: systemPrompt,
         messages: [
-          { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        temperature: 0.3,
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("AI Gateway error:", response.status, errorText);
+      console.error("Anthropic API error:", response.status, errorText);
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again later." }), {
           status: 429,
@@ -120,11 +120,11 @@ ${planContext ? `Context: ${planContext}\n\n` : ''}${truncated}`;
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      throw new Error(`AI Gateway error: ${response.status}`);
+      throw new Error(`Anthropic API error: ${response.status}`);
     }
 
     const aiResponse = await response.json();
-    const content = aiResponse.choices?.[0]?.message?.content;
+    const content = aiResponse.content?.[0]?.text;
     if (!content) throw new Error("No content in AI response");
 
     let result;

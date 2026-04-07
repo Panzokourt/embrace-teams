@@ -158,8 +158,8 @@ function ConversationGroup({
           className={cn(
             "group w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left text-sm transition-colors",
             activeId === c.id
-              ? "bg-accent text-foreground"
-              : "text-foreground/80 hover:bg-accent/50"
+              ? "bg-sidebar-accent text-sidebar-accent-foreground"
+              : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50"
           )}
         >
           <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-60" />

@@ -775,15 +775,18 @@ export function TasksTableView({
             </TableCell>
           )}
 
-          {/* Progress */}
+          {/* Progress — auto-calculated from status */}
           {isColumnVisible('progress') && (
             <TableCell style={{ width: getColumnWidth('progress') }}>
-              <EnhancedInlineEditCell
-                value={task.progress ?? 0}
-                onSave={(val) => onInlineUpdate(task.id, 'progress', val)}
-                type="progress"
-                disabled={!canManage}
-              />
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all duration-300"
+                    style={{ width: `${STATUS_PROGRESS[task.status] ?? 0}%` }}
+                  />
+                </div>
+                <span className="text-xs text-muted-foreground tabular-nums w-8 text-right">{STATUS_PROGRESS[task.status] ?? 0}%</span>
+              </div>
             </TableCell>
           )}
 

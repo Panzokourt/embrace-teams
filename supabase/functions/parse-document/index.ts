@@ -344,7 +344,7 @@ async function parseDocument(
     const bytes = new Uint8Array(arrayBuffer.slice(0, Math.min(MAX_FILE_SIZE, arrayBuffer.byteLength)));
     const base64 = btoa(String.fromCharCode.apply(null, Array.from(bytes)));
     try {
-      text = await parseDocumentWithGemini(base64, 'application/msword', fileName);
+      text = await parseDocumentWithClaude(base64, 'application/msword', fileName);
       usedOcr = true;
     } catch {
       // Fallback to basic text extraction

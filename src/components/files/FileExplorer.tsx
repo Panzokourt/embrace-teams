@@ -22,6 +22,7 @@ const DEFAULT_FOLDER_NAMES = [
 interface FileExplorerProps {
   tenderId?: string;
   projectId?: string;
+  taskId?: string;
 }
 
 export function FileExplorer({ tenderId, projectId }: FileExplorerProps) {

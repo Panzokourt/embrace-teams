@@ -22,8 +22,8 @@
     --popover: 0 0% 100%;
     --popover-foreground: 240 6% 10%;
 
-    /* Primary — Apple Blue (#007AFF) */
-    --primary: 211 100% 50%;
+    /* Primary — Lime Green */
+    --primary: 84 81% 44%;
     --primary-foreground: 0 0% 100%;
 
     /* Secondary */
@@ -34,9 +34,9 @@
     --muted: 240 5% 96%;
     --muted-foreground: 240 4% 46%;
 
-    /* Accent — subtle blue tint */
-    --accent: 211 100% 97%;
-    --accent-foreground: 211 100% 50%;
+    /* Accent — subtle lime tint */
+    --accent: 84 60% 95%;
+    --accent-foreground: 84 81% 44%;
 
     /* Semantic colors */
     --destructive: 0 84% 60%;

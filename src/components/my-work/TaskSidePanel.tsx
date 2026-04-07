@@ -298,13 +298,29 @@ export function TaskSidePanel({ taskId, onClose, activeTimer, startTimer, stopTi
           </div>
         </div>
 
-        {/* Progress (auto-calculated from status) */}
+        {/* Progress (auto-calculated) */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">Πρόοδος</p>
-            <span className="text-xs font-medium text-foreground">{STATUS_PROGRESS[task.status as keyof typeof STATUS_PROGRESS] ?? 0}%</span>
+            <span className="text-xs font-medium text-foreground">
+              {subtasks.length > 0
+                ? `${computeSubtaskProgress(subtasks)}%`
+                : `${STATUS_PROGRESS[task.status as keyof typeof STATUS_PROGRESS] ?? 0}%`
+              }
+            </span>
           </div>
-          <Progress value={STATUS_PROGRESS[task.status as keyof typeof STATUS_PROGRESS] ?? 0} className="w-full" />
+          <Progress
+            value={subtasks.length > 0
+              ? computeSubtaskProgress(subtasks)
+              : (STATUS_PROGRESS[task.status as keyof typeof STATUS_PROGRESS] ?? 0)
+            }
+            className="w-full"
+          />
+          {subtasks.length > 0 && (
+            <p className="text-[10px] text-muted-foreground">
+              Βασισμένο σε {subtasks.length} subtask{subtasks.length > 1 ? 's' : ''}
+            </p>
+          )}
         </div>
 
         <Separator className="bg-border/30" />

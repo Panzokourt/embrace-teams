@@ -494,12 +494,14 @@ export default function TaskDetailPage() {
             return (
               <div key={s} className="flex items-center flex-1 last:flex-none">
                 <button
-                  onClick={() => handleStatusChange(s)}
+                  onClick={() => !hasSubtasks && handleStatusChange(s)}
                   className={cn(
                     "flex flex-col items-center gap-1 group relative z-10 min-w-0",
-                    isLast ? "px-1" : "px-1 flex-1"
+                    isLast ? "px-1" : "px-1 flex-1",
+                    hasSubtasks && "cursor-not-allowed opacity-60"
                   )}
-                  title={conf.label}
+                  title={hasSubtasks ? 'Η κατάσταση καθορίζεται από τα subtasks' : conf.label}
+                  disabled={hasSubtasks}
                 >
                   <div className={cn(
                     "h-6 w-6 rounded-full flex items-center justify-center shrink-0 transition-all border-2",

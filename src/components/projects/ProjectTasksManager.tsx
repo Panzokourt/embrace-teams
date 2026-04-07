@@ -219,6 +219,9 @@ export function ProjectTasksManager({ projectId }: ProjectTasksManagerProps) {
 
   const handleStatusChange = async (taskId: string, newStatus: TaskStatus) => {
     try {
+      // Check if this task is a subtask - if so, auto-update parent
+      const changedTask = tasks.find(t => t.id === taskId);
+      
       const { error } = await supabase
         .from('tasks')
         .update({ status: newStatus })
@@ -226,6 +229,39 @@ export function ProjectTasksManager({ projectId }: ProjectTasksManagerProps) {
 
       if (error) throw error;
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+      
+      // If this is a subtask, auto-update the parent task's status
+      if (changedTask?.deliverable_id || true) {
+        // Check if task has a parent
+        const { data: taskData } = await supabase
+          .from('tasks')
+          .select('parent_task_id')
+          .eq('id', taskId)
+          .single();
+        
+        if (taskData?.parent_task_id) {
+          // Fetch all sibling subtasks
+          const { data: siblings } = await supabase
+            .from('tasks')
+            .select('id, status')
+            .eq('parent_task_id', taskData.parent_task_id);
+          
+          if (siblings) {
+            // Update siblings with the new status for the changed task
+            const updatedSiblings = siblings.map(s => 
+              s.id === taskId ? { ...s, status: newStatus } : s
+            );
+            const { computeParentStatus } = await import('@/utils/subtaskProgress');
+            const parentStatus = computeParentStatus(updatedSiblings);
+            
+            await supabase
+              .from('tasks')
+              .update({ status: parentStatus })
+              .eq('id', taskData.parent_task_id);
+          }
+        }
+      }
+      
       toast.success('Η κατάσταση ενημερώθηκε!');
     } catch (error) {
       console.error('Error updating status:', error);

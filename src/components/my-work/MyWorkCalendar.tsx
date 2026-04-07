@@ -14,8 +14,9 @@ import {
 } from 'date-fns';
 import { el } from 'date-fns/locale';
 import {
-  CalendarDays, Play, Square, Plus, GripVertical, X, Inbox, AlertTriangle, Clock, Sparkles, Loader2,
+  CalendarDays, Play, Square, Plus, GripVertical, X, Inbox, AlertTriangle, Clock, Sparkles, Loader2, RefreshCw,
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { STATUS_COLORS } from '@/components/shared/mondayStyleConfig';
 
 interface TaskItem {

@@ -27,41 +27,48 @@ interface ParseResult {
   };
 }
 
-// OCR/Document parsing using Gemini Vision via Lovable AI Gateway
-// Supports chunked processing for large documents
-async function parseDocumentWithGemini(
+// OCR/Document parsing using Claude Vision via Anthropic API
+async function parseDocumentWithClaude(
   base64Data: string, 
   mimeType: string, 
   fileName: string,
   pageInfo?: string
 ): Promise<string> {
-  const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+  const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
   
-  if (!lovableApiKey) {
-    console.warn("LOVABLE_API_KEY not found, cannot use AI parsing");
+  if (!anthropicApiKey) {
+    console.warn("ANTHROPIC_API_KEY not found, cannot use AI parsing");
     return "";
   }
   
   try {
     const pageNote = pageInfo ? ` (${pageInfo})` : '';
-    console.log(`Parsing ${fileName}${pageNote} with Gemini Vision...`);
+    console.log(`Parsing ${fileName}${pageNote} with Claude Vision...`);
     
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    // Map mime types for Claude's supported image formats
+    const supportedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    const mediaType = supportedImageTypes.includes(mimeType) ? mimeType : 'image/png';
+    
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${lovableApiKey}`,
-        "Content-Type": "application/json",
+        "x-api-key": anthropicApiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 32768,
         messages: [
           {
             role: "user",
             content: [
               {
-                type: "image_url",
-                image_url: {
-                  url: `data:${mimeType};base64,${base64Data}`
+                type: "image",
+                source: {
+                  type: "base64",
+                  media_type: mediaType,
+                  data: base64Data,
                 }
               },
               {
@@ -94,34 +101,31 @@ async function parseDocumentWithGemini(
             ]
           }
         ],
-        max_tokens: 32768,
-        temperature: 0.1
       })
     });
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Gemini API error:", response.status, errorText);
+      console.error("Claude API error:", response.status, errorText);
       
-      // Handle rate limits gracefully
       if (response.status === 429) {
         throw new Error("Rate limit exceeded. Παρακαλώ δοκιμάστε ξανά σε λίγο.");
       }
-      if (response.status === 402) {
-        throw new Error("Credits required. Προσθέστε credits στο workspace.");
+      if (response.status === 402 || response.status === 400) {
+        throw new Error("API error. Ελέγξτε το API key.");
       }
       
       return "";
     }
     
     const data = await response.json();
-    const extractedText = data.choices?.[0]?.message?.content || "";
+    const extractedText = data.content?.[0]?.text || "";
     
-    console.log(`Gemini extracted ${extractedText.length} characters from ${fileName}${pageNote}`);
+    console.log(`Claude extracted ${extractedText.length} characters from ${fileName}${pageNote}`);
     return extractedText.trim();
     
   } catch (error) {
-    console.error("Gemini parsing error:", error);
+    console.error("Claude parsing error:", error);
     throw error;
   }
 }

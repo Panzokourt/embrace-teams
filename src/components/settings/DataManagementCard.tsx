@@ -116,7 +116,6 @@ export function DataManagementCard() {
                       checked={selected.has(key)}
                       onCheckedChange={() => toggleCategory(key)}
                       className="mt-0.5"
-                      className="mt-0.5"
                     />
                     <Icon className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
                     <div className="flex-1 min-w-0">

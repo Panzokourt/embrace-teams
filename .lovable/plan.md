@@ -1,64 +1,46 @@
 
 
-# Luma Redesign — Lime + Geist + Pill Geometry
+# Secretary Page — ChatGPT-style Redesign
 
-## Phase A: Color System — Lime Theme
-**`src/index.css`**
-- Replace all Apple Blue (`211 100% 50%`) primary/ring/accent/sidebar-primary tokens with Lime equivalents
-- Light: `--primary: 84 81% 44%`, `--accent: 84 60% 95%`, `--ring: 84 81% 44%`
-- Dark: `--primary: 84 75% 52%`
-- Chart palette: 6 shades of neutral gray (matching "Chart Color: Neutral")
-- Sidebar tokens: dark inverted (`--sidebar-background: 240 6% 10%`, `--sidebar-foreground: 0 0% 98%`) in both light AND dark
-- Update `.force-light` class to use lime primary
+## Τρέχουσα κατάσταση
+- Messages σε bubbles (user = primary bg, assistant = card with border)
+- Full-width message area
+- Header bar με Bot icon + "Νέα συνομιλία" button
+- Input stuck to bottom with border-top
+- Sidebar = light, 256px wide
 
-## Phase B: Typography — Geist Font
-**`src/index.css`**: Replace Inter import with Geist
-```
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&display=swap');
-```
-Update `body` and heading font-family references to `'Geist'`
+## ChatGPT Pattern — Τι αλλάζει
 
-**`tailwind.config.ts`**: Update fontFamily.sans and fontFamily.display to `['Geist', 'Inter', ...]`
+### Layout
+- Messages σε **centered column** (`max-w-3xl mx-auto`) αντί full-width
+- **Αφαίρεση header bar** — ο τίτλος/new chat button μετακομίζει στο sidebar
+- Input area: centered στο κάτω μέρος, `max-w-3xl`, με **shadow + rounded-2xl border**, χωρίς border-top στο container
 
-## Phase C: Geometry Updates
+### Messages
+- **User messages**: Απλό text, `bg-muted/50 rounded-2xl px-4 py-3` (subtle γκρι background, όχι primary color)
+- **Assistant messages**: Χωρίς border/card background — plain text με μικρό icon αριστερά
+- Αφαίρεση `justify-end` / `justify-start` — όλα aligned αριστερά στο centered column
 
-| File | Current | Change |
-|------|---------|--------|
-| `button.tsx` | `rounded-[10px]` | `rounded-full` (all sizes) |
-| `badge.tsx` | `rounded-full` | Already correct |
-| `card.tsx` | `rounded-2xl` | `rounded-[20px]` |
-| `input.tsx` | `rounded-[10px]` | `rounded-xl` |
-| `textarea.tsx` | `rounded-[10px]` | `rounded-xl` |
-| `select.tsx` trigger | `rounded-[10px]` | `rounded-xl` |
-| `tabs.tsx` list | `rounded-[10px]` | `rounded-full` |
-| `tabs.tsx` trigger | `rounded-lg` | `rounded-full` |
-| `dialog.tsx` | `rounded-[20px]` | Already correct |
-| `alert-dialog.tsx` | `rounded-[20px]` | Already correct |
-| `dropdown-menu.tsx` | `rounded-xl` | `rounded-2xl` |
-| `context-menu.tsx` | `rounded-xl` | `rounded-2xl` |
-| `popover.tsx` | `rounded-xl` | `rounded-2xl` |
+### Empty State
+- Μεγαλύτερο greeting χωρίς Bot icon box
+- Quick actions σε **2x grid** αντί flex-wrap, με `border rounded-xl p-4` κάρτες (τίτλος + description style)
 
-## Phase D: Button Destructive Variant
-- Change from `bg-destructive text-destructive-foreground` to `bg-destructive/10 text-destructive hover:bg-destructive/20` (softer, muted)
+### Input
+- Rounded container με `shadow-lg border bg-background rounded-2xl`
+- Quick action chips μέσα στο input container (πάνω από το textarea)
+- Send button μέσα στο container, δεξιά
 
-## Phase E: Sidebar Inverted Style
-**`src/components/layout/AppSidebar.tsx`** — The sidebar tokens in CSS handle the dark inversion. No structural code changes needed since the sidebar already uses `--sidebar-*` tokens.
+### Sidebar
+- Σκούρο background (ήδη inverted από Luma tokens — χρησιμοποιεί `--sidebar-*`)
+- Πιο minimal styling
 
-## Files to Modify (13 files)
+## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/index.css` | Lime tokens, Geist import, neutral chart colors, inverted sidebar tokens |
-| `tailwind.config.ts` | Geist in fontFamily |
-| `src/components/ui/button.tsx` | `rounded-full`, softer destructive |
-| `src/components/ui/card.tsx` | `rounded-[20px]` |
-| `src/components/ui/input.tsx` | `rounded-xl` |
-| `src/components/ui/textarea.tsx` | `rounded-xl` |
-| `src/components/ui/select.tsx` | `rounded-xl` trigger |
-| `src/components/ui/tabs.tsx` | `rounded-full` list + triggers |
-| `src/components/ui/dropdown-menu.tsx` | `rounded-2xl` content + subcontent |
-| `src/components/ui/context-menu.tsx` | `rounded-2xl` content + subcontent |
-| `src/components/ui/popover.tsx` | `rounded-2xl` |
+| `src/components/secretary/SecretaryChat.tsx` | Centered column, remove header, ChatGPT message layout, new input container, grid quick actions |
+| `src/components/secretary/MentionInput.tsx` | Remove outer gap layout, adapt to fit inside the new container |
+| `src/components/secretary/ConversationSidebar.tsx` | Dark bg using sidebar tokens, minimal tweaks |
 
-All className-level only. No API, logic, or structural changes.
+All className-level changes. No API or logic changes.
 

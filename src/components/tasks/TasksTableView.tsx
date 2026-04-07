@@ -123,6 +123,10 @@ const STATUS_OPTIONS = [
   { value: 'completed', label: 'Ολοκληρώθηκε', color: 'hsl(var(--success))' },
 ];
 
+const STATUS_PROGRESS: Record<string, number> = {
+  todo: 0, in_progress: 20, review: 50, internal_review: 65, client_review: 80, completed: 100,
+};
+
 const PRIORITY_OPTIONS = [
   { value: 'low', label: 'Χαμηλή', color: '#22c55e' },
   { value: 'medium', label: 'Μεσαία', color: '#f59e0b' },
@@ -271,8 +275,8 @@ export function TasksTableView({
           bVal = priorityOrder[b.priority as keyof typeof priorityOrder] ?? 3;
           break;
         case 'progress':
-          aVal = a.progress ?? 0;
-          bVal = b.progress ?? 0;
+          aVal = STATUS_PROGRESS[a.status] ?? 0;
+          bVal = STATUS_PROGRESS[b.status] ?? 0;
           break;
         default:
           return 0;
@@ -440,7 +444,7 @@ export function TasksTableView({
       { key: 'project', label: 'Έργο', format: (_: any, row: Task) => row.project?.name || '-' },
       { key: 'assignee', label: 'Υπεύθυνος', format: (_: any, row: Task) => row.assignee?.full_name || '-' },
       { key: 'due_date', label: 'Προθεσμία', format: formatters.date },
-      { key: 'progress', label: 'Πρόοδος', format: formatters.percentage },
+      { key: 'progress', label: 'Πρόοδος', format: (_: any, row: Task) => `${STATUS_PROGRESS[row.status] ?? 0}%` },
       { key: 'estimated_hours', label: 'Εκτίμηση (ώρες)', format: (v: number | null) => v != null ? String(v) : '-' },
     ];
     exportToCSV(tasks, exportColumns, `tasks_${format(new Date(), 'yyyy-MM-dd')}`);
@@ -455,7 +459,7 @@ export function TasksTableView({
       { key: 'project', label: 'Έργο', format: (_: any, row: Task) => row.project?.name || '-' },
       { key: 'assignee', label: 'Υπεύθυνος', format: (_: any, row: Task) => row.assignee?.full_name || '-' },
       { key: 'due_date', label: 'Προθεσμία', format: formatters.date },
-      { key: 'progress', label: 'Πρόοδος', format: formatters.percentage },
+      { key: 'progress', label: 'Πρόοδος', format: (_: any, row: Task) => `${STATUS_PROGRESS[row.status] ?? 0}%` },
       { key: 'estimated_hours', label: 'Εκτίμηση (ώρες)', format: (v: number | null) => v != null ? String(v) : '-' },
     ];
     exportToExcel(tasks, exportColumns, `tasks_${format(new Date(), 'yyyy-MM-dd')}`);
@@ -771,15 +775,18 @@ export function TasksTableView({
             </TableCell>
           )}
 
-          {/* Progress */}
+          {/* Progress — auto-calculated from status */}
           {isColumnVisible('progress') && (
             <TableCell style={{ width: getColumnWidth('progress') }}>
-              <EnhancedInlineEditCell
-                value={task.progress ?? 0}
-                onSave={(val) => onInlineUpdate(task.id, 'progress', val)}
-                type="progress"
-                disabled={!canManage}
-              />
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all duration-300"
+                    style={{ width: `${STATUS_PROGRESS[task.status] ?? 0}%` }}
+                  />
+                </div>
+                <span className="text-xs text-muted-foreground tabular-nums w-8 text-right">{STATUS_PROGRESS[task.status] ?? 0}%</span>
+              </div>
             </TableCell>
           )}
 
@@ -1147,7 +1154,7 @@ export function TasksTableView({
                         <div className="flex items-center gap-4 text-xs text-muted-foreground pl-10">
                           <span className="font-medium">{group.tasks.length} tasks</span>
                           {isColumnVisible('progress') && (
-                            <span>Πρόοδος: {Math.round(group.tasks.reduce((sum, t) => sum + (t.progress ?? 0), 0) / Math.max(group.tasks.length, 1))}%</span>
+                            <span>Πρόοδος: {Math.round(group.tasks.reduce((sum, t) => sum + (STATUS_PROGRESS[t.status] ?? 0), 0) / Math.max(group.tasks.length, 1))}%</span>
                           )}
                           {isColumnVisible('estimated_hours') && (
                             <span>Εκτίμηση: {group.tasks.reduce((sum, t) => sum + (t.estimated_hours ?? 0), 0)}h</span>

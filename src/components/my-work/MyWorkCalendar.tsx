@@ -395,7 +395,7 @@ function CalendarTaskPill({ task, onDragStart, onClick, activeTimer, startTimer,
 }) {
   const isRunning = activeTimer?.is_running && activeTimer.task_id === task.id;
   const dateStr = getTaskDate(task);
-  const isOverdue = dateStr && isBefore(startOfDay(new Date(dateStr)), startOfDay(new Date())) && task.status !== 'completed';
+  const isOverdue = dateStr && isBefore(startOfDay(parseTaskDate(dateStr)), startOfDay(new Date())) && task.status !== 'completed';
 
   return (
     <div draggable onDragStart={onDragStart} onClick={onClick}

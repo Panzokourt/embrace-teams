@@ -363,7 +363,7 @@ async function parseDocument(
     const bytes = new Uint8Array(arrayBuffer);
     const base64 = btoa(String.fromCharCode.apply(null, Array.from(bytes)));
     const mimeType = lowerContentType || 'image/png';
-    text = await parseDocumentWithGemini(base64, mimeType, fileName);
+    text = await parseDocumentWithClaude(base64, mimeType, fileName);
     usedOcr = true;
   } else {
     // Try text extraction as fallback

@@ -471,6 +471,61 @@ export default function TaskDetailPage() {
         </div>
       </div>
 
+      {/* ===== STATUS STEPPER BAR ===== */}
+      <div className="border-b bg-card px-4 lg:px-5 py-3">
+        <div className="flex items-center gap-1">
+          {STATUS_ORDER.map((s, i) => {
+            const conf = STATUS_CONFIG[s];
+            const currentIdx = STATUS_ORDER.indexOf(task.status);
+            const isCurrent = task.status === s;
+            const isPast = currentIdx > i;
+            const isLast = i === STATUS_ORDER.length - 1;
+            return (
+              <div key={s} className="flex items-center flex-1 last:flex-none">
+                <button
+                  onClick={() => handleStatusChange(s)}
+                  className={cn(
+                    "flex flex-col items-center gap-1 group relative z-10 min-w-0",
+                    isLast ? "px-1" : "px-1 flex-1"
+                  )}
+                  title={conf.label}
+                >
+                  <div className={cn(
+                    "h-6 w-6 rounded-full flex items-center justify-center shrink-0 transition-all border-2",
+                    isCurrent && "border-primary bg-primary text-primary-foreground scale-110 shadow-md",
+                    isPast && !isCurrent && "border-green-500 bg-green-500/20 text-green-600",
+                    !isCurrent && !isPast && "border-border bg-muted text-muted-foreground group-hover:border-muted-foreground"
+                  )}>
+                    {isPast && !isCurrent && <Check className="h-3.5 w-3.5" />}
+                    {isCurrent && <div className="h-2 w-2 rounded-full bg-primary-foreground" />}
+                  </div>
+                  <span className={cn(
+                    "text-[10px] leading-tight text-center truncate max-w-[80px]",
+                    isCurrent && "font-semibold text-foreground",
+                    isPast && !isCurrent && "text-green-600 font-medium",
+                    !isCurrent && !isPast && "text-muted-foreground"
+                  )}>
+                    {conf.label}
+                  </span>
+                </button>
+                {!isLast && (
+                  <div className={cn(
+                    "h-0.5 flex-1 -mx-1 mt-[-14px]",
+                    isPast ? "bg-green-500/40" : "bg-border"
+                  )} />
+                )}
+              </div>
+            );
+          })}
+          <div className="ml-3 pl-3 border-l flex items-center gap-2 shrink-0">
+            <div className="w-20">
+              <Progress value={displayProgress} className="h-2" />
+            </div>
+            <span className="text-xs font-semibold text-foreground tabular-nums">{displayProgress}%</span>
+          </div>
+        </div>
+      </div>
+
       {/* ===== THREE-COLUMN LAYOUT ===== */}
       <div className="flex-1 overflow-auto">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 p-4 lg:p-5 items-start">

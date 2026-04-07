@@ -81,9 +81,6 @@ function getStatusLabel(s: string) { return STATUS_COLORS[s]?.label || s; }
 function getStatusStyle(s: string): React.CSSProperties {
   const c = STATUS_COLORS[s]; return c ? { backgroundColor: c.bg, color: c.text } : {};
 }
-function getPriorityStyle(p: string): React.CSSProperties {
-  const c = PRIORITY_COLORS[p]; return c ? { backgroundColor: c.bg, color: c.text } : {};
-}
 
 // ── Main Page ──────────────────────────────────────
 export default function MyWork() {

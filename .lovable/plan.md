@@ -1,68 +1,97 @@
 
 
-# Calendar Upgrade — Multi-Hour Tasks, AI Scheduling, Working Hours, Time Indicator
+# Calendar: Multi-Day Task Spanning, Time Entry Integration & Remaining Hours
 
-## Changes
+## Πρόβλημα
+Τώρα ένα task με 10 estimated hours εμφανίζεται ως ένα μεγάλο block που ξεπερνάει τις εργάσιμες ώρες χωρίς να "σπάει" στην επόμενη μέρα. Επίσης οι καταγεγραμμένες ώρες (time entries) δεν φαίνονται στο ημερολόγιο και δεν αφαιρούνται από τις estimated hours.
 
-### 1. Multi-Hour Task Blocks
-Tasks placed in a specific hour slot will span multiple rows based on `estimated_hours`. A task with `estimated_hours: 3` starting at 10:00 will visually cover 10:00–13:00 (3 rows of 52px each). Tasks without `estimated_hours` default to 1 hour.
+## Λύση
 
-- Add `estimated_hours` to the `TaskItem` interface in `MyWorkCalendar.tsx`
-- Render task pills with `position: absolute` inside a relatively-positioned day column, using top/height calculated from hour offset and `estimated_hours`
-- Overlap detection: stack overlapping tasks side-by-side (columns)
+### 1. Fetch time entries στο ημερολόγιο
+Το `MyWorkCalendar` θα κάνει fetch τα `time_entries` του χρήστη (με `start_time`, `duration_minutes`, `task_id`) για τις ημέρες που εμφανίζονται. Αυτά θα εμφανίζονται ως **ξεχωριστά blocks** στο ημερολόγιο, στην ώρα/ημέρα που καταγράφηκαν, με διαφορετική απόχρωση (π.χ. `bg-emerald-500/10` — "logged time").
 
-### 2. Working Hours Highlight
-Fetch `work_schedules` for the current user on mount. Highlight working hours with a subtle different background (e.g., `bg-primary/3`). Non-working hours and non-working days get no highlight (remain default). This makes it visually clear which slots are "available."
+### 2. Υπολογισμός remaining hours
+Για κάθε task: `remainingHours = max(0, estimatedHours - totalLoggedHours)`. Το `totalLoggedHours` υπολογίζεται από τα completed time entries (`is_running = false`) του task.
 
-### 3. Past Hours/Days Greyed Out
-Hours and days that have already passed get a `bg-muted/30 opacity-60` treatment. For today, only hours before the current hour are greyed. For past days in week view, the entire column is dimmed.
+### 3. Multi-day task spanning
+Αντί να render ένα τεράστιο block, ο calendar θα "σπάει" ένα task σε πολλαπλά blocks:
+- Υπολογίζει τις διαθέσιμες εργάσιμες ώρες από το `start_time` του task μέχρι το τέλος εκείνης της εργάσιμης ημέρας
+- Αν `remainingHours > availableHoursToday`, τοποθετεί ένα block μέχρι το τέλος του ωραρίου και μεταφέρει τις υπόλοιπες ώρες στην επόμενη εργάσιμη ημέρα (στην αρχή του ωραρίου)
+- Συνεχίζει μέχρι εξαντλήσει τις remaining hours
 
-### 4. Current Time Indicator
-A horizontal red line (`border-t-2 border-red-500`) positioned absolutely at the exact current minute within the hour grid. Updates every minute via `setInterval`. Only visible on today's column.
+### 4. Time entries ως blocks στο ημερολόγιο (real-time)
+Κάθε completed time entry εμφανίζεται ως ξεχωριστό block (πράσινη απόχρωση) στην ώρα `start_time`, με ύψος ανάλογο `duration_minutes / 60 * ROW_HEIGHT`. Εμφανίζει τίτλο task + διάρκεια. Realtime subscription στον πίνακα `time_entries` ώστε μόλις καταγραφεί νέο entry να εμφανιστεί αμέσως.
 
-### 5. Day Header Click → Day View
-Clicking on a day header (date number or day name) in week view switches to day view for that day: `onCalendarModeChange('day')` + `onCalendarDateChange(clickedDay)`.
-
-### 6. AI Smart Rescheduling ("Έξυπνη Αναδιάταξη")
-A button in the calendar header triggers an edge function that:
-- Receives all unscheduled + overdue tasks (with priority, estimated_hours)
-- Receives the user's `work_schedules` and already-scheduled tasks
-- Uses Lovable AI to determine optimal placement based on priority, estimated hours, and available slots
-- Returns a list of `{ taskId, new_due_date }` assignments
-- Frontend applies the updates via batch `supabase.from('tasks').update()`
+### 5. Ενημέρωση Props
+Η `TaskItem` interface δεν αλλάζει. Τα time entries είναι ξεχωριστό dataset.
 
 ## Technical Details
 
-### Task height calculation
-```
-const ROW_HEIGHT = 52; // matches min-h-[52px]
-const taskHeight = (task.estimated_hours || 1) * ROW_HEIGHT;
-const taskTop = (taskHour - HOURS[0]) * ROW_HEIGHT + minuteOffset;
+```text
+Task: "Website Redesign" | estimated: 10h | logged: 2h | remaining: 8h
+Work schedule: 09:00–17:00 (8h/day)
+
+Day 1 (task starts 09:00):
+  [09:00–17:00] ──── 8h planned block ────
+Day 2 (continuation):
+  [09:00–09:00] ──── 0h (remaining 0) ────
+  
+If logged 2h already:
+  remaining = 10 - 2 = 8h
+Day 1: [09:00–17:00] 8h
+Day 2: No spillover needed
 ```
 
-### Working hours fetch
+### Splitting algorithm
 ```typescript
-const { data } = await supabase.from('work_schedules').select('*').eq('user_id', user.id);
-// Map: dayOfWeek → { start_time, end_time, is_working_day }
+function splitTaskIntoBlocks(task, startDate, workScheduleMap, loggedHours) {
+  const remaining = Math.max(0, (task.estimated_hours || 1) - loggedHours);
+  const blocks = [];
+  let hoursLeft = remaining;
+  let currentDay = startDate;
+  
+  while (hoursLeft > 0) {
+    const ws = workScheduleMap[currentDay.getDay()];
+    if (!ws?.is_working_day) { currentDay = addDays(currentDay, 1); continue; }
+    
+    const startH = parseInt(ws.start_time.split(':')[0]);
+    const endH = parseInt(ws.end_time.split(':')[0]);
+    const taskStartH = blocks.length === 0 ? parseTaskDate(task.due_date).getHours() || startH : startH;
+    const available = endH - taskStartH;
+    const blockHours = Math.min(hoursLeft, available);
+    
+    blocks.push({ taskId: task.id, day: currentDay, startHour: taskStartH, hours: blockHours });
+    hoursLeft -= blockHours;
+    currentDay = addDays(currentDay, 1);
+  }
+  return blocks;
+}
 ```
 
-### Current time line
+### Time entries rendering
 ```typescript
-const [now, setNow] = useState(new Date());
-useEffect(() => { const t = setInterval(() => setNow(new Date()), 60000); return () => clearInterval(t); }, []);
-// Position: ((now.getHours() - 7) * 52) + (now.getMinutes() / 60 * 52)
+// Fetch
+const { data } = await supabase.from('time_entries')
+  .select('id, task_id, start_time, duration_minutes, task:tasks(title)')
+  .eq('user_id', user.id)
+  .eq('is_running', false)
+  .gte('start_time', weekStartISO)
+  .lte('start_time', weekEndISO);
+
+// Render as blocks at their start_time with height = (duration_minutes/60)*ROW_HEIGHT
 ```
 
-### AI Edge Function: `supabase/functions/smart-reschedule/index.ts`
-- Input: `{ tasks, workSchedule, existingSlots }`
-- Calls Lovable AI Gateway with a system prompt that schedules tasks optimally
-- Uses tool calling to return structured `{ assignments: [{ task_id, due_date }] }`
-- Frontend updates all tasks in parallel
+### Realtime subscription
+```typescript
+supabase.channel('time-entries-calendar')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'time_entries', filter: `user_id=eq.${user.id}` }, () => {
+    fetchTimeEntries();
+  }).subscribe();
+```
 
 ## Files
 
-| File | Change |
+| File | Αλλαγή |
 |------|--------|
-| `src/components/my-work/MyWorkCalendar.tsx` | Multi-hour blocks, working hours highlight, past dimming, current time line, day header click, AI button |
-| `supabase/functions/smart-reschedule/index.ts` | New — AI-powered task scheduling edge function |
+| `src/components/my-work/MyWorkCalendar.tsx` | Fetch time entries, split tasks into multi-day blocks based on work schedule and remaining hours, render time entry blocks with green styling, add realtime subscription |
 

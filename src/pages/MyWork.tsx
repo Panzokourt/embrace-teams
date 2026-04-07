@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { TaskSidePanel } from '@/components/my-work/TaskSidePanel';
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
@@ -80,9 +80,6 @@ const TASK_SELECT = 'id, title, status, priority, due_date, start_date, estimate
 function getStatusLabel(s: string) { return STATUS_COLORS[s]?.label || s; }
 function getStatusStyle(s: string): React.CSSProperties {
   const c = STATUS_COLORS[s]; return c ? { backgroundColor: c.bg, color: c.text } : {};
-}
-function getPriorityStyle(p: string): React.CSSProperties {
-  const c = PRIORITY_COLORS[p]; return c ? { backgroundColor: c.bg, color: c.text } : {};
 }
 
 // ── Main Page ──────────────────────────────────────
@@ -277,7 +274,8 @@ export default function MyWork() {
   }
 
   return (
-    <div className="flex-1 p-4 md:p-6 lg:p-8 space-y-6">
+    <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-6">
       {/* ── Header with inline KPI chips ── */}
       <div className="flex flex-col gap-2">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -591,28 +589,32 @@ export default function MyWork() {
       <QuickNotes />
 
 
-      <Sheet open={!!selectedItem} onOpenChange={open => !open && setSelectedItem(null)}>
-        <SheetContent className="sm:max-w-lg overflow-y-auto">
-          {selectedItem?.type === 'task' && (
-            <TaskDetailSheet
-              task={selectedItem.data}
-              today={today}
-              onClose={() => setSelectedItem(null)}
-              navigate={navigate}
-              activeTimer={activeTimer}
-              startTimer={startTimer}
-              stopTimer={stopTimer}
-            />
-          )}
-          {selectedItem?.type === 'deliverable' && (
-            <DeliverableDetailSheet
-              deliverable={selectedItem.data}
-              onClose={() => setSelectedItem(null)}
-              navigate={navigate}
-            />
-          )}
-        </SheetContent>
-      </Sheet>
+      </div>
+
+      {/* Docked Side Panel */}
+      {selectedItem?.type === 'task' && (
+        <div className="w-[420px] shrink-0 border-l border-border/30 bg-card animate-in slide-in-from-right duration-200 overflow-hidden">
+          <TaskSidePanel
+            taskId={selectedItem.data.id}
+            onClose={() => setSelectedItem(null)}
+            activeTimer={activeTimer}
+            startTimer={startTimer}
+            stopTimer={stopTimer}
+            onTaskUpdated={(taskId, updates) => {
+              setAllMyTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
+            }}
+          />
+        </div>
+      )}
+      {selectedItem?.type === 'deliverable' && (
+        <div className="w-[420px] shrink-0 border-l border-border/30 bg-card animate-in slide-in-from-right duration-200 overflow-hidden">
+          <DeliverableDetailPanel
+            deliverable={selectedItem.data}
+            onClose={() => setSelectedItem(null)}
+            navigate={navigate}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -844,86 +846,22 @@ function CalendarTaskCard({
   );
 }
 
-// ── Task Detail Sheet Content ────────────────────────
-function TaskDetailSheet({ task, today, onClose, navigate, activeTimer, startTimer, stopTimer }: {
-  task: TaskItem; today: Date; onClose: () => void; navigate: any; activeTimer: any; startTimer: any; stopTimer: any;
-}) {
-  const isOverdue = task.due_date && isBefore(new Date(task.due_date), today);
-  const isRunning = activeTimer?.is_running && activeTimer.task_id === task.id;
-
-  return (
-    <>
-      <SheetHeader>
-        <SheetTitle className="text-lg">{task.title}</SheetTitle>
-        <SheetDescription>{(task.project as any)?.name || 'Χωρίς project'}</SheetDescription>
-      </SheetHeader>
-      <div className="mt-6 space-y-4">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-muted/30 rounded-[12px] p-3">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Status</p>
-            <span className="text-xs font-medium rounded-[6px] px-2.5 py-1" style={getStatusStyle(task.status)}>{getStatusLabel(task.status)}</span>
-          </div>
-          <div className="bg-muted/30 rounded-[12px] p-3">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Priority</p>
-            <span className="text-xs font-medium rounded-[6px] px-2.5 py-1" style={getPriorityStyle(task.priority)}>{PRIORITY_COLORS[task.priority]?.label || task.priority}</span>
-          </div>
-          <div className="bg-muted/30 rounded-[12px] p-3">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Έναρξη</p>
-            <p className="text-sm font-medium">{task.start_date ? format(new Date(task.start_date), 'd MMM yyyy', { locale: el }) : '-'}</p>
-          </div>
-          <div className="bg-muted/30 rounded-[12px] p-3">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Λήξη</p>
-            <p className={`text-sm font-medium ${isOverdue ? 'text-destructive' : ''}`}>{task.due_date ? format(new Date(task.due_date), 'd MMM yyyy', { locale: el }) : '-'}</p>
-          </div>
-        </div>
-
-        <div className="bg-muted/30 rounded-[12px] p-3">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Πρόοδος</p>
-          <div className="flex items-center gap-2">
-            <Progress value={task.progress || 0} className="flex-1 h-2" />
-            <span className="text-sm font-medium">{task.progress || 0}%</span>
-          </div>
-        </div>
-
-        {task.description && (
-          <div className="bg-muted/30 rounded-[12px] p-3">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Περιγραφή</p>
-            <p className="text-sm whitespace-pre-wrap">{task.description}</p>
-          </div>
-        )}
-
-        {/* Timer control */}
-        <div className="flex gap-2">
-          {!isRunning ? (
-            <Button variant="outline" size="sm" className="flex-1 gap-1.5" onClick={() => startTimer(task.id, task.project_id)}>
-              <Play className="h-3.5 w-3.5" /> Εκκίνηση Timer
-            </Button>
-          ) : (
-            <Button variant="destructive" size="sm" className="flex-1 gap-1.5" onClick={() => stopTimer()}>
-              <Square className="h-3.5 w-3.5" /> Διακοπή Timer
-            </Button>
-          )}
-        </div>
-
-        <Button className="w-full gap-2" onClick={() => { onClose(); navigate(`/tasks/${task.id}`); }}>
-          <ExternalLink className="h-4 w-4" /> Άνοιγμα σελίδας Task
-        </Button>
-      </div>
-    </>
-  );
-}
-
-// ── Deliverable Detail Sheet Content ─────────────────
-function DeliverableDetailSheet({ deliverable, onClose, navigate }: {
+// ── Deliverable Detail Panel Content ─────────────────
+function DeliverableDetailPanel({ deliverable, onClose, navigate }: {
   deliverable: DeliverableItem; onClose: () => void; navigate: any;
 }) {
   return (
-    <>
-      <SheetHeader>
-        <SheetTitle className="text-lg">{deliverable.name}</SheetTitle>
-        <SheetDescription>Παραδοτέο</SheetDescription>
-      </SheetHeader>
-      <div className="mt-6 space-y-4">
+    <div className="h-full flex flex-col overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-border/30 shrink-0">
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-semibold text-foreground truncate">{deliverable.name}</h3>
+          <p className="text-xs text-muted-foreground">Παραδοτέο</p>
+        </div>
+        <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={onClose}>
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-muted/30 rounded-[12px] p-3">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Κατάσταση</p>
@@ -936,11 +874,12 @@ function DeliverableDetailSheet({ deliverable, onClose, navigate }: {
             <p className="text-sm font-medium">{deliverable.due_date ? format(new Date(deliverable.due_date), 'd MMM yyyy', { locale: el }) : '-'}</p>
           </div>
         </div>
-
-        <Button className="w-full gap-2" onClick={() => { onClose(); navigate(`/projects/${deliverable.project_id}?tab=deliverables`); }}>
+      </div>
+      <div className="px-4 py-3 border-t border-border/30 shrink-0">
+        <Button className="w-full gap-2 h-9 rounded-lg" onClick={() => { onClose(); navigate(`/projects/${deliverable.project_id}?tab=deliverables`); }}>
           <ExternalLink className="h-4 w-4" /> Άνοιγμα στο Έργο
         </Button>
       </div>
-    </>
+    </div>
   );
 }

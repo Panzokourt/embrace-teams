@@ -1,39 +1,33 @@
 
 
-# Task Detail — Three-Column Layout Redesign
+# Task Files — Task-Scoped Files, Drag & Drop & Non-Empty Indicator
 
-## Current Layout (2 columns)
-```text
-LEFT (flex-1)                    RIGHT (w-72)
-├─ Description + Tags           ├─ Ανάθεση
-├─ Subtasks                     ├─ Χρονοδιάγραμμα
-└─ Tabs (Σχόλια/Αρχεία/         ├─ Ροή Κατάστασης
-   Χρόνος/Ιστορικό)             ├─ Ιδιότητες
-                                 ├─ Εξαρτήσεις
-                                 ├─ Επανάληψη
-                                 ├─ Έγκριση & Review
-                                 └─ Media Source
-```
+## Τρέχουσα κατάσταση
+- Η καρτέλα "Αρχεία" στο TaskDetail δείχνει `<FileExplorer projectId={task.project_id} />` — δηλαδή **όλα τα αρχεία του project**, όχι τα αρχεία του task.
+- Η `file_attachments` table έχει ήδη `task_id` column — αλλά δεν χρησιμοποιείται στο FileExplorer.
+- Drag & drop λειτουργεί ήδη στο FinderColumnView (OS files + internal move).
+- Δεν υπάρχει visual indicator σε φακέλους που περιέχουν αρχεία.
 
-## New Layout (3 columns)
-```text
-LEFT (w-64)                 CENTER (flex-1)              RIGHT (w-72)
-├─ Ανάθεση                 ├─ Description + Tags        ├─ Σχόλια (CommentsSection)
-├─ Χρονοδιάγραμμα          ├─ Subtasks                  ├─ Εξαρτήσεις
-├─ Ροή Κατάστασης          └─ Tabs (Αρχεία/Χρόνος/      ├─ Επανάληψη
-├─ Ιδιότητες                    Ιστορικό)                ├─ Έγκριση & Review
-└─ Media Source                                          └─ (empty space)
-```
+## Αλλαγές
 
-Key changes:
-- **Left column**: Assignment, Timeline, Status Flow, Properties, Media Source — the "identity" cards
-- **Center**: Description, Subtasks, remaining tabs (Files, Time, History — comments tab removed)
-- **Right column**: Comments (promoted to always-visible card, no longer in tabs), Dependencies, Recurrence, Review/Approval
-- On screens < `lg`, left & right columns collapse — left goes above center, right goes below (stacked)
+### 1. Task-scoped file filtering
+- Προσθήκη `taskId` prop στο `FileExplorer` component.
+- Όταν `taskId` είναι παρόν, τα queries θα φιλτράρουν `file_attachments` με `.eq('task_id', taskId)` και `file_folders` με project scope (φάκελοι είναι κοινοί σε project level).
+- Κατά το upload, αν υπάρχει `taskId`, θα γράφεται αυτόματα στο `task_id` field.
+- Στο TaskDetail: `<FileExplorer projectId={task.project_id} taskId={task.id} />`
 
-## File Changes
+### 2. Non-empty folder indicator
+- Στο `FinderColumnView`, υπολογισμός ενός `Set` με τα folder IDs που έχουν τουλάχιστον ένα αρχείο ή child folder.
+- Εμφάνιση μικρού dot/badge δίπλα στο folder icon (πριν το chevron) για τους μη-κενούς φακέλους.
 
-| File | Change |
+### 3. Drag & Drop στο folder area
+- Ήδη υποστηρίζεται — θα βεβαιωθούμε ότι λειτουργεί σωστά και στο task context (τα uploads θα παίρνουν task_id).
+
+## Files
+
+| File | Αλλαγή |
 |------|--------|
-| `src/pages/TaskDetail.tsx` | Restructure to 3-column layout, move Comments out of Tabs into right column as standalone card, redistribute cards |
+| `src/components/files/FileExplorer.tsx` | Προσθήκη `taskId` prop, φιλτράρισμα queries, pass task_id σε uploads |
+| `src/components/files/FinderColumnView.tsx` | Non-empty folder indicator (dot badge) |
+| `src/pages/TaskDetail.tsx` | Pass `taskId={task.id}` στο FileExplorer |
 

@@ -133,7 +133,7 @@ export function MyWorkCalendar({
     tasks.filter(t => {
       const d = getTaskDate(t);
       if (!d) return false;
-      return isBefore(startOfDay(new Date(d)), startOfDay(new Date())) && t.status !== 'completed';
+      return isBefore(startOfDay(parseTaskDate(d)), startOfDay(new Date())) && t.status !== 'completed';
     }), [tasks]);
   const backlogCount = unscheduledTasks.length + overdueTasks.length;
 

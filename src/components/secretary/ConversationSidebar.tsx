@@ -75,7 +75,7 @@ export default function ConversationSidebar({
   const groups = groupConversations();
 
   return (
-    <div className="w-64 border-r border-border/40 flex flex-col h-full bg-card/30">
+    <div className="w-64 border-r border-sidebar-border flex flex-col h-full bg-sidebar text-sidebar-foreground">
       <div className="p-3 border-b border-border/40">
         <Button
           variant="outline"

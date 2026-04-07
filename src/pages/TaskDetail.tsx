@@ -464,10 +464,10 @@ export default function TaskDetailPage() {
 
       {/* ===== THREE-COLUMN LAYOUT ===== */}
       <div className="flex-1 overflow-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 p-4 lg:p-5 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 p-4 lg:p-5 items-start">
 
           {/* LEFT COLUMN: Identity & Properties */}
-          <div className="lg:col-span-3 space-y-4 lg:sticky lg:top-[60px]">
+          <div className="lg:col-span-3 space-y-3 lg:sticky lg:top-0 self-start">
             {/* Assignment Card */}
             <Card>
               <CardContent className="p-4 space-y-3">
@@ -608,7 +608,7 @@ export default function TaskDetailPage() {
           </div>
 
           {/* CENTER COLUMN: Description, Subtasks, Tabs */}
-          <div className="lg:col-span-5 min-w-0 space-y-4">
+          <div className="lg:col-span-5 min-w-0 space-y-3 self-start">
             {/* Description + Tags */}
             <Card>
               <CardContent className="p-4 space-y-3">
@@ -790,7 +790,7 @@ export default function TaskDetailPage() {
           </div>
 
           {/* RIGHT COLUMN: Comments, Dependencies, Recurrence, Review */}
-          <div className="lg:col-span-4 space-y-4 lg:sticky lg:top-[60px]">
+          <div className="lg:col-span-4 space-y-3 lg:sticky lg:top-0 self-start">
             {/* Comments — always visible */}
             <Card>
               <CardContent className="p-4">
@@ -836,7 +836,7 @@ export default function TaskDetailPage() {
 function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="text-[11px] text-muted-foreground w-20 shrink-0">{label}</span>
+      <span className="text-[11px] text-muted-foreground w-[72px] shrink-0 truncate">{label}</span>
       <div className="flex-1 min-w-0">{children}</div>
     </div>
   );

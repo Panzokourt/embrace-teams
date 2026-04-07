@@ -25,7 +25,7 @@ interface FileExplorerProps {
   taskId?: string;
 }
 
-export function FileExplorer({ tenderId, projectId }: FileExplorerProps) {
+export function FileExplorer({ tenderId, projectId, taskId }: FileExplorerProps) {
   const { user, isAdmin, isManager } = useAuth();
   const [files, setFiles] = useState<FileAttachment[]>([]);
   const [folders, setFolders] = useState<FileFolder[]>([]);

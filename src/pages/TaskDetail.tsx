@@ -836,7 +836,7 @@ export default function TaskDetailPage() {
 function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="text-[11px] text-muted-foreground w-20 shrink-0">{label}</span>
+      <span className="text-[11px] text-muted-foreground w-[72px] shrink-0 truncate">{label}</span>
       <div className="flex-1 min-w-0">{children}</div>
     </div>
   );

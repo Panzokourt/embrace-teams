@@ -42,6 +42,7 @@ import { ProjectCategoriesManager } from '@/components/settings/ProjectCategorie
 import { ProjectFolderTemplatesManager } from '@/components/settings/ProjectFolderTemplatesManager';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { EmailAccountSetup } from '@/components/settings/EmailAccountSetup';
+import { DataManagementCard } from '@/components/settings/DataManagementCard';
 
 const DAY_LABELS = ['Δευτέρα', 'Τρίτη', 'Τετάρτη', 'Πέμπτη', 'Παρασκευή', 'Σάββατο', 'Κυριακή'];
 const DEFAULT_SCHEDULE = DAY_LABELS.map((_, i) => ({
@@ -500,6 +501,9 @@ export default function SettingsPage() {
 
       {/* Work Schedule */}
       <WorkScheduleCard />
+
+      {/* Data Management (Admin only) */}
+      {isAdmin && <DataManagementCard />}
 
       {/* Password Change Dialog */}
       <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>

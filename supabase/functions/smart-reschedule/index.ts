@@ -21,16 +21,28 @@ serve(async (req) => {
 
     const today = new Date().toISOString().split("T")[0];
 
+    // Pre-compute working days list for the prompt
+    const workingDays = (workSchedule || [])
+      .filter((ws: any) => ws.is_working_day)
+      .map((ws: any) => ws.day_of_week);
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const workingDayNames = workingDays.map((d: number) => `${dayNames[d]} (${d})`).join(', ');
+    const nonWorkingDays = [0,1,2,3,4,5,6].filter((d: number) => !workingDays.includes(d));
+    const nonWorkingDayNames = nonWorkingDays.map((d: number) => dayNames[d]).join(', ');
+
     const systemPrompt = `You are a task scheduling assistant. Given a list of tasks (with priority and estimated_hours), work schedule (working days and hours), and already-scheduled slots, assign each task to an optimal time slot.
 
 Rules:
-- Only schedule during working hours on working days
+- CRITICAL: ONLY schedule on working days: ${workingDayNames}
+- NEVER schedule on non-working days: ${nonWorkingDayNames}
+- Only schedule during the working hours defined in the work schedule
 - Higher priority tasks (high > medium > low) should be scheduled earlier
 - Don't overlap with existing scheduled slots
-- Each task needs consecutive hours equal to its estimated_hours
+- Each task needs consecutive hours equal to its estimated_hours (if it exceeds daily working hours, split across multiple working days)
 - Start scheduling from today: ${today}
 - Return ISO date strings for due_date (with time, e.g. "2026-04-08T09:00:00")
 - If no slots available in the next 14 days, skip the task
+- Double-check that the day of the week of each assignment is a working day before returning
 
 Use the schedule_tasks tool to return your assignments.`;
 

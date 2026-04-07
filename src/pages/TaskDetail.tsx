@@ -464,10 +464,10 @@ export default function TaskDetailPage() {
 
       {/* ===== THREE-COLUMN LAYOUT ===== */}
       <div className="flex-1 overflow-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 p-4 lg:p-5 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 p-4 lg:p-5 items-start">
 
           {/* LEFT COLUMN: Identity & Properties */}
-          <div className="lg:col-span-3 space-y-4 lg:sticky lg:top-[60px]">
+          <div className="lg:col-span-3 space-y-3 lg:sticky lg:top-0 self-start">
             {/* Assignment Card */}
             <Card>
               <CardContent className="p-4 space-y-3">

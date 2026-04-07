@@ -1,74 +1,52 @@
 
 
-# Secretary Chat — Streaming & Speed Optimization
+# Διαχείριση Δεδομένων — Settings Data Management
 
-## Problem
-1. **No streaming**: The secretary-agent completes ALL work (up to 8 Anthropic API calls + tool executions) before sending a single JSON response. User sees "Σκέφτομαι..." for 10-30 seconds.
-2. **Heavy model**: Uses `claude-sonnet-4-20250514` for every iteration, even simple queries.
+## Τι θα φτιάξουμε
 
-## Solution: Hybrid Streaming
+Νέα ενότητα "Διαχείριση Δεδομένων" στη σελίδα Ρυθμίσεις (μόνο για Admin), που επιτρέπει επιλεκτική ή μαζική διαγραφή δεδομένων ανά κατηγορία.
 
-### Architecture
+## Κατηγορίες δεδομένων
 
-```text
-Client                    Edge Function
-  |                           |
-  |--- POST /secretary ------>|
-  |                           |-- DB context queries (parallel)
-  |<-- SSE: thinking ---------|
-  |                           |-- Anthropic call #1
-  |<-- SSE: tool_call --------|-- (tool detected)
-  |                           |-- Execute tool
-  |<-- SSE: tool_result ------|
-  |                           |-- Anthropic call #2 (with tool result)
-  |<-- SSE: streaming text -->|-- (final response, streamed)
-  |<-- SSE: [DONE] -----------|
-```
+Ομαδοποίηση σε λογικές ενότητες με counter (πόσα records υπάρχουν):
 
-The user sees:
-1. "Αναζήτηση projects..." (while tools execute)
-2. Text appearing word-by-word (final response streamed)
+| Κατηγορία | Τι διαγράφεται |
+|-----------|---------------|
+| **Έργα & Tasks** | projects, tasks, deliverables, comments, time_entries, file_attachments, file_folders |
+| **Πελάτες & Επαφές** | clients, contacts, contact_tags |
+| **Προτάσεις & Συμβόλαια** | proposals, proposal_items, contracts, invoices, expenses |
+| **Media Plans** | media_plans, media_plan_items + snapshots |
+| **Επικοινωνία** | chat_messages, chat_channels, secretary_messages, secretary_conversations |
+| **HR & Άδειες** | hr_documents, leave_requests, leave_balances |
+| **Brain / AI** | brain_insights, brain_deep_dives |
+| **Ειδοποιήσεις & Logs** | notifications, activity_log |
 
-### Changes
+## UX Flow
 
-**`supabase/functions/secretary-agent/index.ts`**
-- Switch response from JSON to **SSE stream**
-- Tool-calling iterations remain non-streaming (they're short)
-- Send progress SSE events: `{"type":"status","text":"Εκτέλεση: list_projects..."}`
-- Final Anthropic call uses `stream: true` — forward text deltas as SSE
-- Keep all existing tools and system prompt unchanged
+1. Card με τίτλο "Διαχείριση Δεδομένων" + warning icon (admin-only)
+2. Λίστα κατηγοριών με checkbox, κάθε μία δείχνει τον αριθμό εγγραφών
+3. Κουμπί "Διαγραφή Επιλεγμένων" → AlertDialog με confirmation (πληκτρολόγηση "ΔΙΑΓΡΑΦΗ" για επιβεβαίωση)
+4. Edge function εκτελεί τη διαγραφή server-side (ασφαλής, company-scoped)
 
-**`src/components/secretary/SecretaryChat.tsx`**
-- Replace `await response.json()` with SSE reader (EventSource-like fetch)
-- Show intermediate status messages ("Αναζήτηση...", "Δημιουργία task...")
-- Accumulate streamed text and update message in real-time
-- Keep all existing rendering logic (ActionRenderer, markdown, etc.)
+## Τεχνική υλοποίηση
 
-### SSE Protocol
+### Edge Function: `data-management`
+- Δέχεται JWT + categories array
+- Επαληθεύει ότι ο χρήστης είναι admin/owner της εταιρείας
+- Εκτελεί DELETE σε cascading σειρά (tasks πριν projects, κλπ)
+- Επιστρέφει πόσα records διαγράφηκαν ανά κατηγορία
 
-```
-data: {"type":"status","text":"Εκτελώ list_projects..."}
+### Frontend: `DataManagementCard` component
+- Νέο component στο `src/components/settings/DataManagementCard.tsx`
+- Fetch counts μέσω Supabase client (count queries)
+- Κλήση edge function για τη διαγραφή
+- Ενσωμάτωση στο Settings.tsx (μόνο αν `isAdmin`)
 
-data: {"type":"delta","content":"Τα "}
-data: {"type":"delta","content":"projects "}
-data: {"type":"delta","content":"σου είναι:"}
+## Files
 
-data: {"type":"done","reply":"full content here"}
-
-data: [DONE]
-```
-
-### Speed Gains
-- **Perceived latency**: ~1-2s (first text appears) vs current 10-30s
-- **Tool progress**: User sees what the AI is doing in real-time
-- **No model change needed**: Streaming alone eliminates the perceived delay
-
-## Files to Modify
-
-| File | Changes |
-|------|---------|
-| `supabase/functions/secretary-agent/index.ts` | SSE response, stream final call, progress events during tool loop |
-| `src/components/secretary/SecretaryChat.tsx` | SSE reader, real-time text accumulation, status indicators |
-
-No database changes. All existing tools, system prompt, and ActionRenderer remain unchanged.
+| File | Αλλαγή |
+|------|--------|
+| `src/components/settings/DataManagementCard.tsx` | Νέο component — UI κατηγοριών, counts, confirmation dialog |
+| `supabase/functions/data-management/index.ts` | Νέο edge function — server-side deletion, company-scoped |
+| `src/pages/Settings.tsx` | Import + render DataManagementCard (admin-only) |
 

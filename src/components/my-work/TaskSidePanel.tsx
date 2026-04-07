@@ -20,14 +20,7 @@ import { format, isBefore, startOfDay } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { STATUS_COLORS, PRIORITY_COLORS } from '@/components/shared/mondayStyleConfig';
 
-const STATUS_PROGRESS: Record<string, number> = {
-  todo: 0,
-  in_progress: 20,
-  review: 50,
-  internal_review: 65,
-  client_review: 80,
-  completed: 100,
-};
+import { STATUS_PROGRESS, computeParentStatus, computeSubtaskProgress } from '@/utils/subtaskProgress';
 
 interface TaskSidePanelProps {
   taskId: string;

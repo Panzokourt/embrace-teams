@@ -1833,28 +1833,42 @@ Risk Radar:
 Context δεδομένων χρήστη:
 ${contextParts.join("\n")}`;
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) {
+      throw new Error("ANTHROPIC_API_KEY is not configured");
     }
 
+    // Convert OpenAI-style tool definitions to Anthropic format
+    const anthropicTools = toolDefinitions.map((t: any) => ({
+      name: t.function.name,
+      description: t.function.description,
+      input_schema: t.function.parameters,
+    }));
+
+    // Build Anthropic messages (separate system, convert roles)
+    // Filter out system messages from the conversation
+    const anthropicMessages = messages.map((m: any) => ({
+      role: m.role === "system" ? "user" : m.role,
+      content: m.content,
+    }));
+
     // Tool calling loop (max 8 iterations for complex workflows)
-    let conversationMessages = [
-      { role: "system", content: systemPrompt },
-      ...messages,
-    ];
+    let conversationMessages = [...anthropicMessages];
 
     for (let i = 0; i < 8; i++) {
-      const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-pro",
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 8192,
+          system: systemPrompt,
           messages: conversationMessages,
-          tools: toolDefinitions,
+          tools: anthropicTools,
         }),
       });
 
@@ -1865,49 +1879,56 @@ ${contextParts.join("\n")}`;
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-        if (aiResponse.status === 402) {
-          return new Response(JSON.stringify({ error: "Απαιτείται ανανέωση credits." }), {
-            status: 402,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
         const errText = await aiResponse.text();
-        console.error("AI gateway error:", aiResponse.status, errText);
-        throw new Error("AI gateway error");
+        console.error("Anthropic API error:", aiResponse.status, errText);
+        throw new Error("AI API error");
       }
 
       const result = await aiResponse.json();
-      const choice = result.choices?.[0];
+      const stopReason = result.stop_reason;
+      const contentBlocks = result.content || [];
 
-      if (!choice) throw new Error("No response from AI");
+      // Extract text response
+      const textBlocks = contentBlocks.filter((b: any) => b.type === "text");
+      const textResponse = textBlocks.map((b: any) => b.text).join("");
+
+      // Extract tool use blocks
+      const toolUseBlocks = contentBlocks.filter((b: any) => b.type === "tool_use");
 
       // If no tool calls, return the text response
-      if (!choice.message?.tool_calls || choice.message.tool_calls.length === 0) {
+      if (toolUseBlocks.length === 0 || stopReason === "end_turn") {
         return new Response(
-          JSON.stringify({ reply: choice.message?.content || "" }),
+          JSON.stringify({ reply: textResponse }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Execute tool calls
-      conversationMessages.push(choice.message);
+      // Add assistant message with all content blocks
+      conversationMessages.push({
+        role: "assistant",
+        content: contentBlocks,
+      });
 
-      for (const toolCall of choice.message.tool_calls) {
-        const fnName = toolCall.function.name;
-        let fnArgs: any = {};
-        try {
-          fnArgs = JSON.parse(toolCall.function.arguments || "{}");
-        } catch {}
+      // Execute each tool call and add results
+      const toolResults: any[] = [];
+      for (const toolBlock of toolUseBlocks) {
+        const fnName = toolBlock.name;
+        const fnArgs = toolBlock.input || {};
 
         console.log(`Executing tool: ${fnName}`, fnArgs);
         const toolResult = await executeTool(supabase, userId, companyId, fnName, fnArgs);
 
-        conversationMessages.push({
-          role: "tool",
-          tool_call_id: toolCall.id,
+        toolResults.push({
+          type: "tool_result",
+          tool_use_id: toolBlock.id,
           content: JSON.stringify(toolResult),
         });
       }
+
+      conversationMessages.push({
+        role: "user",
+        content: toolResults,
+      });
     }
 
     // If we exhausted iterations

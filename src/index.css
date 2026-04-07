@@ -131,25 +131,25 @@
     /* Borders */
     --border: 240 4% 22%;
     --input: 240 4% 22%;
-    --ring: 211 100% 64%;
+    --ring: 84 75% 52%;
 
-    /* Sidebar */
+    /* Sidebar — inverted dark */
     --sidebar-background: 240 6% 10%;
     --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 211 100% 64%;
+    --sidebar-primary: 84 75% 52%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 4% 20%;
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 240 4% 22%;
-    --sidebar-ring: 211 100% 64%;
+    --sidebar-ring: 84 75% 52%;
 
-    /* Charts — 6-color Apple palette (dark) */
-    --chart-1: 211 100% 64%;
-    --chart-2: 172 66% 55%;
-    --chart-3: 280 60% 68%;
-    --chart-4: 35 82% 58%;
-    --chart-5: 0 72% 65%;
-    --chart-6: 142 60% 55%;
+    /* Charts — neutral gray palette (dark) */
+    --chart-1: 0 0% 98%;
+    --chart-2: 240 5% 80%;
+    --chart-3: 240 5% 65%;
+    --chart-4: 240 4% 46%;
+    --chart-5: 240 4% 30%;
+    --chart-6: 240 6% 20%;
     --sidebar: 240 5% 14%;
 
     --shadow-2xs: 0 1px 2px 0 hsl(0 0% 0% / 0.1);

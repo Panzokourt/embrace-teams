@@ -39,10 +39,28 @@ interface Milestone {
 }
 
 interface WorkSchedule {
-  day_of_week: number; // 0=Sun, 1=Mon, ...
+  day_of_week: number;
   start_time: string;
   end_time: string;
   is_working_day: boolean;
+}
+
+interface TimeEntryBlock {
+  id: string;
+  task_id: string;
+  task_title: string;
+  start_time: string;
+  duration_minutes: number;
+}
+
+interface TaskBlock {
+  taskId: string;
+  task: TaskItem;
+  day: Date;
+  startHour: number;
+  startMinute: number;
+  hours: number;
+  isContinuation: boolean;
 }
 
 interface Props {
@@ -96,6 +114,74 @@ const MILESTONE_COLORS: Record<string, string> = {
   deliverable: 'bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/30',
 };
 
+// ── Split a task into multi-day blocks based on work schedule and remaining hours ──
+function splitTaskIntoBlocks(
+  task: TaskItem,
+  workScheduleMap: Record<number, WorkSchedule>,
+  loggedHours: number,
+): TaskBlock[] {
+  const dateStr = getTaskDate(task);
+  if (!dateStr || isAllDay(dateStr)) return [];
+
+  const estimated = (task as any).estimated_hours || 1;
+  const remaining = Math.max(0.5, estimated - loggedHours);
+  const startDate = parseTaskDate(dateStr);
+  const blocks: TaskBlock[] = [];
+  let hoursLeft = remaining;
+  let currentDay = new Date(startDate);
+  let isFirst = true;
+  let maxDays = 30; // safety limit
+
+  while (hoursLeft > 0 && maxDays-- > 0) {
+    const dow = currentDay.getDay();
+    const ws = workScheduleMap[dow];
+    const isWorking = ws?.is_working_day ?? (dow !== 0 && dow !== 6);
+
+    if (!isWorking) {
+      currentDay = addDays(currentDay, 1);
+      continue;
+    }
+
+    const wsStart = parseInt(ws?.start_time?.split(':')[0] || '9', 10);
+    const wsEnd = parseInt(ws?.end_time?.split(':')[0] || '17', 10);
+
+    let blockStartH: number;
+    let blockStartM = 0;
+    if (isFirst) {
+      blockStartH = startDate.getHours();
+      blockStartM = startDate.getMinutes();
+      // If task starts before working hours, move to working hours start
+      if (blockStartH < wsStart) { blockStartH = wsStart; blockStartM = 0; }
+      isFirst = false;
+    } else {
+      blockStartH = wsStart;
+    }
+
+    const availableHours = wsEnd - blockStartH - (blockStartM / 60);
+    if (availableHours <= 0) {
+      currentDay = addDays(currentDay, 1);
+      continue;
+    }
+
+    const blockHours = Math.min(hoursLeft, availableHours);
+
+    blocks.push({
+      taskId: task.id,
+      task,
+      day: new Date(currentDay),
+      startHour: blockStartH,
+      startMinute: blockStartM,
+      hours: blockHours,
+      isContinuation: blocks.length > 0,
+    });
+
+    hoursLeft -= blockHours;
+    currentDay = addDays(currentDay, 1);
+  }
+
+  return blocks;
+}
+
 export function MyWorkCalendar({
   tasks, calendarDate, calendarMode, onCalendarDateChange, onCalendarModeChange,
   onTaskClick, onTaskUpdated, activeTimer, startTimer, stopTimer,
@@ -103,6 +189,7 @@ export function MyWorkCalendar({
   const { user } = useAuth();
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [workSchedules, setWorkSchedules] = useState<WorkSchedule[]>([]);
+  const [timeEntries, setTimeEntries] = useState<TimeEntryBlock[]>([]);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [createDialog, setCreateDialog] = useState<{ date: Date; hour?: number } | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -118,6 +205,87 @@ export function MyWorkCalendar({
   }, []);
 
   useEffect(() => { fetchMilestones(); fetchWorkSchedules(); }, [user]);
+
+  const weekStart = startOfWeek(calendarDate, { weekStartsOn: 1 });
+  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
+  const days = calendarMode === 'week' ? weekDays : [calendarDate];
+
+  // Fetch time entries for visible range
+  const fetchTimeEntries = useCallback(async () => {
+    if (!user) return;
+    const rangeStart = days[0];
+    const rangeEnd = addDays(days[days.length - 1], 1);
+
+    const { data } = await supabase
+      .from('time_entries')
+      .select('id, task_id, start_time, duration_minutes, task:tasks(title)')
+      .eq('user_id', user.id)
+      .eq('is_running', false)
+      .gte('start_time', rangeStart.toISOString())
+      .lte('start_time', rangeEnd.toISOString());
+
+    if (data) {
+      setTimeEntries(data.map((e: any) => ({
+        id: e.id,
+        task_id: e.task_id,
+        task_title: e.task?.title || 'Task',
+        start_time: e.start_time,
+        duration_minutes: e.duration_minutes || 0,
+      })));
+    }
+  }, [user, days]);
+
+  useEffect(() => { fetchTimeEntries(); }, [fetchTimeEntries]);
+
+  // Realtime subscription for time entries
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel('time-entries-calendar')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'time_entries',
+        filter: `user_id=eq.${user.id}`,
+      }, () => {
+        fetchTimeEntries();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user, fetchTimeEntries]);
+
+  // Compute logged hours per task
+  const loggedHoursByTask = useMemo(() => {
+    const map: Record<string, number> = {};
+    // We need ALL time entries for tasks, not just visible range - use what we have plus fetch totals
+    timeEntries.forEach(te => {
+      map[te.task_id] = (map[te.task_id] || 0) + (te.duration_minutes / 60);
+    });
+    return map;
+  }, [timeEntries]);
+
+  // Fetch total logged hours for all visible tasks (not limited to visible date range)
+  const [totalLoggedByTask, setTotalLoggedByTask] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (!user || tasks.length === 0) return;
+    const taskIds = tasks.filter(t => (t as any).estimated_hours && (t as any).estimated_hours > 0).map(t => t.id);
+    if (taskIds.length === 0) { setTotalLoggedByTask({}); return; }
+
+    (async () => {
+      const { data } = await supabase
+        .from('time_entries')
+        .select('task_id, duration_minutes')
+        .eq('is_running', false)
+        .in('task_id', taskIds);
+
+      const map: Record<string, number> = {};
+      (data || []).forEach((e: any) => {
+        map[e.task_id] = (map[e.task_id] || 0) + ((e.duration_minutes || 0) / 60);
+      });
+      setTotalLoggedByTask(map);
+    })();
+  }, [user, tasks]);
 
   async function fetchMilestones() {
     if (!user) return;
@@ -156,7 +324,7 @@ export function MyWorkCalendar({
   }, [workSchedules]);
 
   function isWorkingHour(day: Date, hour: number): boolean {
-    const dow = day.getDay(); // 0=Sun
+    const dow = day.getDay();
     const ws = workScheduleMap[dow];
     if (!ws || !ws.is_working_day) return false;
     const startH = parseInt(ws.start_time?.split(':')[0] || '9', 10);
@@ -178,10 +346,6 @@ export function MyWorkCalendar({
   function isPastDay(day: Date): boolean {
     return isBefore(startOfDay(day), startOfDay(now)) && !isSameDay(day, now);
   }
-
-  const weekStart = startOfWeek(calendarDate, { weekStartsOn: 1 });
-  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
-  const days = calendarMode === 'week' ? weekDays : [calendarDate];
 
   const scheduledTasks = useMemo(() => tasks.filter(t => getTaskDate(t) !== null), [tasks]);
   const allDayTasks = useMemo(() => scheduledTasks.filter(t => isAllDay(getTaskDate(t))), [scheduledTasks]);
@@ -207,18 +371,39 @@ export function MyWorkCalendar({
     return map;
   }, [milestones]);
 
-  // Group timed tasks by day for absolute positioning
-  const timedTasksByDay = useMemo(() => {
-    const map: Record<string, TaskItem[]> = {};
-    timedTasks.forEach(t => {
-      const d = getTaskDate(t);
-      if (!d) return;
-      const key = format(parseTaskDate(d), 'yyyy-MM-dd');
+  // Split timed tasks into multi-day blocks
+  const taskBlocks = useMemo(() => {
+    const blocks: TaskBlock[] = [];
+    timedTasks.forEach(task => {
+      const logged = totalLoggedByTask[task.id] || 0;
+      const taskBlks = splitTaskIntoBlocks(task, workScheduleMap, logged);
+      blocks.push(...taskBlks);
+    });
+    return blocks;
+  }, [timedTasks, workScheduleMap, totalLoggedByTask]);
+
+  // Group task blocks by day
+  const blocksByDay = useMemo(() => {
+    const map: Record<string, TaskBlock[]> = {};
+    taskBlocks.forEach(b => {
+      const key = format(b.day, 'yyyy-MM-dd');
       if (!map[key]) map[key] = [];
-      map[key].push(t);
+      map[key].push(b);
     });
     return map;
-  }, [timedTasks]);
+  }, [taskBlocks]);
+
+  // Group time entries by day
+  const timeEntriesByDay = useMemo(() => {
+    const map: Record<string, TimeEntryBlock[]> = {};
+    timeEntries.forEach(te => {
+      const d = new Date(te.start_time);
+      const key = format(d, 'yyyy-MM-dd');
+      if (!map[key]) map[key] = [];
+      map[key].push(te);
+    });
+    return map;
+  }, [timeEntries]);
 
   function handleDragStart(e: React.DragEvent, taskId: string) {
     setDraggedTaskId(taskId);
@@ -312,7 +497,6 @@ export function MyWorkCalendar({
         return;
       }
 
-      // Batch update
       await Promise.all(
         assignments.map((a: { task_id: string; due_date: string }) =>
           supabase.from('tasks').update({ due_date: a.due_date } as any).eq('id', a.task_id)
@@ -452,12 +636,13 @@ export function MyWorkCalendar({
                     const key = format(day, 'yyyy-MM-dd');
                     const working = isWorkingHour(day, hour);
                     const past = isPastHour(day, hour);
-                    const dayTasks = timedTasksByDay[key] || [];
-                    // Only render tasks that START at this hour
-                    const hourTasks = dayTasks.filter(t => {
-                      const d = getTaskDate(t);
-                      if (!d) return false;
-                      return parseTaskDate(d).getHours() === hour;
+
+                    // Get task blocks that START at this hour
+                    const dayBlocks = (blocksByDay[key] || []).filter(b => b.startHour === hour);
+                    // Get time entries that START at this hour
+                    const dayTimeEntries = (timeEntriesByDay[key] || []).filter(te => {
+                      const d = new Date(te.start_time);
+                      return d.getHours() === hour;
                     });
 
                     return (
@@ -476,27 +661,52 @@ export function MyWorkCalendar({
                         onDrop={e => handleDrop(e, day, hour)}
                         onClick={() => handleSlotClick(day, hour)}
                       >
-                        {hourTasks.map((task, idx) => {
-                          const estH = (task as any).estimated_hours || 1;
-                          const taskH = Math.max(estH, 0.5) * ROW_HEIGHT;
-                          const dateStr = getTaskDate(task)!;
-                          const dt = parseTaskDate(dateStr);
-                          const minuteOffset = (dt.getMinutes() / 60) * ROW_HEIGHT;
+                        {/* Task blocks (planned work) */}
+                        {dayBlocks.map((block, idx) => {
+                          const blockH = Math.max(block.hours, 0.5) * ROW_HEIGHT;
+                          const minuteOffset = (block.startMinute / 60) * ROW_HEIGHT;
                           return (
                             <div
-                              key={task.id}
+                              key={`${block.taskId}-${idx}`}
                               className="absolute left-0.5 right-0.5 z-10"
-                              style={{ top: minuteOffset, height: taskH - 2 }}
+                              style={{ top: minuteOffset, height: blockH - 2 }}
                             >
                               <MultiHourTaskBlock
-                                task={task}
-                                height={taskH - 2}
-                                onDragStart={e => handleDragStart(e, task.id)}
-                                onClick={e => { e.stopPropagation(); onTaskClick(task); }}
+                                task={block.task}
+                                height={blockH - 2}
+                                hours={block.hours}
+                                isContinuation={block.isContinuation}
+                                remainingHours={Math.max(0, ((block.task as any).estimated_hours || 1) - (totalLoggedByTask[block.taskId] || 0))}
+                                onDragStart={e => handleDragStart(e, block.taskId)}
+                                onClick={e => { e.stopPropagation(); onTaskClick(block.task); }}
                                 activeTimer={activeTimer}
                                 startTimer={startTimer}
                                 stopTimer={stopTimer}
                               />
+                            </div>
+                          );
+                        })}
+
+                        {/* Time entry blocks (logged work) */}
+                        {dayTimeEntries.map(te => {
+                          const d = new Date(te.start_time);
+                          const minuteOffset = (d.getMinutes() / 60) * ROW_HEIGHT;
+                          const teH = Math.max((te.duration_minutes / 60), 0.25) * ROW_HEIGHT;
+                          return (
+                            <div
+                              key={`te-${te.id}`}
+                              className="absolute left-0.5 right-0.5 z-[8]"
+                              style={{ top: minuteOffset, height: teH - 2 }}
+                            >
+                              <div className="h-full rounded-[5px] border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] overflow-hidden">
+                                <div className="flex items-center gap-1">
+                                  <Clock className="h-2.5 w-2.5 text-emerald-600 shrink-0" />
+                                  <span className="truncate font-medium text-emerald-700 dark:text-emerald-300">{te.task_title}</span>
+                                </div>
+                                <div className="text-[9px] text-emerald-600/70 dark:text-emerald-400/70">
+                                  {Math.round(te.duration_minutes)}λ • {format(d, 'HH:mm')}
+                                </div>
+                              </div>
                             </div>
                           );
                         })}
@@ -517,7 +727,6 @@ export function MyWorkCalendar({
                   }}
                 >
                   {calendarMode === 'week' ? (
-                    // Position only over today's column
                     (() => {
                       const todayIdx = days.findIndex(d => isToday(d));
                       if (todayIdx < 0) return null;
@@ -621,8 +830,9 @@ export function MyWorkCalendar({
 }
 
 // ── Multi-Hour Task Block ──
-function MultiHourTaskBlock({ task, height, onDragStart, onClick, activeTimer, startTimer, stopTimer }: {
-  task: TaskItem; height: number; onDragStart: (e: React.DragEvent) => void; onClick: (e: React.MouseEvent) => void;
+function MultiHourTaskBlock({ task, height, hours, isContinuation, remainingHours, onDragStart, onClick, activeTimer, startTimer, stopTimer }: {
+  task: TaskItem; height: number; hours: number; isContinuation: boolean; remainingHours: number;
+  onDragStart: (e: React.DragEvent) => void; onClick: (e: React.MouseEvent) => void;
   activeTimer: any; startTimer: any; stopTimer: any;
 }) {
   const isRunning = activeTimer?.is_running && activeTimer.task_id === task.id;
@@ -639,14 +849,18 @@ function MultiHourTaskBlock({ task, height, onDragStart, onClick, activeTimer, s
         'group flex flex-col rounded-[6px] border px-1.5 py-1 cursor-grab active:cursor-grabbing transition-colors text-[11px] overflow-hidden',
         isOverdue
           ? 'border-destructive/30 bg-destructive/10 text-destructive'
-          : 'border-primary/20 bg-primary/5 hover:bg-primary/10 text-foreground'
+          : isContinuation
+            ? 'border-primary/15 bg-primary/[0.03] hover:bg-primary/[0.07] text-foreground border-dashed'
+            : 'border-primary/20 bg-primary/5 hover:bg-primary/10 text-foreground'
       )}
       style={{ height: '100%' }}
     >
       <div className="flex items-center gap-1">
         <GripVertical className="h-3 w-3 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-        <span className="flex-1 min-w-0 truncate font-medium">{task.title}</span>
-        {dateStr && <span className="text-[9px] text-muted-foreground tabular-nums shrink-0">{format(parseTaskDate(dateStr), 'HH:mm')}</span>}
+        <span className="flex-1 min-w-0 truncate font-medium">
+          {isContinuation && '↳ '}{task.title}
+        </span>
+        {dateStr && !isContinuation && <span className="text-[9px] text-muted-foreground tabular-nums shrink-0">{format(parseTaskDate(dateStr), 'HH:mm')}</span>}
         {!isRunning ? (
           <button className="h-4 w-4 flex items-center justify-center text-muted-foreground hover:text-primary shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
             onClick={e => { e.stopPropagation(); startTimer(task.id, task.project_id); }}><Play className="h-2.5 w-2.5" /></button>
@@ -655,9 +869,14 @@ function MultiHourTaskBlock({ task, height, onDragStart, onClick, activeTimer, s
             onClick={e => { e.stopPropagation(); stopTimer(); }}><Square className="h-2.5 w-2.5" /></button>
         )}
       </div>
-      {estH > 1 && (
-        <div className="text-[9px] text-muted-foreground mt-0.5">{estH}h</div>
-      )}
+      <div className="text-[9px] text-muted-foreground mt-0.5 flex gap-1.5">
+        <span>{hours.toFixed(1)}h</span>
+        {remainingHours < estH && (
+          <span className="text-emerald-600 dark:text-emerald-400">
+            ({(estH - remainingHours).toFixed(1)}h logged)
+          </span>
+        )}
+      </div>
       {task.project?.name && height > 40 && (
         <div className="text-[9px] text-muted-foreground truncate mt-auto">{task.project.name}</div>
       )}

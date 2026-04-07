@@ -1,79 +1,45 @@
-# Plan: Full Visual Redesign — shadcn/ui Default Aesthetic
-
-Μετάβαση από το Apple-inspired (blue primary, warm neutrals) στο **shadcn/ui v2 default** (neutral primary, clean blacks/whites, oklch colors). Σταδιακή εφαρμογή, ξεκινώντας από globals.  
-  
-**Βασικό βήμα:** Κάνε εγκατάσταση το npx shadcn@latest init --preset b1VoQo2F --template vite
-
-Με βάση το παραπάνω θα κινηθείς.  
-  
-Αλλαγές σε 4 φάσεις
-
-### Phase A: Design Tokens & CSS Variables (Global Foundation)
-
-**File: `src/index.css**`
-
-- Αντικατάσταση **όλων** των CSS variables με τις default shadcn v2 neutral τιμές:
-  - Primary: Apple Blue → **near-black** (`oklch(0.205 0 0)` / HSL fallback `240 6% 10%`)
-  - Background: warm off-white → **pure white** (`0 0% 100%`)
-  - Accent: blue tint → **neutral gray** (`240 5% 96%`)
-  - Border: subtle warm → **slightly cooler neutral**
-  - Radius: `0.625rem` → `0.625rem` (keep same, shadcn default is also 0.625rem)
-- Dark mode: update αντίστοιχα με shadcn dark defaults
-- Αφαίρεση Apple-specific comments, ανανέωση `.force-light` class
-- Κρατάμε: shadows, animations, density system, scrollbar, print styles
-
-**File: `tailwind.config.ts**`
-
-- Minimal changes (colors map already uses CSS vars, so they auto-update)
-
-### Phase B: Core UI Components (~20 files)
-
-Update `src/components/ui/` components ώστε να ακολουθούν shadcn default styling:
 
 
-| Component           | Key Change                                                                                  |
-| ------------------- | ------------------------------------------------------------------------------------------- |
-| `button.tsx`        | Remove `rounded-[10px]`, use `rounded-md`. Remove `brightness` hover, use opacity/darker bg |
-| `card.tsx`          | Remove `rounded-2xl`, use `rounded-xl`. Simplify border to `border`                         |
-| `input.tsx`         | Remove `rounded-[10px]`, use `rounded-md`. Standard focus ring                              |
-| `badge.tsx`         | Standard shadcn badge styles                                                                |
-| `dialog.tsx`        | Remove `rounded-[20px]`, use `rounded-lg`. Standard overlay                                 |
-| `sheet.tsx`         | Simpler overlay, standard border                                                            |
-| `dropdown-menu.tsx` | Remove backdrop-blur, standard bg                                                           |
-| `popover.tsx`       | Remove backdrop-blur, standard styling                                                      |
-| `alert-dialog.tsx`  | Standard rounded, overlay                                                                   |
-| `tabs.tsx`          | Standard tab styling                                                                        |
-| `toast/sonner.tsx`  | Standard toast look                                                                         |
-| All others          | Align border-radius and spacing with shadcn defaults                                        |
+# Plan: Fix Blank Pages — Tailwind v4/v3 Incompatibility
 
+## Root Cause
 
-### Phase C: Layout Shell (Sidebar, TopBar, PageHeader)
+Η εντολή `npx shadcn@latest init --preset ...` εγκατέστησε **Tailwind v4 components** σε project που τρέχει **Tailwind v3**. Αυτό σπάει ΟΛΟΚΛΗΡΗ την εφαρμογή γιατί:
 
+1. **`@import "shadcn/tailwind.css"`** — χρησιμοποιεί `@theme inline`, `@custom-variant`, `@utility` (v4-only syntax)
+2. **`@import "tw-animate-css"`** — πιθανόν v4-only
+3. **28 UI component files** χρησιμοποιούν v4 classes: `outline-ring`, `ring-ring/50`, `border-transparent!`, `group-data-*`, `has-data-*`, `data-open:`, `data-closed:`, `w-(--sidebar-width)`
 
-| File             | Change                                                                         |
-| ---------------- | ------------------------------------------------------------------------------ |
-| `AppSidebar.tsx` | Remove Apple-specific icon styling (`bg-primary/8`), use neutral active states |
-| `PageHeader.tsx` | Icon boxes: neutral instead of blue-tinted, simpler styling                    |
-| TopBar           | Neutral tones, remove blue accents                                             |
+Αποτέλεσμα: Το CSS processing αποτυγχάνει → κανένα style → blank page.
 
+## Solution: Restore Pre-Redesign UI Components + Keep CSS Tokens
 
-### Phase D: Page-Level Sweep
+Η πιο ασφαλής λύση είναι:
 
-Bulk class replacements across all 80+ pages:
+### Phase 1: Fix index.css
+- Remove `@import "shadcn/tailwind.css"` and `@import "tw-animate-css"` (v4 imports)
+- Keep the oklch CSS variable tokens (these work fine in v3 as raw CSS custom properties)
 
-- `bg-primary/8` → `bg-muted` or `bg-accent`
-- `text-primary` on icons → `text-foreground`
-- `rounded-[16px]` → `rounded-xl`
-- `rounded-[10px]` → `rounded-md`
-- `border-border/30` → `border`
-- `shadow-sm` (keep, already standard)
+### Phase 2: Restore all 28 UI components to v3-compatible versions
+The following files need to be reverted to their Tailwind v3 (shadcn/ui v0.x) versions — removing all v4-only syntax:
 
-## Σημαντικές αποφάσεις
+`accordion.tsx`, `alert-dialog.tsx`, `alert.tsx`, `avatar.tsx`, `badge.tsx`, `button.tsx`, `calendar.tsx`, `card.tsx`, `command.tsx`, `context-menu.tsx`, `dialog.tsx`, `drawer.tsx`, `dropdown-menu.tsx`, `hover-card.tsx`, `input-group.tsx`, `label.tsx`, `menubar.tsx`, `navigation-menu.tsx`, `popover.tsx`, `scroll-area.tsx`, `select.tsx`, `sheet.tsx`, `sidebar.tsx`, `switch.tsx`, `tabs.tsx`, `toggle-group.tsx`, `toggle.tsx`, `tooltip.tsx`
 
-1. **Primary color**: Θα γίνει near-black (shadcn default). Αν θέλεις να κρατήσεις κάποιο brand color (π.χ. μπλε) ως primary, πες μου.
-2. **Accent color**: Γίνεται ουδέτερο γκρι αντί για μπλε tint.
-3. **Backward compatibility**: Όλα τα CSS variables αλλάζουν globally, οπότε τα περισσότερα components θα ακολουθήσουν αυτόματα.
+For each file, the v4 syntax will be converted:
+- `outline-ring` → removed or replaced with `outline-none ring-2 ring-ring`
+- `ring-ring/50` → `ring-ring ring-opacity-50` or `ring-offset-2`
+- `border-transparent!` → `!border-transparent`
+- `group-data-vertical/tabs:` → standard conditional classes
+- `has-data-[...]` → removed (no v3 equivalent)
+- `data-open:` / `data-closed:` → `data-[state=open]:` / `data-[state=closed]:`
+- `w-(--sidebar-width)` → inline style or CSS variable fallback
 
-## Execution Order
+### Phase 3: Fix date-fns
+- Add Vite resolve alias for `date-fns/locale.mjs` → `date-fns/locale` (the `.mjs` files no longer exist in the installed version)
 
-Θα ξεκινήσω με **Phase A + B** (tokens + core UI) σε ένα πέρασμα. Αυτό θα αλλάξει αμέσως ολόκληρη την εφαρμογή. Μετά Phase C + D για τελειοποίηση.
+## Alternative: Restore from History
+
+Αν προτιμάς, μπορείς να κάνεις **restore σε version πριν το redesign** μέσω History, και να ξαναξεκινήσουμε το redesign σωστά — αυτή τη φορά **χωρίς** να τρέξουμε `shadcn init` (που εγκατέστησε v4 components) αλλά κρατώντας τα v3 components και αλλάζοντας μόνο τα CSS tokens/colors.
+
+**Σύσταση**: Η επαναφορά μέσω History είναι πιο γρήγορη και ασφαλής, γιατί η μετατροπή 28 αρχείων χειροκίνητα είναι πολύ εκτεταμένη και error-prone.
+

@@ -1205,8 +1205,8 @@ async function executeTool(
       // ── SMART INTAKE & PLANNING EXECUTORS ──
 
       case "smart_project_plan": {
-        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-        if (!LOVABLE_API_KEY) return { error: "AI not configured" };
+        const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+        if (!ANTHROPIC_API_KEY) return { error: "AI not configured" };
 
         const planPrompt = `Είσαι expert project planner για agency επικοινωνίας/marketing.
 Δημιούργησε ένα πλήρες project plan βασισμένο στην περιγραφή.
@@ -1216,28 +1216,7 @@ ${args.budget ? `Budget: €${args.budget}` : ""}
 ${args.duration_months ? `Διάρκεια: ${args.duration_months} μήνες` : ""}
 ${args.template_hint ? `Τύπος: ${args.template_hint}` : ""}
 
-Επέστρεψε ένα JSON object:
-{
-  "name": "Project name",
-  "description": "Brief description",
-  "deliverables": [
-    {
-      "name": "Deliverable name",
-      "budget_pct": 30,
-      "tasks": [
-        {
-          "title": "Task title",
-          "priority": "high|medium|low",
-          "days_offset_start": 0,
-          "days_offset_due": 14,
-          "estimated_hours": 8,
-          "role_hint": "seo_specialist"
-        }
-      ]
-    }
-  ],
-  "suggested_roles": ["project_lead", "seo_specialist", "content_writer"]
-}
+Επέστρεψε ένα JSON object μέσω του tool output_plan.
 
 Κανόνες:
 - 3-6 deliverables ανάλογα πολυπλοκότητα
@@ -1247,33 +1226,32 @@ ${args.template_hint ? `Τύπος: ${args.template_hint}` : ""}
 - Ρεαλιστικά estimated_hours
 - role_hint πρέπει να αντιστοιχεί σε ρόλους agency (project_lead, designer, copywriter, seo_specialist, social_media_manager, developer, account_manager, media_planner)`;
 
-        const planResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        const planResp = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
+            "x-api-key": ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
           },
           body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 8192,
             messages: [{ role: "user", content: planPrompt }],
             tools: [{
-              type: "function",
-              function: {
-                name: "output_plan",
-                description: "Output the structured project plan",
-                parameters: {
-                  type: "object",
-                  properties: {
-                    name: { type: "string" },
-                    description: { type: "string" },
-                    deliverables: { type: "array", items: { type: "object", properties: { name: { type: "string" }, budget_pct: { type: "number" }, tasks: { type: "array", items: { type: "object", properties: { title: { type: "string" }, priority: { type: "string" }, days_offset_start: { type: "number" }, days_offset_due: { type: "number" }, estimated_hours: { type: "number" }, role_hint: { type: "string" } } } } } } },
-                    suggested_roles: { type: "array", items: { type: "string" } },
-                  },
-                  required: ["name", "description", "deliverables", "suggested_roles"],
+              name: "output_plan",
+              description: "Output the structured project plan",
+              input_schema: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  description: { type: "string" },
+                  deliverables: { type: "array", items: { type: "object", properties: { name: { type: "string" }, budget_pct: { type: "number" }, tasks: { type: "array", items: { type: "object", properties: { title: { type: "string" }, priority: { type: "string" }, days_offset_start: { type: "number" }, days_offset_due: { type: "number" }, estimated_hours: { type: "number" }, role_hint: { type: "string" } } } } } } },
+                  suggested_roles: { type: "array", items: { type: "string" } },
                 },
+                required: ["name", "description", "deliverables", "suggested_roles"],
               },
             }],
-            tool_choice: { type: "function", function: { name: "output_plan" } },
+            tool_choice: { type: "tool", name: "output_plan" },
           }),
         });
 
@@ -1284,15 +1262,11 @@ ${args.template_hint ? `Τύπος: ${args.template_hint}` : ""}
         }
 
         const planResult = await planResp.json();
-        const toolCall = planResult.choices?.[0]?.message?.tool_calls?.[0];
-        if (!toolCall) return { error: "AI did not return a plan" };
+        // Find tool_use block in Anthropic response
+        const toolUseBlock = planResult.content?.find((b: any) => b.type === "tool_use" && b.name === "output_plan");
+        if (!toolUseBlock) return { error: "AI did not return a plan" };
 
-        let plan;
-        try {
-          plan = JSON.parse(toolCall.function.arguments);
-        } catch {
-          return { error: "Failed to parse plan" };
-        }
+        const plan = toolUseBlock.input;
 
         // Enrich with budget amounts
         if (args.budget && plan.deliverables) {

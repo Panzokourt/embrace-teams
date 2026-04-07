@@ -502,6 +502,9 @@ export default function SettingsPage() {
       {/* Work Schedule */}
       <WorkScheduleCard />
 
+      {/* Data Management (Admin only) */}
+      {isAdmin && <DataManagementCard />}
+
       {/* Password Change Dialog */}
       <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
         <DialogContent>

@@ -134,6 +134,20 @@ export function FinderColumnView({
     );
   }, [files, searchQuery]);
 
+  // Compute set of folder IDs that contain at least one file or child folder
+  const nonEmptyFolderIds = useMemo(() => {
+    const ids = new Set<string>();
+    // Folders with files
+    for (const f of files) {
+      if (f.folder_id) ids.add(f.folder_id);
+    }
+    // Folders with child folders
+    for (const f of folders) {
+      if (f.parent_folder_id) ids.add(f.parent_folder_id);
+    }
+    return ids;
+  }, [files, folders]);
+
   function getColumnItems(parentId: string | null): ColumnItem[] {
     const childFolders = folders
       .filter((f) => f.parent_folder_id === parentId)

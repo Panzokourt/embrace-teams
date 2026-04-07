@@ -382,7 +382,7 @@ function BacklogTaskItem({ task, onDragStart, onClick, isOverdue }: {
       <div className="min-w-0 flex-1">
         <div className="font-medium truncate">{task.title}</div>
         {task.project?.name && <div className="text-[10px] text-muted-foreground truncate">{task.project.name}</div>}
-        {isOverdue && task.due_date && <div className="text-[9px] text-destructive mt-0.5">{format(new Date(task.due_date), 'd MMM', { locale: el })}</div>}
+        {isOverdue && task.due_date && <div className="text-[9px] text-destructive mt-0.5">{format(parseTaskDate(task.due_date), 'd MMM', { locale: el })}</div>}
       </div>
     </div>
   );

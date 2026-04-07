@@ -530,6 +530,13 @@ export default function MyWork() {
             stopTimer={stopTimer}
             onTaskUpdated={(taskId, updates) => {
               setAllMyTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
+              setSelectedItem(prev => prev?.type === 'task' && prev.data.id === taskId
+                ? { ...prev, data: { ...prev.data, ...updates } }
+                : prev);
+
+              if ('due_date' in updates || 'start_date' in updates) {
+                void fetchAll();
+              }
             }}
           />
         </div>

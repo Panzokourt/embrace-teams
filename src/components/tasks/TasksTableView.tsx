@@ -444,7 +444,7 @@ export function TasksTableView({
       { key: 'project', label: 'Έργο', format: (_: any, row: Task) => row.project?.name || '-' },
       { key: 'assignee', label: 'Υπεύθυνος', format: (_: any, row: Task) => row.assignee?.full_name || '-' },
       { key: 'due_date', label: 'Προθεσμία', format: formatters.date },
-      { key: 'progress', label: 'Πρόοδος', format: formatters.percentage },
+      { key: 'progress', label: 'Πρόοδος', format: (_: any, row: Task) => `${STATUS_PROGRESS[row.status] ?? 0}%` },
       { key: 'estimated_hours', label: 'Εκτίμηση (ώρες)', format: (v: number | null) => v != null ? String(v) : '-' },
     ];
     exportToCSV(tasks, exportColumns, `tasks_${format(new Date(), 'yyyy-MM-dd')}`);

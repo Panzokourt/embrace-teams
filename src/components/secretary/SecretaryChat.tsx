@@ -99,6 +99,7 @@ export default function SecretaryChat({ mode, registerSendHandler }: SecretaryCh
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [sidebarKey, setSidebarKey] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);

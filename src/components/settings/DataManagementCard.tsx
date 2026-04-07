@@ -115,7 +115,7 @@ export function DataManagementCard() {
                     <Checkbox
                       checked={selected.has(key)}
                       onCheckedChange={() => toggleCategory(key)}
-                      disabled={count === 0}
+                      className="mt-0.5"
                       className="mt-0.5"
                     />
                     <Icon className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />

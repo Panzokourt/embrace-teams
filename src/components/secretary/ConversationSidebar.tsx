@@ -76,11 +76,11 @@ export default function ConversationSidebar({
 
   return (
     <div className="w-64 border-r border-sidebar-border flex flex-col h-full bg-sidebar text-sidebar-foreground">
-      <div className="p-3 border-b border-border/40">
+      <div className="p-3 border-b border-sidebar-border">
         <Button
           variant="outline"
           size="sm"
-          className="w-full gap-2 rounded-lg"
+          className="w-full gap-2 rounded-full border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent"
           onClick={onNewConversation}
         >
           <Plus className="h-4 w-4" />

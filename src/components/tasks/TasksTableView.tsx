@@ -275,8 +275,8 @@ export function TasksTableView({
           bVal = priorityOrder[b.priority as keyof typeof priorityOrder] ?? 3;
           break;
         case 'progress':
-          aVal = a.progress ?? 0;
-          bVal = b.progress ?? 0;
+          aVal = STATUS_PROGRESS[a.status] ?? 0;
+          bVal = STATUS_PROGRESS[b.status] ?? 0;
           break;
         default:
           return 0;

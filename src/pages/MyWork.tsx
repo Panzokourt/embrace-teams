@@ -274,7 +274,7 @@ export default function MyWork() {
   }
 
   return (
-    <div className="flex-1 flex overflow-hidden">
+    <div className="flex-1 flex overflow-hidden h-full">
       <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-6">
       {/* ── Header with inline KPI chips ── */}
       <div className="flex flex-col gap-2">

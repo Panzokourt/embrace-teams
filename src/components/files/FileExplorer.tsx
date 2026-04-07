@@ -161,6 +161,7 @@ export function FileExplorer({ tenderId, projectId, taskId }: FileExplorerProps)
         };
         if (tenderId) fileData.tender_id = tenderId;
         if (projectId) fileData.project_id = projectId;
+        if (taskId) fileData.task_id = taskId;
         const { data: inserted, error: insertError } = await supabase.from('file_attachments').insert([fileData as any]).select('id').single();
         if (insertError) throw insertError;
         if (inserted) uploadedFileIds.push(inserted.id);

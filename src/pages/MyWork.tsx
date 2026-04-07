@@ -21,10 +21,10 @@ import {
   Send, ClipboardCheck, Plus, StopCircle,
 } from 'lucide-react';
 import {
-  format, isBefore, startOfDay, startOfWeek, addDays, isToday, isSameDay,
+  format, isBefore, startOfDay,
 } from 'date-fns';
 import { el } from 'date-fns/locale';
-import { STATUS_COLORS, PRIORITY_COLORS } from '@/components/shared/mondayStyleConfig';
+import { STATUS_COLORS } from '@/components/shared/mondayStyleConfig';
 import { QuickNotes } from '@/components/my-work/QuickNotes';
 import { TodayTasksCard } from '@/components/my-work/TodayTasksCard';
 import { MyWorkCalendar } from '@/components/my-work/MyWorkCalendar';

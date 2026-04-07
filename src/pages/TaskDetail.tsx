@@ -347,8 +347,9 @@ export default function TaskDetailPage() {
 
   // Subtask progress calculation
   const completedSubtasks = subtasks.filter(s => s.status === 'completed').length;
-  const subtaskProgress = subtasks.length > 0 ? Math.round((completedSubtasks / subtasks.length) * 100) : null;
-  const displayProgress = subtaskProgress !== null ? subtaskProgress : STATUS_PROGRESS[task?.status || 'todo'];
+  const displayProgress = hasSubtasks
+    ? computeSubtaskProgress(subtasks)
+    : STATUS_PROGRESS[task?.status as TaskStatus || 'todo'];
 
   if (loading) {
     return (

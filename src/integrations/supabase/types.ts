@@ -5217,6 +5217,7 @@ export type Database = {
           created_at: string
           date: string
           id: string
+          is_pinned: boolean | null
           linked_entity_id: string | null
           linked_entity_type: string | null
           title: string
@@ -5229,6 +5230,7 @@ export type Database = {
           created_at?: string
           date?: string
           id?: string
+          is_pinned?: boolean | null
           linked_entity_id?: string | null
           linked_entity_type?: string | null
           title?: string
@@ -5241,6 +5243,7 @@ export type Database = {
           created_at?: string
           date?: string
           id?: string
+          is_pinned?: boolean | null
           linked_entity_id?: string | null
           linked_entity_type?: string | null
           title?: string

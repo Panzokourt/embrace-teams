@@ -264,7 +264,7 @@ export function MyWorkCalendar({
               <div className="px-2 py-1.5 text-[10px] text-muted-foreground text-right pr-3">Ολοήμ.</div>
               {days.map(day => {
                 const key = format(day, 'yyyy-MM-dd');
-                const dayAllDay = allDayTasks.filter(t => { const d = getTaskDate(t); return d && isSameDay(new Date(d), day); });
+                const dayAllDay = allDayTasks.filter(t => { const d = getTaskDate(t); return d && isSameDay(parseTaskDate(d), day); });
                 return (
                   <div key={`allday-${key}`} className="border-l border-border/20 px-1 py-1 min-h-[36px] hover:bg-accent/10 transition-colors cursor-pointer"
                     onDragOver={handleDragOver} onDrop={e => handleDrop(e, day)} onClick={() => handleSlotClick(day)}>

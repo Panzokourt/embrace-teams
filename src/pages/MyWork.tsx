@@ -739,40 +739,7 @@ function TaskRow({
   );
 }
 
-// ── Calendar Task Card ───────────────────────────────
-function CalendarTaskCard({
-  task, onComplete, onClick, activeTimer, startTimer, stopTimer, wide,
-}: {
-  task: TaskItem;
-  onComplete: () => void;
-  onClick: () => void;
-  activeTimer: any;
-  startTimer: any;
-  stopTimer: any;
-  wide?: boolean;
-}) {
-  const isRunning = activeTimer?.is_running && activeTimer.task_id === task.id;
-  const isOverdue = task.due_date && isBefore(startOfDay(new Date(task.due_date)), startOfDay(new Date()));
 
-  return (
-    <div
-      className={`flex items-center gap-1.5 rounded-[10px] border border-border/30 px-2 py-1.5 hover:bg-accent/20 transition-colors cursor-pointer ${wide ? 'px-4 py-3' : ''} ${isOverdue ? 'border-destructive/30 bg-destructive/5' : 'bg-card'}`}
-      onClick={onClick}
-    >
-      <Checkbox className="h-3.5 w-3.5 shrink-0" onCheckedChange={e => { e && onComplete(); }} onClick={e => e.stopPropagation()} />
-      <span className={`flex-1 min-w-0 truncate ${wide ? 'text-sm' : 'text-[11px]'} text-foreground`}>{task.title}</span>
-      {!isRunning ? (
-        <Button size="icon" variant="ghost" className="h-5 w-5 text-muted-foreground hover:text-primary shrink-0" onClick={e => { e.stopPropagation(); startTimer(task.id, task.project_id); }}>
-          <Play className="h-2.5 w-2.5" />
-        </Button>
-      ) : (
-        <Button size="icon" variant="ghost" className="h-5 w-5 text-primary shrink-0" onClick={e => { e.stopPropagation(); stopTimer(); }}>
-          <Square className="h-2.5 w-2.5" />
-        </Button>
-      )}
-    </div>
-  );
-}
 
 // ── Deliverable Detail Panel Content ─────────────────
 function DeliverableDetailPanel({ deliverable, onClose, navigate }: {

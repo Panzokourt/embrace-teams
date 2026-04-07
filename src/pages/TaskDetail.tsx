@@ -238,8 +238,17 @@ export default function TaskDetailPage() {
     toast.success('Ενημερώθηκε!');
   };
 
+  const hasSubtasks = subtasks.length > 0;
+
   const handleStatusChange = async (newStatus: TaskStatus) => {
     if (!task) return;
+    
+    // Block manual status change when subtasks exist
+    if (hasSubtasks) {
+      toast.warning('Η κατάσταση καθορίζεται αυτόματα από τα subtasks');
+      return;
+    }
+    
     try {
       let updateData: Record<string, string | null> = { status: newStatus };
 

@@ -315,10 +315,18 @@ export default function TaskDetailPage() {
   };
 
   const toggleSubtaskStatus = async (subtask: TaskData) => {
-    const newStatus: TaskStatus = subtask.status === 'completed' ? 'todo' : 'completed';
+    const newSubStatus: TaskStatus = subtask.status === 'completed' ? 'todo' : 'completed';
     try {
-      const { error } = await supabase.from('tasks').update({ status: newStatus }).eq('id', subtask.id);
+      const { error } = await supabase.from('tasks').update({ status: newSubStatus }).eq('id', subtask.id);
       if (error) throw error;
+      
+      // Auto-update parent status based on new subtask states
+      const updatedSubtasks = subtasks.map(s => s.id === subtask.id ? { ...s, status: newSubStatus } : s);
+      const newParentStatus = computeParentStatus(updatedSubtasks);
+      if (task && newParentStatus !== task.status) {
+        await supabase.from('tasks').update({ status: newParentStatus }).eq('id', task.id);
+      }
+      
       fetchTask();
     } catch {
       toast.error('Σφάλμα');

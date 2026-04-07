@@ -283,7 +283,7 @@ export function MyWorkCalendar({
                 <div className="px-2 py-1 text-[10px] text-muted-foreground text-right pr-3 -mt-1.5 tabular-nums">{String(hour).padStart(2, '0')}:00</div>
                 {days.map(day => {
                   const key = format(day, 'yyyy-MM-dd');
-                  const hourTasks = timedTasks.filter(t => { const d = getTaskDate(t); if (!d) return false; const dt = new Date(d); return isSameDay(dt, day) && dt.getHours() === hour; });
+                  const hourTasks = timedTasks.filter(t => { const d = getTaskDate(t); if (!d) return false; const dt = parseTaskDate(d); return isSameDay(dt, day) && dt.getHours() === hour; });
                   return (
                     <div key={`${key}-${hour}`} className={cn('border-l border-border/20 px-0.5 py-0.5 cursor-pointer hover:bg-accent/10 transition-colors', draggedTaskId && 'hover:bg-primary/10')}
                       onDragOver={handleDragOver} onDrop={e => handleDrop(e, day, hour)} onClick={() => handleSlotClick(day, hour)}>

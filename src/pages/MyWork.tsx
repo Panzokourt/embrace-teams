@@ -592,28 +592,32 @@ export default function MyWork() {
       <QuickNotes />
 
 
-      <Sheet open={!!selectedItem} onOpenChange={open => !open && setSelectedItem(null)}>
-        <SheetContent className="sm:max-w-lg overflow-y-auto">
-          {selectedItem?.type === 'task' && (
-            <TaskDetailSheet
-              task={selectedItem.data}
-              today={today}
-              onClose={() => setSelectedItem(null)}
-              navigate={navigate}
-              activeTimer={activeTimer}
-              startTimer={startTimer}
-              stopTimer={stopTimer}
-            />
-          )}
-          {selectedItem?.type === 'deliverable' && (
-            <DeliverableDetailSheet
-              deliverable={selectedItem.data}
-              onClose={() => setSelectedItem(null)}
-              navigate={navigate}
-            />
-          )}
-        </SheetContent>
-      </Sheet>
+      </div>
+
+      {/* Docked Side Panel */}
+      {selectedItem?.type === 'task' && (
+        <div className="w-[420px] shrink-0 border-l border-border/30 bg-card animate-in slide-in-from-right duration-200 overflow-hidden">
+          <TaskSidePanel
+            taskId={selectedItem.data.id}
+            onClose={() => setSelectedItem(null)}
+            activeTimer={activeTimer}
+            startTimer={startTimer}
+            stopTimer={stopTimer}
+            onTaskUpdated={(taskId, updates) => {
+              setAllMyTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
+            }}
+          />
+        </div>
+      )}
+      {selectedItem?.type === 'deliverable' && (
+        <div className="w-[420px] shrink-0 border-l border-border/30 bg-card animate-in slide-in-from-right duration-200 overflow-hidden">
+          <DeliverableDetailPanel
+            deliverable={selectedItem.data}
+            onClose={() => setSelectedItem(null)}
+            navigate={navigate}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -97,7 +97,7 @@ export default function ConversationSidebar({
           )}
 
           {!loading && conversations.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-4">Χωρίς ιστορικό</p>
+            <p className="text-xs text-sidebar-foreground/40 text-center py-4">Χωρίς ιστορικό</p>
           )}
 
           {groups.today.length > 0 && (

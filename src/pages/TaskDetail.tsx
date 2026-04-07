@@ -18,6 +18,9 @@ import { EnhancedInlineEditCell } from '@/components/shared/EnhancedInlineEditCe
 import { CommentsSection } from '@/components/comments/CommentsSection';
 import { FileExplorer } from '@/components/files/FileExplorer';
 import { TaskMediaSourceCard } from '@/components/tasks/TaskMediaSourceCard';
+import { TaskRecurrenceCard } from '@/components/tasks/TaskRecurrenceCard';
+import { TaskReviewCard } from '@/components/tasks/TaskReviewCard';
+import { TaskDependenciesCard } from '@/components/tasks/TaskDependenciesCard';
 import { TaskTimer } from '@/components/time-tracking/TaskTimer';
 import { toast } from 'sonner';
 import {

@@ -160,7 +160,12 @@ export default function AppSidebar({
   const [activeCategory, setActiveCategory] = useState<CategoryIdOrNull>(detectedCategory);
 
   useMemo(() => {
-    setActiveCategory(detectCategory(location.pathname));
+    const detected = detectCategory(location.pathname);
+    setActiveCategory(detected);
+    // Auto-collapse sidebar when navigating to My Work (no sub-menu)
+    if (detected === null && !isEffectivelyCollapsed && !isMobileSheet) {
+      onToggleCollapse();
+    }
   }, [location.pathname]);
 
   const selectedDef = selectedBriefType ? getBriefDefinition(selectedBriefType) : null;

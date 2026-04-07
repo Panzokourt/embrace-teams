@@ -20,16 +20,15 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
     const perplexityApiKey = Deno.env.get("PERPLEXITY_API_KEY");
 
-    if (!lovableApiKey) {
-      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
+    if (!ANTHROPIC_API_KEY) {
+      return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Auth
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -47,7 +46,6 @@ serve(async (req) => {
 
     const serviceClient = createClient(supabaseUrl, serviceRoleKey);
 
-    // Fetch evidence entities
     const evidence = insight.evidence || [];
     const clientIds = evidence.filter((e: any) => e.type === "client").map((e: any) => e.id);
     const projectIds = evidence.filter((e: any) => e.type === "project").map((e: any) => e.id);
@@ -59,7 +57,6 @@ serve(async (req) => {
       taskIds.length > 0 ? serviceClient.from("tasks").select("*").in("id", taskIds) : Promise.resolve({ data: [] }),
     ]);
 
-    // Optional Perplexity deep dive
     let marketResearch = "";
     if (perplexityApiKey) {
       try {
@@ -86,7 +83,6 @@ serve(async (req) => {
       }
     }
 
-    // Build context
     const entityContext = JSON.stringify({
       clients: clientsRes.data || [],
       projects: (projectsRes.data || []).map((p: any) => ({
@@ -101,10 +97,10 @@ serve(async (req) => {
     const systemPrompt = `You are "Brain Deep Dive", an expert AI analyst for a marketing agency. You are given an existing insight and must provide a comprehensive deep analysis.
 
 Your output must include:
-1. **Extended Analysis**: A thorough markdown report (500-1000 words in Greek) expanding on the insight with data, benchmarks, and strategic recommendations
+1. **Extended Analysis**: A thorough markdown report (500-1000 words in Greek)
 2. **Action Plan**: 3-6 concrete steps with timeline and effort estimates
-3. **Suggested Project**: If this insight warrants a new project, suggest one with name, description, and budget estimate
-4. **Suggested Task**: If this insight warrants immediate action, suggest a task with title, description, and priority
+3. **Suggested Project**: If warranted, suggest one with name, description, and budget estimate
+4. **Suggested Task**: If warranted, suggest a task with title, description, and priority
 
 Write everything in GREEK. Be specific with numbers and names.`;
 
@@ -123,63 +119,65 @@ ${marketResearch ? `## Market Research (Perplexity)\n${marketResearch}` : ""}
 
 Provide a deep dive analysis.`;
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
+      headers: {
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4096,
+        system: systemPrompt,
         messages: [
-          { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
         tools: [{
-          type: "function",
-          function: {
-            name: "deep_dive_result",
-            description: "Return deep dive analysis results",
-            parameters: {
-              type: "object",
-              properties: {
-                extended_analysis: { type: "string", description: "Extended markdown analysis in Greek (500-1000 words)" },
-                action_plan: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      step: { type: "string" },
-                      timeline: { type: "string" },
-                      effort: { type: "string", enum: ["low", "medium", "high"] },
-                    },
-                    required: ["step", "timeline", "effort"],
-                  },
-                },
-                suggested_project: {
+          name: "deep_dive_result",
+          description: "Return deep dive analysis results",
+          input_schema: {
+            type: "object",
+            properties: {
+              extended_analysis: { type: "string", description: "Extended markdown analysis in Greek (500-1000 words)" },
+              action_plan: {
+                type: "array",
+                items: {
                   type: "object",
                   properties: {
-                    name: { type: "string" },
-                    description: { type: "string" },
-                    client_id: { type: "string" },
-                    budget: { type: "number" },
-                    estimated_duration_days: { type: "number" },
+                    step: { type: "string" },
+                    timeline: { type: "string" },
+                    effort: { type: "string", enum: ["low", "medium", "high"] },
                   },
-                  required: ["name", "description"],
-                },
-                suggested_task: {
-                  type: "object",
-                  properties: {
-                    title: { type: "string" },
-                    description: { type: "string" },
-                    priority: { type: "string", enum: ["low", "medium", "high", "urgent"] },
-                    estimated_hours: { type: "number" },
-                  },
-                  required: ["title", "description", "priority"],
+                  required: ["step", "timeline", "effort"],
                 },
               },
-              required: ["extended_analysis", "action_plan"],
+              suggested_project: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  description: { type: "string" },
+                  client_id: { type: "string" },
+                  budget: { type: "number" },
+                  estimated_duration_days: { type: "number" },
+                },
+                required: ["name", "description"],
+              },
+              suggested_task: {
+                type: "object",
+                properties: {
+                  title: { type: "string" },
+                  description: { type: "string" },
+                  priority: { type: "string", enum: ["low", "medium", "high", "urgent"] },
+                  estimated_hours: { type: "number" },
+                },
+                required: ["title", "description", "priority"],
+              },
             },
+            required: ["extended_analysis", "action_plan"],
           },
         }],
-        tool_choice: { type: "function", function: { name: "deep_dive_result" } },
+        tool_choice: { type: "tool", name: "deep_dive_result" },
       }),
     });
 
@@ -191,24 +189,18 @@ Provide a deep dive analysis.`;
         return new Response(JSON.stringify({ error: "Payment required" }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       const errText = await aiResponse.text();
-      console.error("AI error:", aiResponse.status, errText);
+      console.error("Anthropic API error:", aiResponse.status, errText);
       return new Response(JSON.stringify({ error: "AI analysis failed" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const aiData = await aiResponse.json();
-    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall) {
+    const toolUse = aiData.content?.find((c: any) => c.type === "tool_use");
+    if (!toolUse) {
       return new Response(JSON.stringify({ error: "No analysis generated" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    let result;
-    try {
-      result = JSON.parse(toolCall.function.arguments);
-    } catch {
-      return new Response(JSON.stringify({ error: "Failed to parse AI response" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    const result = toolUse.input;
 
-    // Attach client_id from evidence if not provided
     if (result.suggested_project && !result.suggested_project.client_id && clientIds.length > 0) {
       result.suggested_project.client_id = clientIds[0];
     }

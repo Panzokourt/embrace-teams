@@ -13,13 +13,12 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 
-    if (!lovableKey) throw new Error("LOVABLE_API_KEY not configured");
+    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get user from JWT
     const anonClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!);
     const token = authHeader?.replace("Bearer ", "");
     const { data: { user }, error: userError } = await anonClient.auth.getUser(token);
@@ -31,7 +30,7 @@ serve(async (req) => {
       throw new Error("Missing required fields");
     }
 
-    const systemPrompt = `You are a project management assistant. Extract structured data from the user's note to perform the requested action. Always respond with valid JSON using the tool provided.`;
+    const systemPrompt = `You are a project management assistant. Extract structured data from the user's note to perform the requested action. Always respond using the tool provided.`;
 
     let toolDef: any;
     let userPrompt: string;
@@ -40,21 +39,17 @@ serve(async (req) => {
       case "create_task":
         userPrompt = `From this note, extract a task:\nTitle: ${noteTitle}\nContent: ${noteContent}`;
         toolDef = {
-          type: "function",
-          function: {
-            name: "create_task",
-            description: "Create a task from note content",
-            parameters: {
-              type: "object",
-              properties: {
-                title: { type: "string", description: "Task title" },
-                description: { type: "string", description: "Task description" },
-                priority: { type: "string", enum: ["low", "medium", "high", "urgent"] },
-                due_date: { type: "string", description: "Due date in YYYY-MM-DD format or null" },
-              },
-              required: ["title", "description", "priority"],
-              additionalProperties: false,
+          name: "create_task",
+          description: "Create a task from note content",
+          input_schema: {
+            type: "object",
+            properties: {
+              title: { type: "string", description: "Task title" },
+              description: { type: "string", description: "Task description" },
+              priority: { type: "string", enum: ["low", "medium", "high", "urgent"] },
+              due_date: { type: "string", description: "Due date in YYYY-MM-DD format or null" },
             },
+            required: ["title", "description", "priority"],
           },
         };
         break;
@@ -62,20 +57,16 @@ serve(async (req) => {
       case "create_deliverable":
         userPrompt = `From this note, extract a deliverable:\nTitle: ${noteTitle}\nContent: ${noteContent}`;
         toolDef = {
-          type: "function",
-          function: {
-            name: "create_deliverable",
-            description: "Create a deliverable from note content",
-            parameters: {
-              type: "object",
-              properties: {
-                name: { type: "string", description: "Deliverable name" },
-                description: { type: "string", description: "Description" },
-                due_date: { type: "string", description: "Due date YYYY-MM-DD or null" },
-              },
-              required: ["name", "description"],
-              additionalProperties: false,
+          name: "create_deliverable",
+          description: "Create a deliverable from note content",
+          input_schema: {
+            type: "object",
+            properties: {
+              name: { type: "string", description: "Deliverable name" },
+              description: { type: "string", description: "Description" },
+              due_date: { type: "string", description: "Due date YYYY-MM-DD or null" },
             },
+            required: ["name", "description"],
           },
         };
         break;
@@ -83,28 +74,23 @@ serve(async (req) => {
       case "create_meeting":
         userPrompt = `From this note, extract meeting details:\nTitle: ${noteTitle}\nContent: ${noteContent}`;
         toolDef = {
-          type: "function",
-          function: {
-            name: "create_meeting",
-            description: "Create a calendar event/meeting from note",
-            parameters: {
-              type: "object",
-              properties: {
-                title: { type: "string" },
-                description: { type: "string" },
-                date: { type: "string", description: "Date YYYY-MM-DD" },
-                start_time: { type: "string", description: "HH:MM format" },
-                duration_minutes: { type: "number" },
-              },
-              required: ["title", "description"],
-              additionalProperties: false,
+          name: "create_meeting",
+          description: "Create a calendar event/meeting from note",
+          input_schema: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              description: { type: "string" },
+              date: { type: "string", description: "Date YYYY-MM-DD" },
+              start_time: { type: "string", description: "HH:MM format" },
+              duration_minutes: { type: "number" },
             },
+            required: ["title", "description"],
           },
         };
         break;
 
       case "link_project":
-        // Fetch company projects for context
         const { data: projects } = await supabase
           .from("projects")
           .select("id, name")
@@ -113,19 +99,15 @@ serve(async (req) => {
 
         userPrompt = `Match this note to the most relevant project:\nTitle: ${noteTitle}\nContent: ${noteContent}\n\nAvailable projects: ${JSON.stringify(projects?.map(p => ({ id: p.id, name: p.name })))}`;
         toolDef = {
-          type: "function",
-          function: {
-            name: "link_project",
-            description: "Link note to a project",
-            parameters: {
-              type: "object",
-              properties: {
-                project_id: { type: "string", description: "UUID of matching project" },
-                confidence: { type: "string", enum: ["high", "medium", "low"] },
-              },
-              required: ["project_id", "confidence"],
-              additionalProperties: false,
+          name: "link_project",
+          description: "Link note to a project",
+          input_schema: {
+            type: "object",
+            properties: {
+              project_id: { type: "string", description: "UUID of matching project" },
+              confidence: { type: "string", enum: ["high", "medium", "low"] },
             },
+            required: ["project_id", "confidence"],
           },
         };
         break;
@@ -134,21 +116,22 @@ serve(async (req) => {
         throw new Error(`Unknown action: ${action}`);
     }
 
-    // Call AI
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 2048,
+        system: systemPrompt,
         messages: [
-          { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
         tools: [toolDef],
-        tool_choice: { type: "function", function: { name: toolDef.function.name } },
+        tool_choice: { type: "tool", name: toolDef.name },
       }),
     });
 
@@ -160,10 +143,10 @@ serve(async (req) => {
     }
 
     const aiData = await aiResponse.json();
-    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall) throw new Error("AI did not return structured data");
+    const toolUse = aiData.content?.find((c: any) => c.type === "tool_use");
+    if (!toolUse) throw new Error("AI did not return structured data");
 
-    const parsed = JSON.parse(toolCall.function.arguments);
+    const parsed = toolUse.input;
 
     // Execute the action
     let entityId: string | null = null;
@@ -172,7 +155,6 @@ serve(async (req) => {
 
     switch (action) {
       case "create_task": {
-        // Find first project for the user
         const { data: firstProject } = await supabase
           .from("projects")
           .select("id")

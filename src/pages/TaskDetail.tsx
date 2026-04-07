@@ -608,7 +608,7 @@ export default function TaskDetailPage() {
           </div>
 
           {/* CENTER COLUMN: Description, Subtasks, Tabs */}
-          <div className="lg:col-span-5 min-w-0 space-y-4">
+          <div className="lg:col-span-5 min-w-0 space-y-3 self-start">
             {/* Description + Tags */}
             <Card>
               <CardContent className="p-4 space-y-3">

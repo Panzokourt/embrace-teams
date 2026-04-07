@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,7 +14,7 @@ import {
 } from 'date-fns';
 import { el } from 'date-fns/locale';
 import {
-  CalendarDays, Play, Square, Plus, GripVertical, X, Inbox, AlertTriangle, Clock,
+  CalendarDays, Play, Square, Plus, GripVertical, X, Inbox, AlertTriangle, Clock, Sparkles, Loader2,
 } from 'lucide-react';
 import { STATUS_COLORS } from '@/components/shared/mondayStyleConfig';
 
@@ -27,6 +27,7 @@ interface TaskItem {
   start_date: string | null;
   project_id: string;
   project?: { name: string } | null;
+  estimated_hours?: number | null;
 }
 
 interface Milestone {
@@ -35,6 +36,13 @@ interface Milestone {
   date: string;
   type: 'project_start' | 'project_end' | 'contract_start' | 'contract_end' | 'deliverable';
   color: string;
+}
+
+interface WorkSchedule {
+  day_of_week: number; // 0=Sun, 1=Mon, ...
+  start_time: string;
+  end_time: string;
+  is_working_day: boolean;
 }
 
 interface Props {
@@ -51,6 +59,7 @@ interface Props {
 }
 
 const HOURS = Array.from({ length: 15 }, (_, i) => i + 7);
+const ROW_HEIGHT = 52;
 
 function getTaskDate(task: TaskItem): string | null {
   return task.due_date || task.start_date || null;
@@ -64,20 +73,17 @@ function isUtcMidnight(date: Date): boolean {
   return date.getUTCHours() === 0 && date.getUTCMinutes() === 0 && date.getUTCSeconds() === 0;
 }
 
-// Parse date string handling date-only strings (YYYY-MM-DD) as local dates
 function parseTaskDate(dateStr: string): Date {
   if (isDateOnlyString(dateStr)) {
     const [y, m, d] = dateStr.split('-').map(Number);
     return new Date(y, m - 1, d);
   }
-
   return new Date(dateStr);
 }
 
 function isAllDay(dateStr: string | null): boolean {
   if (!dateStr) return true;
   if (isDateOnlyString(dateStr)) return true;
-
   const d = new Date(dateStr);
   return (d.getHours() === 0 && d.getMinutes() === 0) || isUtcMidnight(d);
 }
@@ -96,13 +102,22 @@ export function MyWorkCalendar({
 }: Props) {
   const { user } = useAuth();
   const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [workSchedules, setWorkSchedules] = useState<WorkSchedule[]>([]);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [createDialog, setCreateDialog] = useState<{ date: Date; hour?: number } | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [creating, setCreating] = useState(false);
   const [backlogOpen, setBacklogOpen] = useState(false);
+  const [now, setNow] = useState(new Date());
+  const [rescheduling, setRescheduling] = useState(false);
 
-  useEffect(() => { fetchMilestones(); }, [user]);
+  // Update current time every minute
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => { fetchMilestones(); fetchWorkSchedules(); }, [user]);
 
   async function fetchMilestones() {
     if (!user) return;
@@ -125,6 +140,43 @@ export function MyWorkCalendar({
       if (d.due_date) ms.push({ id: `dl-${d.id}`, label: `📦 ${d.name}`, date: d.due_date, type: 'deliverable', color: 'violet' });
     });
     setMilestones(ms);
+  }
+
+  async function fetchWorkSchedules() {
+    if (!user) return;
+    const { data } = await supabase.from('work_schedules').select('day_of_week, start_time, end_time, is_working_day').eq('user_id', user.id);
+    if (data) setWorkSchedules(data);
+  }
+
+  // Work schedule helpers
+  const workScheduleMap = useMemo(() => {
+    const map: Record<number, WorkSchedule> = {};
+    workSchedules.forEach(ws => { map[ws.day_of_week] = ws; });
+    return map;
+  }, [workSchedules]);
+
+  function isWorkingHour(day: Date, hour: number): boolean {
+    const dow = day.getDay(); // 0=Sun
+    const ws = workScheduleMap[dow];
+    if (!ws || !ws.is_working_day) return false;
+    const startH = parseInt(ws.start_time?.split(':')[0] || '9', 10);
+    const endH = parseInt(ws.end_time?.split(':')[0] || '17', 10);
+    return hour >= startH && hour < endH;
+  }
+
+  function isWorkingDay(day: Date): boolean {
+    const ws = workScheduleMap[day.getDay()];
+    return ws?.is_working_day ?? (day.getDay() !== 0 && day.getDay() !== 6);
+  }
+
+  function isPastHour(day: Date, hour: number): boolean {
+    if (isBefore(startOfDay(day), startOfDay(now)) && !isSameDay(day, now)) return true;
+    if (isSameDay(day, now) && hour < now.getHours()) return true;
+    return false;
+  }
+
+  function isPastDay(day: Date): boolean {
+    return isBefore(startOfDay(day), startOfDay(now)) && !isSameDay(day, now);
   }
 
   const weekStart = startOfWeek(calendarDate, { weekStartsOn: 1 });
@@ -154,6 +206,19 @@ export function MyWorkCalendar({
     });
     return map;
   }, [milestones]);
+
+  // Group timed tasks by day for absolute positioning
+  const timedTasksByDay = useMemo(() => {
+    const map: Record<string, TaskItem[]> = {};
+    timedTasks.forEach(t => {
+      const d = getTaskDate(t);
+      if (!d) return;
+      const key = format(parseTaskDate(d), 'yyyy-MM-dd');
+      if (!map[key]) map[key] = [];
+      map[key].push(t);
+    });
+    return map;
+  }, [timedTasks]);
 
   function handleDragStart(e: React.DragEvent, taskId: string) {
     setDraggedTaskId(taskId);
@@ -202,6 +267,76 @@ export function MyWorkCalendar({
     setNewTaskTitle('');
   }
 
+  function handleDayHeaderClick(day: Date) {
+    if (calendarMode === 'week') {
+      onCalendarDateChange(day);
+      onCalendarModeChange('day');
+    }
+  }
+
+  // AI Smart Rescheduling
+  async function handleSmartReschedule() {
+    if (rescheduling) return;
+    setRescheduling(true);
+    try {
+      const tasksToSchedule = [...unscheduledTasks, ...overdueTasks].map(t => ({
+        id: t.id,
+        title: t.title,
+        priority: t.priority,
+        estimated_hours: (t as any).estimated_hours || 1,
+        due_date: t.due_date,
+        status: t.status,
+      }));
+
+      if (tasksToSchedule.length === 0) {
+        toast.info('Δεν υπάρχουν tasks για αναδιάταξη');
+        setRescheduling(false);
+        return;
+      }
+
+      const existingSlots = timedTasks.map(t => {
+        const d = getTaskDate(t);
+        return { id: t.id, due_date: d, estimated_hours: (t as any).estimated_hours || 1 };
+      });
+
+      const { data, error } = await supabase.functions.invoke('smart-reschedule', {
+        body: { tasks: tasksToSchedule, workSchedule: workSchedules, existingSlots },
+      });
+
+      if (error) throw error;
+
+      const assignments = data?.assignments || [];
+      if (assignments.length === 0) {
+        toast.info('Δεν βρέθηκαν διαθέσιμα slots');
+        setRescheduling(false);
+        return;
+      }
+
+      // Batch update
+      await Promise.all(
+        assignments.map((a: { task_id: string; due_date: string }) =>
+          supabase.from('tasks').update({ due_date: a.due_date } as any).eq('id', a.task_id)
+        )
+      );
+
+      toast.success(`${assignments.length} tasks τοποθετήθηκαν!`);
+      onTaskUpdated();
+    } catch (err: any) {
+      console.error('Smart reschedule error:', err);
+      toast.error('Σφάλμα κατά την αναδιάταξη');
+    } finally {
+      setRescheduling(false);
+    }
+  }
+
+  // Current time indicator position
+  const currentTimeTop = useMemo(() => {
+    const h = now.getHours();
+    const m = now.getMinutes();
+    if (h < HOURS[0] || h > HOURS[HOURS.length - 1]) return null;
+    return (h - HOURS[0]) * ROW_HEIGHT + (m / 60) * ROW_HEIGHT;
+  }, [now]);
+
   return (
     <>
       <Card className="border-border/30 shadow-sm relative overflow-hidden">
@@ -215,6 +350,16 @@ export function MyWorkCalendar({
               : format(calendarDate, 'EEEE d MMMM yyyy', { locale: el })}
           </CardTitle>
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-[11px] gap-1.5"
+              onClick={handleSmartReschedule}
+              disabled={rescheduling || backlogCount === 0}
+            >
+              {rescheduling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              Έξυπνη Αναδιάταξη
+            </Button>
             <Button
               variant={backlogOpen ? 'default' : 'outline'}
               size="sm"
@@ -250,8 +395,17 @@ export function MyWorkCalendar({
               {days.map(day => {
                 const key = format(day, 'yyyy-MM-dd');
                 const dayMilestones = milestonesByDay[key] || [];
+                const past = isPastDay(day);
                 return (
-                  <div key={key} className={cn('border-l border-border/20 px-1.5 py-2 text-center', isToday(day) && 'bg-primary/5')}>
+                  <div
+                    key={key}
+                    className={cn(
+                      'border-l border-border/20 px-1.5 py-2 text-center cursor-pointer hover:bg-accent/20 transition-colors',
+                      isToday(day) && 'bg-primary/5',
+                      past && 'opacity-50'
+                    )}
+                    onClick={() => handleDayHeaderClick(day)}
+                  >
                     <div className="text-[10px] text-muted-foreground uppercase tracking-wide">{format(day, 'EEE', { locale: el })}</div>
                     <div className={cn('text-lg font-semibold mt-0.5', isToday(day) && 'text-primary')}>{format(day, 'd')}</div>
                     {dayMilestones.length > 0 && (
@@ -273,8 +427,10 @@ export function MyWorkCalendar({
               {days.map(day => {
                 const key = format(day, 'yyyy-MM-dd');
                 const dayAllDay = allDayTasks.filter(t => { const d = getTaskDate(t); return d && isSameDay(parseTaskDate(d), day); });
+                const past = isPastDay(day);
                 return (
-                  <div key={`allday-${key}`} className="border-l border-border/20 px-1 py-1 min-h-[36px] hover:bg-accent/10 transition-colors cursor-pointer"
+                  <div key={`allday-${key}`}
+                    className={cn('border-l border-border/20 px-1 py-1 min-h-[36px] hover:bg-accent/10 transition-colors cursor-pointer', past && 'opacity-50 bg-muted/20')}
                     onDragOver={handleDragOver} onDrop={e => handleDrop(e, day)} onClick={() => handleSlotClick(day)}>
                     {dayAllDay.map(task => (
                       <CalendarTaskPill key={task.id} task={task} onDragStart={e => handleDragStart(e, task.id)}
@@ -285,25 +441,111 @@ export function MyWorkCalendar({
               })}
             </div>
 
-            {/* Hourly grid */}
-            {HOURS.map(hour => (
-              <div key={hour} className={cn('grid border-b border-border/10', calendarMode === 'week' ? 'grid-cols-[60px_repeat(7,1fr)]' : 'grid-cols-[60px_1fr]', 'min-h-[52px]')}>
-                <div className="px-2 py-1 text-[10px] text-muted-foreground text-right pr-3 -mt-1.5 tabular-nums">{String(hour).padStart(2, '0')}:00</div>
-                {days.map(day => {
-                  const key = format(day, 'yyyy-MM-dd');
-                  const hourTasks = timedTasks.filter(t => { const d = getTaskDate(t); if (!d) return false; const dt = parseTaskDate(d); return isSameDay(dt, day) && dt.getHours() === hour; });
-                  return (
-                    <div key={`${key}-${hour}`} className={cn('border-l border-border/20 px-0.5 py-0.5 cursor-pointer hover:bg-accent/10 transition-colors', draggedTaskId && 'hover:bg-primary/10')}
-                      onDragOver={handleDragOver} onDrop={e => handleDrop(e, day, hour)} onClick={() => handleSlotClick(day, hour)}>
-                      {hourTasks.map(task => (
-                        <CalendarTaskPill key={task.id} task={task} onDragStart={e => handleDragStart(e, task.id)}
-                          onClick={e => { e.stopPropagation(); onTaskClick(task); }} activeTimer={activeTimer} startTimer={startTimer} stopTimer={stopTimer} showTime />
-                      ))}
+            {/* Hourly grid with relative positioning for multi-hour blocks */}
+            <div className="relative">
+              {HOURS.map(hour => (
+                <div key={hour} className={cn('grid border-b border-border/10', calendarMode === 'week' ? 'grid-cols-[60px_repeat(7,1fr)]' : 'grid-cols-[60px_1fr]')}>
+                  <div className="px-2 py-1 text-[10px] text-muted-foreground text-right pr-3 -mt-1.5 tabular-nums" style={{ height: ROW_HEIGHT }}>
+                    {String(hour).padStart(2, '0')}:00
+                  </div>
+                  {days.map(day => {
+                    const key = format(day, 'yyyy-MM-dd');
+                    const working = isWorkingHour(day, hour);
+                    const past = isPastHour(day, hour);
+                    const dayTasks = timedTasksByDay[key] || [];
+                    // Only render tasks that START at this hour
+                    const hourTasks = dayTasks.filter(t => {
+                      const d = getTaskDate(t);
+                      if (!d) return false;
+                      return parseTaskDate(d).getHours() === hour;
+                    });
+
+                    return (
+                      <div
+                        key={`${key}-${hour}`}
+                        className={cn(
+                          'border-l border-border/20 cursor-pointer transition-colors relative',
+                          working && !past && 'bg-primary/[0.03]',
+                          past && 'bg-muted/30 opacity-60',
+                          !past && !working && 'bg-transparent',
+                          draggedTaskId && 'hover:bg-primary/10',
+                          !draggedTaskId && !past && 'hover:bg-accent/10',
+                        )}
+                        style={{ height: ROW_HEIGHT }}
+                        onDragOver={handleDragOver}
+                        onDrop={e => handleDrop(e, day, hour)}
+                        onClick={() => handleSlotClick(day, hour)}
+                      >
+                        {hourTasks.map((task, idx) => {
+                          const estH = (task as any).estimated_hours || 1;
+                          const taskH = Math.max(estH, 0.5) * ROW_HEIGHT;
+                          const dateStr = getTaskDate(task)!;
+                          const dt = parseTaskDate(dateStr);
+                          const minuteOffset = (dt.getMinutes() / 60) * ROW_HEIGHT;
+                          return (
+                            <div
+                              key={task.id}
+                              className="absolute left-0.5 right-0.5 z-10"
+                              style={{ top: minuteOffset, height: taskH - 2 }}
+                            >
+                              <MultiHourTaskBlock
+                                task={task}
+                                height={taskH - 2}
+                                onDragStart={e => handleDragStart(e, task.id)}
+                                onClick={e => { e.stopPropagation(); onTaskClick(task); }}
+                                activeTimer={activeTimer}
+                                startTimer={startTimer}
+                                stopTimer={stopTimer}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+
+              {/* Current time indicator */}
+              {currentTimeTop !== null && days.some(d => isToday(d)) && (
+                <div
+                  className="absolute pointer-events-none z-20"
+                  style={{
+                    top: currentTimeTop,
+                    left: 60,
+                    right: 0,
+                  }}
+                >
+                  {calendarMode === 'week' ? (
+                    // Position only over today's column
+                    (() => {
+                      const todayIdx = days.findIndex(d => isToday(d));
+                      if (todayIdx < 0) return null;
+                      const colWidth = `calc((100%) / 7)`;
+                      return (
+                        <div
+                          className="absolute"
+                          style={{
+                            left: `calc(${todayIdx} * (100% / 7))`,
+                            width: colWidth,
+                          }}
+                        >
+                          <div className="flex items-center">
+                            <div className="h-2.5 w-2.5 rounded-full bg-red-500 -ml-[5px] shrink-0" />
+                            <div className="flex-1 border-t-2 border-red-500" />
+                          </div>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <div className="flex items-center">
+                      <div className="h-2.5 w-2.5 rounded-full bg-red-500 -ml-[5px] shrink-0" />
+                      <div className="flex-1 border-t-2 border-red-500" />
                     </div>
-                  );
-                })}
-              </div>
-            ))}
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Backlog Side Panel */}
@@ -378,6 +620,51 @@ export function MyWorkCalendar({
   );
 }
 
+// ── Multi-Hour Task Block ──
+function MultiHourTaskBlock({ task, height, onDragStart, onClick, activeTimer, startTimer, stopTimer }: {
+  task: TaskItem; height: number; onDragStart: (e: React.DragEvent) => void; onClick: (e: React.MouseEvent) => void;
+  activeTimer: any; startTimer: any; stopTimer: any;
+}) {
+  const isRunning = activeTimer?.is_running && activeTimer.task_id === task.id;
+  const dateStr = getTaskDate(task);
+  const isOverdue = dateStr && isBefore(startOfDay(parseTaskDate(dateStr)), startOfDay(new Date())) && task.status !== 'completed';
+  const estH = (task as any).estimated_hours || 1;
+
+  return (
+    <div
+      draggable
+      onDragStart={onDragStart}
+      onClick={onClick}
+      className={cn(
+        'group flex flex-col rounded-[6px] border px-1.5 py-1 cursor-grab active:cursor-grabbing transition-colors text-[11px] overflow-hidden',
+        isOverdue
+          ? 'border-destructive/30 bg-destructive/10 text-destructive'
+          : 'border-primary/20 bg-primary/5 hover:bg-primary/10 text-foreground'
+      )}
+      style={{ height: '100%' }}
+    >
+      <div className="flex items-center gap-1">
+        <GripVertical className="h-3 w-3 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+        <span className="flex-1 min-w-0 truncate font-medium">{task.title}</span>
+        {dateStr && <span className="text-[9px] text-muted-foreground tabular-nums shrink-0">{format(parseTaskDate(dateStr), 'HH:mm')}</span>}
+        {!isRunning ? (
+          <button className="h-4 w-4 flex items-center justify-center text-muted-foreground hover:text-primary shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={e => { e.stopPropagation(); startTimer(task.id, task.project_id); }}><Play className="h-2.5 w-2.5" /></button>
+        ) : (
+          <button className="h-4 w-4 flex items-center justify-center text-primary shrink-0"
+            onClick={e => { e.stopPropagation(); stopTimer(); }}><Square className="h-2.5 w-2.5" /></button>
+        )}
+      </div>
+      {estH > 1 && (
+        <div className="text-[9px] text-muted-foreground mt-0.5">{estH}h</div>
+      )}
+      {task.project?.name && height > 40 && (
+        <div className="text-[9px] text-muted-foreground truncate mt-auto">{task.project.name}</div>
+      )}
+    </div>
+  );
+}
+
 // ── Backlog Task Item ──
 function BacklogTaskItem({ task, onDragStart, onClick, isOverdue }: {
   task: TaskItem; onDragStart: (e: React.DragEvent) => void; onClick: () => void; isOverdue?: boolean;
@@ -396,7 +683,7 @@ function BacklogTaskItem({ task, onDragStart, onClick, isOverdue }: {
   );
 }
 
-// ── Calendar Task Pill ──
+// ── Calendar Task Pill (for all-day row) ──
 function CalendarTaskPill({ task, onDragStart, onClick, activeTimer, startTimer, stopTimer, showTime }: {
   task: TaskItem; onDragStart: (e: React.DragEvent) => void; onClick: (e: React.MouseEvent) => void;
   activeTimer: any; startTimer: any; stopTimer: any; showTime?: boolean;

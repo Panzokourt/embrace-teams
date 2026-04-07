@@ -26,6 +26,7 @@ import {
 import { el } from 'date-fns/locale';
 import { STATUS_COLORS, PRIORITY_COLORS } from '@/components/shared/mondayStyleConfig';
 import { QuickNotes } from '@/components/my-work/QuickNotes';
+import { TodayTasksCard } from '@/components/my-work/TodayTasksCard';
 import { naturalCompare } from '@/lib/utils';
 
 // ── Types ──────────────────────────────────────────
@@ -328,42 +329,25 @@ export default function MyWork() {
 
       {/* ── Main Content ── */}
       {activeView === 'projects' ? (
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Today's Tasks */}
-          <Card className="border-border/30 shadow-sm lg:col-span-2">
-            <CardHeader className="pb-3 px-5">
-              <CardTitle className="text-[13px] font-semibold tracking-tight flex items-center gap-2.5">
-                <span className="h-7 w-7 rounded-lg bg-primary/8 flex items-center justify-center">
-                  <CheckSquare className="h-3.5 w-3.5 text-primary" />
-                </span>
-                Tasks Σήμερα
-                <Badge variant="secondary" className="text-[10px] ml-1">{todayTasks.length}</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {todayTasks.length === 0 ? (
-                <p className="text-sm text-muted-foreground px-6 py-6">Κανένα task για σήμερα 🎉</p>
-              ) : (
-                <div className="overflow-y-auto max-h-[60vh] divide-y divide-border/20">
-                    {todayTasks.map(task => (
-                      <TaskRow
-                        key={task.id}
-                        task={task}
-                        onComplete={() => toggleTaskComplete(task)}
-                        onClick={() => setSelectedItem({ type: 'task', data: task })}
-                        activeTimer={activeTimer}
-                        startTimer={startTimer}
-                        stopTimer={stopTimer}
-                        showProject
-                      />
-                    ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <TodayTasksCard
+            todayTasks={todayTasks}
+            onTaskComplete={toggleTaskComplete}
+            onTaskClick={(task) => setSelectedItem({ type: 'task', data: task })}
+            activeTimer={activeTimer}
+            startTimer={startTimer}
+            stopTimer={stopTimer}
+            userId={user!.id}
+            myProjects={myProjects}
+            onTaskCreated={() => fetchAll()}
+            onTaskUpdated={(taskId, updates) => {
+              setAllMyTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
+            }}
+          />
 
           {/* Active Projects */}
-          <Card className="border-border/30 shadow-sm lg:col-span-3">
+          <Card className="border-border/30 shadow-sm">
             <CardHeader className="pb-3 px-5">
               <CardTitle className="text-[13px] font-semibold tracking-tight flex items-center gap-2.5">
                 <span className="h-7 w-7 rounded-lg bg-primary/8 flex items-center justify-center">

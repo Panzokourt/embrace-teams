@@ -4,7 +4,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -18,16 +17,18 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { toast } from 'sonner';
 import {
   StickyNote, Plus, Search, Trash2, ChevronDown, ChevronRight,
-  Sparkles, CheckSquare, Package, FolderKanban, CalendarDays, MoreHorizontal, Loader2,
+  Sparkles, CheckSquare, Package, FolderKanban, CalendarDays, MoreHorizontal, Loader2, Pin,
 } from 'lucide-react';
 import { format, isToday, isYesterday, startOfDay } from 'date-fns';
 import { el } from 'date-fns/locale';
+import { NoteEditor } from './NoteEditor';
 
 interface QuickNote {
   id: string;
   title: string;
   content: string;
   date: string;
+  is_pinned: boolean;
   linked_entity_type: string | null;
   linked_entity_id: string | null;
   created_at: string;
@@ -56,6 +57,7 @@ export function QuickNotes() {
       .from('quick_notes')
       .select('*')
       .eq('company_id', companyId)
+      .order('is_pinned', { ascending: false })
       .order('updated_at', { ascending: false });
 
     if (!error && data) {
@@ -82,7 +84,7 @@ export function QuickNotes() {
       .single();
 
     if (!error && data) {
-      const note = data as unknown as QuickNote;
+      const note = { ...(data as unknown as QuickNote), is_pinned: false };
       setNotes(prev => [note, ...prev]);
       setSelectedNote(note);
       setTimeout(() => titleRef.current?.select(), 100);
@@ -108,6 +110,23 @@ export function QuickNotes() {
     saveNote(updated);
   };
 
+  // Toggle pin
+  const togglePin = async () => {
+    if (!selectedNote) return;
+    const newPinned = !selectedNote.is_pinned;
+    const updated = { ...selectedNote, is_pinned: newPinned };
+    setSelectedNote(updated);
+    setNotes(prev => {
+      const list = prev.map(n => n.id === updated.id ? updated : n);
+      return list.sort((a, b) => {
+        if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
+        return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+      });
+    });
+    await supabase.from('quick_notes').update({ is_pinned: newPinned }).eq('id', selectedNote.id);
+    toast.success(newPinned ? 'Η σημείωση καρφιτσώθηκε' : 'Η σημείωση ξεκαρφιτσώθηκε');
+  };
+
   // Delete note
   const deleteNote = async (id: string) => {
     await supabase.from('quick_notes').delete().eq('id', id);
@@ -126,25 +145,17 @@ export function QuickNotes() {
     setAiLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('notes-ai-action', {
-        body: {
-          action,
-          noteContent: selectedNote.content,
-          noteTitle: selectedNote.title,
-          companyId,
-        },
+        body: { action, noteContent: selectedNote.content, noteTitle: selectedNote.title, companyId },
       });
       if (error) throw error;
-
       if (data?.success) {
         toast.success(data.message || `Η ενέργεια "${action}" ολοκληρώθηκε`);
-        // Link the note to the created entity
         if (data.entityId && data.entityType) {
           const updated = { ...selectedNote, linked_entity_type: data.entityType, linked_entity_id: data.entityId };
           setSelectedNote(updated);
           setNotes(prev => prev.map(n => n.id === updated.id ? updated : n));
           await supabase.from('quick_notes').update({
-            linked_entity_type: data.entityType,
-            linked_entity_id: data.entityId,
+            linked_entity_type: data.entityType, linked_entity_id: data.entityId,
           }).eq('id', selectedNote.id);
         }
       } else {
@@ -157,13 +168,23 @@ export function QuickNotes() {
     }
   };
 
-  // Group notes by date
+  // Strip HTML for preview
+  const stripHtml = (html: string) => {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || '';
+  };
+
+  // Group notes by date (pinned first, then by date)
   const filteredNotes = notes.filter(n =>
     n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    n.content.toLowerCase().includes(searchQuery.toLowerCase())
+    stripHtml(n.content).toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const grouped = filteredNotes.reduce<Record<string, QuickNote[]>>((acc, note) => {
+  const pinnedNotes = filteredNotes.filter(n => n.is_pinned);
+  const unpinnedNotes = filteredNotes.filter(n => !n.is_pinned);
+
+  const grouped = unpinnedNotes.reduce<Record<string, QuickNote[]>>((acc, note) => {
     const d = startOfDay(new Date(note.updated_at));
     let label: string;
     if (isToday(d)) label = 'Σήμερα';
@@ -173,6 +194,28 @@ export function QuickNotes() {
     acc[label].push(note);
     return acc;
   }, {});
+
+  const NoteListItem = ({ note }: { note: QuickNote }) => (
+    <button
+      onClick={() => setSelectedNote(note)}
+      className={`w-full text-left rounded-[10px] px-2.5 py-2 mb-0.5 transition-colors text-xs group ${
+        selectedNote?.id === note.id ? 'bg-accent text-foreground' : 'hover:bg-accent/30 text-muted-foreground'
+      }`}
+    >
+      <div className="flex items-center gap-1">
+        {note.is_pinned && <Pin className="h-2.5 w-2.5 text-primary shrink-0" />}
+        <p className="font-medium truncate text-foreground">{note.title || 'Χωρίς τίτλο'}</p>
+      </div>
+      <p className="truncate text-[10px] mt-0.5 opacity-70">
+        {note.content ? stripHtml(note.content).substring(0, 60) : 'Κενή σημείωση'}
+      </p>
+      {note.linked_entity_type && (
+        <Badge variant="outline" className="mt-1 text-[9px] h-4 px-1">
+          {note.linked_entity_type === 'task' ? 'Task' : note.linked_entity_type === 'project' ? 'Project' : note.linked_entity_type}
+        </Badge>
+      )}
+    </button>
+  );
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -191,7 +234,7 @@ export function QuickNotes() {
         </CollapsibleTrigger>
         <CollapsibleContent>
           <CardContent className="p-0">
-            <div className="flex h-[340px] border-t border-border/30">
+            <div className="flex h-[400px] border-t border-border/30">
               {/* Left: Note List */}
               <div className="w-[240px] border-r border-border/30 flex flex-col">
                 <div className="p-2 flex gap-1.5">
@@ -222,28 +265,18 @@ export function QuickNotes() {
                         </Button>
                       </div>
                     )}
+                    {pinnedNotes.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 pt-2 pb-1 flex items-center gap-1">
+                          <Pin className="h-2.5 w-2.5" /> Καρφιτσωμένα
+                        </p>
+                        {pinnedNotes.map(note => <NoteListItem key={note.id} note={note} />)}
+                      </div>
+                    )}
                     {Object.entries(grouped).map(([label, items]) => (
                       <div key={label}>
                         <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 pt-2 pb-1">{label}</p>
-                        {items.map(note => (
-                          <button
-                            key={note.id}
-                            onClick={() => setSelectedNote(note)}
-                            className={`w-full text-left rounded-[10px] px-2.5 py-2 mb-0.5 transition-colors text-xs group ${
-                              selectedNote?.id === note.id ? 'bg-accent text-foreground' : 'hover:bg-accent/30 text-muted-foreground'
-                            }`}
-                          >
-                            <p className="font-medium truncate text-foreground">{note.title || 'Χωρίς τίτλο'}</p>
-                            <p className="truncate text-[10px] mt-0.5 opacity-70">
-                              {note.content ? note.content.substring(0, 60) : 'Κενή σημείωση'}
-                            </p>
-                            {note.linked_entity_type && (
-                              <Badge variant="outline" className="mt-1 text-[9px] h-4 px-1">
-                                {note.linked_entity_type === 'task' ? 'Task' : note.linked_entity_type === 'project' ? 'Project' : note.linked_entity_type}
-                              </Badge>
-                            )}
-                          </button>
-                        ))}
+                        {items.map(note => <NoteListItem key={note.id} note={note} />)}
                       </div>
                     ))}
                   </div>
@@ -254,13 +287,20 @@ export function QuickNotes() {
               <div className="flex-1 flex flex-col min-w-0">
                 {selectedNote ? (
                   <>
-                    {/* Toolbar */}
+                    {/* Title bar */}
                     <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border/20 shrink-0">
+                      <Input
+                        ref={titleRef}
+                        value={selectedNote.title}
+                        onChange={e => updateSelectedNote('title', e.target.value)}
+                        className="border-0 bg-transparent text-sm font-semibold px-0 h-7 focus-visible:ring-0 focus-visible:ring-offset-0 flex-1"
+                        placeholder="Τίτλος σημείωσης..."
+                      />
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5 rounded-[10px]" disabled={aiLoading}>
                             {aiLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3 text-amber-500" />}
-                            AI Actions
+                            AI
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start" className="w-48">
@@ -280,8 +320,6 @@ export function QuickNotes() {
                         </DropdownMenuContent>
                       </DropdownMenu>
 
-                      <div className="flex-1" />
-
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-7 w-7">
@@ -289,6 +327,10 @@ export function QuickNotes() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={togglePin} className="text-xs gap-2">
+                            <Pin className="h-3.5 w-3.5" /> {selectedNote.is_pinned ? 'Ξεκαρφίτσωμα' : 'Καρφίτσωμα'}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem
                             onClick={() => setDeleteNoteId(selectedNote.id)}
                             className="text-destructive focus:text-destructive text-xs gap-2"
@@ -299,22 +341,11 @@ export function QuickNotes() {
                       </DropdownMenu>
                     </div>
 
-                    {/* Title + Content */}
-                    <div className="flex-1 flex flex-col overflow-hidden px-3 py-2">
-                      <Input
-                        ref={titleRef}
-                        value={selectedNote.title}
-                        onChange={e => updateSelectedNote('title', e.target.value)}
-                        className="border-0 bg-transparent text-base font-semibold px-0 h-8 focus-visible:ring-0 focus-visible:ring-offset-0 mb-1"
-                        placeholder="Τίτλος σημείωσης..."
-                      />
-                      <Textarea
-                        value={selectedNote.content}
-                        onChange={e => updateSelectedNote('content', e.target.value)}
-                        placeholder="Γράψε εδώ τις σημειώσεις σου..."
-                        className="flex-1 border-0 bg-transparent resize-none px-0 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 min-h-0"
-                      />
-                    </div>
+                    {/* Rich text editor */}
+                    <NoteEditor
+                      content={selectedNote.content}
+                      onChange={(html) => updateSelectedNote('content', html)}
+                    />
 
                     {/* Footer */}
                     <div className="px-3 py-1.5 border-t border-border/20 shrink-0">

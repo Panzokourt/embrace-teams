@@ -60,7 +60,7 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // Persist to localStorage
-  useEffect(() => { try { localStorage.setItem(PANEL_OPEN_KEY, String(rightPanelOpen)); } catch {} }, [rightPanelOpen]);
+  // Note: rightPanelOpen is intentionally NOT persisted — panel starts closed on every page load
   useEffect(() => { try { localStorage.setItem(PANEL_TAB_KEY, activeTab); } catch {} }, [activeTab]);
   useEffect(() => { try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(sidebarUserPref)); } catch {} }, [sidebarUserPref]);
   useEffect(() => { try { localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth)); } catch {} }, [sidebarWidth]);

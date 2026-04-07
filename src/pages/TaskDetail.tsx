@@ -790,7 +790,7 @@ export default function TaskDetailPage() {
           </div>
 
           {/* RIGHT COLUMN: Comments, Dependencies, Recurrence, Review */}
-          <div className="lg:col-span-4 space-y-4 lg:sticky lg:top-[60px]">
+          <div className="lg:col-span-4 space-y-3 lg:sticky lg:top-0 self-start">
             {/* Comments — always visible */}
             <Card>
               <CardContent className="p-4">

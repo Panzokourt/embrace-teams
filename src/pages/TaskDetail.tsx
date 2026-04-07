@@ -578,52 +578,7 @@ export default function TaskDetailPage() {
               </CardContent>
             </Card>
 
-            {/* Status Flow Card */}
-            <Card>
-              <CardContent className="p-4">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">Ροή Κατάστασης</h4>
-                <div className="flex flex-col gap-0">
-                  {STATUS_ORDER.map((s, i) => {
-                    const conf = STATUS_CONFIG[s];
-                    const isCurrent = task.status === s;
-                    const isPast = STATUS_ORDER.indexOf(task.status) > i;
-                    const isLast = i === STATUS_ORDER.length - 1;
-                    return (
-                      <div key={s} className="flex items-stretch gap-3">
-                        <div className="flex flex-col items-center w-5">
-                          <button
-                            onClick={() => handleStatusChange(s)}
-                            className={cn(
-                              "h-5 w-5 rounded-full flex items-center justify-center shrink-0 transition-all border-2",
-                              isCurrent && "border-primary bg-primary text-primary-foreground scale-110 shadow-sm",
-                              isPast && !isCurrent && "border-success bg-success/20 text-success",
-                              !isCurrent && !isPast && "border-border bg-muted text-muted-foreground hover:border-muted-foreground"
-                            )}
-                          >
-                            {isPast && !isCurrent && <Check className="h-3 w-3" />}
-                            {isCurrent && <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground" />}
-                          </button>
-                          {!isLast && (
-                            <div className={cn(
-                              "w-0.5 flex-1 min-h-[16px]",
-                              isPast ? "bg-success/40" : "bg-border"
-                            )} />
-                          )}
-                        </div>
-                        <div className={cn(
-                          "pb-3 text-xs pt-0.5",
-                          isCurrent && "font-semibold text-foreground",
-                          isPast && !isCurrent && "text-success font-medium",
-                          !isCurrent && !isPast && "text-muted-foreground"
-                        )}>
-                          {conf.label}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+            {/* Status Flow Card removed — now in horizontal stepper above */}
 
             {/* Properties Card */}
             <Card>

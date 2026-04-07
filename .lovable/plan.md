@@ -1,45 +1,43 @@
 
 
-# Plan: Fix Blank Pages — Tailwind v4/v3 Incompatibility
+# Plan: Auth & Onboarding Fixes (4 issues)
 
-## Root Cause
+## 1. Google OAuth Branding — Lovable URL/branding visible
+**Issue**: Κατά το Google sign-in, ο χρήστης βλέπει "Lovable" στο consent screen και `oauth.lovable.app` στο URL.
+**Solution**: Αυτό ελέγχεται από τα OAuth credentials στο Google Cloud Console. Δεν μπορεί να αλλάξει μέσω κώδικα — πρέπει να ρυθμίσεις τα δικά σου Google OAuth credentials ώστε να εμφανίζεται "Olseny" αντί "Lovable". Αυτό γίνεται μέσω Cloud → Authentication Settings → Google → Add your own Client ID/Secret. Θα σου δείξω πώς μετά την υλοποίηση.
 
-Η εντολή `npx shadcn@latest init --preset ...` εγκατέστησε **Tailwind v4 components** σε project που τρέχει **Tailwind v3**. Αυτό σπάει ΟΛΟΚΛΗΡΗ την εφαρμογή γιατί:
+## 2. Domain field στο Onboarding — Κρύψιμο & auto-detect
+**File**: `src/pages/Onboarding.tsx`
+- Αφαίρεση του domain input πεδίου από τη φόρμα δημιουργίας εταιρείας
+- Χρήση αυτόματα του `emailDomain` (ήδη υπάρχει στο state) αν το email είναι εταιρικό
+- Αν είναι personal email, χρήση `'none'` ή αφαίρεση domain εντελώς
+- Στο `handleCreateCompany`, αλλαγή: `_domain: isPersonalEmail ? companyName.trim().toLowerCase().replace(/\s+/g, '') + '.local' : emailDomain`
 
-1. **`@import "shadcn/tailwind.css"`** — χρησιμοποιεί `@theme inline`, `@custom-variant`, `@utility` (v4-only syntax)
-2. **`@import "tw-animate-css"`** — πιθανόν v4-only
-3. **28 UI component files** χρησιμοποιούν v4 classes: `outline-ring`, `ring-ring/50`, `border-transparent!`, `group-data-*`, `has-data-*`, `data-open:`, `data-closed:`, `w-(--sidebar-width)`
+## 3. Error "duplicate value violates unique constraint companies_domain_key"
+**File**: `src/pages/Onboarding.tsx` → `handleCreateCompany`
+- Catch the `23505` error code and show user-friendly Greek message: "Υπάρχει ήδη εταιρεία με αυτό το domain. Ζητήστε πρόσβαση."
+- For personal emails, generate a unique domain (e.g. `{companyName}-{userId.slice(0,8)}.personal`) to avoid collisions
 
-Αποτέλεσμα: Το CSS processing αποτυγχάνει → κανένα style → blank page.
+## 4. Auth page — Remove left panel, force light mode
+**File**: `src/pages/Auth.tsx`
+- Remove the entire left `lg:w-1/2 bg-sidebar` panel
+- Center the auth card on the full width
+- Add logo above the card (already exists for mobile, make it always visible)
+- Keep `Feature` component but remove usage
 
-## Solution: Restore Pre-Redesign UI Components + Keep CSS Tokens
+**File**: `src/pages/Auth.tsx`, `src/pages/Onboarding.tsx`, `src/pages/ResetPassword.tsx`
+- Add `className="light"` attribute to the root `<div>` or use a wrapper that forces light mode on pre-auth pages
+- Override with inline data-theme or a class that forces light CSS variables
 
-Η πιο ασφαλής λύση είναι:
+**File**: `src/index.css` (or new utility)
+- Add a `.force-light` class that sets light mode CSS variables regardless of system/user preference
 
-### Phase 1: Fix index.css
-- Remove `@import "shadcn/tailwind.css"` and `@import "tw-animate-css"` (v4 imports)
-- Keep the oklch CSS variable tokens (these work fine in v3 as raw CSS custom properties)
+## Files to Modify
 
-### Phase 2: Restore all 28 UI components to v3-compatible versions
-The following files need to be reverted to their Tailwind v3 (shadcn/ui v0.x) versions — removing all v4-only syntax:
-
-`accordion.tsx`, `alert-dialog.tsx`, `alert.tsx`, `avatar.tsx`, `badge.tsx`, `button.tsx`, `calendar.tsx`, `card.tsx`, `command.tsx`, `context-menu.tsx`, `dialog.tsx`, `drawer.tsx`, `dropdown-menu.tsx`, `hover-card.tsx`, `input-group.tsx`, `label.tsx`, `menubar.tsx`, `navigation-menu.tsx`, `popover.tsx`, `scroll-area.tsx`, `select.tsx`, `sheet.tsx`, `sidebar.tsx`, `switch.tsx`, `tabs.tsx`, `toggle-group.tsx`, `toggle.tsx`, `tooltip.tsx`
-
-For each file, the v4 syntax will be converted:
-- `outline-ring` → removed or replaced with `outline-none ring-2 ring-ring`
-- `ring-ring/50` → `ring-ring ring-opacity-50` or `ring-offset-2`
-- `border-transparent!` → `!border-transparent`
-- `group-data-vertical/tabs:` → standard conditional classes
-- `has-data-[...]` → removed (no v3 equivalent)
-- `data-open:` / `data-closed:` → `data-[state=open]:` / `data-[state=closed]:`
-- `w-(--sidebar-width)` → inline style or CSS variable fallback
-
-### Phase 3: Fix date-fns
-- Add Vite resolve alias for `date-fns/locale.mjs` → `date-fns/locale` (the `.mjs` files no longer exist in the installed version)
-
-## Alternative: Restore from History
-
-Αν προτιμάς, μπορείς να κάνεις **restore σε version πριν το redesign** μέσω History, και να ξαναξεκινήσουμε το redesign σωστά — αυτή τη φορά **χωρίς** να τρέξουμε `shadcn init` (που εγκατέστησε v4 components) αλλά κρατώντας τα v3 components και αλλάζοντας μόνο τα CSS tokens/colors.
-
-**Σύσταση**: Η επαναφορά μέσω History είναι πιο γρήγορη και ασφαλής, γιατί η μετατροπή 28 αρχείων χειροκίνητα είναι πολύ εκτεταμένη και error-prone.
+| File | Changes |
+|------|---------|
+| `src/pages/Auth.tsx` | Remove left panel, center auth card, force light mode |
+| `src/pages/Onboarding.tsx` | Hide domain field, auto-set domain, handle duplicate domain error |
+| `src/pages/ResetPassword.tsx` | Force light mode wrapper |
+| `src/index.css` | Add `.force-light` utility class |
 

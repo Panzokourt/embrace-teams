@@ -22,9 +22,10 @@ const DEFAULT_FOLDER_NAMES = [
 interface FileExplorerProps {
   tenderId?: string;
   projectId?: string;
+  taskId?: string;
 }
 
-export function FileExplorer({ tenderId, projectId }: FileExplorerProps) {
+export function FileExplorer({ tenderId, projectId, taskId }: FileExplorerProps) {
   const { user, isAdmin, isManager } = useAuth();
   const [files, setFiles] = useState<FileAttachment[]>([]);
   const [folders, setFolders] = useState<FileFolder[]>([]);
@@ -38,7 +39,7 @@ export function FileExplorer({ tenderId, projectId }: FileExplorerProps) {
 
   useEffect(() => {
     fetchData();
-  }, [tenderId, projectId]);
+  }, [tenderId, projectId, taskId]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -83,7 +84,8 @@ export function FileExplorer({ tenderId, projectId }: FileExplorerProps) {
 
   const fetchFiles = async () => {
     let query = supabase.from('file_attachments').select('*').order('created_at', { ascending: false });
-    if (tenderId) query = query.eq('tender_id', tenderId);
+    if (taskId) query = query.eq('task_id', taskId);
+    else if (tenderId) query = query.eq('tender_id', tenderId);
     else if (projectId) query = query.eq('project_id', projectId);
     const { data, error } = await query;
     if (error) throw error;
@@ -159,6 +161,7 @@ export function FileExplorer({ tenderId, projectId }: FileExplorerProps) {
         };
         if (tenderId) fileData.tender_id = tenderId;
         if (projectId) fileData.project_id = projectId;
+        if (taskId) fileData.task_id = taskId;
         const { data: inserted, error: insertError } = await supabase.from('file_attachments').insert([fileData as any]).select('id').single();
         if (insertError) throw insertError;
         if (inserted) uploadedFileIds.push(inserted.id);

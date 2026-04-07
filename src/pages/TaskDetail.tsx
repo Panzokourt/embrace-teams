@@ -744,7 +744,7 @@ export default function TaskDetailPage() {
               </TabsList>
 
               <TabsContent value="files">
-                <FileExplorer projectId={task.project_id} />
+                <FileExplorer projectId={task.project_id} taskId={task.id} />
               </TabsContent>
 
               <TabsContent value="time">

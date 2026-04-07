@@ -1854,90 +1854,210 @@ ${contextParts.join("\n")}`;
       content: m.content,
     }));
 
-    // Tool calling loop (max 8 iterations for complex workflows)
-    let conversationMessages = [...anthropicMessages];
+    // SSE streaming response
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        const send = (data: any) => {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        };
 
-    for (let i = 0; i < 8; i++) {
-      const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "x-api-key": ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 8192,
-          system: systemPrompt,
-          messages: conversationMessages,
-          tools: anthropicTools,
-        }),
-      });
+        try {
+          let conversationMessages = [...anthropicMessages];
 
-      if (!aiResponse.ok) {
-        if (aiResponse.status === 429) {
-          return new Response(JSON.stringify({ error: "Πολλά αιτήματα. Δοκίμασε ξανά σε λίγο." }), {
-            status: 429,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
+          // Tool calling loop (max 8 iterations)
+          for (let i = 0; i < 8; i++) {
+            const isToolLoop = i > 0;
+
+            // Check if this might be the final call — use streaming
+            const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+              method: "POST",
+              headers: {
+                "x-api-key": ANTHROPIC_API_KEY,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+              },
+              body: JSON.stringify({
+                model: "claude-sonnet-4-20250514",
+                max_tokens: 8192,
+                system: systemPrompt,
+                messages: conversationMessages,
+                tools: anthropicTools,
+                stream: true,
+              }),
+            });
+
+            if (!aiResponse.ok) {
+              if (aiResponse.status === 429) {
+                send({ type: "error", text: "Πολλά αιτήματα. Δοκίμασε ξανά σε λίγο." });
+              } else {
+                const errText = await aiResponse.text();
+                console.error("Anthropic API error:", aiResponse.status, errText);
+                send({ type: "error", text: "Σφάλμα AI API" });
+              }
+              break;
+            }
+
+            // Parse SSE stream from Anthropic
+            const reader = aiResponse.body!.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+            let contentBlocks: any[] = [];
+            let currentBlockIndex = -1;
+            let currentBlockType = "";
+            let currentToolName = "";
+            let currentToolId = "";
+            let textAccumulator = "";
+            let inputJsonAccumulator = "";
+            let stopReason = "";
+            let hasToolUse = false;
+            let streamedText = false;
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+
+              const lines = buffer.split("\n");
+              buffer = lines.pop() || "";
+
+              for (const line of lines) {
+                if (!line.startsWith("data: ")) continue;
+                const data = line.slice(6).trim();
+                if (data === "[DONE]") continue;
+
+                let event: any;
+                try { event = JSON.parse(data); } catch { continue; }
+
+                switch (event.type) {
+                  case "content_block_start":
+                    currentBlockIndex = event.index;
+                    if (event.content_block?.type === "tool_use") {
+                      currentBlockType = "tool_use";
+                      currentToolName = event.content_block.name;
+                      currentToolId = event.content_block.id;
+                      inputJsonAccumulator = "";
+                      hasToolUse = true;
+                    } else if (event.content_block?.type === "text") {
+                      currentBlockType = "text";
+                      textAccumulator = "";
+                    }
+                    break;
+
+                  case "content_block_delta":
+                    if (event.delta?.type === "text_delta" && currentBlockType === "text") {
+                      const text = event.delta.text;
+                      textAccumulator += text;
+                      // Stream text to client immediately
+                      if (!hasToolUse || stopReason === "end_turn") {
+                        send({ type: "delta", content: text });
+                        streamedText = true;
+                      }
+                    } else if (event.delta?.type === "input_json_delta" && currentBlockType === "tool_use") {
+                      inputJsonAccumulator += event.delta.partial_json || "";
+                    }
+                    break;
+
+                  case "content_block_stop":
+                    if (currentBlockType === "text") {
+                      contentBlocks.push({ type: "text", text: textAccumulator });
+                    } else if (currentBlockType === "tool_use") {
+                      let parsedInput = {};
+                      try { parsedInput = JSON.parse(inputJsonAccumulator); } catch { }
+                      contentBlocks.push({
+                        type: "tool_use",
+                        id: currentToolId,
+                        name: currentToolName,
+                        input: parsedInput,
+                      });
+                    }
+                    currentBlockType = "";
+                    break;
+
+                  case "message_delta":
+                    if (event.delta?.stop_reason) {
+                      stopReason = event.delta.stop_reason;
+                    }
+                    break;
+                }
+              }
+            }
+
+            // Check for tool use blocks
+            const toolUseBlocks = contentBlocks.filter((b: any) => b.type === "tool_use");
+
+            // If no tool calls or end_turn, we're done
+            if (toolUseBlocks.length === 0 || stopReason === "end_turn") {
+              // If we didn't stream text yet (e.g. text came before tool detection), send it now
+              if (!streamedText) {
+                const fullText = contentBlocks.filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
+                if (fullText) {
+                  send({ type: "delta", content: fullText });
+                }
+              }
+              const fullReply = contentBlocks.filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
+              send({ type: "done", reply: fullReply });
+              break;
+            }
+
+            // We have tool calls — send status and execute them
+            // First, if any text was streamed, we need to handle that
+            // Add assistant message with all content blocks
+            conversationMessages.push({
+              role: "assistant",
+              content: contentBlocks,
+            });
+
+            // Execute each tool call
+            const toolResults: any[] = [];
+            for (const toolBlock of toolUseBlocks) {
+              const fnName = toolBlock.name;
+              const fnArgs = toolBlock.input || {};
+
+              // Send status to client
+              const toolLabel = fnName.replace(/_/g, " ");
+              send({ type: "status", text: `Εκτέλεση: ${toolLabel}...` });
+
+              console.log(`Executing tool: ${fnName}`, fnArgs);
+              const toolResult = await executeTool(supabase, userId, companyId, fnName, fnArgs);
+
+              toolResults.push({
+                type: "tool_result",
+                tool_use_id: toolBlock.id,
+                content: JSON.stringify(toolResult),
+              });
+            }
+
+            conversationMessages.push({
+              role: "user",
+              content: toolResults,
+            });
+
+            // Reset for next iteration
+            contentBlocks = [];
+            textAccumulator = "";
+            hasToolUse = false;
+            streamedText = false;
+          }
+        } catch (e) {
+          console.error("secretary-agent stream error:", e);
+          const errMsg = e instanceof Error ? e.message : "Unknown error";
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "error", text: errMsg })}\n\n`));
+        } finally {
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
         }
-        const errText = await aiResponse.text();
-        console.error("Anthropic API error:", aiResponse.status, errText);
-        throw new Error("AI API error");
-      }
+      },
+    });
 
-      const result = await aiResponse.json();
-      const stopReason = result.stop_reason;
-      const contentBlocks = result.content || [];
-
-      // Extract text response
-      const textBlocks = contentBlocks.filter((b: any) => b.type === "text");
-      const textResponse = textBlocks.map((b: any) => b.text).join("");
-
-      // Extract tool use blocks
-      const toolUseBlocks = contentBlocks.filter((b: any) => b.type === "tool_use");
-
-      // If no tool calls, return the text response
-      if (toolUseBlocks.length === 0 || stopReason === "end_turn") {
-        return new Response(
-          JSON.stringify({ reply: textResponse }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      // Add assistant message with all content blocks
-      conversationMessages.push({
-        role: "assistant",
-        content: contentBlocks,
-      });
-
-      // Execute each tool call and add results
-      const toolResults: any[] = [];
-      for (const toolBlock of toolUseBlocks) {
-        const fnName = toolBlock.name;
-        const fnArgs = toolBlock.input || {};
-
-        console.log(`Executing tool: ${fnName}`, fnArgs);
-        const toolResult = await executeTool(supabase, userId, companyId, fnName, fnArgs);
-
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: toolBlock.id,
-          content: JSON.stringify(toolResult),
-        });
-      }
-
-      conversationMessages.push({
-        role: "user",
-        content: toolResults,
-      });
-    }
-
-    // If we exhausted iterations
-    return new Response(
-      JSON.stringify({ reply: "Η επεξεργασία ολοκληρώθηκε. Μπορώ να βοηθήσω σε κάτι άλλο;" }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(stream, {
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+      },
+    });
   } catch (e) {
     console.error("secretary-agent error:", e);
     return new Response(

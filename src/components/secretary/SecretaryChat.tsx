@@ -99,6 +99,7 @@ export default function SecretaryChat({ mode, registerSendHandler }: SecretaryCh
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [sidebarKey, setSidebarKey] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -211,9 +212,67 @@ export default function SecretaryChat({ mode, registerSendHandler }: SecretaryCh
         setLoading(false);
         return;
       }
-      const data = await response.json();
-      const reply = data.reply || "Δεν λήφθηκε απάντηση.";
-      setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
+
+      // SSE streaming reader
+      const reader = response.body?.getReader();
+      if (!reader) {
+        toast.error("Σφάλμα streaming.");
+        setLoading(false);
+        return;
+      }
+      const decoder = new TextDecoder();
+      let sseBuffer = "";
+      let accumulatedReply = "";
+
+      // Add empty assistant message that we'll update
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        sseBuffer += decoder.decode(value, { stream: true });
+
+        const lines = sseBuffer.split("\n");
+        sseBuffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const raw = line.slice(6).trim();
+          if (raw === "[DONE]") continue;
+
+          let event: any;
+          try { event = JSON.parse(raw); } catch { continue; }
+
+          if (event.type === "delta") {
+            accumulatedReply += event.content;
+            setMessages((prev) => {
+              const updated = [...prev];
+              updated[updated.length - 1] = { role: "assistant", content: accumulatedReply };
+              return updated;
+            });
+          } else if (event.type === "status") {
+            setStatusMessage(event.text);
+          } else if (event.type === "done") {
+            accumulatedReply = event.reply || accumulatedReply;
+            setMessages((prev) => {
+              const updated = [...prev];
+              updated[updated.length - 1] = { role: "assistant", content: accumulatedReply };
+              return updated;
+            });
+          } else if (event.type === "error") {
+            toast.error(event.text || "Σφάλμα AI.");
+          }
+        }
+      }
+
+      setStatusMessage(null);
+      const reply = accumulatedReply || "Δεν λήφθηκε απάντηση.";
+      // Update final message
+      setMessages((prev) => {
+        const updated = [...prev];
+        updated[updated.length - 1] = { role: "assistant", content: reply };
+        return updated;
+      });
       await saveMessage(convId, "assistant", reply);
       await supabase
         .from("secretary_conversations")
@@ -326,8 +385,8 @@ export default function SecretaryChat({ mode, registerSendHandler }: SecretaryCh
                     </div>
                   </div>
                   <div className="flex items-center gap-2 pt-1">
-                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Σκέφτομαι...</span>
+                     <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                     <span className="text-sm text-muted-foreground">{statusMessage || "Σκέφτομαι..."}</span>
                   </div>
                 </div>
               )}

@@ -36,6 +36,7 @@ import {
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { computeParentStatus } from '@/utils/subtaskProgress';
 
 type TaskStatus = 'todo' | 'in_progress' | 'review' | 'internal_review' | 'client_review' | 'completed';
 

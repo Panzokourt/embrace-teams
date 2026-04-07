@@ -56,8 +56,20 @@ function getTaskDate(task: TaskItem): string | null {
   return task.due_date || task.start_date || null;
 }
 
+// Parse date string handling date-only strings (YYYY-MM-DD) as local dates
+function parseTaskDate(dateStr: string): Date {
+  // If it's a date-only string (no T), parse as local date to avoid timezone shift
+  if (dateStr.length === 10 || !dateStr.includes('T')) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+  return new Date(dateStr);
+}
+
 function isAllDay(dateStr: string | null): boolean {
   if (!dateStr) return true;
+  // Date-only strings are always all-day
+  if (dateStr.length === 10 || !dateStr.includes('T')) return true;
   const d = new Date(dateStr);
   return d.getHours() === 0 && d.getMinutes() === 0;
 }
@@ -121,7 +133,7 @@ export function MyWorkCalendar({
     tasks.filter(t => {
       const d = getTaskDate(t);
       if (!d) return false;
-      return isBefore(startOfDay(new Date(d)), startOfDay(new Date())) && t.status !== 'completed';
+      return isBefore(startOfDay(parseTaskDate(d)), startOfDay(new Date())) && t.status !== 'completed';
     }), [tasks]);
   const backlogCount = unscheduledTasks.length + overdueTasks.length;
 
@@ -252,7 +264,7 @@ export function MyWorkCalendar({
               <div className="px-2 py-1.5 text-[10px] text-muted-foreground text-right pr-3">Ολοήμ.</div>
               {days.map(day => {
                 const key = format(day, 'yyyy-MM-dd');
-                const dayAllDay = allDayTasks.filter(t => { const d = getTaskDate(t); return d && isSameDay(new Date(d), day); });
+                const dayAllDay = allDayTasks.filter(t => { const d = getTaskDate(t); return d && isSameDay(parseTaskDate(d), day); });
                 return (
                   <div key={`allday-${key}`} className="border-l border-border/20 px-1 py-1 min-h-[36px] hover:bg-accent/10 transition-colors cursor-pointer"
                     onDragOver={handleDragOver} onDrop={e => handleDrop(e, day)} onClick={() => handleSlotClick(day)}>
@@ -271,7 +283,7 @@ export function MyWorkCalendar({
                 <div className="px-2 py-1 text-[10px] text-muted-foreground text-right pr-3 -mt-1.5 tabular-nums">{String(hour).padStart(2, '0')}:00</div>
                 {days.map(day => {
                   const key = format(day, 'yyyy-MM-dd');
-                  const hourTasks = timedTasks.filter(t => { const d = getTaskDate(t); if (!d) return false; const dt = new Date(d); return isSameDay(dt, day) && dt.getHours() === hour; });
+                  const hourTasks = timedTasks.filter(t => { const d = getTaskDate(t); if (!d) return false; const dt = parseTaskDate(d); return isSameDay(dt, day) && dt.getHours() === hour; });
                   return (
                     <div key={`${key}-${hour}`} className={cn('border-l border-border/20 px-0.5 py-0.5 cursor-pointer hover:bg-accent/10 transition-colors', draggedTaskId && 'hover:bg-primary/10')}
                       onDragOver={handleDragOver} onDrop={e => handleDrop(e, day, hour)} onClick={() => handleSlotClick(day, hour)}>
@@ -370,7 +382,7 @@ function BacklogTaskItem({ task, onDragStart, onClick, isOverdue }: {
       <div className="min-w-0 flex-1">
         <div className="font-medium truncate">{task.title}</div>
         {task.project?.name && <div className="text-[10px] text-muted-foreground truncate">{task.project.name}</div>}
-        {isOverdue && task.due_date && <div className="text-[9px] text-destructive mt-0.5">{format(new Date(task.due_date), 'd MMM', { locale: el })}</div>}
+        {isOverdue && task.due_date && <div className="text-[9px] text-destructive mt-0.5">{format(parseTaskDate(task.due_date), 'd MMM', { locale: el })}</div>}
       </div>
     </div>
   );
@@ -383,7 +395,7 @@ function CalendarTaskPill({ task, onDragStart, onClick, activeTimer, startTimer,
 }) {
   const isRunning = activeTimer?.is_running && activeTimer.task_id === task.id;
   const dateStr = getTaskDate(task);
-  const isOverdue = dateStr && isBefore(startOfDay(new Date(dateStr)), startOfDay(new Date())) && task.status !== 'completed';
+  const isOverdue = dateStr && isBefore(startOfDay(parseTaskDate(dateStr)), startOfDay(new Date())) && task.status !== 'completed';
 
   return (
     <div draggable onDragStart={onDragStart} onClick={onClick}
@@ -391,7 +403,7 @@ function CalendarTaskPill({ task, onDragStart, onClick, activeTimer, startTimer,
         isOverdue ? 'border-destructive/30 bg-destructive/5 text-destructive' : 'border-border/30 bg-card hover:bg-accent/20')}>
       <GripVertical className="h-3 w-3 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
       <span className="flex-1 min-w-0 truncate font-medium">{task.title}</span>
-      {showTime && dateStr && <span className="text-[9px] text-muted-foreground tabular-nums shrink-0">{format(new Date(dateStr), 'HH:mm')}</span>}
+      {showTime && dateStr && <span className="text-[9px] text-muted-foreground tabular-nums shrink-0">{format(parseTaskDate(dateStr), 'HH:mm')}</span>}
       {!isRunning ? (
         <button className="h-4 w-4 flex items-center justify-center text-muted-foreground hover:text-primary shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
           onClick={e => { e.stopPropagation(); startTimer(task.id, task.project_id); }}><Play className="h-2.5 w-2.5" /></button>

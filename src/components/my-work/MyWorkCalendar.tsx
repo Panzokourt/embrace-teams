@@ -56,8 +56,20 @@ function getTaskDate(task: TaskItem): string | null {
   return task.due_date || task.start_date || null;
 }
 
+// Parse date string handling date-only strings (YYYY-MM-DD) as local dates
+function parseTaskDate(dateStr: string): Date {
+  // If it's a date-only string (no T), parse as local date to avoid timezone shift
+  if (dateStr.length === 10 || !dateStr.includes('T')) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+  return new Date(dateStr);
+}
+
 function isAllDay(dateStr: string | null): boolean {
   if (!dateStr) return true;
+  // Date-only strings are always all-day
+  if (dateStr.length === 10 || !dateStr.includes('T')) return true;
   const d = new Date(dateStr);
   return d.getHours() === 0 && d.getMinutes() === 0;
 }

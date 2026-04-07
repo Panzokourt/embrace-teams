@@ -148,29 +148,6 @@ export function EnhancedInlineEditCell({
       : placeholder;
     const timeValue = dateValue ? format(dateValue, 'HH:mm') : '09:00';
 
-    const handleDateTimeSelect = useCallback(async (date: Date | undefined) => {
-      if (!date) {
-        setCalendarOpen(false);
-        await handleSave(null);
-        return;
-      }
-      // Preserve existing time or use current time input
-      const existingDate = dateValue || new Date();
-      const [hours, minutes] = (dateValue ? format(existingDate, 'HH:mm') : '09:00').split(':').map(Number);
-      date.setHours(hours, minutes, 0, 0);
-      const newValue = date.toISOString();
-      setCalendarOpen(false);
-      await handleSave(newValue);
-    }, [dateValue, handleSave]);
-
-    const handleTimeChange = useCallback(async (newTime: string) => {
-      if (!dateValue) return;
-      const [hours, minutes] = newTime.split(':').map(Number);
-      const updated = new Date(dateValue);
-      updated.setHours(hours, minutes, 0, 0);
-      await handleSave(updated.toISOString());
-    }, [dateValue, handleSave]);
-
     return (
       <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
         <PopoverTrigger asChild>
@@ -190,7 +167,19 @@ export function EnhancedInlineEditCell({
           <CalendarComponent
             mode="single"
             selected={dateValue}
-            onSelect={handleDateTimeSelect}
+            onSelect={async (date) => {
+              if (!date) {
+                setCalendarOpen(false);
+                await handleSave(null);
+                return;
+              }
+              const existingDate = dateValue || new Date();
+              const [hours, minutes] = (dateValue ? format(existingDate, 'HH:mm') : '09:00').split(':').map(Number);
+              date.setHours(hours, minutes, 0, 0);
+              const newValue = date.toISOString();
+              setCalendarOpen(false);
+              await handleSave(newValue);
+            }}
             initialFocus
           />
           <div className="border-t px-3 py-2 flex items-center gap-2">
@@ -198,7 +187,13 @@ export function EnhancedInlineEditCell({
             <Input
               type="time"
               value={timeValue}
-              onChange={(e) => handleTimeChange(e.target.value)}
+              onChange={async (e) => {
+                if (!dateValue) return;
+                const [hours, minutes] = e.target.value.split(':').map(Number);
+                const updated = new Date(dateValue);
+                updated.setHours(hours, minutes, 0, 0);
+                await handleSave(updated.toISOString());
+              }}
               className="h-7 w-24 text-sm"
             />
           </div>

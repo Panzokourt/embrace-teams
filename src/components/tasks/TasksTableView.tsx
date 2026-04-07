@@ -1154,7 +1154,7 @@ export function TasksTableView({
                         <div className="flex items-center gap-4 text-xs text-muted-foreground pl-10">
                           <span className="font-medium">{group.tasks.length} tasks</span>
                           {isColumnVisible('progress') && (
-                            <span>Πρόοδος: {Math.round(group.tasks.reduce((sum, t) => sum + (t.progress ?? 0), 0) / Math.max(group.tasks.length, 1))}%</span>
+                            <span>Πρόοδος: {Math.round(group.tasks.reduce((sum, t) => sum + (STATUS_PROGRESS[t.status] ?? 0), 0) / Math.max(group.tasks.length, 1))}%</span>
                           )}
                           {isColumnVisible('estimated_hours') && (
                             <span>Εκτίμηση: {group.tasks.reduce((sum, t) => sum + (t.estimated_hours ?? 0), 0)}h</span>

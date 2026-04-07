@@ -29,6 +29,7 @@ interface TaskItem {
   project_id: string;
   project?: { name: string } | null;
   estimated_hours?: number | null;
+  rescheduled_from?: string | null;
 }
 
 interface Milestone {

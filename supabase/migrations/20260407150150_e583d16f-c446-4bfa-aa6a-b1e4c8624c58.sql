@@ -1,0 +1,1 @@
+ALTER TABLE public.tasks ADD COLUMN rescheduled_from timestamptz DEFAULT NULL;

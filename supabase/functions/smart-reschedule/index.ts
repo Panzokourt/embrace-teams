@@ -43,6 +43,7 @@ Rules:
 - Return ISO date strings for due_date (with time, e.g. "2026-04-08T09:00:00")
 - If no slots available in the next 14 days, skip the task
 - Double-check that the day of the week of each assignment is a working day before returning
+- NEVER modify or return estimated_hours — use them only for calculating scheduling duration, but do NOT include them in the response
 
 Use the schedule_tasks tool to return your assignments.`;
 

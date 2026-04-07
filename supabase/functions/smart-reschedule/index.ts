@@ -133,7 +133,18 @@ Schedule all unscheduled/overdue tasks into available working hour slots.`;
         ? JSON.parse(toolCall.function.arguments) 
         : toolCall.function.arguments;
       
-      return new Response(JSON.stringify({ assignments: args.assignments || [] }), {
+      // Server-side validation: filter out assignments on non-working days
+      const validAssignments = (args.assignments || []).filter((a: any) => {
+        const d = new Date(a.due_date);
+        const dow = d.getDay();
+        return workingDays.includes(dow);
+      });
+      
+      if (validAssignments.length < (args.assignments || []).length) {
+        console.warn(`Filtered out ${(args.assignments || []).length - validAssignments.length} assignments on non-working days`);
+      }
+
+      return new Response(JSON.stringify({ assignments: validAssignments }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

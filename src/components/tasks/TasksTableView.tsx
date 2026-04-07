@@ -35,7 +35,9 @@ import {
   User,
   Flag,
   X as XIcon,
+  RefreshCw,
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { TaskTimer } from '@/components/time-tracking/TaskTimer';
 import { MondayStatusCell } from '@/components/shared/MondayStatusCell';

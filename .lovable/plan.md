@@ -1,66 +1,64 @@
 
+# Task Sidebar — Docked Panel αντί Modal Sheet
 
-# Tasks Σήμερα — Enhanced UX Upgrade
+## Πρόβλημα
+Τώρα, όταν πατάς ένα task στα "Tasks Σήμερα", ανοίγει ένα `Sheet` (modal overlay) που κάνει blur το background και δεν αφήνει αλληλεπίδραση με την υπόλοιπη σελίδα. Δείχνει επίσης πολύ λίγη πληροφορία και τίποτα δεν είναι editable ή clickable.
 
-## Current State
-- "Tasks Σήμερα" is a simple list with `lg:col-span-2` (narrower than "Ενεργά Έργα" which is `lg:col-span-3`)
-- Each row shows: checkbox + icon + title/project + date + status badge + play/stop button
-- No drag reorder, no sort, no row numbers, no inline editing, no subtask expansion, no quick-add
+## Λύση
+Αντικατάσταση του `Sheet` με ένα **docked sidebar panel** στα δεξιά, που:
+- Σπρώχνει (resize) το υπόλοιπο content αντί να κάνει overlay/blur
+- Δείχνει πλήρη πληροφορία του task με inline editing
+- Έχει clickable links (project, client, assignee)
 
-## Changes
+## Αλλαγές
 
-### 1. Equal width with "Ενεργά Έργα"
-- Change grid from `lg:grid-cols-5` to `lg:grid-cols-2` (equal 50/50 split)
-- Both cards get `lg:col-span-1`
+### 1. Αντικατάσταση Sheet → Docked Panel (`MyWork.tsx`)
+- Αφαίρεση του `<Sheet>` component
+- Προσθήκη ενός `<div>` sidebar panel στα δεξιά, conditional render βάσει `selectedItem`
+- Το main content γίνεται `flex-1` και ο panel `w-[420px] shrink-0` — push layout, χωρίς blur
+- Animation: slide-in από δεξιά (`animate-in slide-in-from-right`)
 
-### 2. Row numbers (αύξων αριθμός)
-- Add sequential index number (`1.`, `2.`, `3.`...) on the left of each task row
+### 2. Νέο component `TaskSidePanel.tsx`
+Πλούσιο panel με:
+- **Header**: Τίτλος task (editable), X button για κλείσιμο
+- **Clickable links**: Project name → `/projects/:id`, Client name → `/clients/:id`, Assignee name → profile
+- **Inline editing**: Status (dropdown), Priority (dropdown), Due date (calendar popover), Start date, Progress (slider), Description (textarea)
+- **Timer**: Start/Stop button
+- **Subtasks**: Compact list αν υπάρχουν
+- **Footer**: "Άνοιγμα σελίδας Task" button
 
-### 3. Completion icon — hover-only
-- Remove always-visible `Checkbox`
-- Show a `Check` circle icon only on hover (`opacity-0 group-hover:opacity-100`)
-- Click completes the task as before
+### 3. Layout restructure
+```text
+BEFORE:
+┌─────────────── full width ───────────────┐
+│ MyWork content                           │
+│                        ┌──── Sheet ────┐ │
+│     (blurred)          │  Task info    │ │
+│                        └───────────────┘ │
+└──────────────────────────────────────────┘
 
-### 4. Drag & Drop reorder
-- Use `@dnd-kit/core` + `@dnd-kit/sortable` (already installed in the project)
-- Wrap task list in `DndContext` + `SortableContext`
-- Each row becomes sortable with a drag handle (grip dots icon, visible on hover)
-- Maintain local `orderedTasks` state for reorder (client-side only, resets on refresh)
-
-### 5. Sort options
-- Add a small sort dropdown button in the card header (next to the count badge)
-- Options: `Ημερομηνία` (default), `Προτεραιότητα`, `Project`, `Status`
-- Sort is applied before drag reorder (drag reorder only works when sort = manual)
-
-### 6. Inline date & status editing
-- **Date**: Click on the date label → show a small date picker popover (using existing `Popover` + `Calendar` components)
-- **Status**: Click on the status badge → show a dropdown with all status options from `STATUS_COLORS`
-- Both update via `supabase.from('tasks').update(...)` and local state
-
-### 7. Quick add task
-- Add an "+ Νέο Task" row at the bottom of the list
-- Click reveals an inline text input + project selector (dropdown of user's projects)
-- Enter creates a task with `due_date = today`, `status = 'todo'`, `assigned_to = user.id`
-
-### 8. Expandable subtasks
-- Add a chevron toggle on tasks that have subtasks (query `parent_task_id`)
-- On expand, fetch subtasks from DB and show them indented below the parent
-- Subtasks show title + status badge only (compact)
+AFTER:
+┌──── flex-1 ────┬──── w-[420px] ────┐
+│ MyWork content │  Task Side Panel  │
+│ (interactive)  │  (editable info)  │
+│                │  - Status ✏️       │
+│                │  - Project 🔗     │
+│                │  - Date ✏️        │
+│                │  - Timer ▶️       │
+└────────────────┴───────────────────┘
+```
 
 ## Technical Details
-
-### Subtask detection
-- Fetch subtask counts alongside today tasks: a separate query `select task_id, count(*) from tasks where parent_task_id in (...) group by parent_task_id` or fetch all subtasks for today's task IDs
-
-### Components
-All changes are within `src/pages/MyWork.tsx`:
-- Refactor the "Tasks Σήμερα" card section into a new inline component or keep it in MyWork
-- `TaskRow` component updated with: row number, hover-only complete icon, drag handle, inline date/status editing, subtask expand
-- New `QuickAddTask` inline component at bottom
+- Fetch full task data (with project.client, assignee profile) when panel opens, using task ID from the clicked item
+- Updates via `supabase.from('tasks').update(...)` — same pattern as TaskDetail page
+- Status/Priority use the existing `STATUS_COLORS`/`PRIORITY_COLORS` configs
+- Clickable elements use `<Link>` from react-router-dom
+- Panel closes on X click or Escape key
+- `DeliverableDetailSheet` also moves into the same docked panel pattern
 
 ## Files
 
 | File | Change |
 |------|--------|
-| `src/pages/MyWork.tsx` | Grid layout 50/50, enhanced TaskRow (row numbers, hover complete, drag, inline edit, subtask expand), sort dropdown, quick add row, subtask fetching |
-
+| `src/components/my-work/TaskSidePanel.tsx` | New — rich, editable docked task panel with clickable links |
+| `src/pages/MyWork.tsx` | Replace `Sheet` with docked side panel layout, flex container |

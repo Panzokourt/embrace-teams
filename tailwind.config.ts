@@ -20,6 +20,7 @@ export default {
   		},
   		fontFamily: {
   			sans: [
+  				'Geist',
   				'Inter',
   				'-apple-system',
   				'BlinkMacSystemFont',
@@ -27,6 +28,7 @@ export default {
   				'sans-serif'
   			],
   			display: [
+  				'Geist',
   				'Inter',
   				'-apple-system',
   				'BlinkMacSystemFont',

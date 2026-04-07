@@ -96,14 +96,7 @@ const STATUS_CONFIG: Record<TaskStatus, { icon: React.ReactNode; label: string; 
 
 const STATUS_ORDER: TaskStatus[] = ['todo', 'in_progress', 'review', 'internal_review', 'client_review', 'completed'];
 
-const STATUS_PROGRESS: Record<TaskStatus, number> = {
-  todo: 0,
-  in_progress: 20,
-  review: 50,
-  internal_review: 65,
-  client_review: 80,
-  completed: 100,
-};
+import { STATUS_PROGRESS, computeParentStatus, computeSubtaskProgress } from '@/utils/subtaskProgress';
 
 const PRIORITY_OPTIONS = [
   { value: 'low', label: 'Χαμηλή', color: 'hsl(var(--success))' },

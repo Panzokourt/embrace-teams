@@ -1205,8 +1205,8 @@ async function executeTool(
       // ── SMART INTAKE & PLANNING EXECUTORS ──
 
       case "smart_project_plan": {
-        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-        if (!LOVABLE_API_KEY) return { error: "AI not configured" };
+        const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+        if (!ANTHROPIC_API_KEY) return { error: "AI not configured" };
 
         const planPrompt = `Είσαι expert project planner για agency επικοινωνίας/marketing.
 Δημιούργησε ένα πλήρες project plan βασισμένο στην περιγραφή.
@@ -1216,28 +1216,7 @@ ${args.budget ? `Budget: €${args.budget}` : ""}
 ${args.duration_months ? `Διάρκεια: ${args.duration_months} μήνες` : ""}
 ${args.template_hint ? `Τύπος: ${args.template_hint}` : ""}
 
-Επέστρεψε ένα JSON object:
-{
-  "name": "Project name",
-  "description": "Brief description",
-  "deliverables": [
-    {
-      "name": "Deliverable name",
-      "budget_pct": 30,
-      "tasks": [
-        {
-          "title": "Task title",
-          "priority": "high|medium|low",
-          "days_offset_start": 0,
-          "days_offset_due": 14,
-          "estimated_hours": 8,
-          "role_hint": "seo_specialist"
-        }
-      ]
-    }
-  ],
-  "suggested_roles": ["project_lead", "seo_specialist", "content_writer"]
-}
+Επέστρεψε ένα JSON object μέσω του tool output_plan.
 
 Κανόνες:
 - 3-6 deliverables ανάλογα πολυπλοκότητα
@@ -1247,33 +1226,32 @@ ${args.template_hint ? `Τύπος: ${args.template_hint}` : ""}
 - Ρεαλιστικά estimated_hours
 - role_hint πρέπει να αντιστοιχεί σε ρόλους agency (project_lead, designer, copywriter, seo_specialist, social_media_manager, developer, account_manager, media_planner)`;
 
-        const planResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        const planResp = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
+            "x-api-key": ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
           },
           body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 8192,
             messages: [{ role: "user", content: planPrompt }],
             tools: [{
-              type: "function",
-              function: {
-                name: "output_plan",
-                description: "Output the structured project plan",
-                parameters: {
-                  type: "object",
-                  properties: {
-                    name: { type: "string" },
-                    description: { type: "string" },
-                    deliverables: { type: "array", items: { type: "object", properties: { name: { type: "string" }, budget_pct: { type: "number" }, tasks: { type: "array", items: { type: "object", properties: { title: { type: "string" }, priority: { type: "string" }, days_offset_start: { type: "number" }, days_offset_due: { type: "number" }, estimated_hours: { type: "number" }, role_hint: { type: "string" } } } } } } },
-                    suggested_roles: { type: "array", items: { type: "string" } },
-                  },
-                  required: ["name", "description", "deliverables", "suggested_roles"],
+              name: "output_plan",
+              description: "Output the structured project plan",
+              input_schema: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  description: { type: "string" },
+                  deliverables: { type: "array", items: { type: "object", properties: { name: { type: "string" }, budget_pct: { type: "number" }, tasks: { type: "array", items: { type: "object", properties: { title: { type: "string" }, priority: { type: "string" }, days_offset_start: { type: "number" }, days_offset_due: { type: "number" }, estimated_hours: { type: "number" }, role_hint: { type: "string" } } } } } } },
+                  suggested_roles: { type: "array", items: { type: "string" } },
                 },
+                required: ["name", "description", "deliverables", "suggested_roles"],
               },
             }],
-            tool_choice: { type: "function", function: { name: "output_plan" } },
+            tool_choice: { type: "tool", name: "output_plan" },
           }),
         });
 
@@ -1284,15 +1262,11 @@ ${args.template_hint ? `Τύπος: ${args.template_hint}` : ""}
         }
 
         const planResult = await planResp.json();
-        const toolCall = planResult.choices?.[0]?.message?.tool_calls?.[0];
-        if (!toolCall) return { error: "AI did not return a plan" };
+        // Find tool_use block in Anthropic response
+        const toolUseBlock = planResult.content?.find((b: any) => b.type === "tool_use" && b.name === "output_plan");
+        if (!toolUseBlock) return { error: "AI did not return a plan" };
 
-        let plan;
-        try {
-          plan = JSON.parse(toolCall.function.arguments);
-        } catch {
-          return { error: "Failed to parse plan" };
-        }
+        const plan = toolUseBlock.input;
 
         // Enrich with budget amounts
         if (args.budget && plan.deliverables) {
@@ -1412,8 +1386,8 @@ ${args.template_hint ? `Τύπος: ${args.template_hint}` : ""}
       }
 
       case "analyze_uploaded_file": {
-        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-        if (!LOVABLE_API_KEY) return { error: "AI not configured" };
+        const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+        if (!ANTHROPIC_API_KEY) return { error: "AI not configured" };
 
         const content = args.file_content || "";
         const fileName = args.file_name || "unknown";
@@ -1440,14 +1414,16 @@ ${truncatedContent}
 
 Respond in Greek. Be thorough but concise.`;
 
-        const analysisResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        const analysisResp = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
+            "x-api-key": ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
           },
           body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 4096,
             messages: [{ role: "user", content: analysisPrompt }],
           }),
         });
@@ -1457,7 +1433,7 @@ Respond in Greek. Be thorough but concise.`;
         }
 
         const analysisResult = await analysisResp.json();
-        const analysis = analysisResult.choices?.[0]?.message?.content || "No analysis generated";
+        const analysis = analysisResult.content?.[0]?.text || "No analysis generated";
 
         return {
           success: true,
@@ -1859,28 +1835,42 @@ Risk Radar:
 Context δεδομένων χρήστη:
 ${contextParts.join("\n")}`;
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) {
+      throw new Error("ANTHROPIC_API_KEY is not configured");
     }
 
+    // Convert OpenAI-style tool definitions to Anthropic format
+    const anthropicTools = toolDefinitions.map((t: any) => ({
+      name: t.function.name,
+      description: t.function.description,
+      input_schema: t.function.parameters,
+    }));
+
+    // Build Anthropic messages (separate system, convert roles)
+    // Filter out system messages from the conversation
+    const anthropicMessages = messages.map((m: any) => ({
+      role: m.role === "system" ? "user" : m.role,
+      content: m.content,
+    }));
+
     // Tool calling loop (max 8 iterations for complex workflows)
-    let conversationMessages = [
-      { role: "system", content: systemPrompt },
-      ...messages,
-    ];
+    let conversationMessages = [...anthropicMessages];
 
     for (let i = 0; i < 8; i++) {
-      const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-pro",
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 8192,
+          system: systemPrompt,
           messages: conversationMessages,
-          tools: toolDefinitions,
+          tools: anthropicTools,
         }),
       });
 
@@ -1891,49 +1881,56 @@ ${contextParts.join("\n")}`;
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-        if (aiResponse.status === 402) {
-          return new Response(JSON.stringify({ error: "Απαιτείται ανανέωση credits." }), {
-            status: 402,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
         const errText = await aiResponse.text();
-        console.error("AI gateway error:", aiResponse.status, errText);
-        throw new Error("AI gateway error");
+        console.error("Anthropic API error:", aiResponse.status, errText);
+        throw new Error("AI API error");
       }
 
       const result = await aiResponse.json();
-      const choice = result.choices?.[0];
+      const stopReason = result.stop_reason;
+      const contentBlocks = result.content || [];
 
-      if (!choice) throw new Error("No response from AI");
+      // Extract text response
+      const textBlocks = contentBlocks.filter((b: any) => b.type === "text");
+      const textResponse = textBlocks.map((b: any) => b.text).join("");
+
+      // Extract tool use blocks
+      const toolUseBlocks = contentBlocks.filter((b: any) => b.type === "tool_use");
 
       // If no tool calls, return the text response
-      if (!choice.message?.tool_calls || choice.message.tool_calls.length === 0) {
+      if (toolUseBlocks.length === 0 || stopReason === "end_turn") {
         return new Response(
-          JSON.stringify({ reply: choice.message?.content || "" }),
+          JSON.stringify({ reply: textResponse }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Execute tool calls
-      conversationMessages.push(choice.message);
+      // Add assistant message with all content blocks
+      conversationMessages.push({
+        role: "assistant",
+        content: contentBlocks,
+      });
 
-      for (const toolCall of choice.message.tool_calls) {
-        const fnName = toolCall.function.name;
-        let fnArgs: any = {};
-        try {
-          fnArgs = JSON.parse(toolCall.function.arguments || "{}");
-        } catch {}
+      // Execute each tool call and add results
+      const toolResults: any[] = [];
+      for (const toolBlock of toolUseBlocks) {
+        const fnName = toolBlock.name;
+        const fnArgs = toolBlock.input || {};
 
         console.log(`Executing tool: ${fnName}`, fnArgs);
         const toolResult = await executeTool(supabase, userId, companyId, fnName, fnArgs);
 
-        conversationMessages.push({
-          role: "tool",
-          tool_call_id: toolCall.id,
+        toolResults.push({
+          type: "tool_result",
+          tool_use_id: toolBlock.id,
           content: JSON.stringify(toolResult),
         });
       }
+
+      conversationMessages.push({
+        role: "user",
+        content: toolResults,
+      });
     }
 
     // If we exhausted iterations

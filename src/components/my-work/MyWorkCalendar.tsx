@@ -403,7 +403,7 @@ function CalendarTaskPill({ task, onDragStart, onClick, activeTimer, startTimer,
         isOverdue ? 'border-destructive/30 bg-destructive/5 text-destructive' : 'border-border/30 bg-card hover:bg-accent/20')}>
       <GripVertical className="h-3 w-3 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
       <span className="flex-1 min-w-0 truncate font-medium">{task.title}</span>
-      {showTime && dateStr && <span className="text-[9px] text-muted-foreground tabular-nums shrink-0">{format(new Date(dateStr), 'HH:mm')}</span>}
+      {showTime && dateStr && <span className="text-[9px] text-muted-foreground tabular-nums shrink-0">{format(parseTaskDate(dateStr), 'HH:mm')}</span>}
       {!isRunning ? (
         <button className="h-4 w-4 flex items-center justify-center text-muted-foreground hover:text-primary shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
           onClick={e => { e.stopPropagation(); startTimer(task.id, task.project_id); }}><Play className="h-2.5 w-2.5" /></button>

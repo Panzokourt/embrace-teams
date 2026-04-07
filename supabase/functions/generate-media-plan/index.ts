@@ -18,14 +18,10 @@ interface GenerateRequest {
   projectBudget: number;
   agencyFeePercentage?: number;
   deliverables: Array<{ id: string; name: string }>;
-  // Legacy single objective (backward compat)
   campaignObjective?: string;
-  // New: multi-objective array
   campaignObjectives?: string[];
   targetAudience?: string;
-  // Legacy: flat start/end
   campaignDuration?: { start: string; end: string };
-  // New: phases with dates
   phases?: Phase[];
   selectedChannels?: string[];
   budgetAllocation?: Record<string, number>;
@@ -61,8 +57,8 @@ serve(async (req) => {
     }
     const userId = claimsData.claims.sub;
 
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!lovableApiKey) throw new Error("LOVABLE_API_KEY not configured");
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
 
     const body = await req.json() as GenerateRequest;
     const {
@@ -97,12 +93,10 @@ serve(async (req) => {
       );
     }
 
-    // Resolve objectives (support both single and multi)
     const resolvedObjectives: string[] = campaignObjectives && campaignObjectives.length > 0
       ? campaignObjectives
       : (campaignObjective ? [campaignObjective] : ['awareness']);
 
-    // NET BUDGET: strictly project budget minus agency fee
     const netBudget = projectBudget * (1 - agencyFeePercentage / 100);
 
     const channelList = selectedChannels?.length
@@ -113,7 +107,6 @@ serve(async (req) => {
       ? Object.entries(budgetAllocation).filter(([, v]) => v > 0).map(([k, v]) => `${k}: ${v}%`).join(', ')
       : 'Distribute intelligently based on campaign objectives';
 
-    // Format phases for prompt
     let phasesText = '';
     if (phases && phases.length > 0) {
       phasesText = phases.map(p =>
@@ -132,16 +125,16 @@ Return ONLY valid JSON in this exact format:
   "mediaPlanItems": [
     {
       "medium": "TV|Radio|Facebook|Instagram|TikTok|Google Ads (Search)|Google Ads (Display)|YouTube|OOH (Billboards)|DOOH (Digital OOH)|Programmatic|Influencer|Ambassador|PR|Εφημερίδες|Περιοδικά|Advertorial|Native Content|Email Marketing|SMS Marketing|Sponsorship|Events|Άλλο",
-      "placement": "specific placement e.g. Feed, Stories, Banner 300x250, Spot 30sec",
+      "placement": "specific placement",
       "campaign_name": "descriptive campaign name in Greek or English",
-      "format": "creative format e.g. Video 15sec, Carousel, Static 300x250, Spot 30sec",
+      "format": "creative format",
       "phase": "one of the campaign phases exactly as provided",
       "objective": "one of: awareness|consideration|conversion|retention|launch|engagement|leads",
-      "start_date": "YYYY-MM-DD or null if no dates provided",
-      "end_date": "YYYY-MM-DD or null if no dates provided",
+      "start_date": "YYYY-MM-DD or null",
+      "end_date": "YYYY-MM-DD or null",
       "budget": <number - must be NET budget excluding agency fee>,
-      "reach": <estimated unique reach as integer for Greek market>,
-      "impressions": <estimated impressions as integer for Greek market>,
+      "reach": <estimated unique reach as integer>,
+      "impressions": <estimated impressions as integer>,
       "target_audience": "demographic description",
       "notes": "strategic rationale in Greek",
       "deliverable_id": "UUID of associated deliverable or null"
@@ -149,13 +142,10 @@ Return ONLY valid JSON in this exact format:
   ]
 }
 
-CRITICAL RULES — VIOLATION IS NOT ACCEPTABLE:
-- CRITICAL: The SUM of ALL budget values MUST equal EXACTLY €${Math.round(netBudget)}. Do NOT exceed this amount.
-- If you create 10 items and net budget is €85,000, the total must be exactly €85,000 — not €86,000 or €90,000.
+CRITICAL RULES:
+- The SUM of ALL budget values MUST equal EXACTLY €${Math.round(netBudget)}.
 - Create 6-14 diverse media items across the selected channels
 - Each item MUST align its "phase" with one of the campaign phases provided
-- Each item's "objective" must match one of the campaign's objectives
-- Distribute budget intelligently respecting any allocation preferences
 - Use Greek for campaign names and notes
 - Provide realistic reach/impressions for the Greek market`;
 
@@ -164,56 +154,49 @@ CRITICAL RULES — VIOLATION IS NOT ACCEPTABLE:
 Project: ${projectName}
 Total Project Budget: €${projectBudget.toLocaleString()}
 Agency Fee: ${agencyFeePercentage}%
-NET Budget (available for media): €${Math.round(netBudget).toLocaleString()} ← USE ONLY THIS FOR BUDGET ALLOCATION
+NET Budget (available for media): €${Math.round(netBudget).toLocaleString()}
 Campaign Objectives: ${resolvedObjectives.join(', ')}
 Target Audience: ${targetAudience || 'General audience'}
 Selected Channels: ${channelList}
 Budget Allocation Preferences: ${allocationText}
 
-Campaign Phases (IMPORTANT - each item must belong to one of these phases):
+Campaign Phases:
 ${phasesText}
 
-Project Deliverables (link relevant items):
-${deliverables.map(d => `- ${d.name} (ID: ${d.id})`).join('\n')}
+Project Deliverables:
+${deliverables.map(d => `- ${d.name} (ID: ${d.id})`).join('\n')}`;
 
-Instructions:
-1. Total budget across ALL items must equal approximately €${Math.round(netBudget).toLocaleString()} (the NET budget)
-2. Assign each item to one of the phases listed above using the exact phase name
-3. Match each item's objective to one of: ${resolvedObjectives.join(', ')}
-4. Create items for each selected channel category
-5. Respect the budget allocation percentages if provided
-6. Use realistic Greek market estimates for reach/impressions`;
-
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${lovableApiKey}`,
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4096,
+        system: systemPrompt,
         messages: [
-          { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        temperature: 0.7,
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("AI Gateway error:", response.status, errorText);
+      console.error("Anthropic API error:", response.status, errorText);
       if (response.status === 429) {
         return new Response(
           JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      throw new Error(`AI Gateway error: ${response.status}`);
+      throw new Error(`Anthropic API error: ${response.status}`);
     }
 
     const aiResponse = await response.json();
-    const content = aiResponse.choices?.[0]?.message?.content;
+    const content = aiResponse.content?.[0]?.text;
     if (!content) throw new Error("No content in AI response");
 
     let result;
@@ -225,7 +208,7 @@ Instructions:
       throw new Error("Failed to parse AI response as JSON");
     }
 
-    // ── Budget normalization: enforce netBudget strictly ──────────────────────
+    // Budget normalization
     if (result.mediaPlanItems && Array.isArray(result.mediaPlanItems)) {
       const totalAI = result.mediaPlanItems.reduce((s: number, i: { budget?: number }) => s + (i.budget || 0), 0);
       if (totalAI > netBudget * 1.01) {
@@ -234,7 +217,6 @@ Instructions:
           ...i,
           budget: Math.round((i.budget || 0) * scale),
         }));
-        console.log(`Budget scaled from €${Math.round(totalAI)} → €${Math.round(netBudget)} (scale: ${scale.toFixed(3)})`);
       }
     }
 

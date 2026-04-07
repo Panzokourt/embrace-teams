@@ -10,7 +10,6 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    // Auth validation
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -30,8 +29,8 @@ serve(async (req) => {
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not configured");
 
     const { services, prompt } = await req.json();
 
@@ -60,55 +59,54 @@ ${servicesSummary}`;
       ? `Ο χρήστης ζητάει: "${prompt}". Πρότεινε ένα πακέτο βάσει αυτής της περιγραφής.`
       : "Πρότεινε ένα βέλτιστο πακέτο υπηρεσιών βάσει των διαθέσιμων υπηρεσιών.";
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const toolInputSchema = {
+      type: "object" as const,
+      properties: {
+        package_name: { type: "string" as const, description: "Όνομα πακέτου" },
+        description: { type: "string" as const, description: "Σύντομη περιγραφή πακέτου" },
+        list_price: { type: "number" as const, description: "Προτεινόμενη τιμή πακέτου σε EUR" },
+        discount_percent: { type: "number" as const, description: "Ποσοστό έκπτωσης (0-50)" },
+        duration_type: { type: "string" as const, enum: ["monthly", "quarterly", "semi_annual", "annual", "fixed_days", "custom_months"] },
+        duration_value: { type: "number" as const, description: "Τιμή διάρκειας" },
+        items: {
+          type: "array" as const,
+          items: {
+            type: "object" as const,
+            properties: {
+              service_id: { type: "string" as const },
+              quantity: { type: "number" as const },
+              duration_months: { type: "number" as const },
+              rationale: { type: "string" as const },
+            },
+            required: ["service_id", "quantity", "duration_months", "rationale"],
+          },
+        },
+      },
+      required: ["package_name", "description", "list_price", "discount_percent", "duration_type", "duration_value", "items"],
+    };
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4096,
+        system: systemPrompt,
         messages: [
-          { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
         tools: [
           {
-            type: "function",
-            function: {
-              name: "suggest_package",
-              description: "Return a structured package suggestion with selected services, pricing and discount.",
-              parameters: {
-                type: "object",
-                properties: {
-                  package_name: { type: "string", description: "Όνομα πακέτου (στα Ελληνικά ή Αγγλικά)" },
-                  description: { type: "string", description: "Σύντομη περιγραφή πακέτου" },
-                  list_price: { type: "number", description: "Προτεινόμενη τιμή πακέτου σε EUR" },
-                  discount_percent: { type: "number", description: "Ποσοστό έκπτωσης (0-50)" },
-                  duration_type: { type: "string", enum: ["monthly", "quarterly", "semi_annual", "annual", "fixed_days", "custom_months"], description: "Τύπος διάρκειας πακέτου" },
-                  duration_value: { type: "number", description: "Τιμή διάρκειας (π.χ. 3 για μήνες, 60 για ημέρες)" },
-                  items: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        service_id: { type: "string", description: "UUID της υπηρεσίας" },
-                        quantity: { type: "number", description: "Ποσότητα (1-12)" },
-                        duration_months: { type: "number", description: "Διάρκεια σε μήνες (1-24)" },
-                        rationale: { type: "string", description: "Γιατί περιλαμβάνεται αυτή η υπηρεσία" },
-                      },
-                      required: ["service_id", "quantity", "duration_months", "rationale"],
-                      additionalProperties: false,
-                    },
-                  },
-                },
-                required: ["package_name", "description", "list_price", "discount_percent", "duration_type", "duration_value", "items"],
-                additionalProperties: false,
-              },
-            },
+            name: "suggest_package",
+            description: "Return a structured package suggestion with selected services, pricing and discount.",
+            input_schema: toolInputSchema,
           },
         ],
-        tool_choice: { type: "function", function: { name: "suggest_package" } },
+        tool_choice: { type: "tool", name: "suggest_package" },
       }),
     });
 
@@ -124,18 +122,18 @@ ${servicesSummary}`;
         });
       }
       const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
-      throw new Error("AI gateway error");
+      console.error("Anthropic API error:", response.status, t);
+      throw new Error("AI API error");
     }
 
     const data = await response.json();
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    const toolUse = data.content?.find((c: any) => c.type === "tool_use");
     
-    if (!toolCall?.function?.arguments) {
+    if (!toolUse?.input) {
       throw new Error("No structured response from AI");
     }
 
-    const suggestion = JSON.parse(toolCall.function.arguments);
+    const suggestion = toolUse.input;
 
     // Validate service_ids exist in provided services
     const serviceIds = new Set(services.map((s: any) => s.id));

@@ -39,7 +39,7 @@ export function FileExplorer({ tenderId, projectId, taskId }: FileExplorerProps)
 
   useEffect(() => {
     fetchData();
-  }, [tenderId, projectId]);
+  }, [tenderId, projectId, taskId]);
 
   const fetchData = async () => {
     setLoading(true);

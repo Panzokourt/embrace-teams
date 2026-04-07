@@ -148,7 +148,7 @@ function ConversationGroup({
 }) {
   return (
     <div className="space-y-0.5">
-      <p className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider px-2 pt-2 pb-1">
+      <p className="text-[10px] font-medium text-sidebar-foreground/40 uppercase tracking-wider px-2 pt-2 pb-1">
         {label}
       </p>
       {items.map((c) => (

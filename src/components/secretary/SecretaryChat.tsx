@@ -385,8 +385,8 @@ export default function SecretaryChat({ mode, registerSendHandler }: SecretaryCh
                     </div>
                   </div>
                   <div className="flex items-center gap-2 pt-1">
-                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Σκέφτομαι...</span>
+                     <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                     <span className="text-sm text-muted-foreground">{statusMessage || "Σκέφτομαι..."}</span>
                   </div>
                 </div>
               )}

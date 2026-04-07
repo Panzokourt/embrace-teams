@@ -53,6 +53,11 @@ interface TaskData {
   task_type: string | null;
   task_category: string | null;
   created_at: string;
+  is_recurring: boolean;
+  recurrence_pattern: string | null;
+  recurrence_end_date: string | null;
+  internal_reviewer: string | null;
+  approver: string | null;
   project?: { name: string } | null;
   assignee?: { full_name: string | null } | null;
   deliverable?: { name: string } | null;

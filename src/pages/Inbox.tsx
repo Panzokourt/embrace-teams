@@ -63,7 +63,7 @@ export default function Inbox() {
 
       {/* Desktop view with resizable panels */}
       <div className="hidden md:flex h-full">
-        <ResizablePanelGroup direction="horizontal">
+        <ResizablePanelGroup orientation="horizontal">
           <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
             <InboxThreadList
               threads={threads}

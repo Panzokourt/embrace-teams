@@ -1,43 +1,64 @@
 
 
-# Plan: Auth & Onboarding Fixes (4 issues)
+# Luma Redesign — Lime + Geist + Pill Geometry
 
-## 1. Google OAuth Branding — Lovable URL/branding visible
-**Issue**: Κατά το Google sign-in, ο χρήστης βλέπει "Lovable" στο consent screen και `oauth.lovable.app` στο URL.
-**Solution**: Αυτό ελέγχεται από τα OAuth credentials στο Google Cloud Console. Δεν μπορεί να αλλάξει μέσω κώδικα — πρέπει να ρυθμίσεις τα δικά σου Google OAuth credentials ώστε να εμφανίζεται "Olseny" αντί "Lovable". Αυτό γίνεται μέσω Cloud → Authentication Settings → Google → Add your own Client ID/Secret. Θα σου δείξω πώς μετά την υλοποίηση.
+## Phase A: Color System — Lime Theme
+**`src/index.css`**
+- Replace all Apple Blue (`211 100% 50%`) primary/ring/accent/sidebar-primary tokens with Lime equivalents
+- Light: `--primary: 84 81% 44%`, `--accent: 84 60% 95%`, `--ring: 84 81% 44%`
+- Dark: `--primary: 84 75% 52%`
+- Chart palette: 6 shades of neutral gray (matching "Chart Color: Neutral")
+- Sidebar tokens: dark inverted (`--sidebar-background: 240 6% 10%`, `--sidebar-foreground: 0 0% 98%`) in both light AND dark
+- Update `.force-light` class to use lime primary
 
-## 2. Domain field στο Onboarding — Κρύψιμο & auto-detect
-**File**: `src/pages/Onboarding.tsx`
-- Αφαίρεση του domain input πεδίου από τη φόρμα δημιουργίας εταιρείας
-- Χρήση αυτόματα του `emailDomain` (ήδη υπάρχει στο state) αν το email είναι εταιρικό
-- Αν είναι personal email, χρήση `'none'` ή αφαίρεση domain εντελώς
-- Στο `handleCreateCompany`, αλλαγή: `_domain: isPersonalEmail ? companyName.trim().toLowerCase().replace(/\s+/g, '') + '.local' : emailDomain`
+## Phase B: Typography — Geist Font
+**`src/index.css`**: Replace Inter import with Geist
+```
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&display=swap');
+```
+Update `body` and heading font-family references to `'Geist'`
 
-## 3. Error "duplicate value violates unique constraint companies_domain_key"
-**File**: `src/pages/Onboarding.tsx` → `handleCreateCompany`
-- Catch the `23505` error code and show user-friendly Greek message: "Υπάρχει ήδη εταιρεία με αυτό το domain. Ζητήστε πρόσβαση."
-- For personal emails, generate a unique domain (e.g. `{companyName}-{userId.slice(0,8)}.personal`) to avoid collisions
+**`tailwind.config.ts`**: Update fontFamily.sans and fontFamily.display to `['Geist', 'Inter', ...]`
 
-## 4. Auth page — Remove left panel, force light mode
-**File**: `src/pages/Auth.tsx`
-- Remove the entire left `lg:w-1/2 bg-sidebar` panel
-- Center the auth card on the full width
-- Add logo above the card (already exists for mobile, make it always visible)
-- Keep `Feature` component but remove usage
+## Phase C: Geometry Updates
 
-**File**: `src/pages/Auth.tsx`, `src/pages/Onboarding.tsx`, `src/pages/ResetPassword.tsx`
-- Add `className="light"` attribute to the root `<div>` or use a wrapper that forces light mode on pre-auth pages
-- Override with inline data-theme or a class that forces light CSS variables
+| File | Current | Change |
+|------|---------|--------|
+| `button.tsx` | `rounded-[10px]` | `rounded-full` (all sizes) |
+| `badge.tsx` | `rounded-full` | Already correct |
+| `card.tsx` | `rounded-2xl` | `rounded-[20px]` |
+| `input.tsx` | `rounded-[10px]` | `rounded-xl` |
+| `textarea.tsx` | `rounded-[10px]` | `rounded-xl` |
+| `select.tsx` trigger | `rounded-[10px]` | `rounded-xl` |
+| `tabs.tsx` list | `rounded-[10px]` | `rounded-full` |
+| `tabs.tsx` trigger | `rounded-lg` | `rounded-full` |
+| `dialog.tsx` | `rounded-[20px]` | Already correct |
+| `alert-dialog.tsx` | `rounded-[20px]` | Already correct |
+| `dropdown-menu.tsx` | `rounded-xl` | `rounded-2xl` |
+| `context-menu.tsx` | `rounded-xl` | `rounded-2xl` |
+| `popover.tsx` | `rounded-xl` | `rounded-2xl` |
 
-**File**: `src/index.css` (or new utility)
-- Add a `.force-light` class that sets light mode CSS variables regardless of system/user preference
+## Phase D: Button Destructive Variant
+- Change from `bg-destructive text-destructive-foreground` to `bg-destructive/10 text-destructive hover:bg-destructive/20` (softer, muted)
 
-## Files to Modify
+## Phase E: Sidebar Inverted Style
+**`src/components/layout/AppSidebar.tsx`** — The sidebar tokens in CSS handle the dark inversion. No structural code changes needed since the sidebar already uses `--sidebar-*` tokens.
+
+## Files to Modify (13 files)
 
 | File | Changes |
 |------|---------|
-| `src/pages/Auth.tsx` | Remove left panel, center auth card, force light mode |
-| `src/pages/Onboarding.tsx` | Hide domain field, auto-set domain, handle duplicate domain error |
-| `src/pages/ResetPassword.tsx` | Force light mode wrapper |
-| `src/index.css` | Add `.force-light` utility class |
+| `src/index.css` | Lime tokens, Geist import, neutral chart colors, inverted sidebar tokens |
+| `tailwind.config.ts` | Geist in fontFamily |
+| `src/components/ui/button.tsx` | `rounded-full`, softer destructive |
+| `src/components/ui/card.tsx` | `rounded-[20px]` |
+| `src/components/ui/input.tsx` | `rounded-xl` |
+| `src/components/ui/textarea.tsx` | `rounded-xl` |
+| `src/components/ui/select.tsx` | `rounded-xl` trigger |
+| `src/components/ui/tabs.tsx` | `rounded-full` list + triggers |
+| `src/components/ui/dropdown-menu.tsx` | `rounded-2xl` content + subcontent |
+| `src/components/ui/context-menu.tsx` | `rounded-2xl` content + subcontent |
+| `src/components/ui/popover.tsx` | `rounded-2xl` |
+
+All className-level only. No API, logic, or structural changes.
 

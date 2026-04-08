@@ -153,14 +153,8 @@ export default function CommandCenter() {
         </div>
       </div>
 
-      {/* Quick Actions */}
-      {!isViewer && (
-        <CCQuickActions
-          isAdmin={isAdmin || isOwner}
-          isManager={isManager}
-          isMember={isMember}
-        />
-      )}
+
+
     </div>
   );
 }

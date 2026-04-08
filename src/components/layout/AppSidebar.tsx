@@ -47,7 +47,7 @@ interface NavItem {
   adminOnly?: boolean;
 }
 
-type CategoryId = 'overview' | 'work' | 'clients' | 'communication' | 'revenue' | 'operations' | 'intelligence' | 'governance' | 'settings';
+type CategoryId = 'work' | 'clients' | 'communication' | 'revenue' | 'operations' | 'intelligence' | 'governance' | 'settings';
 type CategoryIdOrNull = CategoryId | null;
 
 interface Category {

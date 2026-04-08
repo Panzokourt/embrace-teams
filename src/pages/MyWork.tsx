@@ -189,6 +189,20 @@ export default function MyWork() {
     setTodayHours(Math.round((totalMin / 60) * 10) / 10);
     setTodayEntries((entriesRes.data || []) as TimeEntryToday[]);
 
+    // CC KPI calculations
+    const allProjects = allProjectsRes.data || [];
+    const pipelineStatuses = ['lead', 'proposal', 'negotiation'];
+    const pipelineProjects = allProjects.filter((p: any) => pipelineStatuses.includes(p.status));
+    const activeProjs = allProjects.filter((p: any) => p.status === 'active');
+    const wonProjects = allProjects.filter((p: any) => ['won', 'active', 'completed'].includes(p.status));
+    const lostProjects = allProjects.filter((p: any) => p.status === 'lost');
+    const totalDecided = wonProjects.length + lostProjects.length;
+
+    setPipelineValue(pipelineProjects.reduce((s: number, p: any) => s + (p.budget || 0), 0));
+    setActiveProjectCount(activeProjs.length);
+    setWinRate(totalDecided > 0 ? Math.round((wonProjects.length / totalDecided) * 100) : 0);
+    setTasksCompletedToday((completedTodayRes.data || []).length);
+
     setLoading(false);
   }
 

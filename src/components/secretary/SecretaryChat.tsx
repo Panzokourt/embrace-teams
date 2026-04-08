@@ -466,6 +466,7 @@ export default function SecretaryChat({ mode, registerSendHandler, onOpenMemory 
           activeConversationId={conversationId}
           onSelectConversation={loadConversation}
           onNewConversation={startNewConversation}
+          onOpenMemory={onOpenMemory}
         />
       )}
 

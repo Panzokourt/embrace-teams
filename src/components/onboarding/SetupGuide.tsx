@@ -14,8 +14,13 @@ export default function SetupGuide() {
 
   if (isComplete || loading) return null;
 
-  const handleGoToOnboarding = () => {
-    navigate('/onboarding');
+  const handleGoToStep = (route: string) => {
+    navigate(route);
+  };
+
+  const handleContinueSetup = () => {
+    const nextStep = steps.find(s => !s.completed);
+    if (nextStep) navigate(nextStep.route);
   };
 
   const handleFinish = async () => {
@@ -48,7 +53,7 @@ export default function SetupGuide() {
           {steps.map((step) => (
             <button
               key={step.key}
-              onClick={!step.completed ? handleGoToOnboarding : undefined}
+              onClick={!step.completed ? () => handleGoToStep(step.route) : undefined}
               className={cn(
                 "w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left transition-colors",
                 step.completed
@@ -73,7 +78,7 @@ export default function SetupGuide() {
         </div>
 
         <div className="p-3 border-t border-border/40 flex gap-2">
-          <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={handleGoToOnboarding}>
+          <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={handleContinueSetup}>
             Συνέχεια Setup
           </Button>
           <Button size="sm" className="flex-1 text-xs" onClick={handleFinish}>

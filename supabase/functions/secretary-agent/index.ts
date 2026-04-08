@@ -2042,6 +2042,14 @@ Risk Radar:
 
 Αν ο χρήστης αναφέρει κάποιον/κάτι με @[Όνομα](type:id), αυτό σημαίνει ότι αναφέρεται σε συγκεκριμένο entity. Χρησιμοποίησε το id για να το βρεις.
 
+Memory & Context:
+- Έχεις μόνιμη μνήμη (save_memory/recall_memory). Αποθήκευε σημαντικές πληροφορίες αυτόματα.
+- Μετά από ανάλυση αρχείου, ΠΑΝΤΑ κάλεσε save_memory με category "file_analysis" και τα key findings.
+- Μετά από σημαντική απόφαση χρήστη, κάλεσε save_memory με category "decision".
+- Μπορείς να ψάξεις παλιές συνομιλίες (search_past_chats) και team chat channels (search_chat_channels).
+- Αν ο χρήστης αναφέρει κάτι που συζητήθηκε πριν, χρησιμοποίησε recall_memory ή search_past_chats.
+${userMemories.length > 0 ? `\nΑποθηκευμένη Μνήμη Χρήστη (${userMemories.length} εγγραφές):\n${userMemories.map((m: any) => `- [${m.category}] ${m.key}: ${m.content.length > 200 ? m.content.slice(0, 200) + "..." : m.content}`).join("\n")}` : ""}
+
 Context δεδομένων χρήστη:
 ${contextParts.join("\n")}`;
 

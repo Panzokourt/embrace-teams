@@ -4743,6 +4743,107 @@ export type Database = {
           },
         ]
       }
+      project_financial_milestones: {
+        Row: {
+          collected_amount: number | null
+          collected_at: string | null
+          company_id: string
+          costing_amount: number | null
+          costing_at: string | null
+          costing_notes: string | null
+          created_at: string
+          delivery_at: string | null
+          delivery_notes: string | null
+          id: string
+          invoice_id: string | null
+          invoiced_at: string | null
+          is_internal_costing: boolean
+          project_id: string
+          proposal_accepted_at: string | null
+          proposal_amount: number | null
+          proposal_reference: string | null
+          proposal_rejected_at: string | null
+          proposal_sent_at: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          collected_amount?: number | null
+          collected_at?: string | null
+          company_id: string
+          costing_amount?: number | null
+          costing_at?: string | null
+          costing_notes?: string | null
+          created_at?: string
+          delivery_at?: string | null
+          delivery_notes?: string | null
+          id?: string
+          invoice_id?: string | null
+          invoiced_at?: string | null
+          is_internal_costing?: boolean
+          project_id: string
+          proposal_accepted_at?: string | null
+          proposal_amount?: number | null
+          proposal_reference?: string | null
+          proposal_rejected_at?: string | null
+          proposal_sent_at?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          collected_amount?: number | null
+          collected_at?: string | null
+          company_id?: string
+          costing_amount?: number | null
+          costing_at?: string | null
+          costing_notes?: string | null
+          created_at?: string
+          delivery_at?: string | null
+          delivery_notes?: string | null
+          id?: string
+          invoice_id?: string | null
+          invoiced_at?: string | null
+          is_internal_costing?: boolean
+          project_id?: string
+          proposal_accepted_at?: string | null
+          proposal_amount?: number | null
+          proposal_reference?: string | null
+          proposal_rejected_at?: string | null
+          proposal_sent_at?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_financial_milestones_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_financial_milestones_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_financial_milestones_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_financial_milestones_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_folder_templates: {
         Row: {
           company_id: string

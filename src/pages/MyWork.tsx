@@ -11,6 +11,11 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 import { TaskSidePanel } from '@/components/my-work/TaskSidePanel';
+import CCHeroZone from '@/components/command-center/CCHeroZone';
+import CCMissionCards from '@/components/command-center/CCMissionCards';
+import CCTeamRadar from '@/components/command-center/CCTeamRadar';
+import CCIntelFeed from '@/components/command-center/CCIntelFeed';
+import CCQuickActions from '@/components/command-center/CCQuickActions';
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
@@ -85,10 +90,14 @@ function getStatusStyle(s: string): React.CSSProperties {
 
 // ── Main Page ──────────────────────────────────────
 export default function MyWork() {
-  const { user, profile } = useAuth();
+  const { user, profile, isAdmin, isManager, isOwner, isViewer, isMember } = useAuth();
   const navigate = useNavigate();
   const { activeTimer, elapsed, formatElapsed, startTimer, stopTimer } = useTimeTracking();
   const { awardTaskXP } = useXPEngine();
+
+  const showFinancials = isAdmin || isManager || isOwner;
+  const showTeamRadar = isAdmin || isManager || isOwner;
+  const showIntel = isAdmin || isManager || isOwner;
 
   const [myProjects, setMyProjects] = useState<MyProject[]>([]);
   const [projectTasks, setProjectTasks] = useState<Record<string, TaskItem[]>>({});
@@ -100,6 +109,12 @@ export default function MyWork() {
   const [todayEntries, setTodayEntries] = useState<TimeEntryToday[]>([]);
   const [allMyTasks, setAllMyTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
+  // CC KPI state
+  const [pipelineValue, setPipelineValue] = useState(0);
+  const [winRate, setWinRate] = useState(0);
+  const [activeProjectCount, setActiveProjectCount] = useState(0);
+  const [tasksCompletedToday, setTasksCompletedToday] = useState(0);
+  const [pendingInvoices] = useState(0);
   const [selectedItem, setSelectedItem] = useState<{ type: 'task' | 'deliverable'; data: any } | null>(null);
   const [activeView, setActiveView] = useState<'projects' | 'calendar'>('projects');
   const [calendarMode, setCalendarMode] = useState<'week' | 'day'>('week');
@@ -141,7 +156,7 @@ export default function MyWork() {
     if (!user) return;
     setLoading(true);
 
-    const [tasksRes, sentRes, needRes, accessRes, leadRes, timeRes, entriesRes] = await Promise.all([
+    const [tasksRes, sentRes, needRes, accessRes, leadRes, timeRes, entriesRes, allProjectsRes, completedTodayRes] = await Promise.all([
       supabase.from('tasks').select(TASK_SELECT).eq('assigned_to', user.id).neq('status', 'completed').order('due_date', { ascending: true }),
       supabase.from('tasks').select(TASK_SELECT).eq('assigned_to', user.id).in('status', ['internal_review', 'client_review', 'review'] as any),
       supabase.from('tasks').select(TASK_SELECT + ', assignee:profiles!assigned_to(full_name)').or(`internal_reviewer.eq.${user.id},approver.eq.${user.id}`).in('status', ['internal_review', 'client_review', 'review'] as any) as any,
@@ -149,6 +164,8 @@ export default function MyWork() {
       supabase.from('projects').select('id, name, status, progress, parent_project_id, client:clients(name)').or(`project_lead_id.eq.${user.id},account_manager_id.eq.${user.id}`),
       supabase.from('time_entries').select('duration_minutes').eq('user_id', user.id).gte('start_time', new Date(today).toISOString()).eq('is_running', false),
       supabase.from('time_entries').select('id, duration_minutes, description, start_time, task:tasks(title)').eq('user_id', user.id).gte('start_time', new Date(today).toISOString()).eq('is_running', false).order('start_time', { ascending: false }),
+      supabase.from('projects').select('id, status, budget'),
+      supabase.from('tasks').select('id').eq('assigned_to', user.id).eq('status', 'completed').gte('updated_at', new Date(today).toISOString()),
     ]);
 
     setAllMyTasks((tasksRes.data || []) as TaskItem[]);
@@ -171,6 +188,20 @@ export default function MyWork() {
     const totalMin = (timeRes.data || []).reduce((s: number, e: any) => s + (e.duration_minutes || 0), 0);
     setTodayHours(Math.round((totalMin / 60) * 10) / 10);
     setTodayEntries((entriesRes.data || []) as TimeEntryToday[]);
+
+    // CC KPI calculations
+    const allProjects = allProjectsRes.data || [];
+    const pipelineStatuses = ['lead', 'proposal', 'negotiation'];
+    const pipelineProjects = allProjects.filter((p: any) => pipelineStatuses.includes(p.status));
+    const activeProjs = allProjects.filter((p: any) => p.status === 'active');
+    const wonProjects = allProjects.filter((p: any) => ['won', 'active', 'completed'].includes(p.status));
+    const lostProjects = allProjects.filter((p: any) => p.status === 'lost');
+    const totalDecided = wonProjects.length + lostProjects.length;
+
+    setPipelineValue(pipelineProjects.reduce((s: number, p: any) => s + (p.budget || 0), 0));
+    setActiveProjectCount(activeProjs.length);
+    setWinRate(totalDecided > 0 ? Math.round((wonProjects.length / totalDecided) * 100) : 0);
+    setTasksCompletedToday((completedTodayRes.data || []).length);
 
     setLoading(false);
   }
@@ -262,37 +293,25 @@ export default function MyWork() {
 
   return (
     <div className="flex-1 flex overflow-hidden h-full">
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-6">
-      {/* ── Header with inline KPI chips ── */}
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">{greeting}, {firstName}</h1>
-            <p className="text-sm text-muted-foreground capitalize">{todayStr}</p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="secondary" className="inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 h-7 rounded-[10px] whitespace-nowrap bg-muted/50">
-              <CheckSquare className="h-3.5 w-3.5 shrink-0" /> {todayTaskCount} tasks
-            </Badge>
-            <Badge variant="secondary" className="inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 h-7 rounded-[10px] whitespace-nowrap bg-muted/50">
-              <Clock className="h-3.5 w-3.5 shrink-0" /> {todayHours}h
-            </Badge>
-            {overdueCount > 0 && (
-              <Badge className="inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 h-7 rounded-[10px] whitespace-nowrap bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/15">
-                <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {overdueCount} εκπρόθεσμα
-              </Badge>
-            )}
-            {approvalCount > 0 && (
-              <Badge variant="outline" className="inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 h-7 rounded-[10px] whitespace-nowrap border-border">
-                <ClipboardCheck className="h-3.5 w-3.5 shrink-0" /> {approvalCount} εγκρίσεις
-              </Badge>
-            )}
-            <div className="hidden sm:flex items-center">
-              <LevelProgressBar userId={user?.id} variant="compact" />
-            </div>
-          </div>
-        </div>
-      </div>
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-5 max-w-7xl mx-auto animate-fade-in">
+      {/* ── CC Hero Zone ── */}
+      {!isViewer && (
+        <CCHeroZone
+          tasksCompletedToday={tasksCompletedToday}
+          hoursToday={todayHours}
+        />
+      )}
+
+      {/* ── CC Mission Cards (KPIs) ── */}
+      <CCMissionCards
+        pipelineValue={pipelineValue}
+        activeProjects={activeProjectCount}
+        myTasks={allMyTasks.length}
+        overdueTasks={overdueCount}
+        winRate={winRate}
+        pendingInvoices={pendingInvoices}
+        showFinancials={showFinancials}
+      />
 
       {/* ── View Toggle ── */}
       <div className="inline-flex items-center gap-1 p-1 rounded-[10px] bg-muted/50">
@@ -516,6 +535,22 @@ export default function MyWork() {
       {/* ── Quick Notes ── */}
       <QuickNotes />
 
+      {/* ── Team Radar + Intel Feed (admin/manager only) ── */}
+      {(showTeamRadar || showIntel) && (
+        <div className="grid gap-5 lg:grid-cols-2">
+          {showTeamRadar && <CCTeamRadar />}
+          {showIntel && <CCIntelFeed />}
+        </div>
+      )}
+
+      {/* ── Quick Actions ── */}
+      {!isViewer && (
+        <CCQuickActions
+          isAdmin={isAdmin || isOwner}
+          isManager={isManager}
+          isMember={isMember}
+        />
+      )}
 
       </div>
 

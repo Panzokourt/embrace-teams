@@ -28,7 +28,7 @@ import {
   DollarSign, Settings, LogOut, Zap, ChevronLeft, ChevronRight, UserCog, Building2,
   Moon, Sun, CalendarDays, FileArchive, Timer, FileStack, BarChart3,
   Plus, Palette, Monitor, Globe, Calendar, MessageSquare, BookUser,
-  Briefcase, Mail, Trophy, ShieldCheck, BookOpen, GitBranch, MonitorPlay, Radar } from
+  Briefcase, Mail, Trophy, ShieldCheck, BookOpen, GitBranch, MonitorPlay } from
 'lucide-react';
 import { briefDefinitions, getBriefDefinition } from '@/components/blueprints/briefDefinitions';
 import { BriefFormDialog } from '@/components/blueprints/BriefFormDialog';
@@ -47,7 +47,7 @@ interface NavItem {
   adminOnly?: boolean;
 }
 
-type CategoryId = 'overview' | 'work' | 'clients' | 'communication' | 'revenue' | 'operations' | 'intelligence' | 'governance' | 'settings';
+type CategoryId = 'work' | 'clients' | 'communication' | 'revenue' | 'operations' | 'intelligence' | 'governance' | 'settings';
 type CategoryIdOrNull = CategoryId | null;
 
 interface Category {
@@ -58,7 +58,6 @@ interface Category {
 }
 
 const categories: Category[] = [
-{ id: 'overview', icon: Radar, label: 'Command Center', routePrefixes: ['/command-center'] },
 { id: 'work', icon: Briefcase, label: 'Work', routePrefixes: ['/work', '/projects', '/tasks', '/calendar', '/files', '/blueprints', '/workflows', '/media-planning'] },
 { id: 'clients', icon: Building2, label: 'Clients', routePrefixes: ['/clients', '/contacts'] },
 { id: 'communication', icon: MessageSquare, label: 'Communication', routePrefixes: ['/chat', '/inbox'] },
@@ -70,8 +69,6 @@ const categories: Category[] = [
 
 
 const categoryNavItems: Record<CategoryId, NavItem[]> = {
-  overview: [
-  { title: 'Command Center', href: '/command-center', icon: Radar }],
 
 
   work: [],
@@ -123,7 +120,7 @@ function detectCategory(pathname: string): CategoryIdOrNull {
   if (pathname.startsWith('/reports') || pathname.startsWith('/brain')) return 'intelligence';
   if (pathname.startsWith('/governance')) return 'governance';
   if (pathname.startsWith('/settings')) return 'settings';
-  if (pathname.startsWith('/dashboards')) return 'overview';
+  if (pathname.startsWith('/dashboards')) return 'work';
   return null;
 }
 

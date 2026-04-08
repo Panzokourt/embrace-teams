@@ -87,23 +87,27 @@ export default function CCMissionCards({
     });
   }
 
+  const gridClass = cards.length >= 5
+    ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5'
+    : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
+
   return (
-    <div className="flex gap-3 overflow-x-auto" style={{ minWidth: 0 }}>
+    <div className={`grid gap-3 ${gridClass}`}>
       {cards.map((card) => (
         <div
           key={card.id}
-          className={`group relative rounded-2xl border bg-card p-4 transition-all duration-300
-            hover:scale-[1.02] hover:shadow-md flex-1 min-w-[160px] ${healthGlow[card.health]}`}
+          className={`group relative min-w-0 rounded-2xl border bg-card p-4 transition-all duration-300
+            hover:scale-[1.02] hover:shadow-md ${healthGlow[card.health]}`}
         >
-          <div className="flex items-start justify-between">
-            <div className="space-y-1">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 space-y-1">
               <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
                 {card.label}
               </p>
               <p className="text-2xl font-bold text-foreground">{card.value}</p>
               <p className="text-xs text-muted-foreground">{card.subtitle}</p>
             </div>
-            <card.icon className={`h-6 w-6 ${healthIcon[card.health]} opacity-70 
+            <card.icon className={`h-6 w-6 shrink-0 ${healthIcon[card.health]} opacity-70 
               group-hover:opacity-100 transition-opacity`} />
           </div>
 

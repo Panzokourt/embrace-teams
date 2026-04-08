@@ -45,47 +45,19 @@ function WorkDayClockInner({ compact = false }: { compact?: boolean }) {
   const currentStatus = statusConfig[workStatus];
 
   return (
-    <div className="flex items-center gap-1.5 text-sm min-w-0 shrink-0">
-      {/* Date & Time — hidden in compact */}
-      {!compact && (
-        <Popover>
-          <PopoverTrigger asChild>
-            <button className="hidden lg:flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors shrink-0">
-              <Calendar className="h-3.5 w-3.5" />
-              <span className="text-xs font-semibold text-foreground">{dateStr}</span>
-              <span className="text-xs font-bold text-foreground">{timeStr}</span>
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <CalendarComponent mode="single" selected={now} className="p-3 pointer-events-auto" />
-          </PopoverContent>
-        </Popover>
-      )}
-
-      {!compact && <div className="hidden lg:block w-px h-4 bg-border shrink-0" />}
-
-      {/* Work Timer */}
-      {isClockedIn && (
-        <>
-          <div className={cn('flex items-center gap-1 font-mono text-xs font-semibold shrink-0', timerColor, isOvertime && 'animate-pulse')}>
-            <Clock className="h-3 w-3" />
-            <span>{formatTime(elapsedSeconds)}</span>
+    <div className="flex items-center gap-1.5 text-sm min-w-0 shrink-0 px-[7px] mx-0">
+...
             {!compact && scheduledMinutes > 0 && (
-              <span className="text-muted-foreground font-normal">/ {Math.floor(scheduledMinutes / 60)}ω</span>
+              <span className="text-primary text-xl font-normal">/ {Math.floor(scheduledMinutes / 60)}ω</span>
             )}
-          </div>
-          <div className="w-px h-4 bg-border shrink-0" />
-        </>
-      )}
-
-      {/* Start / End Day */}
+...
       {!isClockedIn ? (
-        <Button size="sm" variant="outline" className="h-7 text-xs gap-1 shrink-0 px-2" onClick={clockIn} disabled={loading}>
+        <Button size="sm" variant="outline" className="h-7 text-xs gap-1 shrink-0 px-[10px]" onClick={clockIn} disabled={loading}>
           <Play className="h-3 w-3" />
           {!compact && <span>Start</span>}
         </Button>
       ) : (
-        <Button size="sm" variant="outline" className="h-7 text-xs gap-1 shrink-0 px-2" onClick={clockOut}>
+        <Button size="sm" variant="outline" className="h-7 text-xs gap-1 shrink-0 px-[10px]" onClick={clockOut}>
           <Square className="h-3 w-3" />
           {!compact && <span>End</span>}
         </Button>
@@ -95,7 +67,7 @@ function WorkDayClockInner({ compact = false }: { compact?: boolean }) {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0">
-            <Circle className={cn('h-2.5 w-2.5 fill-current shrink-0', currentStatus.color)} />
+            <Circle className={cn('h-2.5 w-2.5 fill-current shrink-0 px-0 mx-[7px]', currentStatus.color)} />
             {!compact && <span className="hidden md:inline truncate max-w-[80px]">{currentStatus.label}</span>}
           </button>
         </DropdownMenuTrigger>

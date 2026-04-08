@@ -113,7 +113,7 @@ export default function TopBar({ onPanelToggle, rightPanelOpen, onMobileMenuTogg
   }, {});
 
   return (
-    <div className="sticky top-0 z-20 h-12 border-b border-border/40 bg-card/80 backdrop-blur-lg px-3 md:px-4 flex items-center gap-3 shrink-0">
+    <div className="sticky top-0 z-20 h-12 border-b border-border/40 bg-card/80 backdrop-blur-lg md:px-4 shrink-0 gap-[15px] mx-0 py-0 px-[10px] flex-row text-sm font-normal flex items-center justify-center">
       {/* Hamburger for mobile */}
       {showHamburger && (
         <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={onMobileMenuToggle}>

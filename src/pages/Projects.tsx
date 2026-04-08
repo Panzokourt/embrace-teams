@@ -438,43 +438,40 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
   const ProjectCard = ({ project, isDragOverlay = false }: { project: Project; isDragOverlay?: boolean }) => (
     <div 
       className={cn(
-        "group bg-card rounded-xl border border-border/50 p-4 transition-all duration-200 ease-apple cursor-pointer",
-        "hover:shadow-soft hover:border-border hover:-translate-y-0.5",
-        isDragOverlay && "shadow-soft-xl rotate-1 scale-105"
+        "group/card bg-card rounded-lg border border-border/50 transition-all duration-200 cursor-pointer overflow-hidden",
+        isDragOverlay && "shadow-lg rotate-1 scale-105"
       )}
       onClick={() => !isDragOverlay && navigate(`/projects/${project.id}`)}
     >
-      <div className="flex items-start gap-3">
-        <GripVertical className="h-4 w-4 text-muted-foreground/30 mt-0.5 flex-shrink-0 cursor-grab transition-colors group-hover:text-muted-foreground/50" />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <h4 className="font-medium text-sm text-foreground/90 line-clamp-2 flex-1 group-hover:text-foreground transition-colors">
-              {project.name}
-            </h4>
-            {canManage && !isDragOverlay && (
-              <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-secondary" onClick={() => handleEdit(project)}>
-                  <Pencil className="h-3 w-3" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/70 hover:text-destructive hover:bg-destructive/10" onClick={() => handleDelete(project.id)}>
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-            )}
-          </div>
-          {project.client && <p className="text-xs text-muted-foreground/70 mt-1">{project.client.name}</p>}
-          {(project as any).is_internal && (
-            <Badge variant="outline" className="text-[10px] mt-1 bg-muted/50">Internal</Badge>
+      {/* Compact default view */}
+      <div className="flex items-center gap-2 px-2.5 py-1.5">
+        <GripVertical className="h-3.5 w-3.5 text-muted-foreground/20 shrink-0 cursor-grab" />
+        <p className="text-xs font-medium truncate flex-1">{project.name}</p>
+      </div>
+      {/* Expanded on hover */}
+      <div className="max-h-0 group-hover/card:max-h-40 overflow-hidden transition-all duration-200 ease-in-out opacity-0 group-hover/card:opacity-100">
+        <div className="px-2.5 pb-2 pt-0.5 space-y-1.5 border-t border-border/30">
+          {project.client && (
+            <p className="text-[10px] text-muted-foreground truncate">{project.client.name}</p>
           )}
-          <div className="flex items-center justify-between text-xs mt-3 pt-3 border-t border-border/30">
-            <span className="text-foreground font-semibold">€{project.budget?.toLocaleString() || 0}</span>
+          {(project as any).is_internal && (
+            <Badge variant="outline" className="text-[9px] bg-muted/50">Internal</Badge>
+          )}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] font-semibold text-foreground">€{project.budget?.toLocaleString() || 0}</span>
             {project.end_date && (
-              <span className="flex items-center gap-1 text-muted-foreground/60">
-                <Calendar className="h-3 w-3" />
+              <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                <Calendar className="h-2.5 w-2.5" />
                 {format(new Date(project.end_date), 'd/M', { locale: el })}
               </span>
             )}
           </div>
+          {canManage && !isDragOverlay && (
+            <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
+              <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleEdit(project)}><Pencil className="h-2.5 w-2.5" /></Button>
+              <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive/70" onClick={() => handleDelete(project.id)}><Trash2 className="h-2.5 w-2.5" /></Button>
+            </div>
+          )}
         </div>
       </div>
     </div>

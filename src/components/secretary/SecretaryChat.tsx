@@ -100,6 +100,7 @@ export default function SecretaryChat({ mode, registerSendHandler, onOpenMemory 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
   const location = useLocation();
+  const pageContext = usePageContext();
 
   const { parseFiles } = useDocumentParser();
   const quickActions = useMemo(() => getContextualQuickActions(location.pathname), [location.pathname]);

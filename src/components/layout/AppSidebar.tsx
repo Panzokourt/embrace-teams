@@ -28,7 +28,7 @@ import {
   DollarSign, Settings, LogOut, Zap, ChevronLeft, ChevronRight, UserCog, Building2,
   Moon, Sun, CalendarDays, FileArchive, Timer, FileStack, BarChart3,
   Plus, Palette, Monitor, Globe, Calendar, MessageSquare, BookUser,
-  Briefcase, Mail, Trophy, ShieldCheck, BookOpen, GitBranch, MonitorPlay, Radar } from
+  Briefcase, Mail, Trophy, ShieldCheck, BookOpen, GitBranch, MonitorPlay } from
 'lucide-react';
 import { briefDefinitions, getBriefDefinition } from '@/components/blueprints/briefDefinitions';
 import { BriefFormDialog } from '@/components/blueprints/BriefFormDialog';

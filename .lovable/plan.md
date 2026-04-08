@@ -1,46 +1,34 @@
 
 
-# Fix Layout — TopBar Full Width + Sidebar Full Height
+# Setup Guide — Λειτουργικά Deep Links ανά Βήμα
 
-## Problem
+## Πρόβλημα
 
-Μετά την αλλαγή layout, η TopBar δεν πιάνει όλο το εύρος (λείπει δεξιά), και το sidebar rail κόβεται. Η τρέχουσα δομή είναι:
+Όλα τα βήματα στο Setup Guide popover πηγαίνουν στο `/onboarding` (full wizard). Αυτό δεν είναι χρήσιμο αφού ο χρήστης είναι ήδη μέσα στην εφαρμογή — πρέπει κάθε βήμα να οδηγεί στη σωστή σελίδα.
 
-```text
-┌─────────────────────────────┐
-│ TopBar (full width)         │
-├────┬────────────────┬───────┤
-│Side│ Content        │ Right │
-│bar │                │ Panel │
-└────┴────────────────┴───────┘
-```
+## Λύση
 
-Το πρόβλημα: η TopBar πρέπει να πιάνει **ακριβώς** το εύρος μεταξύ sidebar και right panel, αφήνοντας sidebar + right panel σε πλήρες ύψος. Η σωστή δομή:
+Κάθε step θα έχει ένα `route` property που οδηγεί στη σχετική σελίδα:
 
-```text
-┌────┬────────────────┬───────┐
-│    │ TopBar         │       │
-│Side├────────────────┤ Right │
-│bar │ Content        │ Panel │
-│    │                │       │
-└────┴────────────────┴───────┘
-```
+| Step | Route |
+|------|-------|
+| Εταιρεία | `/settings/organization` |
+| Προφίλ | `/settings` |
+| Ομάδα | `/hr?tab=staff` |
+| Πελάτης | `/clients` |
+| Έγγραφα | `/knowledge` |
+| AI Setup | `/knowledge?tab=wiki` |
 
-## Fix
+## Αλλαγές
 
-### `src/components/layout/AppLayout.tsx`
+### 1. `src/hooks/useOnboardingProgress.ts`
+- Προσθήκη `route: string` στο `OnboardingStep` interface
+- Κάθε step παίρνει το αντίστοιχο route
 
-Επαναφορά σε horizontal-first layout: Sidebar | (TopBar + Content) | RightPanel
+### 2. `src/components/onboarding/SetupGuide.tsx`
+- Κάθε step button κάνει `navigate(step.route)` αντί για `navigate('/onboarding')`
+- Το "Συνέχεια Setup" button βρίσκει τo πρώτο incomplete step και πηγαίνει εκεί
+- Αφαιρείται η γενική αναφορά στο `/onboarding`
 
-- Αλλαγή root container πίσω σε `flex flex-row h-screen`
-- Sidebar στο αριστερό column (full height)
-- Middle column: `flex flex-col` → TopBar + Content
-- Right panel στο δεξί column (full height)
-- Αυτό εξασφαλίζει ότι sidebar rail φαίνεται πλήρες, TopBar πιάνει ακριβώς τον χώρο content, και right panel δεν κόβεται
-
-### Αλλαγές
-
-| File | Change |
-|------|--------|
-| `src/components/layout/AppLayout.tsx` | Restructure: sidebar + (topbar/content column) + right panel as 3 horizontal siblings |
+Δεν χρειάζεται δημιουργία νέων σελίδων — όλες υπάρχουν ήδη.
 

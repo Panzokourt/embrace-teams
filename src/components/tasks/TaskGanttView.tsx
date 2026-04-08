@@ -375,27 +375,60 @@ export function TaskGanttView({ tasks, onTaskUpdated }: TaskGanttViewProps) {
                                       <div
                                         className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rotate-45 cursor-pointer z-20"
                                         style={{ left: `calc(${pos.leftPct}% - 6px)`, backgroundColor: isOverdue ? 'hsl(var(--destructive))' : cfg.barColor }}
-                                        onClick={(e) => handleBarClick(task, e)}
+                                        onClick={(e) => { if (!wasDragged()) handleBarClick(task, e); }}
                                       />
                                     ) : (
                                       <div
-                                        className="absolute top-1/2 -translate-y-1/2 rounded-full cursor-pointer hover:opacity-80 z-20 transition-opacity"
+                                        className="absolute top-1/2 -translate-y-1/2 rounded-full cursor-grab hover:opacity-80 z-20 transition-opacity group/bar"
                                         style={{
-                                          left: `${pos.leftPct}%`,
-                                          width: `${pos.widthPct}%`,
+                                          left: `${(() => {
+                                            const dates = getOverriddenDates(task.id, task.start_date || '', task.due_date || '');
+                                            const oStart = parseISO(dates.start);
+                                            const oEnd = parseISO(dates.end);
+                                            const oPos = getBarPosition(oStart, oEnd, timelineStart, timelineEnd);
+                                            return oPos ? oPos.leftPct : pos.leftPct;
+                                          })()}%`,
+                                          width: `${(() => {
+                                            const dates = getOverriddenDates(task.id, task.start_date || '', task.due_date || '');
+                                            const oStart = parseISO(dates.start);
+                                            const oEnd = parseISO(dates.end);
+                                            const oPos = getBarPosition(oStart, oEnd, timelineStart, timelineEnd);
+                                            return oPos ? oPos.widthPct : pos.widthPct;
+                                          })()}%`,
                                           height: '18px',
                                           minWidth: '6px',
                                           backgroundColor: isOverdue ? 'hsl(var(--destructive))' : cfg.barColor,
+                                          opacity: isDragging(task.id) ? 0.6 : 1,
                                         }}
-                                        onClick={(e) => handleBarClick(task, e)}
+                                        onClick={(e) => { if (!wasDragged()) handleBarClick(task, e); }}
+                                        onMouseDown={(e) => {
+                                          if (task.start_date && task.due_date) {
+                                            onDragStart(e, task.id, 'move', task.start_date, task.due_date);
+                                          }
+                                        }}
                                       >
+                                        {/* Resize handle left */}
+                                        {task.start_date && task.due_date && (
+                                          <div
+                                            className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover/bar:opacity-100 bg-white/20 rounded-l-full z-30"
+                                            onMouseDown={(e) => { e.stopPropagation(); onDragStart(e, task.id, 'resize-start', task.start_date!, task.due_date!); }}
+                                          />
+                                        )}
                                         {(task.progress ?? 0) > 0 && (
                                           <div
                                             className="absolute inset-y-0 left-0 rounded-full opacity-30 bg-background"
                                             style={{ width: `${100 - (task.progress ?? 0)}%`, right: 0, left: 'auto' }}
                                           />
                                         )}
+                                        {/* Resize handle right */}
+                                        {task.start_date && task.due_date && (
+                                          <div
+                                            className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover/bar:opacity-100 bg-white/20 rounded-r-full z-30"
+                                            onMouseDown={(e) => { e.stopPropagation(); onDragStart(e, task.id, 'resize-end', task.start_date!, task.due_date!); }}
+                                          />
+                                        )}
                                       </div>
+                                    )}
                                     )}
                                   </TooltipTrigger>
                                 </PopoverTrigger>

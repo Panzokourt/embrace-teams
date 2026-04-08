@@ -128,19 +128,20 @@ export function TodayTasksCard({
 
   const sortedTasks = useMemo(() => {
     const tasks = [...todayTasks];
+    const dir = sortDir === 'asc' ? 1 : -1;
     switch (sortMode) {
       case 'date':
         return tasks.sort((a, b) => {
           if (!a.due_date) return 1;
           if (!b.due_date) return -1;
-          return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+          return dir * (new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
         });
       case 'priority':
-        return tasks.sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 99) - (PRIORITY_ORDER[b.priority] ?? 99));
+        return tasks.sort((a, b) => dir * ((PRIORITY_ORDER[a.priority] ?? 99) - (PRIORITY_ORDER[b.priority] ?? 99)));
       case 'project':
-        return tasks.sort((a, b) => ((a.project as any)?.name || '').localeCompare((b.project as any)?.name || ''));
+        return tasks.sort((a, b) => dir * ((a.project as any)?.name || '').localeCompare((b.project as any)?.name || ''));
       case 'status':
-        return tasks.sort((a, b) => a.status.localeCompare(b.status));
+        return tasks.sort((a, b) => dir * a.status.localeCompare(b.status));
       case 'manual':
         if (manualOrder.length === 0) return tasks;
         return tasks.sort((a, b) => {
@@ -151,7 +152,7 @@ export function TodayTasksCard({
       default:
         return tasks;
     }
-  }, [todayTasks, sortMode, manualOrder]);
+  }, [todayTasks, sortMode, sortDir, manualOrder]);
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;

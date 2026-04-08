@@ -293,37 +293,25 @@ export default function MyWork() {
 
   return (
     <div className="flex-1 flex overflow-hidden h-full">
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-6">
-      {/* ── Header with inline KPI chips ── */}
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">{greeting}, {firstName}</h1>
-            <p className="text-sm text-muted-foreground capitalize">{todayStr}</p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="secondary" className="inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 h-7 rounded-[10px] whitespace-nowrap bg-muted/50">
-              <CheckSquare className="h-3.5 w-3.5 shrink-0" /> {todayTaskCount} tasks
-            </Badge>
-            <Badge variant="secondary" className="inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 h-7 rounded-[10px] whitespace-nowrap bg-muted/50">
-              <Clock className="h-3.5 w-3.5 shrink-0" /> {todayHours}h
-            </Badge>
-            {overdueCount > 0 && (
-              <Badge className="inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 h-7 rounded-[10px] whitespace-nowrap bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/15">
-                <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {overdueCount} εκπρόθεσμα
-              </Badge>
-            )}
-            {approvalCount > 0 && (
-              <Badge variant="outline" className="inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 h-7 rounded-[10px] whitespace-nowrap border-border">
-                <ClipboardCheck className="h-3.5 w-3.5 shrink-0" /> {approvalCount} εγκρίσεις
-              </Badge>
-            )}
-            <div className="hidden sm:flex items-center">
-              <LevelProgressBar userId={user?.id} variant="compact" />
-            </div>
-          </div>
-        </div>
-      </div>
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-5 max-w-7xl mx-auto animate-fade-in">
+      {/* ── CC Hero Zone ── */}
+      {!isViewer && (
+        <CCHeroZone
+          tasksCompletedToday={tasksCompletedToday}
+          hoursToday={todayHours}
+        />
+      )}
+
+      {/* ── CC Mission Cards (KPIs) ── */}
+      <CCMissionCards
+        pipelineValue={pipelineValue}
+        activeProjects={activeProjectCount}
+        myTasks={allMyTasks.length}
+        overdueTasks={overdueCount}
+        winRate={winRate}
+        pendingInvoices={pendingInvoices}
+        showFinancials={showFinancials}
+      />
 
       {/* ── View Toggle ── */}
       <div className="inline-flex items-center gap-1 p-1 rounded-[10px] bg-muted/50">

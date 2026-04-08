@@ -1,100 +1,75 @@
 
 
-# AI Memory & Cross-Chat Context System
+# Αναβάθμιση Secretary Main Page — Claude-style UI + Drag & Drop + Memory
 
-## Πρόβλημα
-Κάθε chat session (Quick Chat, Sidebar, Main Page) ξεκινά χωρίς μνήμη. Ο χρήστης πρέπει να επαναλαμβάνει πληροφορίες και να ξανα-επισυνάπτει αρχεία. Δεν υπάρχει πρόσβαση σε ιστορικό από άλλα chats ή από τα chat channels της εφαρμογής.
+## Τι αλλάζει
 
-## Λύση — Memory Layer + Context Agent
+Η σελίδα `/secretary` θα αποκτήσει Claude-style UI (βάσει του screenshot) με:
+1. Κεντρικό greeting "Καλημέρα, [Όνομα]" με μεγαλύτερο, πιο καθαρό design
+2. Input bar στυλ Claude — rounded, με `+` κουμπί για αρχεία και paperclip
+3. Quick action chips κάτω από το input (Write, Learn, Code style)
+4. **Drag & drop αρχείων** (ίδια λογική με QuickChatBar)
+5. **File parsing** (PDF, DOCX, images, text) — ίδια λογική με QuickChatBar
+6. **AI Memory tab** στο sidebar (ήδη υπάρχει στο SecretaryPanel, θα προστεθεί link/πρόσβαση)
 
-### Αρχιτεκτονική
+## Αλλαγές
 
+### `src/components/secretary/SecretaryChat.tsx`
+Κύριο refactor:
+
+**Input area:**
+- Αντικατάσταση του MentionInput με νέο Claude-style input container
+- Προσθήκη `+` button (ή paperclip) για file attachment
+- Hidden `<input type="file" multiple>` trigger
+- File chips row (ίδιο με QuickChatBar) πάνω από το input
+- Drag & drop handlers σε ολόκληρο το chat area (dragEnter/Leave/Over/Drop)
+- Drop overlay indicator ("Σύρε αρχεία εδώ")
+
+**File processing:**
+- Import `useDocumentParser` hook
+- Νέα function `processFilesForMessage()` (αντιγραφή λογικής από QuickChatBar)
+- Multimodal content building (text parts + image base64 blocks)
+- Routing: αν content > 100K chars → `quick-chat-gemini`, αλλιώς `secretary-agent`
+
+**Empty state redesign (Claude-style):**
+- Μεγάλος τίτλος "Καλημέρα, [name]" κεντραρισμένο
+- Input bar κεντρικά κάτω από τον τίτλο
+- Quick action chips σε row: 📋 Tasks, 🎯 Plan, 📝 Brief, 🚀 Project, ☀️ Briefing
+
+**Greeting:**
+- Δυναμικό greeting βάσει ώρας: Καλημέρα / Καλησπέρα / Καληνύχτα
+
+### `src/components/secretary/ConversationSidebar.tsx`
+- Προσθήκη κουμπιού "🧠 AI Μνήμη" στο κάτω μέρος του sidebar
+- Κλικ ανοίγει modal/panel με το `MemoryManager` component
+
+### `src/pages/Secretary.tsx`
+- Προσθήκη state για Memory Manager modal
+- Render `MemoryManager` ως overlay/dialog
+
+## Τεχνική λεπτομέρεια
+
+**Drag & drop** — ίδιο pattern με QuickChatBar:
 ```text
-┌─────────────────────────────────────┐
-│  QuickChat / Sidebar / Main Chat    │
-│  (all share same secretary-agent)   │
-└──────────────┬──────────────────────┘
-               │ sends messages + conversation_id
-               ▼
-┌─────────────────────────────────────┐
-│         secretary-agent             │
-│  ┌───────────────────────────────┐  │
-│  │  NEW: recall_memory tool     │  │
-│  │  NEW: search_past_chats tool │  │
-│  │  NEW: search_chat_channels   │  │
-│  │  NEW: save_memory tool       │  │
-│  └───────────────────────────────┘  │
-│  + Auto-inject recent memory into   │
-│    system prompt (last 5 summaries) │
-└─────────────────────────────────────┘
+dragCounter ref → dragEnter increments, dragLeave decrements
+dragging state → shows drop overlay
+handleDrop → adds files to attachedFiles[]
+processFilesForMessage() → converts to multimodal content parts
 ```
 
-### 1. Νέος πίνακας: `secretary_memory` (Migration)
-Αποθηκεύει key facts, αρχεία που αναλύθηκαν, αποφάσεις, και context — ανά χρήστη.
-
-```sql
-CREATE TABLE public.secretary_memory (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  company_id uuid REFERENCES companies(id) ON DELETE CASCADE NOT NULL,
-  category text NOT NULL DEFAULT 'general', -- general, file_analysis, decision, preference, project_context
-  key text NOT NULL,           -- short identifier e.g. "creative_brief_govgr"
-  content text NOT NULL,       -- the actual memory content (summary, key points)
-  source_conversation_id uuid REFERENCES secretary_conversations(id) ON DELETE SET NULL,
-  metadata jsonb DEFAULT '{}', -- file names, entity IDs, etc.
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now()
-);
-
-ALTER TABLE public.secretary_memory ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users manage own memory"
-  ON public.secretary_memory FOR ALL TO authenticated
-  USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
-
-CREATE INDEX idx_secretary_memory_user ON public.secretary_memory(user_id);
-CREATE INDEX idx_secretary_memory_search ON public.secretary_memory USING gin(to_tsvector('simple', content));
+**Routing logic** (ίδιο με QuickChatBar):
+```text
+totalContentChars > 100K → quick-chat-gemini (Gemini 2.5 Pro)
+else → secretary-agent (Claude + tools)
 ```
 
-### 2. Νέα tools στο `secretary-agent` (4 εργαλεία)
-
-**`save_memory`** — Αποθηκεύει σημαντική πληροφορία (αρχείο που αναλύθηκε, απόφαση, preference)
-- Ο agent καλεί αυτό αυτόματα μετά από ανάλυση αρχείου ή σημαντική απόφαση
-- Parameters: `category`, `key`, `content`, `metadata`
-
-**`recall_memory`** — Αναζήτηση στη μνήμη του χρήστη
-- Full-text search στο `secretary_memory`
-- Parameters: `query`, `category` (optional), `limit`
-
-**`search_past_chats`** — Αναζήτηση σε παλιές secretary conversations
-- Ψάχνει στο `secretary_messages` για relevant context
-- Parameters: `query`, `limit`
-
-**`search_chat_channels`** — Αναζήτηση στα team chat channels
-- Χρησιμοποιεί το existing `search_chat_messages` DB function
-- Parameters: `query`, `limit`
-
-### 3. Auto-inject memory στο system prompt
-Στο secretary-agent, πριν κάθε κλήση:
-- Φέρνει τα τελευταία 10 memories του χρήστη
-- Τα προσθέτει στο system prompt ως "Μνήμη χρήστη"
-- Ο agent ξέρει ήδη τι έχει αναλυθεί, τι αποφάσεις πάρθηκαν
-
-### 4. Auto-save memory μετά από ανάλυση
-Στο system prompt, θα προστεθεί οδηγία:
-> "Μετά από κάθε ανάλυση αρχείου, σημαντική απόφαση ή νέα πληροφορία, κάλεσε save_memory για να αποθηκεύσεις τα key findings. Αυτό σε βοηθά να θυμάσαι σε μελλοντικές συνομιλίες."
-
-### 5. Εφαρμογή σε όλα τα chat interfaces
-Δεν χρειάζεται αλλαγή στα frontend components — όλα χρησιμοποιούν ήδη τον `secretary-agent`. Η μνήμη θα λειτουργεί αυτόματα σε QuickChat, Sidebar και Main Page γιατί γίνεται inject server-side.
-
-Για το `quick-chat-gemini` (μεγάλα αρχεία): θα προστεθεί η ίδια λογική memory injection + μετά την απάντηση, ο QuickChatBar θα αποθηκεύει auto-summary μέσω ένα μικρό κλήση save.
+**Memory access** — νέο κουμπί Brain icon στο ConversationSidebar footer, ανοίγει Dialog με MemoryManager.
 
 ## Files
 
 | File | Αλλαγή |
 |------|--------|
-| Migration | Νέος πίνακας `secretary_memory` με RLS |
-| `supabase/functions/secretary-agent/index.ts` | +4 tools (save/recall_memory, search_past_chats, search_chat_channels), auto-inject memory στο system prompt |
-| `supabase/functions/quick-chat-gemini/index.ts` | Inject memory context, post-response summary save |
-| `src/components/quick-chat/QuickChatBar.tsx` | Μετά από Gemini response, save summary στο `secretary_memory` |
+| `src/components/secretary/SecretaryChat.tsx` | Claude-style UI, drag & drop, file attachments, multimodal messages, Gemini routing |
+| `src/components/secretary/ConversationSidebar.tsx` | Προσθήκη Memory button |
+| `src/pages/Secretary.tsx` | Memory Manager dialog state |
 

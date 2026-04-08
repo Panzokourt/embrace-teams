@@ -11,6 +11,11 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 import { TaskSidePanel } from '@/components/my-work/TaskSidePanel';
+import CCHeroZone from '@/components/command-center/CCHeroZone';
+import CCMissionCards from '@/components/command-center/CCMissionCards';
+import CCTeamRadar from '@/components/command-center/CCTeamRadar';
+import CCIntelFeed from '@/components/command-center/CCIntelFeed';
+import CCQuickActions from '@/components/command-center/CCQuickActions';
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';

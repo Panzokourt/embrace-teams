@@ -2,18 +2,33 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Bot, Loader2 } from "lucide-react";
+import { Bot, Loader2, Paperclip, Send, X, FileText, Image as ImageIcon, File as FileIcon, FileSpreadsheet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import MentionInput from "./MentionInput";
 import ConversationSidebar from "./ConversationSidebar";
 import { parseAndRenderContent } from "./ActionRenderer";
 import { useLocation } from "react-router-dom";
-import { sanitizeStorageFileName } from "@/utils/storageKeys";
+import { useDocumentParser } from "@/hooks/useDocumentParser";
 
 interface ChatMessage {
   role: "user" | "assistant";
-  content: string;
+  content: string | any[];
+  displayContent?: string;
+  attachments?: { name: string; type: string }[];
+}
+
+const TEXT_EXTENSIONS = ['txt', 'csv', 'json', 'xml', 'md', 'log', 'yaml', 'yml', 'toml'];
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
+function getExtension(name: string) {
+  return name.split('.').pop()?.toLowerCase() || '';
+}
+
+function getFileIcon(file: File | { name: string; type: string }) {
+  if (IMAGE_TYPES.includes(file.type)) return <ImageIcon className="h-3 w-3" />;
+  if (file.type === 'application/pdf') return <FileText className="h-3 w-3" />;
+  if (file.type.includes('spreadsheet') || file.name.endsWith('.csv') || file.name.endsWith('.xlsx')) return <FileSpreadsheet className="h-3 w-3" />;
+  return <FileIcon className="h-3 w-3" />;
 }
 
 const defaultQuickActions = [
@@ -37,8 +52,6 @@ function getContextualQuickActions(pathname: string) {
       { label: "➕ Νέο Task", prompt: `Θέλω να δημιουργήσω task σε αυτό το project (project_id: ${pid})` },
       { label: "👥 Πρόσθεσε μέλος", prompt: `Θέλω να προσθέσω μέλος στο project (project_id: ${pid})` },
       { label: "📊 Αναφορά", prompt: `Δημιούργησε αναφορά για αυτό το project (project_id: ${pid})` },
-      { label: "🔄 Αλλαγή Status", prompt: `Θέλω να αλλάξω το status αυτού του project (project_id: ${pid})` },
-      { label: "⏱ Log Time", prompt: `Θέλω να καταχωρήσω χρόνο για αυτό το project (project_id: ${pid})` },
     ];
   }
   if (pathname === "/tasks") {
@@ -46,28 +59,6 @@ function getContextualQuickActions(pathname: string) {
       { label: "📋 Tasks μου", prompt: "Δείξε μου τα tasks μου" },
       { label: "➕ Νέο Task", prompt: "Θέλω να δημιουργήσω ένα νέο task" },
       { label: "⚠️ Overdue", prompt: "Δείξε μου τα overdue tasks" },
-      { label: "📊 Tasks Report", prompt: "Δημιούργησε CSV αναφορά tasks" },
-    ];
-  }
-  if (pathname === "/calendar") {
-    return [
-      { label: "📅 Νέο Meeting", prompt: "Θέλω να δημιουργήσω ένα νέο meeting" },
-      { label: "☀️ Σημερινά events", prompt: "Τι events έχω σήμερα;" },
-      { label: "📋 Tasks μου", prompt: "Δείξε μου τα tasks μου" },
-    ];
-  }
-  if (pathname === "/timesheets") {
-    return [
-      { label: "⏱ Log Time", prompt: "Θέλω να καταχωρήσω χρόνο εργασίας" },
-      { label: "📋 Tasks μου", prompt: "Δείξε μου τα tasks μου" },
-      { label: "📊 Projects", prompt: "Δείξε μου τα projects" },
-    ];
-  }
-  if (pathname === "/chat") {
-    return [
-      { label: "💬 Στείλε μήνυμα", prompt: "Θέλω να στείλω μήνυμα σε κανάλι" },
-      { label: "📋 Tasks μου", prompt: "Δείξε μου τα tasks μου" },
-      { label: "☀️ Daily Briefing", prompt: "Τι έχω σήμερα;" },
     ];
   }
   if (pathname === "/brain") {
@@ -75,26 +66,25 @@ function getContextualQuickActions(pathname: string) {
       { label: "🧠 Τρέξε Ανάλυση", prompt: "Τρέξε ανάλυση Brain" },
       { label: "💡 Insights", prompt: "Δείξε μου τα τελευταία Brain insights" },
       { label: "🔴 High Priority", prompt: "Δείξε μου τα high priority Brain insights" },
-      { label: "📈 Market Insights", prompt: "Δείξε μου τα market insights από το Brain" },
-      { label: "🧪 Neuro Tactics", prompt: "Δείξε μου τα neuromarketing insights" },
-    ];
-  }
-  if (pathname === "/clients" || pathname.match(/^\/clients\/[^/]+$/)) {
-    return [
-      { label: "👤 Νέος Πελάτης", prompt: "Θέλω να δημιουργήσω νέο πελάτη" },
-      { label: "🔍 Αναζήτηση", prompt: "Αναζήτησε πελάτη" },
-      { label: "🚀 Νέο Project", prompt: "Θέλω να δημιουργήσω ένα νέο project" },
     ];
   }
   return defaultQuickActions;
 }
 
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Καλημέρα";
+  if (hour < 18) return "Καλησπέρα";
+  return "Καληνύχτα";
+}
+
 interface SecretaryChatProps {
   mode: "full" | "panel";
   registerSendHandler?: (handler: (text: string) => void) => void;
+  onOpenMemory?: () => void;
 }
 
-export default function SecretaryChat({ mode, registerSendHandler }: SecretaryChatProps) {
+export default function SecretaryChat({ mode, registerSendHandler, onOpenMemory }: SecretaryChatProps) {
   const { profile, user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -102,9 +92,15 @@ export default function SecretaryChat({ mode, registerSendHandler }: SecretaryCh
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [sidebarKey, setSidebarKey] = useState(0);
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [dragging, setDragging] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragCounterRef = useRef(0);
   const location = useLocation();
 
+  const { parseFiles } = useDocumentParser();
   const quickActions = useMemo(() => getContextualQuickActions(location.pathname), [location.pathname]);
 
   useEffect(() => {
@@ -137,6 +133,7 @@ export default function SecretaryChat({ mode, registerSendHandler }: SecretaryCh
     setConversationId(null);
     setMessages([]);
     setInput("");
+    setAttachedFiles([]);
   }, []);
 
   const getOrCreateConversation = async (): Promise<string> => {
@@ -173,19 +170,134 @@ export default function SecretaryChat({ mode, registerSendHandler }: SecretaryCh
     setSidebarKey((k) => k + 1);
   };
 
+  // --- Drag & Drop ---
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (e.dataTransfer.types.includes('Files')) setDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) setDragging(false);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+    setDragging(false);
+    const droppedFiles = Array.from(e.dataTransfer.files);
+    if (droppedFiles.length > 0) {
+      setAttachedFiles(prev => [...prev, ...droppedFiles].slice(0, 10));
+    }
+  }, []);
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(e.target.files || []);
+    if (selected.length > 0) {
+      setAttachedFiles(prev => [...prev, ...selected].slice(0, 10));
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }, []);
+
+  const removeFile = useCallback((index: number) => {
+    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  // --- File processing (same as QuickChatBar) ---
+  const processFilesForMessage = useCallback(async (files: File[]): Promise<any[]> => {
+    const contentParts: any[] = [];
+    for (const file of files) {
+      const ext = getExtension(file.name);
+      if (IMAGE_TYPES.includes(file.type)) {
+        const arrayBuffer = await file.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+        const base64 = btoa(binary);
+        contentParts.push({ type: 'image', source: { type: 'base64', media_type: file.type, data: base64 } });
+        continue;
+      }
+      if (TEXT_EXTENSIONS.includes(ext) || file.type.startsWith('text/')) {
+        const text = await file.text();
+        contentParts.push({ type: 'text', text: `📎 ${file.name}\n\n${text}` });
+        continue;
+      }
+      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf') ||
+          file.type.includes('word') || file.type.includes('presentation') ||
+          file.name.endsWith('.docx') || file.name.endsWith('.pptx')) {
+        try {
+          const parsed = await parseFiles([file]);
+          if (parsed.length > 0) {
+            contentParts.push({
+              type: 'text',
+              text: `📎 ${file.name} (${parsed[0].metadata.pagesProcessed || '?'} σελίδες, ${parsed[0].metadata.wordCount} λέξεις)\n\n${parsed[0].content}`,
+            });
+          }
+        } catch (err) {
+          console.error('Failed to parse file:', file.name, err);
+          contentParts.push({ type: 'text', text: `📎 ${file.name} — Αποτυχία ανάγνωσης αρχείου` });
+        }
+        continue;
+      }
+      try {
+        const text = await file.text();
+        contentParts.push({ type: 'text', text: `📎 ${file.name}\n\n${text}` });
+      } catch {
+        contentParts.push({ type: 'text', text: `📎 ${file.name} — Μη αναγνώσιμο αρχείο` });
+      }
+    }
+    return contentParts;
+  }, [parseFiles]);
+
   const sendMessage = async (text: string) => {
-    if (!text.trim() || loading) return;
-    const userMsg: ChatMessage = { role: "user", content: text.trim() };
+    const trimmed = text.trim();
+    if ((!trimmed && attachedFiles.length === 0) || loading) return;
+
+    const currentFiles = [...attachedFiles];
+    const attachmentMeta = currentFiles.map(f => ({ name: f.name, type: f.type }));
+
+    setInput("");
+    setAttachedFiles([]);
+    setLoading(true);
+
+    const userMsg: ChatMessage = {
+      role: "user",
+      content: trimmed,
+      displayContent: trimmed,
+      attachments: attachmentMeta.length > 0 ? attachmentMeta : undefined,
+    };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
-    setInput("");
-    setLoading(true);
+
     try {
-      const convId = await getOrCreateConversation();
-      await saveMessage(convId, "user", userMsg.content);
-      if (messages.length === 0) {
-        updateConversationTitle(convId, userMsg.content);
+      // Process files if any
+      let messageContent: string | any[];
+      if (currentFiles.length > 0) {
+        setStatusMessage('Ανάγνωση αρχείων...');
+        const fileParts = await processFilesForMessage(currentFiles);
+        if (trimmed) fileParts.push({ type: 'text', text: trimmed });
+        messageContent = fileParts;
+      } else {
+        messageContent = trimmed;
       }
+
+      const convId = await getOrCreateConversation();
+      await saveMessage(convId, "user", trimmed || `[${currentFiles.map(f => f.name).join(', ')}]`);
+
+      if (messages.length === 0) {
+        updateConversationTitle(convId, trimmed || currentFiles[0]?.name || 'Νέα συνομιλία');
+      }
+
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
       if (!token) {
@@ -193,17 +305,35 @@ export default function SecretaryChat({ mode, registerSendHandler }: SecretaryCh
         setLoading(false);
         return;
       }
+
+      // Build payload
+      const payloadMessages = newMessages.map(m => ({
+        role: m.role,
+        content: m === userMsg ? messageContent : (typeof m.content === 'string' ? m.content : m.displayContent || ''),
+      }));
+
+      // Route: large files → Gemini, else → secretary-agent
+      const totalContentChars = Array.isArray(messageContent)
+        ? messageContent.filter((p: any) => p.type === 'text').reduce((sum: number, p: any) => sum + (p.text?.length || 0), 0)
+        : 0;
+      const useGemini = totalContentChars > 100000;
+      const endpoint = useGemini ? 'quick-chat-gemini' : 'secretary-agent';
+
+      if (useGemini) setStatusMessage('Χρήση Gemini για μεγάλο αρχείο...');
+      else setStatusMessage(null);
+
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/secretary-agent`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${endpoint}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({
-            messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
+            messages: payloadMessages,
             current_page: location.pathname,
           }),
         }
       );
+
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
         if (response.status === 429) toast.error("Πολλά αιτήματα. Δοκίμασε ξανά σε λίγο.");
@@ -213,25 +343,23 @@ export default function SecretaryChat({ mode, registerSendHandler }: SecretaryCh
         return;
       }
 
-      // SSE streaming reader
       const reader = response.body?.getReader();
       if (!reader) {
         toast.error("Σφάλμα streaming.");
         setLoading(false);
         return;
       }
+
       const decoder = new TextDecoder();
       let sseBuffer = "";
       let accumulatedReply = "";
 
-      // Add empty assistant message that we'll update
-      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+      setMessages(prev => [...prev, { role: "assistant", content: "" }]);
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         sseBuffer += decoder.decode(value, { stream: true });
-
         const lines = sseBuffer.split("\n");
         sseBuffer = lines.pop() || "";
 
@@ -239,13 +367,12 @@ export default function SecretaryChat({ mode, registerSendHandler }: SecretaryCh
           if (!line.startsWith("data: ")) continue;
           const raw = line.slice(6).trim();
           if (raw === "[DONE]") continue;
-
           let event: any;
           try { event = JSON.parse(raw); } catch { continue; }
 
           if (event.type === "delta") {
             accumulatedReply += event.content;
-            setMessages((prev) => {
+            setMessages(prev => {
               const updated = [...prev];
               updated[updated.length - 1] = { role: "assistant", content: accumulatedReply };
               return updated;
@@ -254,7 +381,7 @@ export default function SecretaryChat({ mode, registerSendHandler }: SecretaryCh
             setStatusMessage(event.text);
           } else if (event.type === "done") {
             accumulatedReply = event.reply || accumulatedReply;
-            setMessages((prev) => {
+            setMessages(prev => {
               const updated = [...prev];
               updated[updated.length - 1] = { role: "assistant", content: accumulatedReply };
               return updated;
@@ -267,8 +394,7 @@ export default function SecretaryChat({ mode, registerSendHandler }: SecretaryCh
 
       setStatusMessage(null);
       const reply = accumulatedReply || "Δεν λήφθηκε απάντηση.";
-      // Update final message
-      setMessages((prev) => {
+      setMessages(prev => {
         const updated = [...prev];
         updated[updated.length - 1] = { role: "assistant", content: reply };
         return updated;
@@ -283,6 +409,7 @@ export default function SecretaryChat({ mode, registerSendHandler }: SecretaryCh
       toast.error("Σφάλμα επικοινωνίας με τον Secretary.");
     } finally {
       setLoading(false);
+      setStatusMessage(null);
     }
   };
 
@@ -295,9 +422,11 @@ export default function SecretaryChat({ mode, registerSendHandler }: SecretaryCh
 
   const firstName = profile?.full_name?.split(" ")[0] || "";
   const showSidebar = mode === "full";
+  const greeting = getGreeting();
 
-  const renderMessageContent = (content: string) => {
-    const parts = parseAndRenderContent(content, sendMessage);
+  const renderMessageContent = (content: string | any[]) => {
+    const text = typeof content === 'string' ? content : (content as any[]).filter(p => p.type === 'text').map(p => p.text).join('\n') || '';
+    const parts = parseAndRenderContent(text, sendMessage);
     return parts.map((part, i) => {
       if (typeof part === "string") {
         return (
@@ -310,37 +439,68 @@ export default function SecretaryChat({ mode, registerSendHandler }: SecretaryCh
     });
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage(input);
+    }
+  };
+
+  const handleTextareaInput = (e: React.FormEvent<HTMLTextAreaElement>) => {
+    const target = e.currentTarget;
+    target.style.height = 'auto';
+    target.style.height = Math.min(target.scrollHeight, 200) + 'px';
+  };
+
   return (
-    <div className="flex h-full">
+    <div
+      className="flex h-full"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       {showSidebar && (
         <ConversationSidebar
           key={sidebarKey}
           activeConversationId={conversationId}
           onSelectConversation={loadConversation}
           onNewConversation={startNewConversation}
+          onOpenMemory={onOpenMemory}
         />
       )}
 
       <div className="flex-1 flex flex-col min-w-0 relative">
+        {/* Drag overlay */}
+        {dragging && (
+          <div className="absolute inset-0 z-50 bg-primary/5 border-2 border-dashed border-primary/40 rounded-xl flex items-center justify-center backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-2 text-primary">
+              <Paperclip className="h-10 w-10" />
+              <span className="text-lg font-medium">Σύρε αρχεία εδώ</span>
+              <span className="text-sm text-muted-foreground">PDF, DOCX, εικόνες, κ.ά.</span>
+            </div>
+          </div>
+        )}
+
         {/* Messages */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
           <div className="max-w-3xl mx-auto px-4 py-6">
             {messages.length === 0 && !loading && (
               <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-8">
                 <div className="space-y-3">
-                  <h2 className="text-3xl font-semibold text-foreground">
-                    Γεια{firstName ? ` ${firstName}` : ""}! 👋
+                  <h2 className="text-4xl font-semibold text-foreground">
+                    {greeting}{firstName ? `, ${firstName}` : ""}
                   </h2>
-                  <p className="text-muted-foreground text-base max-w-md mx-auto">
+                  <p className="text-muted-foreground text-lg max-w-md mx-auto">
                     Πώς μπορώ να σε βοηθήσω σήμερα;
                   </p>
                 </div>
-                <div className="grid grid-cols-2 gap-3 w-full max-w-lg">
-                  {quickActions.slice(0, 4).map((qa) => (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full max-w-2xl">
+                  {quickActions.slice(0, 6).map((qa) => (
                     <button
                       key={qa.label}
                       onClick={() => sendMessage(qa.prompt)}
-                      className="flex flex-col items-start gap-1 p-4 rounded-xl border border-border/60 bg-card hover:bg-accent/50 text-left text-sm text-foreground transition-colors"
+                      className="flex flex-col items-start gap-1 p-4 rounded-2xl border border-border/60 bg-card hover:bg-accent/50 text-left text-sm text-foreground transition-colors"
                     >
                       <span className="font-medium">{qa.label}</span>
                     </button>
@@ -368,10 +528,19 @@ export default function SecretaryChat({ mode, registerSendHandler }: SecretaryCh
                         : "flex-1 pt-1"
                     )}
                   >
+                    {msg.role === "user" && msg.attachments && msg.attachments.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {msg.attachments.map((a, j) => (
+                          <span key={j} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-[11px] text-muted-foreground">
+                            {getFileIcon(a)} {a.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     {msg.role === "assistant" ? (
                       renderMessageContent(msg.content)
                     ) : (
-                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                      <p className="whitespace-pre-wrap">{msg.displayContent || (typeof msg.content === 'string' ? msg.content : '')}</p>
                     )}
                   </div>
                 </div>
@@ -385,8 +554,8 @@ export default function SecretaryChat({ mode, registerSendHandler }: SecretaryCh
                     </div>
                   </div>
                   <div className="flex items-center gap-2 pt-1">
-                     <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                     <span className="text-sm text-muted-foreground">{statusMessage || "Σκέφτομαι..."}</span>
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">{statusMessage || "Σκέφτομαι..."}</span>
                   </div>
                 </div>
               )}
@@ -394,7 +563,17 @@ export default function SecretaryChat({ mode, registerSendHandler }: SecretaryCh
           </div>
         </div>
 
-        {/* Input — floating centered */}
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={handleFileSelect}
+          accept=".pdf,.doc,.docx,.pptx,.xlsx,.csv,.txt,.md,.json,.xml,.yaml,.yml,.png,.jpg,.jpeg,.webp,.gif"
+        />
+
+        {/* Input area — Claude-style */}
         <div className="px-4 pb-4 pt-2">
           <div className="max-w-3xl mx-auto space-y-2">
             {messages.length > 0 && (
@@ -411,56 +590,52 @@ export default function SecretaryChat({ mode, registerSendHandler }: SecretaryCh
                 ))}
               </div>
             )}
-            <div className="rounded-2xl border border-border/60 bg-background shadow-lg">
-              <MentionInput
-                value={input}
-                onChange={setInput}
-                onSend={() => sendMessage(input)}
-                disabled={loading}
-                onSendMessage={(text) => sendMessage(text)}
-                onFileUpload={async (file) => {
-                  if (!user) return;
-                  try {
-                    const safeName = sanitizeStorageFileName(file.name);
-                    const CHUNK_SIZE = 5 * 1024 * 1024;
-                    if (file.size <= CHUNK_SIZE) {
-                      const path = `${user.id}/${Date.now()}_${safeName}`;
-                      const { error } = await supabase.storage.from("project-files").upload(path, file);
-                      if (error) throw error;
-                    } else {
-                      const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-                      const fileId = `${Date.now()}_${safeName}`;
-                      toast.info(`Ανέβασμα μεγάλου αρχείου (${totalChunks} κομμάτια)...`);
-                      for (let i = 0; i < totalChunks; i++) {
-                        const start = i * CHUNK_SIZE;
-                        const end = Math.min(start + CHUNK_SIZE, file.size);
-                        const chunk = file.slice(start, end);
-                        const chunkPath = `${user.id}/${fileId}_part${i}`;
-                        const { error } = await supabase.storage.from("project-files").upload(chunkPath, chunk);
-                        if (error) throw error;
-                      }
-                      const path = `${user.id}/${fileId}`;
-                      const { error } = await supabase.storage.from("project-files").upload(path, file);
-                      if (error) throw error;
-                    }
-                    toast.success(`Αρχείο "${file.name}" ανέβηκε (${(file.size / (1024 * 1024)).toFixed(1)} MB)`);
-                    const textTypes = ['.csv', '.tsv', '.txt', '.json', '.xml', '.md', '.log'];
-                    const isTextFile = textTypes.some(ext => file.name.toLowerCase().endsWith(ext));
-                    if (isTextFile && file.size < 50 * 1024 * 1024) {
-                      const textContent = await file.text();
-                      const truncated = textContent.length > 10000
-                        ? textContent.slice(0, 10000) + `\n\n... [αρχείο ${(file.size/1024).toFixed(0)}KB, εμφανίζονται τα πρώτα 10KB]`
-                        : textContent;
-                      sendMessage(`Ανέβασα αρχείο: ${file.name} (${(file.size/1024).toFixed(0)} KB)\n\nΠεριεχόμενο:\n\`\`\`\n${truncated}\n\`\`\``);
-                    } else {
-                      sendMessage(`Ανέβασα αρχείο: ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`);
-                    }
-                  } catch (err) {
-                    console.error("File upload error:", err);
-                    toast.error("Σφάλμα κατά το ανέβασμα αρχείου");
-                  }
-                }}
-              />
+
+            <div className="rounded-2xl border border-border/60 bg-background shadow-lg overflow-hidden">
+              {/* File chips */}
+              {attachedFiles.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 px-4 pt-3">
+                  {attachedFiles.map((file, i) => (
+                    <span key={i} className="inline-flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-lg bg-muted text-xs text-foreground">
+                      {getFileIcon(file)}
+                      <span className="max-w-[150px] truncate">{file.name}</span>
+                      <button onClick={() => removeFile(i)} className="p-0.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-end gap-2 p-3">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 mb-0.5"
+                  title="Επισύναψη αρχείου"
+                >
+                  <Paperclip className="h-5 w-5" />
+                </button>
+
+                <textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onInput={handleTextareaInput}
+                  placeholder="Γράψε ένα μήνυμα ή σύρε αρχεία..."
+                  disabled={loading}
+                  rows={1}
+                  className="flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 max-h-[200px]"
+                />
+
+                <button
+                  onClick={() => sendMessage(input)}
+                  disabled={loading || (!input.trim() && attachedFiles.length === 0)}
+                  className="p-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0 mb-0.5"
+                >
+                  <Send className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           </div>
         </div>

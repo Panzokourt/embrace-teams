@@ -19,6 +19,7 @@ interface ConversationSidebarProps {
   activeConversationId: string | null;
   onSelectConversation: (id: string) => void;
   onNewConversation: () => void;
+  onOpenMemory?: () => void;
   collapsed?: boolean;
 }
 

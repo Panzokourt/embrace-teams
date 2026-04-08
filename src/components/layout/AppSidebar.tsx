@@ -97,12 +97,6 @@ const categoryNavItems: Record<CategoryId, NavItem[]> = {
   { title: 'Reports Hub', href: '/reports', icon: BarChart3, permission: 'financials.view' },
   { title: 'Brain', href: '/brain', icon: Zap }],
 
-  governance: [
-  { title: 'Dashboard', href: '/governance', icon: ShieldCheck },
-  { title: 'Digital Assets', href: '/governance/assets', icon: Globe },
-  { title: 'Access Control', href: '/governance/access', icon: UserCog },
-  { title: 'Vault', href: '/governance/vault', icon: FileArchive },
-  { title: 'Compliance', href: '/governance/compliance', icon: FileText }],
 
   settings: [
   { title: 'General', href: '/settings', icon: Settings, permission: 'settings.company' },

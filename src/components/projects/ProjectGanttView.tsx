@@ -77,6 +77,24 @@ export function ProjectGanttView({ projects, onProjectUpdated }: ProjectGanttVie
   const [editEndDate, setEditEndDate] = useState<Date | undefined>();
   const [editStatus, setEditStatus] = useState<string>('');
 
+  // Drag & resize hook
+  const { getOverriddenDates, handleMouseDown: onDragStart, isDragging, wasDragged } = useGanttDrag({
+    getDayWidth: () => {
+      if (!scrollRef.current) return 5;
+      const totalMs = timelineEnd.getTime() - timelineStart.getTime();
+      const totalDays = totalMs / (1000 * 60 * 60 * 24);
+      return scrollRef.current.scrollWidth / totalDays;
+    },
+    onDragEnd: async (itemId, startDate, endDate) => {
+      const { error } = await supabase.from('projects').update({
+        start_date: startDate,
+        end_date: endDate,
+      }).eq('id', itemId);
+      if (error) { toast.error('Σφάλμα ενημέρωσης'); return; }
+      toast.success('Ημερομηνίες ενημερώθηκαν');
+      onProjectUpdated?.();
+    },
+  });
   const clientOptions = useMemo(() => {
     const map = new Map<string, string>();
     projects.forEach(p => { if (p.client?.name && p.client_id) map.set(p.client_id, p.client.name); });

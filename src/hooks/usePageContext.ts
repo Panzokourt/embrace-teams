@@ -153,7 +153,7 @@ export function usePageContext(): PageContext {
         name: project.name,
         status: project.status,
         budget: project.budget,
-        net_budget: project.net_budget,
+        net_budget: (project as any).net_budget,
         progress: project.progress,
         start_date: project.start_date,
         end_date: project.end_date,

@@ -1,59 +1,59 @@
 
 
-# Interactive Drag & Resize σε όλα τα Gantt Views
+# Επέκταση Ρυθμίσεων Εταιρείας — Πλήρη Στοιχεία
 
 ## Τρέχουσα κατάσταση
+Η φόρμα έχει μόνο: Όνομα, Domain, Περιγραφή, Κλάδος, Ζώνη ώρας, Γλώσσα. Όλα εκτός name/domain αποθηκεύονται στο `settings` JSONB column.
 
-- **MediaPlanGantt** — ήδη υποστηρίζει drag (move) και resize (left/right handles)
-- **ProjectGanttView** — μόνο click → popover edit
-- **TaskGanttView** — μόνο click → popover edit
-- **ProjectMediaPlan GanttView** — στατικό, χωρίς interaction
+## Προτεινόμενη δομή — Οργάνωση σε sections
 
-## Λύση
+### Section 1: Βασικά στοιχεία (υπάρχει ήδη)
+- Όνομα εταιρείας, Domain, Περιγραφή, Λογότυπο (upload)
 
-Προσθήκη drag-to-move και resize handles (αριστερά/δεξιά) σε κάθε Gantt bar, με real-time visual feedback και save στο DB κατά το mouseup.
+### Section 2: Νομικά & Φορολογικά στοιχεία
+- **Μορφή εταιρείας** (ΑΕ, ΕΠΕ, ΙΚΕ, ΟΕ, ΕΕ, Ατομική, Μη Κερδοσκοπική, Άλλο)
+- **ΑΦΜ** (με validation 9 ψηφίων)
+- **ΔΟΥ**
+- **Αρ. ΓΕΜΗ**
+- **Νόμισμα** (EUR, USD, GBP)
 
-## Αλλαγές
+### Section 3: Στοιχεία Επικοινωνίας
+- **Τηλέφωνο** (κύριο)
+- **Fax**
+- **Email εταιρείας**
+- **Website**
 
-### 1. `src/components/projects/ProjectGanttView.tsx`
-- Προσθήκη `dragRef` state για tracking drag type (move/resize-start/resize-end), αρχικό mouseX, original dates
-- Κάθε bar γίνεται `group` class, με δύο resize handles (αριστερά/δεξιά, `cursor-ew-resize`, visible on hover)
-- `onMouseDown` στο bar body = move, στα handles = resize
-- `mousemove` listener υπολογίζει daysDelta βάσει pixel width per tick, ενημερώνει visual position
-- `mouseup` κάνει `supabase.from('projects').update({ start_date, end_date })` και trigger `onProjectUpdated()`
-- Το popover edit παραμένει ως fallback (click χωρίς drag)
+### Section 4: Διεύθυνση
+- **Οδός & αριθμός**
+- **Πόλη**
+- **Τ.Κ.**
+- **Χώρα**
 
-### 2. `src/components/tasks/TaskGanttView.tsx`
-- Ίδιο pattern: `dragRef`, resize handles, mousemove/mouseup
-- `mouseup` κάνει `supabase.from('tasks').update({ start_date, due_date })` και `onTaskUpdated()`
-- Διαχωρισμός click vs drag: αν δεν υπήρξε movement (< 3px), ανοίγει popover· αλλιώς save dates
+### Section 5: Social Media & Online Presence
+- **LinkedIn URL**
+- **Facebook URL**
+- **Instagram URL**
+- **X (Twitter) URL**
 
-### 3. `src/components/projects/ProjectMediaPlan.tsx` (GanttView function)
-- Προσθήκη `onItemUpdate` callback prop
-- Ίδιο drag/resize pattern στα bars
-- Save μέσω parent component που κάνει update στον `media_plan_items` table
+### Section 6: Επιχειρησιακά
+- **Κλάδος** (υπάρχει)
+- **Μέγεθος εταιρείας** (υπάρχει στο DB)
+- **Έτος ίδρυσης**
+- **Ζώνη ώρας** (υπάρχει)
+- **Γλώσσα** (υπάρχει)
 
-## Τεχνική Υλοποίηση
+## Τεχνικές αλλαγές
 
-Κοινό pattern για όλα:
+### 1. `src/components/organization/OrgGeneralTab.tsx`
+- Αναδιοργάνωση σε collapsible sections με Card components
+- Όλα τα νέα πεδία αποθηκεύονται στο `settings` JSONB (δεν χρειάζεται migration εκτός αν θέλουμε dedicated columns)
+- Τα `industry` και `company_size` χρησιμοποιούν τα υπάρχοντα DB columns
+- Validation: ΑΦΜ (9 ψηφία), email format, URL format, Τ.Κ. (5 ψηφία)
+- Logo upload με preview (reuse pattern από OnboardingCompany)
 
-```typescript
-// Drag state ref
-const dragRef = useRef<{
-  type: 'move' | 'resize-start' | 'resize-end';
-  itemId: string;
-  startX: number;
-  originalStart: string;
-  originalEnd: string;
-} | null>(null);
+### 2. Database migration
+- Κανένα νέο column — τα πεδία μπαίνουν στο `settings` JSONB που υπάρχει ήδη
+- Αξιοποίηση του υπάρχοντος `company_size` column
 
-// Local overrides for visual feedback during drag
-const [dragOverrides, setDragOverrides] = useState<Map<string, { start: string; end: string }>>(new Map());
-
-// onMouseDown → set dragRef, add window listeners
-// onMouseMove → calculate daysDelta, update dragOverrides for live preview
-// onMouseUp → save to DB, clear dragOverrides, refresh data
-```
-
-Τα bars θα χρησιμοποιούν τα `dragOverrides` dates αντί των πραγματικών κατά τη διάρκεια του drag, ώστε ο χρήστης να βλέπει real-time preview.
+Δεν επηρεάζονται άλλα components — η αλλαγή είναι αποκλειστικά στο `OrgGeneralTab`.
 

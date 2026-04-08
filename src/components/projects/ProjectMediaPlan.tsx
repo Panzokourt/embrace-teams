@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useGanttDrag } from '@/hooks/useGanttDrag';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -527,8 +528,26 @@ function AIWizardModal({ open, onClose, onGenerate, projectName, projectBudget, 
 }
 
 // ─── Gantt View ───────────────────────────────────────────────────────────────
-function GanttView({ items }: { items: MediaPlanItem[] }) {
+function GanttView({ items, onItemUpdate }: { items: MediaPlanItem[]; onItemUpdate?: (id: string, updates: Partial<MediaPlanItem>) => void }) {
   const withDates = items.filter(i => i.start_date && i.end_date);
+
+  const { getOverriddenDates, handleMouseDown: onDragStart, isDragging } = useGanttDrag({
+    getDayWidth: () => {
+      if (withDates.length === 0) return 5;
+      const allS = withDates.map(i => parseISO(i.start_date!));
+      const allE = withDates.map(i => parseISO(i.end_date!));
+      const ts = allS.reduce((a, b) => a < b ? a : b);
+      const te = allE.reduce((a, b) => a > b ? a : b);
+      const td = differenceInDays(te, ts) + 1;
+      return Math.max(800, 1200) / td;
+    },
+    onDragEnd: async (itemId, startDate, endDate) => {
+      if (onItemUpdate) {
+        onItemUpdate(itemId, { start_date: startDate, end_date: endDate });
+      }
+    },
+  });
+
   if (withDates.length === 0) {
     return (
       <div className="text-center py-16 text-muted-foreground">
@@ -545,10 +564,8 @@ function GanttView({ items }: { items: MediaPlanItem[] }) {
   const timelineEnd = allEnds.reduce((a, b) => a > b ? a : b);
   const totalDays = differenceInDays(timelineEnd, timelineStart) + 1;
 
-  // Generate month columns
   const months = eachMonthOfInterval({ start: timelineStart, end: timelineEnd });
 
-  // Group by medium
   const byMedium: Record<string, MediaPlanItem[]> = {};
   withDates.forEach(i => {
     if (!byMedium[i.medium]) byMedium[i.medium] = [];
@@ -556,8 +573,9 @@ function GanttView({ items }: { items: MediaPlanItem[] }) {
   });
 
   const getBarStyle = (item: MediaPlanItem) => {
-    const start = parseISO(item.start_date!);
-    const end = parseISO(item.end_date!);
+    const dates = getOverriddenDates(item.id, item.start_date!, item.end_date!);
+    const start = parseISO(dates.start);
+    const end = parseISO(dates.end);
     const left = (differenceInDays(start, timelineStart) / totalDays) * 100;
     const width = Math.max((differenceInDays(end, start) + 1) / totalDays * 100, 1);
     return { left: `${left}%`, width: `${width}%` };
@@ -594,9 +612,7 @@ function GanttView({ items }: { items: MediaPlanItem[] }) {
         {Object.entries(byMedium).map(([medium, mediumItems]) => (
           <div key={medium}>
             <div className="flex items-center bg-muted/30 border-y py-1.5">
-              <div className="w-48 shrink-0 px-3 text-xs font-semibold">
-                {medium}
-              </div>
+              <div className="w-48 shrink-0 px-3 text-xs font-semibold">{medium}</div>
               <div className="flex-1" />
             </div>
             {mediumItems.map(item => (
@@ -606,13 +622,27 @@ function GanttView({ items }: { items: MediaPlanItem[] }) {
                 </div>
                 <div className="flex-1 relative h-8 mx-1">
                   <div className="absolute inset-y-0 flex items-center" style={getBarStyle(item)}>
-                    <div className="h-5 rounded-full relative w-full flex items-center px-2 text-xs text-white font-medium overflow-hidden"
-                      style={{ backgroundColor: color(item) }}
-                      title={`${item.campaign_name || item.medium} · ${fmt(item.budget)}`}>
-                      <span className="truncate">{fmt(item.budget)}</span>
+                    <div
+                      className="h-5 rounded-full relative w-full flex items-center px-2 text-xs text-white font-medium overflow-hidden cursor-grab group/bar"
+                      style={{ backgroundColor: color(item), opacity: isDragging(item.id) ? 0.6 : 1 }}
+                      title={`${item.campaign_name || item.medium} · ${fmt(item.budget)}`}
+                      onMouseDown={(e) => {
+                        if (item.start_date && item.end_date) {
+                          onDragStart(e, item.id, 'move', item.start_date, item.end_date);
+                        }
+                      }}
+                    >
+                      <div
+                        className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover/bar:opacity-100 bg-white/20 rounded-l-full z-10"
+                        onMouseDown={(e) => { e.stopPropagation(); onDragStart(e, item.id, 'resize-start', item.start_date!, item.end_date!); }}
+                      />
+                      <span className="truncate select-none">{fmt(item.budget)}</span>
+                      <div
+                        className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover/bar:opacity-100 bg-white/20 rounded-r-full z-10"
+                        onMouseDown={(e) => { e.stopPropagation(); onDragStart(e, item.id, 'resize-end', item.start_date!, item.end_date!); }}
+                      />
                     </div>
                   </div>
-                  {/* Month grid lines */}
                   <div className="absolute inset-0 flex pointer-events-none">
                     {months.map((month, idx) => {
                       const monthDays = differenceInDays(
@@ -1659,7 +1689,9 @@ function PlanDetailView({ plan, projectId, projectName, projectBudget, agencyFee
               </div>
             </div>
           )}
-          {viewMode === 'gantt' && <div className="rounded-xl border p-4"><GanttView items={displayedItems} /></div>}
+          {viewMode === 'gantt' && <div className="rounded-xl border p-4"><GanttView items={displayedItems} onItemUpdate={(id, updates) => {
+            Object.entries(updates).forEach(([field, value]) => updateItem(id, field, value as string));
+          }} /></div>}
           {viewMode === 'calendar' && <div className="rounded-xl border p-4"><CalendarView items={displayedItems} /></div>}
         </>
       )}

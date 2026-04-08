@@ -561,7 +561,7 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
               variant="ghost"
               size="icon"
               className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
-              onClick={sendMessage}
+              onClick={() => sendMessage()}
               disabled={!input.trim() && attachedFiles.length === 0}
             >
               <Send className="h-4 w-4" />

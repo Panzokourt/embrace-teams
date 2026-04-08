@@ -13,6 +13,7 @@ import { XPBadge } from '@/components/gamification/XPBadge';
 import { useLayout } from '@/contexts/LayoutContext';
 import { useTimeTracking } from '@/hooks/useTimeTracking';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import SetupGuide from '@/components/onboarding/SetupGuide';
 
 interface SearchResult {
   id: string;

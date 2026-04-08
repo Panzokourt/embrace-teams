@@ -59,6 +59,8 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
   });
 
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [quickChatOpen, setQuickChatOpen] = useState(false);
+  const toggleQuickChat = useCallback(() => setQuickChatOpen(prev => !prev), []);
 
   // Persist to localStorage
   // Note: rightPanelOpen is intentionally NOT persisted — panel starts closed on every page load

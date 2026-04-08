@@ -92,15 +92,15 @@ export function useGanttDrag({ getDayWidth, onDragEnd }: UseGanttDragOptions) {
       window.removeEventListener('mouseup', handleMouseUp);
 
       if (state?.hasMoved) {
-        const override = dragOverrides.get(state.itemId);
-        // Use the latest from the map, but if not yet set, compute from last dx
         setDragOverrides(prev => {
           const next = new Map(prev);
           const final = next.get(state.itemId);
           next.delete(state.itemId);
-          if (final) {
-            onDragEnd(state.itemId, final.start, final.end);
-          }
+          // Use final override or compute from original
+          const startDate = final?.start || state.originalStart;
+          const endDate = final?.end || state.originalEnd;
+          // Defer the callback to avoid state update during render
+          setTimeout(() => onDragEnd(state.itemId, startDate, endDate), 0);
           return next;
         });
       }

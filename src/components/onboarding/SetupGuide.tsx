@@ -53,7 +53,7 @@ export default function SetupGuide() {
           {steps.map((step) => (
             <button
               key={step.key}
-              onClick={!step.completed ? handleGoToOnboarding : undefined}
+              onClick={!step.completed ? () => handleGoToStep(step.route) : undefined}
               className={cn(
                 "w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left transition-colors",
                 step.completed

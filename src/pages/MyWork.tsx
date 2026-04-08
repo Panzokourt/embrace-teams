@@ -90,10 +90,14 @@ function getStatusStyle(s: string): React.CSSProperties {
 
 // ── Main Page ──────────────────────────────────────
 export default function MyWork() {
-  const { user, profile } = useAuth();
+  const { user, profile, isAdmin, isManager, isOwner, isViewer, isMember } = useAuth();
   const navigate = useNavigate();
   const { activeTimer, elapsed, formatElapsed, startTimer, stopTimer } = useTimeTracking();
   const { awardTaskXP } = useXPEngine();
+
+  const showFinancials = isAdmin || isManager || isOwner;
+  const showTeamRadar = isAdmin || isManager || isOwner;
+  const showIntel = isAdmin || isManager || isOwner;
 
   const [myProjects, setMyProjects] = useState<MyProject[]>([]);
   const [projectTasks, setProjectTasks] = useState<Record<string, TaskItem[]>>({});

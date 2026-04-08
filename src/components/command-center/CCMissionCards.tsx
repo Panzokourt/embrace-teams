@@ -88,12 +88,12 @@ export default function CCMissionCards({
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <div className="flex gap-3 overflow-x-auto" style={{ minWidth: 0 }}>
       {cards.map((card) => (
         <div
           key={card.id}
           className={`group relative rounded-2xl border bg-card p-4 transition-all duration-300
-            hover:scale-[1.02] hover:shadow-md ${healthGlow[card.health]}`}
+            hover:scale-[1.02] hover:shadow-md flex-1 min-w-[160px] ${healthGlow[card.health]}`}
         >
           <div className="flex items-start justify-between">
             <div className="space-y-1">

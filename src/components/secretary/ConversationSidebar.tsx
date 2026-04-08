@@ -27,6 +27,7 @@ export default function ConversationSidebar({
   activeConversationId,
   onSelectConversation,
   onNewConversation,
+  onOpenMemory,
   collapsed = false,
 }: ConversationSidebarProps) {
   const { user } = useAuth();

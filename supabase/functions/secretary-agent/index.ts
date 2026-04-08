@@ -1709,43 +1709,55 @@ Respond in Greek. Be thorough but concise.`;
 
       case "recall_memory": {
         const limit = args.limit || 10;
-        let q = supabase
-          .from("secretary_memory")
-          .select("id, category, key, content, metadata, created_at, updated_at")
-          .eq("user_id", userId)
-          .eq("company_id", companyId)
-          .order("updated_at", { ascending: false })
-          .limit(limit);
+        const selectCols = "id, category, key, content, metadata, project_id, client_id, created_at, updated_at";
 
-        if (args.category) q = q.eq("category", args.category);
+        const applyFilters = (q: any) => {
+          if (args.category) q = q.eq("category", args.category);
+          if (args.project_id) q = q.eq("project_id", args.project_id);
+          if (args.client_id) q = q.eq("client_id", args.client_id);
+          return q;
+        };
 
         // Try full-text search first
         if (args.query) {
-          const { data: ftsData } = await supabase
+          let ftsQ = supabase
             .from("secretary_memory")
-            .select("id, category, key, content, metadata, created_at, updated_at")
+            .select(selectCols)
             .eq("user_id", userId)
             .eq("company_id", companyId)
             .textSearch("content", args.query, { type: "plain" })
             .order("updated_at", { ascending: false })
             .limit(limit);
+          ftsQ = applyFilters(ftsQ);
+          const { data: ftsData } = await ftsQ;
 
           if (ftsData && ftsData.length > 0) {
             return { memories: ftsData, count: ftsData.length, search_type: "full_text" };
           }
 
           // Fallback: ilike search
-          const { data: ilikeData } = await supabase
+          let ilikeQ = supabase
             .from("secretary_memory")
-            .select("id, category, key, content, metadata, created_at, updated_at")
+            .select(selectCols)
             .eq("user_id", userId)
             .eq("company_id", companyId)
             .or(`content.ilike.%${args.query}%,key.ilike.%${args.query}%`)
             .order("updated_at", { ascending: false })
             .limit(limit);
+          ilikeQ = applyFilters(ilikeQ);
+          const { data: ilikeData } = await ilikeQ;
 
           return { memories: ilikeData || [], count: (ilikeData || []).length, search_type: "fuzzy" };
         }
+
+        let q = supabase
+          .from("secretary_memory")
+          .select(selectCols)
+          .eq("user_id", userId)
+          .eq("company_id", companyId)
+          .order("updated_at", { ascending: false })
+          .limit(limit);
+        q = applyFilters(q);
 
         const { data, error } = await q;
         if (error) throw error;

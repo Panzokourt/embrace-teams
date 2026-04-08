@@ -28,7 +28,7 @@ import {
   DollarSign, Settings, LogOut, Zap, ChevronLeft, ChevronRight, UserCog, Building2,
   Moon, Sun, CalendarDays, FileArchive, Timer, FileStack, BarChart3,
   Plus, Palette, Monitor, Globe, Calendar, MessageSquare, BookUser,
-  Briefcase, Mail, Trophy, ShieldCheck, BookOpen, GitBranch, MonitorPlay } from
+  Briefcase, Mail, Trophy, ShieldCheck, BookOpen, GitBranch, MonitorPlay, Radar } from
 'lucide-react';
 import { briefDefinitions, getBriefDefinition } from '@/components/blueprints/briefDefinitions';
 import { BriefFormDialog } from '@/components/blueprints/BriefFormDialog';
@@ -58,7 +58,7 @@ interface Category {
 }
 
 const categories: Category[] = [
-{ id: 'overview', icon: LayoutDashboard, label: 'Dashboards', routePrefixes: ['/dashboards'] },
+{ id: 'overview', icon: Radar, label: 'Command Center', routePrefixes: ['/command-center'] },
 { id: 'work', icon: Briefcase, label: 'Work', routePrefixes: ['/work', '/projects', '/tasks', '/calendar', '/files', '/blueprints', '/workflows', '/media-planning'] },
 { id: 'clients', icon: Building2, label: 'Clients', routePrefixes: ['/clients', '/contacts'] },
 { id: 'communication', icon: MessageSquare, label: 'Communication', routePrefixes: ['/chat', '/inbox'] },
@@ -71,10 +71,8 @@ const categories: Category[] = [
 
 const categoryNavItems: Record<CategoryId, NavItem[]> = {
   overview: [
-  { title: 'Executive', href: '/dashboards', icon: LayoutDashboard },
-  { title: 'Finance', href: '/dashboards/finance', icon: DollarSign },
-  { title: 'Operations', href: '/dashboards/operations', icon: Users },
-  { title: 'Sales & Pipeline', href: '/dashboards/sales', icon: BarChart3 }],
+  { title: 'Command Center', href: '/command-center', icon: Radar }],
+
 
   work: [],
   clients: [

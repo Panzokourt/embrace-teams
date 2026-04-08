@@ -1,59 +1,94 @@
 
 
-# Επέκταση Ρυθμίσεων Εταιρείας — Πλήρη Στοιχεία
+# Οικονομικός Κύκλος Ζωής Έργου (Project Financial Lifecycle)
 
-## Τρέχουσα κατάσταση
-Η φόρμα έχει μόνο: Όνομα, Domain, Περιγραφή, Κλάδος, Ζώνη ώρας, Γλώσσα. Όλα εκτός name/domain αποθηκεύονται στο `settings` JSONB column.
+## Ιδέα
 
-## Προτεινόμενη δομή — Οργάνωση σε sections
+Ένα νέο σύστημα **Financial Milestones** ανά έργο, που καταγράφει τα στάδια: **Κοστολόγηση → Προσφορά → Ανάθεση → Παράδοση → Τιμολόγηση → Είσπραξη**, με timestamps και μετρήσεις χρόνου μεταξύ τους. Ενσωματώνεται στο υπάρχον `ProjectFinancialsHub` ως νέο tab και στο overview ως visual stepper.
 
-### Section 1: Βασικά στοιχεία (υπάρχει ήδη)
-- Όνομα εταιρείας, Domain, Περιγραφή, Λογότυπο (upload)
+## Database
 
-### Section 2: Νομικά & Φορολογικά στοιχεία
-- **Μορφή εταιρείας** (ΑΕ, ΕΠΕ, ΙΚΕ, ΟΕ, ΕΕ, Ατομική, Μη Κερδοσκοπική, Άλλο)
-- **ΑΦΜ** (με validation 9 ψηφίων)
-- **ΔΟΥ**
-- **Αρ. ΓΕΜΗ**
-- **Νόμισμα** (EUR, USD, GBP)
+### Νέος πίνακας: `project_financial_milestones`
 
-### Section 3: Στοιχεία Επικοινωνίας
-- **Τηλέφωνο** (κύριο)
-- **Fax**
-- **Email εταιρείας**
-- **Website**
+```text
+id              UUID PK
+project_id      UUID FK → projects (NOT NULL)
+company_id      UUID FK → companies (NOT NULL)
 
-### Section 4: Διεύθυνση
-- **Οδός & αριθμός**
-- **Πόλη**
-- **Τ.Κ.**
-- **Χώρα**
+-- Κάθε milestone = μία ημερομηνία + optional metadata
+costing_at          TIMESTAMPTZ  -- πότε ολοκληρώθηκε η κοστολόγηση
+costing_amount      NUMERIC      -- κόστος εκτίμησης
+costing_notes       TEXT
 
-### Section 5: Social Media & Online Presence
-- **LinkedIn URL**
-- **Facebook URL**
-- **Instagram URL**
-- **X (Twitter) URL**
+proposal_sent_at    TIMESTAMPTZ  -- πότε στάλθηκε η προσφορά
+proposal_amount     NUMERIC      -- ποσό προσφοράς
+proposal_reference  TEXT         -- αρ. προσφοράς
 
-### Section 6: Επιχειρησιακά
-- **Κλάδος** (υπάρχει)
-- **Μέγεθος εταιρείας** (υπάρχει στο DB)
-- **Έτος ίδρυσης**
-- **Ζώνη ώρας** (υπάρχει)
-- **Γλώσσα** (υπάρχει)
+proposal_accepted_at TIMESTAMPTZ -- πότε εγκρίθηκε η προσφορά
+proposal_rejected_at TIMESTAMPTZ -- αν απορρίφθηκε
 
-## Τεχνικές αλλαγές
+delivery_at         TIMESTAMPTZ  -- πότε παραδόθηκε το έργο
+delivery_notes      TEXT
 
-### 1. `src/components/organization/OrgGeneralTab.tsx`
-- Αναδιοργάνωση σε collapsible sections με Card components
-- Όλα τα νέα πεδία αποθηκεύονται στο `settings` JSONB (δεν χρειάζεται migration εκτός αν θέλουμε dedicated columns)
-- Τα `industry` και `company_size` χρησιμοποιούν τα υπάρχοντα DB columns
-- Validation: ΑΦΜ (9 ψηφία), email format, URL format, Τ.Κ. (5 ψηφία)
-- Logo upload με preview (reuse pattern από OnboardingCompany)
+invoiced_at         TIMESTAMPTZ  -- πότε εκδόθηκε τιμολόγιο
+invoice_id          UUID FK → invoices (optional link)
 
-### 2. Database migration
-- Κανένα νέο column — τα πεδία μπαίνουν στο `settings` JSONB που υπάρχει ήδη
-- Αξιοποίηση του υπάρχοντος `company_size` column
+collected_at        TIMESTAMPTZ  -- πότε εισπράχθηκε
+collected_amount    NUMERIC
 
-Δεν επηρεάζονται άλλα components — η αλλαγή είναι αποκλειστικά στο `OrgGeneralTab`.
+-- Για internal projects
+is_internal_costing BOOLEAN DEFAULT false  -- αν δεν υπάρχει πελάτης, skip proposal
+
+updated_by          UUID FK → profiles
+created_at          TIMESTAMPTZ DEFAULT now()
+updated_at          TIMESTAMPTZ DEFAULT now()
+```
+
+Ένα row ανά project. Κάθε πεδίο `_at` γεμίζει όταν ο χρήστης "κλείνει" αυτό το βήμα. Τα `NULL` σημαίνουν "δεν έχει γίνει ακόμα".
+
+## UI Components
+
+### 1. Visual Stepper — `ProjectFinancialStepper.tsx`
+
+Horizontal stepper (παρόμοιο με task status stepper) που δείχνει τα 6 στάδια:
+
+```text
+[Κοστολόγηση] → [Προσφορά] → [Ανάθεση] → [Παράδοση] → [Τιμολόγηση] → [Είσπραξη]
+     ✓              ✓            ●
+```
+
+- Ολοκληρωμένα = πράσινο check + ημερομηνία κάτω
+- Τρέχον = highlighted ring
+- Μελλοντικά = dimmed
+- Κλικ σε step → expand panel κάτω για συμπλήρωση (amount, notes, date)
+- Αυτόματος υπολογισμός χρόνων μεταξύ σταδίων (π.χ. "12 ημέρες από κοστολόγηση σε προσφορά")
+- Για **internal projects**: τα βήματα Προσφορά/Ανάθεση γίνονται optional/skippable
+
+### 2. Νέο tab στο `ProjectFinancialsHub` — "Οικονομικός Κύκλος"
+
+Προστίθεται ως πρώτο tab, πριν το Budget Overview:
+- Πάνω: ο stepper
+- Κάτω: timeline cards με τα ολοκληρωμένα milestones + χρόνους
+- KPI row: "Μέσος χρόνος κοστολόγησης→τιμολόγησης", "Ημέρες μέχρι είσπραξη"
+
+### 3. Σύνδεση με υπάρχοντα
+
+- Όταν ο χρήστης κλείνει το βήμα "Τιμολόγηση", μπορεί να **συνδέσει υπάρχον invoice** ή να δημιουργήσει νέο
+- Όταν κλείνει "Είσπραξη", ελέγχει αν το linked invoice είναι paid
+- Η κοστολόγηση μπορεί να τραβήξει τα project expenses ως βάση
+
+## Αλλαγές αρχείων
+
+| Αρχείο | Αλλαγή |
+|--------|--------|
+| **Migration** | Νέος πίνακας `project_financial_milestones` + RLS |
+| `src/components/projects/ProjectFinancialStepper.tsx` | **Νέο** — Visual stepper + edit panels |
+| `src/components/projects/ProjectFinancialsHub.tsx` | Νέο tab "Κύκλος Ζωής" με τον stepper |
+| `src/pages/ProjectDetail.tsx` | Mini stepper badge στο header area |
+
+## Τι δεν αλλάζει
+
+- Invoices/Expenses/Contracts tables — παραμένουν ως έχουν
+- ProjectWorkflowTracker (intake workflows) — ξεχωριστό σύστημα
+- P&L Report — παραμένει
 

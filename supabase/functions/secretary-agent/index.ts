@@ -1660,6 +1660,138 @@ Respond in Greek. Be thorough but concise.`;
         };
       }
 
+      // ── MEMORY TOOL EXECUTORS ──
+
+      case "save_memory": {
+        // Upsert memory by key to avoid duplicates
+        const { data: existing } = await supabase
+          .from("secretary_memory")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("company_id", companyId)
+          .eq("key", args.key)
+          .limit(1)
+          .maybeSingle();
+
+        if (existing) {
+          const { error } = await supabase
+            .from("secretary_memory")
+            .update({
+              content: args.content,
+              category: args.category || "general",
+              metadata: args.metadata || {},
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", existing.id);
+          if (error) throw error;
+          return { success: true, action: "updated", key: args.key };
+        } else {
+          const { error } = await supabase.from("secretary_memory").insert({
+            user_id: userId,
+            company_id: companyId,
+            category: args.category || "general",
+            key: args.key,
+            content: args.content,
+            metadata: args.metadata || {},
+          });
+          if (error) throw error;
+          return { success: true, action: "saved", key: args.key };
+        }
+      }
+
+      case "recall_memory": {
+        const limit = args.limit || 10;
+        let q = supabase
+          .from("secretary_memory")
+          .select("id, category, key, content, metadata, created_at, updated_at")
+          .eq("user_id", userId)
+          .eq("company_id", companyId)
+          .order("updated_at", { ascending: false })
+          .limit(limit);
+
+        if (args.category) q = q.eq("category", args.category);
+
+        // Try full-text search first
+        if (args.query) {
+          const { data: ftsData } = await supabase
+            .from("secretary_memory")
+            .select("id, category, key, content, metadata, created_at, updated_at")
+            .eq("user_id", userId)
+            .eq("company_id", companyId)
+            .textSearch("content", args.query, { type: "plain" })
+            .order("updated_at", { ascending: false })
+            .limit(limit);
+
+          if (ftsData && ftsData.length > 0) {
+            return { memories: ftsData, count: ftsData.length, search_type: "full_text" };
+          }
+
+          // Fallback: ilike search
+          const { data: ilikeData } = await supabase
+            .from("secretary_memory")
+            .select("id, category, key, content, metadata, created_at, updated_at")
+            .eq("user_id", userId)
+            .eq("company_id", companyId)
+            .or(`content.ilike.%${args.query}%,key.ilike.%${args.query}%`)
+            .order("updated_at", { ascending: false })
+            .limit(limit);
+
+          return { memories: ilikeData || [], count: (ilikeData || []).length, search_type: "fuzzy" };
+        }
+
+        const { data, error } = await q;
+        if (error) throw error;
+        return { memories: data || [], count: (data || []).length };
+      }
+
+      case "search_past_chats": {
+        const limit = args.limit || 20;
+        // Search in secretary_messages using ilike
+        const { data, error } = await supabase
+          .from("secretary_messages")
+          .select("id, conversation_id, role, content, created_at")
+          .eq("role", "assistant")
+          .ilike("content", `%${args.query}%`)
+          .order("created_at", { ascending: false })
+          .limit(limit);
+
+        if (error) throw error;
+
+        // Filter to only conversations belonging to this user
+        const convIds = [...new Set((data || []).map((m: any) => m.conversation_id))];
+        const { data: userConvs } = await supabase
+          .from("secretary_conversations")
+          .select("id, title")
+          .eq("user_id", userId)
+          .in("id", convIds);
+
+        const validConvIds = new Set((userConvs || []).map((c: any) => c.id));
+        const convTitles: Record<string, string> = {};
+        for (const c of userConvs || []) convTitles[c.id] = c.title;
+
+        const filtered = (data || [])
+          .filter((m: any) => validConvIds.has(m.conversation_id))
+          .map((m: any) => ({
+            ...m,
+            conversation_title: convTitles[m.conversation_id] || "Untitled",
+            content_preview: m.content.length > 300 ? m.content.slice(0, 300) + "..." : m.content,
+          }));
+
+        return { messages: filtered, count: filtered.length };
+      }
+
+      case "search_chat_channels": {
+        const limit = args.limit || 20;
+        // Use the existing search_chat_messages DB function
+        const { data, error } = await supabase.rpc("search_chat_messages", {
+          _query: args.query,
+          _company_id: companyId,
+          _limit: limit,
+        });
+        if (error) throw error;
+        return { messages: data || [], count: (data || []).length };
+      }
+
       default:
         return { error: `Unknown tool: ${toolName}` };
     }

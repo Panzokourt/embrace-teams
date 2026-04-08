@@ -64,7 +64,7 @@ const categories: Category[] = [
 { id: 'revenue', icon: DollarSign, label: 'Revenue', routePrefixes: ['/financials', '/pricing'] },
 { id: 'operations', icon: Users, label: 'Operations', routePrefixes: ['/hr', '/timesheets', '/knowledge', '/operations'] },
 { id: 'intelligence', icon: BarChart3, label: 'Intelligence', routePrefixes: ['/reports', '/brain'] },
-{ id: 'governance', icon: ShieldCheck, label: 'Governance', routePrefixes: ['/governance'] },
+
 { id: 'settings', icon: Settings, label: 'Settings', routePrefixes: ['/settings'] }];
 
 

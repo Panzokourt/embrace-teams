@@ -1,70 +1,59 @@
 
 
-# Knowledge Base Restructure
+# Interactive Drag & Resize σε όλα τα Gantt Views
 
-## Current Problem
+## Τρέχουσα κατάσταση
 
-7 tabs with overlap and confusion:
-- **Άρθρα** and **Playbook** show the same articles, just filtered by category — redundant
-- **Templates** (KB templates like SOPs/checklists) overlaps conceptually with the separate **Blueprints** page (briefs + project templates)
-- Too many tabs cluttering the navigation
+- **MediaPlanGantt** — ήδη υποστηρίζει drag (move) και resize (left/right handles)
+- **ProjectGanttView** — μόνο click → popover edit
+- **TaskGanttView** — μόνο click → popover edit
+- **ProjectMediaPlan GanttView** — στατικό, χωρίς interaction
 
-## Proposed New Structure
+## Λύση
 
-4 clean tabs instead of 7:
+Προσθήκη drag-to-move και resize handles (αριστερά/δεξιά) σε κάθε Gantt bar, με real-time visual feedback και save στο DB κατά το mouseup.
 
-```text
-┌──────────┬────────────┬──────────┬──────────┐
-│  📚 Wiki │ 📋 Blueprints │ 🤖 Ask AI │ ⚙️ Manage │
-└──────────┴────────────┴──────────┴──────────┘
+## Αλλαγές
+
+### 1. `src/components/projects/ProjectGanttView.tsx`
+- Προσθήκη `dragRef` state για tracking drag type (move/resize-start/resize-end), αρχικό mouseX, original dates
+- Κάθε bar γίνεται `group` class, με δύο resize handles (αριστερά/δεξιά, `cursor-ew-resize`, visible on hover)
+- `onMouseDown` στο bar body = move, στα handles = resize
+- `mousemove` listener υπολογίζει daysDelta βάσει pixel width per tick, ενημερώνει visual position
+- `mouseup` κάνει `supabase.from('projects').update({ start_date, end_date })` και trigger `onProjectUpdated()`
+- Το popover edit παραμένει ως fallback (click χωρίς drag)
+
+### 2. `src/components/tasks/TaskGanttView.tsx`
+- Ίδιο pattern: `dragRef`, resize handles, mousemove/mouseup
+- `mouseup` κάνει `supabase.from('tasks').update({ start_date, due_date })` και `onTaskUpdated()`
+- Διαχωρισμός click vs drag: αν δεν υπήρξε movement (< 3px), ανοίγει popover· αλλιώς save dates
+
+### 3. `src/components/projects/ProjectMediaPlan.tsx` (GanttView function)
+- Προσθήκη `onItemUpdate` callback prop
+- Ίδιο drag/resize pattern στα bars
+- Save μέσω parent component που κάνει update στον `media_plan_items` table
+
+## Τεχνική Υλοποίηση
+
+Κοινό pattern για όλα:
+
+```typescript
+// Drag state ref
+const dragRef = useRef<{
+  type: 'move' | 'resize-start' | 'resize-end';
+  itemId: string;
+  startX: number;
+  originalStart: string;
+  originalEnd: string;
+} | null>(null);
+
+// Local overrides for visual feedback during drag
+const [dragOverrides, setDragOverrides] = useState<Map<string, { start: string; end: string }>>(new Map());
+
+// onMouseDown → set dragRef, add window listeners
+// onMouseMove → calculate daysDelta, update dragOverrides for live preview
+// onMouseUp → save to DB, clear dragOverrides, refresh data
 ```
 
-### Tab 1: Wiki (merges Άρθρα + Playbook)
-- All articles in one view with the category tree sidebar (which already includes Company/Departments/Clients etc.)
-- Clicking "Company" categories = the old Playbook behavior
-- No need for a separate Playbook tab — it's just a category filter
-- Search bar works across all articles
-
-### Tab 2: Blueprints (merges Templates + old Blueprints page)
-- Sub-tabs or sections within:
-  - **Προ-φόρμες (Briefs)** — the existing `BriefsList` component from `/blueprints`
-  - **Project Templates** — the existing `ProjectTemplatesManager` from `/blueprints`
-  - **Document Templates** — the existing KB templates (SOPs, checklists, reports)
-- Remove `/blueprints` as a standalone route; redirect to `/knowledge?tab=blueprints`
-- Update sidebar link accordingly
-
-### Tab 3: Ask AI (unchanged)
-- The existing Ask Wiki chat — no changes needed
-
-### Tab 4: Manage (merges Reviews + Πηγές + Health)
-- Three sections/sub-tabs:
-  - **Reviews** — article review queue
-  - **Πηγές (Sources)** — raw source upload & compile
-  - **Health Check** — wiki health analysis
-- These are all "maintenance" tools, grouped together
-
-## KPI Cards
-Keep them but simplify — show only 4:
-- Total Articles | Drafts | Pending Review | Sources
-
-## Sidebar Changes
-- Remove `/blueprints` route from sidebar
-- Change its link to point to `/knowledge?tab=blueprints`
-- Update category detection in sidebar
-
-## Files to Change
-
-| File | Change |
-|------|--------|
-| `src/pages/Knowledge.tsx` | Restructure tabs: Wiki, Blueprints, Ask AI, Manage |
-| `src/pages/Blueprints.tsx` | Redirect to `/knowledge?tab=blueprints` |
-| `src/App.tsx` | Update `/blueprints` route to redirect |
-| `src/components/layout/AppSidebar.tsx` | Update blueprints link to `/knowledge?tab=blueprints` |
-| `src/hooks/useOnboardingProgress.ts` | Update route if blueprints was referenced |
-
-## What stays untouched
-- All AI Wiki infrastructure (kb-compiler edge function, ask/compile/health)
-- Article editor, version history, backlinks
-- Category tree and category management
-- All existing components — we're reorganizing, not rewriting
+Τα bars θα χρησιμοποιούν τα `dragOverrides` dates αντί των πραγματικών κατά τη διάρκεια του drag, ώστε ο χρήστης να βλέπει real-time preview.
 

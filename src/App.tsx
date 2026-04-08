@@ -82,10 +82,10 @@ const App = () => (
                 <Route path="/platform-admin" element={<PlatformAdmin />} />
                 <Route element={<AppLayout />}>
                 <Route path="/" element={<MyWork />} />
-                <Route path="/command-center" element={<CommandCenter />} />
-                <Route path="/dashboards" element={<Navigate to="/command-center" replace />} />
-                <Route path="/dashboards/:templateId" element={<Navigate to="/command-center" replace />} />
-                <Route path="/dashboard/:templateId" element={<Navigate to="/command-center" replace />} />
+                <Route path="/command-center" element={<Navigate to="/" replace />} />
+                <Route path="/dashboards" element={<Navigate to="/" replace />} />
+                <Route path="/dashboards/:templateId" element={<Navigate to="/" replace />} />
+                <Route path="/dashboard/:templateId" element={<Navigate to="/" replace />} />
                   <Route path="/my-work" element={<Navigate to="/" replace />} />
                   <Route path="/work" element={<Work />} />
                   <Route path="/projects" element={<Navigate to="/work?tab=projects" replace />} />

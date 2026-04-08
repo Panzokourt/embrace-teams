@@ -595,6 +595,8 @@ const toolDefinitions = [
         properties: {
           query: { type: "string", description: "Search query" },
           category: { type: "string", enum: ["general", "file_analysis", "decision", "preference", "project_context"], description: "Optional category filter" },
+          project_id: { type: "string", description: "Optional project UUID to filter memories for a specific project" },
+          client_id: { type: "string", description: "Optional client UUID to filter memories for a specific client" },
           limit: { type: "number", description: "Max results (default 10)" },
         },
         required: ["query"],

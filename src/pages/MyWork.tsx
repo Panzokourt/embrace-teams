@@ -294,6 +294,15 @@ export default function MyWork() {
   return (
     <div className="flex-1 flex overflow-hidden h-full">
       <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-5 animate-fade-in">
+      {/* ── Quick Actions ── */}
+      {!isViewer && (
+        <CCQuickActions
+          isAdmin={isAdmin || isOwner}
+          isManager={isManager}
+          isMember={isMember}
+        />
+      )}
+
       {/* ── CC Hero Zone ── */}
       {!isViewer && (
         <CCHeroZone
@@ -543,14 +552,6 @@ export default function MyWork() {
         </div>
       )}
 
-      {/* ── Quick Actions ── */}
-      {!isViewer && (
-        <CCQuickActions
-          isAdmin={isAdmin || isOwner}
-          isManager={isManager}
-          isMember={isMember}
-        />
-      )}
 
       </div>
 

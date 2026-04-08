@@ -219,7 +219,7 @@ export function ProjectFinancialStepper({ projectId, isInternal, compact }: Proj
   return (
     <div className="space-y-4">
       {/* Stepper */}
-      <div className="flex items-center gap-1 overflow-x-auto pb-2">
+      <div className="flex items-center w-full pb-2">
         {visibleSteps.map((step, idx) => {
           const status = getStepStatus(step);
           const Icon = step.icon;
@@ -227,10 +227,10 @@ export function ProjectFinancialStepper({ projectId, isInternal, compact }: Proj
           const dateVal = milestones?.[step.dateField] as string | null;
 
           return (
-            <div key={step.key} className="flex items-center">
+            <div key={step.key} className={cn("flex items-center", idx > 0 ? "flex-1" : "")}>
               {idx > 0 && (
                 <div className={cn(
-                  'w-6 h-0.5 mx-0.5 flex-shrink-0',
+                  'flex-1 h-0.5',
                   status === 'done' ? 'bg-success' :
                   status === 'skipped' ? 'bg-muted-foreground/20' : 'bg-border'
                 )} />
@@ -238,7 +238,7 @@ export function ProjectFinancialStepper({ projectId, isInternal, compact }: Proj
               <button
                 onClick={() => setExpandedStep(isExpanded ? null : step.key)}
                 className={cn(
-                  'flex flex-col items-center gap-1 px-2 py-1.5 rounded-xl transition-all min-w-[72px]',
+                  'flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all min-w-[80px]',
                   status === 'done' && 'bg-success/10',
                   status === 'current' && 'bg-primary/10 ring-1 ring-primary/30',
                   status === 'skipped' && 'opacity-40',
@@ -247,7 +247,7 @@ export function ProjectFinancialStepper({ projectId, isInternal, compact }: Proj
                 )}
               >
                 <div className={cn(
-                  'w-8 h-8 rounded-full flex items-center justify-center',
+                  'w-9 h-9 rounded-full flex items-center justify-center',
                   status === 'done' && 'bg-success text-success-foreground',
                   status === 'current' && 'bg-primary text-primary-foreground',
                   status === 'skipped' && 'bg-muted text-muted-foreground',
@@ -255,9 +255,9 @@ export function ProjectFinancialStepper({ projectId, isInternal, compact }: Proj
                 )}>
                   {status === 'done' ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
                 </div>
-                <span className="text-[10px] font-medium leading-tight text-center">{step.label}</span>
+                <span className="text-xs font-medium leading-tight text-center">{step.label}</span>
                 {dateVal && !compact && (
-                  <span className="text-[9px] text-muted-foreground">{formatDate(dateVal)}</span>
+                  <span className="text-[10px] text-muted-foreground">{formatDate(dateVal)}</span>
                 )}
               </button>
             </div>

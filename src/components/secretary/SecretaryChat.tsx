@@ -9,6 +9,7 @@ import ConversationSidebar from "./ConversationSidebar";
 import { parseAndRenderContent } from "./ActionRenderer";
 import { useLocation } from "react-router-dom";
 import { useDocumentParser } from "@/hooks/useDocumentParser";
+import { usePageContext } from "@/hooks/usePageContext";
 
 interface ChatMessage {
   role: "user" | "assistant";

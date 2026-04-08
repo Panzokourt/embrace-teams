@@ -3092,6 +3092,52 @@ export type Database = {
           },
         ]
       }
+      kb_article_links: {
+        Row: {
+          company_id: string
+          created_at: string
+          from_article_id: string
+          id: string
+          to_article_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          from_article_id: string
+          id?: string
+          to_article_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          from_article_id?: string
+          id?: string
+          to_article_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kb_article_links_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kb_article_links_from_article_id_fkey"
+            columns: ["from_article_id"]
+            isOneToOne: false
+            referencedRelation: "kb_articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kb_article_links_to_article_id_fkey"
+            columns: ["to_article_id"]
+            isOneToOne: false
+            referencedRelation: "kb_articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kb_article_versions: {
         Row: {
           article_id: string
@@ -3299,6 +3345,53 @@ export type Database = {
             columns: ["parent_id"]
             isOneToOne: false
             referencedRelation: "kb_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kb_raw_sources: {
+        Row: {
+          company_id: string
+          compiled: boolean
+          compiled_at: string | null
+          content: string
+          created_at: string
+          id: string
+          source_type: string
+          title: string
+          url: string | null
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          compiled?: boolean
+          compiled_at?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          source_type?: string
+          title: string
+          url?: string | null
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          compiled?: boolean
+          compiled_at?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          source_type?: string
+          title?: string
+          url?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kb_raw_sources_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]

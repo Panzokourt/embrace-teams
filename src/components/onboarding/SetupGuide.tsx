@@ -31,7 +31,7 @@ export default function SetupGuide() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button className="relative flex items-center gap-1.5 h-8 px-2.5 border border-primary/30 bg-primary/10 hover:bg-primary/20 transition-colors text-primary text-xs font-medium shrink-0 rounded-lg">
+        <button className="relative flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-primary/30 bg-primary/10 hover:bg-primary/20 transition-colors text-primary text-xs font-medium shrink-0">
           <Rocket className="h-3.5 w-3.5 shrink-0" />
           <span className="hidden md:inline">Setup</span>
           <span className="font-mono text-[10px] bg-primary/20 rounded px-1 py-0.5">

@@ -20,15 +20,17 @@ export function XPBadge({ userId, size = 'sm', showXP = false, className }: XPBa
   if (size === 'sm') {
     return (
       <span
-        className={cn("inline-flex items-center gap-1 rounded-full border font-bold border-border/50 px-[23px] text-sm my-0 py-[4px] bg-blue-600 text-primary-foreground",
+        className={cn("inline-flex items-center gap-1 rounded-full border px-2 text-[10px] font-bold border-border/50 bg-card py-[7px]",
+
+
         glowClass,
         className
         )}
         title={`Level ${level} — ${levelTitle} — ${totalXP} XP`}>
         
-        <Zap className="h-3 w-3 bg-transparent text-primary-foreground" />
+        <Zap className={cn("h-3 w-3 text-inherit bg-transparent", colorClass)} />
         <span className={colorClass}>{level}</span>
-        {showXP && <span className="font-normal ml-0.5 text-primary-foreground">{totalXP}</span>}
+        {showXP && <span className="text-muted-foreground font-normal ml-0.5">{totalXP}</span>}
       </span>);
 
   }

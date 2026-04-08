@@ -218,7 +218,7 @@ export default function AppSidebar({
       "flex flex-col items-center py-3 gap-1 shrink-0 w-12 shadow-none",
       isMobile ?
       "bg-card border-r border-border/30" :
-      "ml-2 rounded-2xl bg-[#1A1A1A] shadow-lg px-0 mx-[7px] py-[11px] my-[10px]"
+      "my-2 ml-2 rounded-2xl bg-[#1A1A1A] shadow-lg"
     )}
     style={!isMobile ? { height: 'calc(100% - 16px)' } : undefined}
     onMouseEnter={handleFlyoutEnter}

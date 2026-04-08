@@ -89,14 +89,15 @@ export function ProjectPLReport({ projectId, projectBudget, agencyFeePercentage 
         {Object.keys(pl.expensesByCategory).length > 0 && (
           <div className="space-y-3 pt-2">
             {Object.entries(pl.expensesByCategory)
-              .sort((a, b) => b[1] - a[1])
+              .sort((a, b) => (b[1] as number) - (a[1] as number))
               .map(([category, amount]) => {
-                const pct = pl.totalExpenses > 0 ? (amount / pl.totalExpenses) * 100 : 0;
+                const amt = amount as number;
+                const pct = pl.totalExpenses > 0 ? (amt / pl.totalExpenses) * 100 : 0;
                 return (
                   <div key={category} className="space-y-1">
                     <div className="flex justify-between text-xs">
                       <span>{category}</span>
-                      <span className="text-muted-foreground">{fmt(amount)} ({pct.toFixed(0)}%)</span>
+                      <span className="text-muted-foreground">{fmt(amt)} ({pct.toFixed(0)}%)</span>
                     </div>
                     <Progress value={pct} className="h-1.5" />
                   </div>

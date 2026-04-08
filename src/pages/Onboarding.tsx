@@ -52,10 +52,20 @@ export default function Onboarding() {
 
   // If user already has an active company role, redirect
   useEffect(() => {
-    if (companyRole) {
-      navigate('/', { replace: true });
-    }
-  }, [companyRole, navigate]);
+    if (!user || !companyRole) return;
+    // Check onboarding_completed from DB, not the Profile type
+    const checkComplete = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('onboarding_completed')
+        .eq('id', user.id)
+        .single();
+      if (data?.onboarding_completed) {
+        navigate('/', { replace: true });
+      }
+    };
+    checkComplete();
+  }, [companyRole, user, navigate]);
 
   // Auto-onboard check on mount
   useEffect(() => {

@@ -13,6 +13,7 @@ import { XPBadge } from '@/components/gamification/XPBadge';
 import { useLayout } from '@/contexts/LayoutContext';
 import { useTimeTracking } from '@/hooks/useTimeTracking';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import SetupGuide from '@/components/onboarding/SetupGuide';
 
 interface SearchResult {
   id: string;
@@ -206,6 +207,9 @@ export default function TopBar({ onPanelToggle, rightPanelOpen, onMobileMenuTogg
 
       {/* Right actions */}
       <div className="flex items-center gap-2 shrink-0">
+        {/* Setup Guide */}
+        <SetupGuide />
+
         {/* XP Badge — hide on mobile */}
         {!isMobile && <XPBadge userId={user?.id} size="sm" showXP={!isNarrow} />}
 

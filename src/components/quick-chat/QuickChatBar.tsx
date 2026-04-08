@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
+import { parseAndRenderContent } from '@/components/secretary/ActionRenderer';
 import { useLocation } from 'react-router-dom';
 import { useDocumentParser } from '@/hooks/useDocumentParser';
 
@@ -245,9 +246,10 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
     await supabase.from('secretary_messages').insert({ conversation_id: convId, role, content });
   };
 
-  const sendMessage = useCallback(async () => {
-    const text = input.trim();
+  const sendMessage = useCallback(async (overrideText?: string) => {
+    const text = (overrideText ?? input).trim();
     if ((!text && attachedFiles.length === 0) || loading) return;
+    if (overrideText) setInput('');
 
     const currentFiles = [...attachedFiles];
     const attachmentMeta = currentFiles.map(f => ({ name: f.name, type: f.type }));
@@ -470,7 +472,9 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
                   )}
                   {msg.role === 'assistant' ? (
                     <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:m-0 [&>ul]:m-0 [&>ol]:m-0">
-                      <ReactMarkdown>{getDisplayText(msg) || '...'}</ReactMarkdown>
+                      {parseAndRenderContent(getDisplayText(msg) || '...', (text) => sendMessage(text)).map((part, pi) =>
+                        typeof part === 'string' ? <ReactMarkdown key={pi}>{part}</ReactMarkdown> : <div key={pi}>{part}</div>
+                      )}
                     </div>
                   ) : (
                     <span>{getDisplayText(msg) || (msg.attachments ? '' : '...')}</span>
@@ -551,7 +555,7 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
               variant="ghost"
               size="icon"
               className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
-              onClick={sendMessage}
+              onClick={() => sendMessage()}
               disabled={!input.trim() && attachedFiles.length === 0}
             >
               <Send className="h-4 w-4" />

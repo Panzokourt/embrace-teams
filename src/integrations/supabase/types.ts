@@ -5431,46 +5431,66 @@ export type Database = {
       secretary_memory: {
         Row: {
           category: string
+          client_id: string | null
           company_id: string
           content: string
           created_at: string | null
           id: string
           key: string
           metadata: Json | null
+          project_id: string | null
           source_conversation_id: string | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
           category?: string
+          client_id?: string | null
           company_id: string
           content: string
           created_at?: string | null
           id?: string
           key: string
           metadata?: Json | null
+          project_id?: string | null
           source_conversation_id?: string | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
           category?: string
+          client_id?: string | null
           company_id?: string
           content?: string
           created_at?: string | null
           id?: string
           key?: string
           metadata?: Json | null
+          project_id?: string | null
           source_conversation_id?: string | null
           updated_at?: string | null
           user_id?: string
         }
         Relationships: [
           {
+            foreignKeyName: "secretary_memory_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "secretary_memory_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "secretary_memory_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
           {

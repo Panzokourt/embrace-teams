@@ -633,6 +633,55 @@ const toolDefinitions = [
       },
     },
   },
+  // ── WIKI & FILES TOOLS ──
+  {
+    type: "function",
+    function: {
+      name: "search_wiki",
+      description: "Search the company Knowledge Base (wiki) for articles about policies, procedures, know-how, or any documented knowledge. Use when the user asks about processes, guidelines, or information that may be documented.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Search query" },
+          tags: { type: "array", items: { type: "string" }, description: "Optional tag filters" },
+          limit: { type: "number", description: "Max results (default 10)" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "save_to_wiki",
+      description: "Save content as a Knowledge Base article. Use after analyzing files, generating insights, or when the user wants to document something. Creates a new article or updates an existing one.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Article title" },
+          body: { type: "string", description: "Article content in markdown. Use [[Page Title]] syntax for cross-references." },
+          tags: { type: "array", items: { type: "string" }, description: "Tags for categorization" },
+          existing_article_id: { type: "string", description: "If updating an existing article, provide its ID" },
+          article_type: { type: "string", enum: ["wiki", "policy", "how-to", "faq"], description: "Type of article (default: wiki)" },
+        },
+        required: ["title", "body"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_project_files",
+      description: "List files and folders for a specific project or folder. Use when the user asks about project documents or you need to understand what files exist.",
+      parameters: {
+        type: "object",
+        properties: {
+          project_id: { type: "string", description: "Project ID to list files for" },
+          folder_id: { type: "string", description: "Specific folder ID to list contents of" },
+        },
+      },
+    },
+  },
 ];
 
 // ── Tool execution ────────────────────────────────────────────────
@@ -1812,6 +1861,120 @@ Respond in Greek. Be thorough but concise.`;
         return { messages: data || [], count: (data || []).length };
       }
 
+      case "search_wiki": {
+        const limit = args.limit || 10;
+        let q = supabase
+          .from("kb_articles")
+          .select("id, title, body, tags, article_type, status, created_at")
+          .eq("company_id", companyId)
+          .neq("status", "deprecated")
+          .order("created_at", { ascending: false })
+          .limit(limit);
+
+        if (args.tags && args.tags.length > 0) {
+          q = q.overlaps("tags", args.tags);
+        }
+
+        // Search by title and body using ilike
+        if (args.query) {
+          q = q.or(`title.ilike.%${args.query}%,body.ilike.%${args.query}%`);
+        }
+
+        const { data, error } = await q;
+        if (error) throw error;
+
+        const articles = (data || []).map((a: any) => ({
+          id: a.id,
+          title: a.title,
+          snippet: a.body?.substring(0, 300) + (a.body?.length > 300 ? "..." : ""),
+          tags: a.tags || [],
+          type: a.article_type,
+          status: a.status,
+        }));
+
+        return { articles, count: articles.length };
+      }
+
+      case "save_to_wiki": {
+        if (args.existing_article_id) {
+          const { data, error } = await supabase
+            .from("kb_articles")
+            .update({
+              title: args.title,
+              body: args.body,
+              tags: args.tags || [],
+            })
+            .eq("id", args.existing_article_id)
+            .select("id, title")
+            .single();
+          if (error) throw error;
+          return { success: true, action: "updated", article: data };
+        } else {
+          const { data, error } = await supabase
+            .from("kb_articles")
+            .insert({
+              company_id: companyId,
+              title: args.title,
+              body: args.body,
+              tags: args.tags || [],
+              article_type: args.article_type || "wiki",
+              status: "draft",
+              visibility: "internal",
+              owner_id: userId,
+            })
+            .select("id, title")
+            .single();
+          if (error) throw error;
+          return { success: true, action: "created", article: data };
+        }
+      }
+
+      case "list_project_files": {
+        const results: any = {};
+
+        if (args.folder_id) {
+          // List contents of a specific folder
+          const [filesRes, subfoldersRes] = await Promise.all([
+            supabase
+              .from("file_attachments")
+              .select("id, file_name, file_size, content_type, created_at")
+              .eq("folder_id", args.folder_id)
+              .order("file_name")
+              .limit(50),
+            supabase
+              .from("file_folders")
+              .select("id, name")
+              .eq("parent_folder_id", args.folder_id)
+              .order("name"),
+          ]);
+          results.files = filesRes.data || [];
+          results.subfolders = subfoldersRes.data || [];
+        } else if (args.project_id) {
+          // List top-level folders and files for a project
+          const [foldersRes, filesRes] = await Promise.all([
+            supabase
+              .from("file_folders")
+              .select("id, name")
+              .eq("project_id", args.project_id)
+              .is("parent_folder_id", null)
+              .order("name"),
+            supabase
+              .from("file_attachments")
+              .select("id, file_name, file_size, content_type, created_at")
+              .eq("project_id", args.project_id)
+              .is("folder_id", null)
+              .order("file_name")
+              .limit(50),
+          ]);
+          results.folders = foldersRes.data || [];
+          results.root_files = filesRes.data || [];
+        } else {
+          return { error: "Provide project_id or folder_id" };
+        }
+
+        return results;
+      }
+
       default:
         return { error: `Unknown tool: ${toolName}` };
     }
@@ -2042,6 +2205,19 @@ Brain Integration:
 - Μπορείς να μετατρέψεις insight σε project/task (action_brain_insight)
 - Όταν παρουσιάζεις insight, πρότεινε actionable βήματα: "Θες να φτιάξω project/task γι' αυτό;"
 - Αν ο χρήστης ρωτά "τι ρίσκα βλέπεις", "ανάλυσε τον πελάτη Χ", "τι λέει το Brain" → χρησιμοποίησε τα Brain tools
+
+Wiki (Knowledge Base) Integration:
+- Αν ο χρήστης ρωτά για διαδικασίες, πολιτικές, know-how, οδηγίες → κάλεσε search_wiki ΠΡΩΤΑ πριν απαντήσεις
+- Αν ανεβάζει αρχείο → μετά την ανάλυση, πρότεινε "Θες να το αποθηκεύσω στο Wiki;" χρησιμοποιώντας save_to_wiki
+- Αν κάνεις Brain analysis ή βρεις insight → πρότεινε αποθήκευση στο Wiki για μόνιμη τεκμηρίωση
+- Αν δεν βρεθεί κάτι στο wiki → πρότεινε δημιουργία νέου article
+- Συνδύασε Brain insights + Wiki knowledge + Files context για ολοκληρωμένες απαντήσεις
+
+Files Integration:
+- Μπορείς να δεις αρχεία ενός project (list_project_files) για να δώσεις context
+- Μετά από file analysis, πρότεινε αποθήκευση στο Wiki (save_to_wiki)
+- Αν ο χρήστης ρωτά "τι αρχεία έχει το project X" → list_project_files
+- Συνδύασε file context + wiki context + brain insights για πληρέστερες απαντήσεις
 
 Smart Intake & Planning:
 - Αν ο χρήστης περιγράφει ένα αίτημα/project σε φυσική γλώσσα (π.χ. "θέλω καμπάνια SEO για τον πελάτη Χ, budget 5000€, 3 μήνες"), χρησιμοποίησε smart_project_plan

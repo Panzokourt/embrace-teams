@@ -298,10 +298,21 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
         content: m === userMsg ? messageContent : (typeof m.content === 'string' ? m.content : m.displayContent || ''),
       }));
 
-      setStatusMessage(null);
+      // Determine endpoint based on content size
+      const totalContentChars = Array.isArray(messageContent)
+        ? messageContent.filter((p: any) => p.type === 'text').reduce((sum: number, p: any) => sum + (p.text?.length || 0), 0)
+        : 0;
+      const useGemini = totalContentChars > 100000;
+      const endpoint = useGemini ? 'quick-chat-gemini' : 'secretary-agent';
+
+      if (useGemini) {
+        setStatusMessage('Χρήση Gemini για μεγάλο αρχείο...');
+      } else {
+        setStatusMessage(null);
+      }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/secretary-agent`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${endpoint}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

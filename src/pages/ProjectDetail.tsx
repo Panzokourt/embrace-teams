@@ -409,6 +409,16 @@ export default function ProjectDetailPage() {
           </TabsList>
 
           <TabsContent value="overview">
+            {/* Financial Lifecycle Mini Stepper */}
+            <Card className="mb-4">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Activity className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground">Οικονομικός Κύκλος</span>
+                </div>
+                <ProjectFinancialStepperMini projectId={project.id} isInternal={project.is_internal} />
+              </CardContent>
+            </Card>
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
               {/* ===== LEFT COLUMN (7) ===== */}
               <div className="lg:col-span-7 space-y-4">

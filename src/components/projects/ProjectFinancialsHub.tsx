@@ -226,6 +226,10 @@ export function ProjectFinancialsHub({
           </TabsTrigger>
         </TabsList>
 
+        <TabsContent value="lifecycle">
+          <ProjectFinancialStepper projectId={projectId} isInternal={isInternal} />
+        </TabsContent>
+
         <TabsContent value="overview">
           <BudgetOverview
             projectId={projectId}

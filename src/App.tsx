@@ -9,6 +9,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import Auth from "@/pages/Auth";
 import Dashboard from "@/pages/Dashboard";
 import MyWork from "@/pages/MyWork";
+import CommandCenter from "@/pages/CommandCenter";
 
 import Work from "@/pages/Work";
 import ProjectDetail from "@/pages/ProjectDetail";

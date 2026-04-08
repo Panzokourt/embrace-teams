@@ -2016,7 +2016,7 @@ serve(async (req) => {
     }
     const userId = claimsData.claims.sub;
 
-    const { messages, current_page } = await req.json();
+    const { messages, current_page, page_context } = await req.json();
 
     // Fetch user context in parallel
     const today = new Date().toISOString().split("T")[0];

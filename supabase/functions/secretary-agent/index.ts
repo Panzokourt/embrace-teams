@@ -1895,7 +1895,7 @@ serve(async (req) => {
         .limit(5),
       supabase
         .from("secretary_memory")
-        .select("category, key, content, updated_at")
+        .select("category, key, content, project_id, client_id, updated_at")
         .eq("user_id", userId)
         .eq("company_id", companyId)
         .order("updated_at", { ascending: false })

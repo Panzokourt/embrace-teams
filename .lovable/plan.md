@@ -1,98 +1,92 @@
 
 
-# Command Center — Gaming-Style, Role-Adaptive
+# Merge Command Center + My Work → Unified Page
 
-## Concept
+## Overview
 
-Αντικαθιστούμε τα 4 Dashboard sub-pages με ένα ενιαίο **Command Center** με gaming-inspired UI: hex/radial layouts, glowing cards, animated progress rings, streak counters, XP integration, και real-time pulse effects. Η σελίδα προσαρμόζεται αυτόματα ανάλογα με τον ρόλο (owner/admin/manager/member/viewer).
+Συγχωνεύουμε τις δύο σελίδες σε μία ενιαία στη θέση του My Work (`/`). Η σελίδα Command Center (`/command-center`) αφαιρείται. Κρατάμε τα gaming elements (XP ring, glowing cards, mission styling) και ενσωματώνουμε **όλα** τα features του My Work (projects, calendar, approvals, time tracking, quick notes, task side panel).
 
-## UI Design — Gaming Elements
+## Τι κρατάμε από κάθε σελίδα
+
+**Από Command Center (gaming UI)**:
+- CCHeroZone (XP ring, streak, greeting) → αντικαθιστά το απλό header του MyWork
+- CCMissionCards (glowing KPI cards) → αντικαθιστά τα plain badge KPIs
+- CCTeamRadar + CCIntelFeed (admin/manager only panels)
+- CCQuickActions (floating action bar)
+- Gaming styling (glow borders, scan-lines, mission terminology)
+
+**Από My Work (productivity features)**:
+- Projects view + Calendar view toggle
+- TodayTasksCard
+- Expandable project rows με tasks/deliverables
+- Approvals section (sent + need approval)
+- Time tracking widget με active timer
+- QuickNotes
+- TaskSidePanel (docked side panel)
+- Task completion, review approve/reject actions
+
+## Τι συγχωνεύεται (overlapping)
+
+| Feature | CC version | MyWork version | Merged |
+|---------|-----------|----------------|--------|
+| Greeting + name | CCHeroZone | Header greeting | CCHeroZone (gaming) |
+| Tasks count KPI | MissionCard | Badge chip | MissionCard (glowing) |
+| Hours today | StatPill | Badge chip | CCHeroZone StatPill |
+| Overdue count | MissionCard | Badge chip | MissionCard |
+| Active timer | — | Time Tracking Card | Keep MyWork version (functional) |
+| Task list | CCActiveMissions (simple) | TodayTasksCard + Projects (rich) | Keep MyWork versions (more functional) |
+
+## Νέα δομή σελίδας
 
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│  ⚡ COMMAND CENTER          [Greeting + Level Badge + Streak]│
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌─── HERO ZONE ────────────────────────────────────────┐  │
-│  │  XP Progress Ring (animated)  │  Daily Streak 🔥      │  │
-│  │  Level title + glow           │  Tasks completed today │  │
-│  │  "12 XP μέχρι το Level 6"    │  Hours logged          │  │
-│  └──────────────────────────────────────────────────────┘  │
-│                                                             │
-│  ┌─── MISSION CARDS (hex-grid style) ───────────────────┐  │
-│  │  ╔══════╗  ╔══════╗  ╔══════╗  ╔══════╗              │  │
-│  │  ║ Rev  ║  ║ Proj ║  ║ Tasks║  ║ Over ║  (role-based)│  │
-│  │  ║ €12k ║  ║  8   ║  ║  23  ║  ║  2!  ║              │  │
-│  │  ╚══════╝  ╚══════╝  ╚══════╝  ╚══════╝              │  │
-│  │  Glow border based on health (green/amber/red)        │  │
-│  └──────────────────────────────────────────────────────┘  │
-│                                                             │
-│  ┌─── PANELS (2-3 columns) ─────────────────────────────┐  │
-│  │  [Active Missions]     │  [Team Radar]                │  │
-│  │  My tasks as quest list│  Workload heatmap / bars     │  │
-│  │  with XP rewards shown │  (admin/manager only)        │  │
-│  │                        │                              │  │
-│  │  [Pipeline Funnel]     │  [AI Intel Feed]             │  │
-│  │  (owner only)          │  Brain insights + activity   │  │
-│  └──────────────────────────────────────────────────────┘  │
-│                                                             │
-│  ┌─── QUICK ACTIONS BAR (floating, bottom) ─────────────┐  │
-│  │  [+ Task]  [+ Project]  [Start Timer]  [Secretary]    │  │
-│  └──────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│  CCHeroZone (XP ring, streak, greeting, stat pills) │
+├─────────────────────────────────────────────────────┤
+│  CCMissionCards (glowing KPIs, role-filtered)        │
+├─────────────────────────────────────────────────────┤
+│  [Projects/Calendar toggle]                          │
+│  ┌──────────────────┬────────────────────┐          │
+│  │ TodayTasksCard   │ Active Projects    │          │
+│  │ (or Calendar)    │ (expandable rows)  │          │
+│  └──────────────────┴────────────────────┘          │
+├─────────────────────────────────────────────────────┤
+│  ┌──────────────────┬────────────────────┐          │
+│  │ Approvals        │ Time Tracking      │          │
+│  └──────────────────┴────────────────────┘          │
+├─────────────────────────────────────────────────────┤
+│  [TeamRadar + IntelFeed] (admin/manager only)        │
+├─────────────────────────────────────────────────────┤
+│  QuickNotes                                          │
+├─────────────────────────────────────────────────────┤
+│  CCQuickActions (floating bar)                       │
+└─────────────────────────────────────────────────────┘
+                                        ┌─────────────┐
+                                        │ TaskSidePanel│
+                                        │ (docked)     │
+                                        └─────────────┘
 ```
 
-## Gaming UI Details
+## Changes
 
-- **Hero Zone**: Animated SVG ring (XP progress), pulsing glow ανάλογα με level, streak counter με 🔥 animation
-- **Mission Cards (KPIs)**: Cards με glowing borders (green=healthy, amber=warning, red=critical), subtle hover scale effect, icon pulse animation
-- **Active Missions**: Tasks σαν "quests" — δείχνουν estimated XP reward, priority badge σαν difficulty tier (Easy/Medium/Hard/Epic)
-- **Team Radar** (admin/manager): Horizontal bars ή mini avatars με workload percentage, color-coded
-- **AI Intel Feed**: Brain insights + recent activity σαν "intel reports", dark-themed cards με scan-line effect
-- **Quick Actions**: Floating bar, pill-shaped buttons με glow hover
-
-## Role-Based Visibility
-
-| Component | Owner/Admin | Manager | Member | Viewer/Client |
-|-----------|:-----------:|:-------:|:------:|:-------------:|
-| Hero Zone (XP/Streak) | ✓ | ✓ | ✓ | - |
-| KPI: Revenue, Pipeline | ✓ | ✓ | - | - |
-| KPI: My Tasks, Overdue | ✓ | ✓ | ✓ | - |
-| KPI: Active Projects | ✓ | ✓ | ✓ | ✓ |
-| Panel: Active Missions | ✓ | ✓ | ✓ | - |
-| Panel: Team Radar | ✓ | ✓ | - | - |
-| Panel: Pipeline Funnel | ✓ | - | - | - |
-| Panel: AI Intel | ✓ | ✓ | - | - |
-| Panel: Project Progress | ✓ | ✓ | ✓ | ✓ |
-| Quick: +Project, +Client | ✓ | ✓ | - | - |
-| Quick: +Task, Timer | ✓ | ✓ | ✓ | - |
-
-## Data Sources
-
-Χρησιμοποιεί τα ίδια queries με το υπάρχον Dashboard.tsx (invoices, projects, tasks, time_entries, tenders) + useUserXP hook για gamification data.
-
-## Sidebar Change
-
-Η κατηγορία `overview` αλλάζει από 4 sub-items σε 1:
-```
-overview: [
-  { title: 'Command Center', href: '/command-center', icon: Radar }
-]
-```
-
-## Files
-
-| File | Αλλαγή |
+| File | Change |
 |------|--------|
-| `src/pages/CommandCenter.tsx` | Νέο — orchestrator, data fetching, role-based layout |
-| `src/components/command-center/CCHeroZone.tsx` | Νέο — animated XP ring, streak, level display |
-| `src/components/command-center/CCMissionCards.tsx` | Νέο — glowing KPI cards grid |
-| `src/components/command-center/CCActiveMissions.tsx` | Νέο — task list as quests with XP rewards |
-| `src/components/command-center/CCTeamRadar.tsx` | Νέο — team workload visualization |
-| `src/components/command-center/CCIntelFeed.tsx` | Νέο — AI insights + activity feed |
-| `src/components/command-center/CCQuickActions.tsx` | Νέο — floating action bar |
-| `src/components/layout/AppSidebar.tsx` | Αλλαγή overview category → 1 item "Command Center" |
-| `src/App.tsx` | Route `/command-center`, redirect `/dashboards/*` → `/command-center`, default `/` → CommandCenter |
+| `src/pages/MyWork.tsx` | Replace header section with CCHeroZone + CCMissionCards. Add CCTeamRadar, CCIntelFeed, CCQuickActions (role-filtered). Import role flags from useAuth. Keep all existing productivity features intact. |
+| `src/App.tsx` | Remove `/command-center` route + dashboard redirects. Redirect `/command-center` → `/` |
+| `src/components/layout/AppSidebar.tsx` | Remove `overview` category entirely (Command Center disappears as separate nav). My Work icon at `/` remains the single entry point. |
+| `src/pages/CommandCenter.tsx` | Keep file but no longer routed (can delete later) |
+| `src/components/command-center/CCActiveMissions.tsx` | No longer used (MyWork has richer task views) |
+| `src/components/command-center/CCHeroZone.tsx` | Minor: pass tasksCompletedToday from MyWork data instead of CC data |
+| `src/components/command-center/CCMissionCards.tsx` | No changes, reused as-is |
 
-Dashboard.tsx **δεν διαγράφεται** — αφαιρείται μόνο από routes (εύκολη επαναφορά).
+## KPI Data Mapping
+
+The CCMissionCards needs pipeline/winRate data that MyWork doesn't currently fetch. We add a lightweight projects query (already done in CC) to the MyWork fetchAll:
+
+```typescript
+// Add to fetchAll:
+const allProjectsRes = await supabase.from('projects').select('id, status, budget');
+// Calculate pipelineValue, winRate, activeProjects count from this
+```
+
+CCHeroZone gets `tasksCompletedToday` from a count of completed tasks today (add query) and `hoursToday` from existing `todayHours`.
 

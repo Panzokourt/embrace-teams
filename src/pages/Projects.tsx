@@ -537,23 +537,36 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
     />
   );
 
+  const projectKanbanColumns = [
+    { id: 'lead' as ProjectStatus, label: 'Lead', icon: <Circle className="h-5 w-5" />, color: 'hsl(210, 80%, 55%)' },
+    { id: 'proposal' as ProjectStatus, label: 'Πρόταση', icon: <AlertCircle className="h-5 w-5" />, color: 'hsl(38, 92%, 50%)' },
+    { id: 'negotiation' as ProjectStatus, label: 'Διαπραγμάτευση', icon: <Handshake className="h-5 w-5" />, color: 'hsl(25, 95%, 53%)' },
+    { id: 'active' as ProjectStatus, label: 'Ενεργό', icon: <Clock className="h-5 w-5" />, color: 'hsl(142, 71%, 45%)' },
+    { id: 'completed' as ProjectStatus, label: 'Ολοκληρώθηκε', icon: <CheckCircle2 className="h-5 w-5" />, color: 'hsl(var(--foreground))' },
+  ];
+
   const renderKanbanView = () => (
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
-      <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        {statuses.map((status, columnIndex) => (
-          <div key={status} className="space-y-3 animate-fade-in" style={{ animationDelay: `${columnIndex * 50}ms` }}>
-            <div className="flex items-center justify-between px-1">
-              {getStatusBadge(status)}
-              <span className="text-xs font-medium text-muted-foreground/60 bg-secondary/50 px-2 py-0.5 rounded-full">{projectsByStatus[status].length}</span>
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        {projectKanbanColumns.map(column => (
+          <div key={column.id} className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span style={{ color: column.color }}>{column.icon}</span>
+              <h3 className="font-semibold text-sm" style={{ color: column.color }}>
+                {column.label}
+              </h3>
+              <Badge variant="secondary" className="text-xs min-w-[22px] justify-center">
+                {projectsByStatus[column.id]?.length || 0}
+              </Badge>
             </div>
-            <DroppableColumn id={status} items={projectsByStatus[status].map(p => p.id)}>
-              <div className="space-y-3 min-h-[200px]">
-                {projectsByStatus[status].map(project => (
+            <DroppableColumn id={column.id} items={(projectsByStatus[column.id] || []).map(p => p.id)}>
+              <div className="space-y-2.5">
+                {(projectsByStatus[column.id] || []).map(project => (
                   <DraggableCard key={project.id} id={project.id}><ProjectCard project={project} /></DraggableCard>
                 ))}
-                {projectsByStatus[status].length === 0 && (
-                  <div className="border-2 border-dashed border-border/30 rounded-xl p-6 text-center transition-colors hover:border-border/50 hover:bg-secondary/20">
-                    <p className="text-xs text-muted-foreground/50">Σύρετε εδώ</p>
+                {(projectsByStatus[column.id] || []).length === 0 && (
+                  <div className="border border-dashed rounded-lg p-4 text-center text-muted-foreground text-sm">
+                    Σύρετε εδώ
                   </div>
                 )}
               </div>

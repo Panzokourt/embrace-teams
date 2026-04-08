@@ -1,75 +1,78 @@
 
 
-# Αναβάθμιση Secretary Main Page — Claude-style UI + Drag & Drop + Memory
+# Security Hardening — Fix All Findings
 
-## Τι αλλάζει
+## Findings Summary
 
-Η σελίδα `/secretary` θα αποκτήσει Claude-style UI (βάσει του screenshot) με:
-1. Κεντρικό greeting "Καλημέρα, [Όνομα]" με μεγαλύτερο, πιο καθαρό design
-2. Input bar στυλ Claude — rounded, με `+` κουμπί για αρχεία και paperclip
-3. Quick action chips κάτω από το input (Write, Learn, Code style)
-4. **Drag & drop αρχείων** (ίδια λογική με QuickChatBar)
-5. **File parsing** (PDF, DOCX, images, text) — ίδια λογική με QuickChatBar
-6. **AI Memory tab** στο sidebar (ήδη υπάρχει στο SecretaryPanel, θα προστεθεί link/πρόσβαση)
+| # | Finding | Severity | Fix |
+|---|---------|----------|-----|
+| 1 | `comment_attachments` SELECT open to all | error | Restrict via project access check |
+| 2 | `realtime.messages` no RLS | error | Cannot modify realtime schema (Supabase-reserved) — mitigate via documentation note |
+| 3 | `brain_insights` INSERT open to public | error | **Already fixed** — only `service_role` can insert. Scanner finding is stale. |
+| 4 | `chat-attachments` bucket open SELECT | error | **Already fixed** — policy checks `is_chat_channel_member`. Scanner finding is stale. |
+| 5 | `is_company_admin()` missing `status='active'` | warn | Add the check |
+| 6 | Leaked Password Protection disabled | warn | Enable via Cloud UI (manual step) |
+| 7 | Functions missing `search_path` | warn | Fix 4 email queue functions |
 
-## Αλλαγές
+## Actual Changes Needed
 
-### `src/components/secretary/SecretaryChat.tsx`
-Κύριο refactor:
+### Migration 1: Fix `comment_attachments` SELECT policy
 
-**Input area:**
-- Αντικατάσταση του MentionInput με νέο Claude-style input container
-- Προσθήκη `+` button (ή paperclip) για file attachment
-- Hidden `<input type="file" multiple>` trigger
-- File chips row (ίδιο με QuickChatBar) πάνω από το input
-- Drag & drop handlers σε ολόκληρο το chat area (dragEnter/Leave/Over/Drop)
-- Drop overlay indicator ("Σύρε αρχεία εδώ")
+Replace the `USING (true)` policy with one that checks project access via the `comments` table:
 
-**File processing:**
-- Import `useDocumentParser` hook
-- Νέα function `processFilesForMessage()` (αντιγραφή λογικής από QuickChatBar)
-- Multimodal content building (text parts + image base64 blocks)
-- Routing: αν content > 100K chars → `quick-chat-gemini`, αλλιώς `secretary-agent`
+```sql
+DROP POLICY "Authenticated users can view comment attachments" ON public.comment_attachments;
 
-**Empty state redesign (Claude-style):**
-- Μεγάλος τίτλος "Καλημέρα, [name]" κεντραρισμένο
-- Input bar κεντρικά κάτω από τον τίτλο
-- Quick action chips σε row: 📋 Tasks, 🎯 Plan, 📝 Brief, 🚀 Project, ☀️ Briefing
-
-**Greeting:**
-- Δυναμικό greeting βάσει ώρας: Καλημέρα / Καλησπέρα / Καληνύχτα
-
-### `src/components/secretary/ConversationSidebar.tsx`
-- Προσθήκη κουμπιού "🧠 AI Μνήμη" στο κάτω μέρος του sidebar
-- Κλικ ανοίγει modal/panel με το `MemoryManager` component
-
-### `src/pages/Secretary.tsx`
-- Προσθήκη state για Memory Manager modal
-- Render `MemoryManager` ως overlay/dialog
-
-## Τεχνική λεπτομέρεια
-
-**Drag & drop** — ίδιο pattern με QuickChatBar:
-```text
-dragCounter ref → dragEnter increments, dragLeave decrements
-dragging state → shows drop overlay
-handleDrop → adds files to attachedFiles[]
-processFilesForMessage() → converts to multimodal content parts
+CREATE POLICY "Users can view comment attachments via project access"
+ON public.comment_attachments FOR SELECT TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.comments c
+    WHERE c.id = comment_attachments.comment_id
+    AND (
+      has_project_access(auth.uid(), c.project_id)
+      OR c.user_id = auth.uid()
+    )
+  )
+);
 ```
 
-**Routing logic** (ίδιο με QuickChatBar):
-```text
-totalContentChars > 100K → quick-chat-gemini (Gemini 2.5 Pro)
-else → secretary-agent (Claude + tools)
+### Migration 2: Fix `is_company_admin()` — add `AND status = 'active'`
+
+```sql
+CREATE OR REPLACE FUNCTION public.is_company_admin(_user_id uuid, _company_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_company_roles
+    WHERE user_id = _user_id
+    AND company_id = _company_id
+    AND role IN ('owner', 'super_admin', 'admin')
+    AND status = 'active'
+  )
+$$;
 ```
 
-**Memory access** — νέο κουμπί Brain icon στο ConversationSidebar footer, ανοίγει Dialog με MemoryManager.
+### Migration 3: Fix 4 email queue functions — set `search_path`
+
+Add `SET search_path = public` to `enqueue_email`, `read_email_batch`, `delete_email`, `move_to_dlq`.
+
+### Realtime.messages — Cannot Fix via Migration
+
+The `realtime` schema is **Supabase-reserved** — we cannot create policies on it via migrations. Supabase Realtime authorization is handled differently (via RLS on the source tables being published, which we already have). This finding is a false positive for our architecture since all published tables have proper RLS.
+
+### Leaked Password Protection
+
+This is a Cloud UI setting. I'll note the manual step for the user.
+
+### Already Fixed (No Action)
+
+- **brain_insights INSERT**: Already restricted to `service_role` only
+- **chat-attachments SELECT**: Already checks `is_chat_channel_member` via join
 
 ## Files
 
-| File | Αλλαγή |
+| File | Change |
 |------|--------|
-| `src/components/secretary/SecretaryChat.tsx` | Claude-style UI, drag & drop, file attachments, multimodal messages, Gemini routing |
-| `src/components/secretary/ConversationSidebar.tsx` | Προσθήκη Memory button |
-| `src/pages/Secretary.tsx` | Memory Manager dialog state |
+| Migration | 3 SQL statements: fix comment_attachments SELECT, fix is_company_admin, fix email functions search_path |
 

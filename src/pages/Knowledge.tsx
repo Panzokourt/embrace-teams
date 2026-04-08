@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useKnowledgeBase } from '@/hooks/useKnowledgeBase';
+import { useKBCompiler } from '@/hooks/useKBCompiler';
 import { KBSearchBar } from '@/components/knowledge/KBSearchBar';
 import { KBCategoryTree } from '@/components/knowledge/KBCategoryTree';
 import { KBArticleCard } from '@/components/knowledge/KBArticleCard';
@@ -7,6 +8,10 @@ import { KBArticleEditor } from '@/components/knowledge/KBArticleEditor';
 import { KBCategoryManager } from '@/components/knowledge/KBCategoryManager';
 import { KBReviewQueue } from '@/components/knowledge/KBReviewQueue';
 import { KBTemplateCard } from '@/components/knowledge/KBTemplateCard';
+import { KBSourceUploader } from '@/components/knowledge/KBSourceUploader';
+import { KBSourceList } from '@/components/knowledge/KBSourceList';
+import { KBAskChat } from '@/components/knowledge/KBAskChat';
+import { KBHealthCheck } from '@/components/knowledge/KBHealthCheck';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,10 +21,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Plus, BookOpen, FileText, AlertTriangle, Archive, FileStack, ClipboardCheck } from 'lucide-react';
+import { Plus, BookOpen, FileText, AlertTriangle, Archive, FileStack, ClipboardCheck, Download, MessageCircleQuestion, Activity } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { KBArticle } from '@/hooks/useKnowledgeBase';
+import type { HealthReport } from '@/hooks/useKBCompiler';
 
 export default function Knowledge() {
   const navigate = useNavigate();
@@ -32,10 +38,17 @@ export default function Knowledge() {
     createTemplate, useTemplate,
   } = useKnowledgeBase();
 
+  const {
+    sources, createSource, deleteSource, compileSource,
+    askWiki, askAnswer, askLoading,
+    healthCheck,
+  } = useKBCompiler();
+
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editArticle, setEditArticle] = useState<KBArticle | null>(null);
+  const [healthReport, setHealthReport] = useState<HealthReport | null>(null);
 
   // Template creation
   const [tplCreateOpen, setTplCreateOpen] = useState(false);
@@ -97,12 +110,19 @@ export default function Knowledge() {
     return list;
   }, [templates, search]);
 
+  const totalWords = useMemo(() =>
+    articles.filter(a => a.status !== 'deprecated').reduce((sum, a) => sum + (a.body?.split(/\s+/).length || 0), 0),
+    [articles]
+  );
+
   const stats = useMemo(() => ({
     total: articles.length,
     drafts: articles.filter(a => a.status === 'draft').length,
     pendingReview: articles.filter(a => a.next_review_date && new Date(a.next_review_date) <= new Date() && a.status !== 'deprecated').length,
     deprecated: articles.filter(a => a.status === 'deprecated').length,
-  }), [articles]);
+    sources: sources.length,
+    totalWords,
+  }), [articles, sources, totalWords]);
 
   const recentArticles = useMemo(() =>
     [...articles].filter(a => a.status !== 'deprecated').sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 6),
@@ -120,6 +140,11 @@ export default function Knowledge() {
     setTplCreateOpen(false);
   };
 
+  const handleRunHealth = async () => {
+    const result = await healthCheck.mutateAsync();
+    setHealthReport(result);
+  };
+
   return (
     <div className="page-shell">
       <PageHeader
@@ -134,17 +159,17 @@ export default function Knowledge() {
               <Button onClick={() => setTplCreateOpen(true)} className="gap-1">
                 <Plus className="h-4 w-4" /> Νέο Template
               </Button>
-            ) : (
+            ) : activeTab !== 'sources' && activeTab !== 'ask' && activeTab !== 'health' ? (
               <Button onClick={() => setEditorOpen(true)} className="gap-1">
                 <Plus className="h-4 w-4" /> Νέο Άρθρο
               </Button>
-            )}
+            ) : null}
           </div>
         }
       />
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 wide:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 wide:grid-cols-6 gap-4">
         <Card><CardContent className="p-4 text-center">
           <FileText className="h-5 w-5 mx-auto text-primary mb-1" />
           <p className="text-2xl font-bold">{stats.total}</p>
@@ -165,6 +190,16 @@ export default function Knowledge() {
           <p className="text-2xl font-bold">{stats.deprecated}</p>
           <p className="text-xs text-muted-foreground">Αρχειοθετημένα</p>
         </CardContent></Card>
+        <Card><CardContent className="p-4 text-center">
+          <Download className="h-5 w-5 mx-auto text-primary mb-1" />
+          <p className="text-2xl font-bold">{stats.sources}</p>
+          <p className="text-xs text-muted-foreground">Πηγές</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-4 text-center">
+          <BookOpen className="h-5 w-5 mx-auto text-primary mb-1" />
+          <p className="text-2xl font-bold">{stats.totalWords.toLocaleString()}</p>
+          <p className="text-xs text-muted-foreground">Λέξεις Wiki</p>
+        </CardContent></Card>
       </div>
 
       {/* Tabs */}
@@ -177,10 +212,19 @@ export default function Knowledge() {
             <BookOpen className="h-3.5 w-3.5" /> Playbook
           </TabsTrigger>
           <TabsTrigger value="templates" className="gap-1.5">
-            <FileStack className="h-3.5 w-3.5" /> Templates & SOPs
+            <FileStack className="h-3.5 w-3.5" /> Templates
           </TabsTrigger>
           <TabsTrigger value="reviews" className="gap-1.5">
-            <ClipboardCheck className="h-3.5 w-3.5" /> Review Queue
+            <ClipboardCheck className="h-3.5 w-3.5" /> Reviews
+          </TabsTrigger>
+          <TabsTrigger value="sources" className="gap-1.5">
+            <Download className="h-3.5 w-3.5" /> Πηγές
+          </TabsTrigger>
+          <TabsTrigger value="ask" className="gap-1.5">
+            <MessageCircleQuestion className="h-3.5 w-3.5" /> Ask Wiki
+          </TabsTrigger>
+          <TabsTrigger value="health" className="gap-1.5">
+            <Activity className="h-3.5 w-3.5" /> Health
           </TabsTrigger>
         </TabsList>
 
@@ -249,6 +293,40 @@ export default function Knowledge() {
             onApprove={(id) => updateArticle.mutate({ id, status: 'approved' })}
             onDeprecate={(id) => deleteArticle.mutate(id)}
             onSelect={(article) => setEditArticle(article)}
+          />
+        </TabsContent>
+
+        {/* Sources Tab */}
+        <TabsContent value="sources" className="space-y-4 mt-4">
+          <div className="grid lg:grid-cols-[1fr_350px] gap-6">
+            <KBSourceList
+              sources={sources}
+              onCompile={(id) => compileSource.mutate(id)}
+              onDelete={(id) => deleteSource.mutate(id)}
+              compilingId={compileSource.isPending ? (compileSource.variables as string) : undefined}
+            />
+            <KBSourceUploader
+              onSubmit={(data) => createSource.mutate(data)}
+              isLoading={createSource.isPending}
+            />
+          </div>
+        </TabsContent>
+
+        {/* Ask Wiki Tab */}
+        <TabsContent value="ask" className="mt-4">
+          <Card>
+            <CardContent className="p-0">
+              <KBAskChat onAsk={askWiki} answer={askAnswer} isLoading={askLoading} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Health Check Tab */}
+        <TabsContent value="health" className="space-y-4 mt-4">
+          <KBHealthCheck
+            report={healthReport}
+            onRun={handleRunHealth}
+            isLoading={healthCheck.isPending}
           />
         </TabsContent>
       </Tabs>

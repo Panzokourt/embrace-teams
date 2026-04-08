@@ -1,24 +1,65 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useKnowledgeBase } from '@/hooks/useKnowledgeBase';
+import { useKBCompiler } from '@/hooks/useKBCompiler';
 import { KBArticleEditor } from '@/components/knowledge/KBArticleEditor';
 import { KBVersionHistory } from '@/components/knowledge/KBVersionHistory';
+import { KBBacklinks } from '@/components/knowledge/KBBacklinks';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Edit, Archive, Eye, Calendar, Tag, Link as LinkIcon } from 'lucide-react';
+import { ArrowLeft, Edit, Archive, Eye, Calendar, Tag, Link as LinkIcon, Hash } from 'lucide-react';
 import { format } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
+import type { Components } from 'react-markdown';
 
 export default function KnowledgeArticle() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { articles, categories, updateArticle, deleteArticle, useArticleVersions } = useKnowledgeBase();
+  const { useArticleBacklinks } = useKBCompiler();
   const [editorOpen, setEditorOpen] = useState(false);
 
   const article = useMemo(() => articles.find(a => a.id === id), [articles, id]);
   const versionsQuery = useArticleVersions(id || '');
+  const backlinksQuery = useArticleBacklinks(id || '');
   const category = article?.category_id ? categories.find(c => c.id === article.category_id) : null;
+
+  const wordCount = useMemo(() => article?.body?.split(/\s+/).filter(Boolean).length || 0, [article?.body]);
+
+  // Custom markdown renderer for [[wiki-links]]
+  const wikiLinkComponents: Components = useMemo(() => ({
+    p: ({ children, ...props }) => {
+      if (typeof children === 'string') {
+        const parts = children.split(/(\[\[.*?\]\])/g);
+        return (
+          <p {...props}>
+            {parts.map((part, i) => {
+              const match = part.match(/^\[\[(.*?)\]\]$/);
+              if (match) {
+                const linkTitle = match[1];
+                const linkedArticle = articles.find(a => a.title.toLowerCase() === linkTitle.toLowerCase());
+                if (linkedArticle) {
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => navigate(`/knowledge/articles/${linkedArticle.id}`)}
+                      className="text-primary underline underline-offset-2 hover:text-primary/80"
+                    >
+                      {linkTitle}
+                    </button>
+                  );
+                }
+                return <span key={i} className="text-muted-foreground italic">{linkTitle}</span>;
+              }
+              return <span key={i}>{part}</span>;
+            })}
+          </p>
+        );
+      }
+      return <p {...props}>{children}</p>;
+    },
+  }), [articles, navigate]);
 
   if (!article) {
     return (
@@ -65,7 +106,7 @@ export default function KnowledgeArticle() {
 
           <Card>
             <CardContent className="p-6 prose prose-sm dark:prose-invert max-w-none">
-              <ReactMarkdown>{article.body}</ReactMarkdown>
+              <ReactMarkdown components={wikiLinkComponents}>{article.body}</ReactMarkdown>
             </CardContent>
           </Card>
         </div>
@@ -84,6 +125,10 @@ export default function KnowledgeArticle() {
               <div className="flex items-center gap-2">
                 <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
                 <span>Updated: {format(new Date(article.updated_at), 'dd/MM/yyyy')}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Hash className="h-3.5 w-3.5 text-muted-foreground" />
+                <span>{wordCount.toLocaleString()} λέξεις</span>
               </div>
               {article.next_review_date && (
                 <div className="flex items-center gap-2">
@@ -110,6 +155,9 @@ export default function KnowledgeArticle() {
               )}
             </CardContent>
           </Card>
+
+          {/* Backlinks */}
+          <KBBacklinks backlinks={backlinksQuery.data || []} isLoading={backlinksQuery.isLoading} />
 
           <Card>
             <CardHeader className="pb-3"><CardTitle className="text-sm">Ιστορικό Εκδόσεων</CardTitle></CardHeader>

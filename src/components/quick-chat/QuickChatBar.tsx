@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
+import { parseAndRenderContent } from '@/components/secretary/ActionRenderer';
 import { useLocation } from 'react-router-dom';
 import { useDocumentParser } from '@/hooks/useDocumentParser';
 

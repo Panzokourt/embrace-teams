@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, X, MessageSquarePlus, Loader2, Bot } from 'lucide-react';
+import { Send, X, MessageSquarePlus, Loader2, Bot, Paperclip, FileText, Image as ImageIcon, File as FileIcon, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,15 +7,32 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import { useLocation } from 'react-router-dom';
+import { useDocumentParser } from '@/hooks/useDocumentParser';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
-  content: string;
+  content: string | any[];
+  displayContent?: string;
+  attachments?: { name: string; type: string }[];
 }
 
 interface QuickChatBarProps {
   isOpen: boolean;
   onToggle: () => void;
+}
+
+const TEXT_EXTENSIONS = ['txt', 'csv', 'json', 'xml', 'md', 'log', 'yaml', 'yml', 'toml'];
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
+function getFileIcon(file: File) {
+  if (IMAGE_TYPES.includes(file.type)) return <ImageIcon className="h-3 w-3" />;
+  if (file.type === 'application/pdf') return <FileText className="h-3 w-3" />;
+  if (file.type.includes('spreadsheet') || file.name.endsWith('.csv') || file.name.endsWith('.xlsx')) return <FileSpreadsheet className="h-3 w-3" />;
+  return <FileIcon className="h-3 w-3" />;
+}
+
+function getExtension(name: string) {
+  return name.split('.').pop()?.toLowerCase() || '';
 }
 
 export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
@@ -27,9 +44,15 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [dragging, setDragging] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragCounterRef = useRef(0);
+
+  const { parseFiles } = useDocumentParser();
 
   // Auto-scroll
   useEffect(() => {
@@ -77,6 +100,125 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
     return () => document.removeEventListener('mousedown', handler);
   }, [isOpen, onToggle]);
 
+  // Drag & drop handlers
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (e.dataTransfer.types.includes('Files')) {
+      setDragging(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setDragging(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+    setDragging(false);
+    const droppedFiles = Array.from(e.dataTransfer.files);
+    if (droppedFiles.length > 0) {
+      setAttachedFiles(prev => [...prev, ...droppedFiles].slice(0, 10));
+    }
+  }, []);
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(e.target.files || []);
+    if (selected.length > 0) {
+      setAttachedFiles(prev => [...prev, ...selected].slice(0, 10));
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }, []);
+
+  const removeFile = useCallback((index: number) => {
+    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const processFilesForMessage = useCallback(async (files: File[]): Promise<any[]> => {
+    const contentParts: any[] = [];
+
+    for (const file of files) {
+      const ext = getExtension(file.name);
+
+      // Images → base64 vision blocks
+      if (IMAGE_TYPES.includes(file.type)) {
+        const arrayBuffer = await file.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        const base64 = btoa(binary);
+        contentParts.push({
+          type: 'image',
+          source: { type: 'base64', media_type: file.type, data: base64 },
+        });
+        continue;
+      }
+
+      // Plain text files → read directly
+      if (TEXT_EXTENSIONS.includes(ext) || file.type.startsWith('text/')) {
+        const text = await file.text();
+        contentParts.push({
+          type: 'text',
+          text: `📎 ${file.name}\n\n${text}`,
+        });
+        continue;
+      }
+
+      // PDFs & Office docs → use document parser
+      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf') ||
+          file.type.includes('word') || file.type.includes('presentation') ||
+          file.name.endsWith('.docx') || file.name.endsWith('.pptx')) {
+        try {
+          const parsed = await parseFiles([file]);
+          if (parsed.length > 0) {
+            contentParts.push({
+              type: 'text',
+              text: `📎 ${file.name} (${parsed[0].metadata.pagesProcessed || '?'} σελίδες, ${parsed[0].metadata.wordCount} λέξεις)\n\n${parsed[0].content}`,
+            });
+          }
+        } catch (err) {
+          console.error('Failed to parse file:', file.name, err);
+          contentParts.push({
+            type: 'text',
+            text: `📎 ${file.name} — Αποτυχία ανάγνωσης αρχείου`,
+          });
+        }
+        continue;
+      }
+
+      // Fallback: try reading as text
+      try {
+        const text = await file.text();
+        contentParts.push({
+          type: 'text',
+          text: `📎 ${file.name}\n\n${text}`,
+        });
+      } catch {
+        contentParts.push({
+          type: 'text',
+          text: `📎 ${file.name} — Μη αναγνώσιμο αρχείο`,
+        });
+      }
+    }
+
+    return contentParts;
+  }, [parseFiles]);
+
   const getOrCreateConversation = async (): Promise<string> => {
     if (conversationId) return conversationId;
     if (!user) throw new Error('Not authenticated');
@@ -104,19 +246,44 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
 
   const sendMessage = useCallback(async () => {
     const text = input.trim();
-    if (!text || loading) return;
-    const userMsg: ChatMessage = { role: 'user', content: text };
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
+    if ((!text && attachedFiles.length === 0) || loading) return;
+
+    const currentFiles = [...attachedFiles];
+    const attachmentMeta = currentFiles.map(f => ({ name: f.name, type: f.type }));
+
     setInput('');
+    setAttachedFiles([]);
     setLoading(true);
 
+    // Build display message immediately
+    const userMsg: ChatMessage = {
+      role: 'user',
+      content: text,
+      displayContent: text,
+      attachments: attachmentMeta.length > 0 ? attachmentMeta : undefined,
+    };
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
+
     try {
+      // Process files if any
+      let messageContent: string | any[];
+      if (currentFiles.length > 0) {
+        setStatusMessage('Ανάγνωση αρχείων...');
+        const fileParts = await processFilesForMessage(currentFiles);
+        if (text) {
+          fileParts.push({ type: 'text', text });
+        }
+        messageContent = fileParts;
+      } else {
+        messageContent = text;
+      }
+
       const convId = await getOrCreateConversation();
-      await saveMessage(convId, 'user', text);
+      await saveMessage(convId, 'user', text || `[${currentFiles.map(f => f.name).join(', ')}]`);
 
       if (messages.length === 0) {
-        const title = text.slice(0, 50) + (text.length > 50 ? '...' : '');
+        const title = (text || currentFiles[0]?.name || 'Quick Chat').slice(0, 50);
         await supabase.from('secretary_conversations').update({ title, updated_at: new Date().toISOString() }).eq('id', convId);
       }
 
@@ -124,13 +291,21 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
       const token = sessionData?.session?.access_token;
       if (!token) { toast.error('Πρέπει να είσαι συνδεδεμένος.'); setLoading(false); return; }
 
+      // Build messages payload — use content arrays for file messages
+      const payloadMessages = newMessages.map(m => ({
+        role: m.role,
+        content: m === userMsg ? messageContent : (typeof m.content === 'string' ? m.content : m.displayContent || ''),
+      }));
+
+      setStatusMessage(null);
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/secretary-agent`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({
-            messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+            messages: payloadMessages,
             current_page: location.pathname,
           }),
         }
@@ -202,14 +377,16 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
       toast.error('Σφάλμα επικοινωνίας.');
     } finally {
       setLoading(false);
+      setStatusMessage(null);
     }
-  }, [input, loading, messages, conversationId, user, location.pathname]);
+  }, [input, loading, messages, conversationId, user, location.pathname, attachedFiles, processFilesForMessage]);
 
   const startNewChat = useCallback(() => {
     setConversationId(null);
     setMessages([]);
     setInput('');
     setExpanded(false);
+    setAttachedFiles([]);
   }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -219,14 +396,38 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
     }
   };
 
+  const getDisplayText = (msg: ChatMessage): string => {
+    if (msg.displayContent) return msg.displayContent;
+    if (typeof msg.content === 'string') return msg.content;
+    // Extract text parts from array content
+    return (msg.content as any[])
+      .filter((p: any) => p.type === 'text')
+      .map((p: any) => p.text)
+      .join('\n');
+  };
+
   return (
     <div
       ref={containerRef}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
       className={cn(
         'fixed bottom-4 left-1/2 -translate-x-1/2 w-full max-w-2xl z-40 transition-all duration-300 ease-out px-4',
         isOpen ? 'translate-y-0 opacity-100 pointer-events-auto' : 'translate-y-8 opacity-0 pointer-events-none'
       )}
     >
+      {/* Drag overlay */}
+      {dragging && (
+        <div className="absolute inset-0 z-50 rounded-2xl border-2 border-dashed border-primary bg-primary/10 flex items-center justify-center backdrop-blur-sm">
+          <div className="text-primary font-medium text-sm flex items-center gap-2">
+            <Paperclip className="h-5 w-5" />
+            Άφησε αρχεία εδώ
+          </div>
+        </div>
+      )}
+
       <div className="bg-card border border-border/60 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-xl">
         {/* Messages area */}
         {expanded && messages.length > 0 && (
@@ -244,12 +445,23 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
                     ? 'bg-primary text-primary-foreground'
                     : 'text-foreground'
                 )}>
+                  {/* Attachment chips */}
+                  {msg.attachments && msg.attachments.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-1.5">
+                      {msg.attachments.map((att, j) => (
+                        <span key={j} className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-black/10 dark:bg-white/10">
+                          {IMAGE_TYPES.includes(att.type) ? <ImageIcon className="h-2.5 w-2.5" /> : <FileText className="h-2.5 w-2.5" />}
+                          {att.name.length > 20 ? att.name.slice(0, 17) + '...' : att.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   {msg.role === 'assistant' ? (
                     <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:m-0 [&>ul]:m-0 [&>ol]:m-0">
-                      <ReactMarkdown>{msg.content || '...'}</ReactMarkdown>
+                      <ReactMarkdown>{getDisplayText(msg) || '...'}</ReactMarkdown>
                     </div>
                   ) : (
-                    <span>{msg.content}</span>
+                    <span>{getDisplayText(msg) || (msg.attachments ? '' : '...')}</span>
                   )}
                 </div>
               </div>
@@ -262,6 +474,31 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
             )}
           </div>
         )}
+
+        {/* Attached files chips */}
+        {attachedFiles.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 px-4 pt-2">
+            {attachedFiles.map((file, i) => (
+              <span key={i} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-muted text-muted-foreground">
+                {getFileIcon(file)}
+                <span className="max-w-[120px] truncate">{file.name}</span>
+                <button onClick={() => removeFile(i)} className="ml-0.5 hover:text-foreground">
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={handleFileSelect}
+          accept=".pdf,.doc,.docx,.pptx,.txt,.csv,.json,.xml,.md,.log,.yaml,.yml,.jpg,.jpeg,.png,.webp,.gif,.xlsx"
+        />
 
         {/* Input area */}
         <div className="flex items-center gap-2 px-3 py-2.5">
@@ -276,6 +513,16 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
               <MessageSquarePlus className="h-4 w-4" />
             </Button>
           )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={loading}
+            title="Επισύναψη αρχείων"
+          >
+            <Paperclip className="h-4 w-4" />
+          </Button>
           <input
             ref={inputRef}
             value={input}
@@ -293,7 +540,7 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
               size="icon"
               className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
               onClick={sendMessage}
-              disabled={!input.trim()}
+              disabled={!input.trim() && attachedFiles.length === 0}
             >
               <Send className="h-4 w-4" />
             </Button>
@@ -309,9 +556,9 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
         </div>
 
         {/* Shortcut hint */}
-        {messages.length === 0 && !loading && (
+        {messages.length === 0 && !loading && attachedFiles.length === 0 && (
           <div className="px-4 pb-2 -mt-1">
-            <span className="text-[10px] text-muted-foreground">⌘I για εναλλαγή</span>
+            <span className="text-[10px] text-muted-foreground">⌘I για εναλλαγή · Σύρε αρχεία για επισύναψη</span>
           </div>
         )}
       </div>

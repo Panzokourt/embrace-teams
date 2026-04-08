@@ -48,7 +48,6 @@ import { DroppableColumn } from '@/components/dnd/DroppableColumn';
 import { cn } from '@/lib/utils';
 import { GripVertical, Pencil, Trash2 } from 'lucide-react';
 import { el } from 'date-fns/locale';
-import { el } from 'date-fns/locale';
 
 type ProjectStatus = 'lead' | 'proposal' | 'negotiation' | 'won' | 'active' | 'completed' | 'cancelled' | 'lost' | 'tender';
 

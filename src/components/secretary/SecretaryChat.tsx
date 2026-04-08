@@ -332,6 +332,7 @@ export default function SecretaryChat({ mode, registerSendHandler, onOpenMemory 
           body: JSON.stringify({
             messages: payloadMessages,
             current_page: location.pathname,
+            page_context: mode === "panel" ? pageContext : undefined,
           }),
         }
       );

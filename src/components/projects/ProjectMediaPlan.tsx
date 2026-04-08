@@ -1689,7 +1689,9 @@ function PlanDetailView({ plan, projectId, projectName, projectBudget, agencyFee
               </div>
             </div>
           )}
-          {viewMode === 'gantt' && <div className="rounded-xl border p-4"><GanttView items={displayedItems} /></div>}
+          {viewMode === 'gantt' && <div className="rounded-xl border p-4"><GanttView items={displayedItems} onItemUpdate={(id, updates) => {
+            Object.entries(updates).forEach(([field, value]) => updateItem(id, field, value as string));
+          }} /></div>}
           {viewMode === 'calendar' && <div className="rounded-xl border p-4"><CalendarView items={displayedItems} /></div>}
         </>
       )}

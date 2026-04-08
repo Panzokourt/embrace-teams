@@ -249,21 +249,11 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
 
   const effectiveSidebarWidth = sidebarMode === 'hidden' ? 0 : sidebarCollapsed ? SIDEBAR_COLLAPSED_W : sidebarWidth;
 
-  return (
+    return (
     <div className={cn(
-      "flex flex-col h-screen bg-background relative overflow-hidden",
+      "flex h-screen bg-background relative overflow-hidden",
       density === 'compact' ? 'density-compact' : 'density-comfortable'
     )}>
-      {/* Full-width TopBar */}
-      <TopBar
-        onPanelToggle={togglePanelSimple}
-        rightPanelOpen={rightPanelOpen}
-        onMobileMenuToggle={() => setMobileSidebarOpen(true)}
-        showHamburger={sidebarMode === 'hidden'}
-        onQuickChatToggle={toggleQuickChat}
-      />
-
-      <div className="flex flex-1 min-h-0 overflow-hidden">
       {/* Mobile sidebar as Sheet */}
       {sidebarMode === 'hidden' && (
         <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
@@ -273,7 +263,7 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
         </Sheet>
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar — full height */}
       {sidebarMode !== 'hidden' && (
         <div
           className="h-full shrink-0 transition-[width] duration-200 ease-apple overflow-visible relative"
@@ -284,7 +274,6 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
             onToggleCollapse={toggleCollapsed}
             forceCollapsed={sidebarMode === 'collapsed'}
           />
-          {/* Sidebar resize handle */}
           <div
             className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/20 active:bg-primary/30 transition-colors z-10"
             onMouseDown={onSidebarResizeStart}
@@ -292,20 +281,26 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
         </div>
       )}
 
-      {/* Main content area */}
+      {/* Middle column: TopBar + Content */}
       <div className="flex-1 min-w-0 flex flex-col h-full">
+        <TopBar
+          onPanelToggle={togglePanelSimple}
+          rightPanelOpen={rightPanelOpen}
+          onMobileMenuToggle={() => setMobileSidebarOpen(true)}
+          showHamburger={sidebarMode === 'hidden'}
+          onQuickChatToggle={toggleQuickChat}
+        />
         <main className="flex-1 overflow-auto">
           <Outlet />
         </main>
       </div>
 
-      {/* Docked right panel (wide layout only) */}
+      {/* Docked right panel — full height */}
       {showDockedRightPanel && (
         <div
           className="h-full shrink-0 overflow-hidden relative"
           style={{ width: rightPanelWidth }}
         >
-          {/* Resize handle on left edge */}
           <div
             className="absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-primary/20 active:bg-primary/30 transition-colors z-10"
             onMouseDown={onRightPanelResizeStart}
@@ -314,7 +309,7 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
         </div>
       )}
 
-      {/* Overlay right panel (standard/narrow layouts) */}
+      {/* Overlay right panel */}
       {showOverlayRightPanel && (
         <>
           <div className="fixed inset-0 bg-black/20 z-30" onClick={closePanel} />
@@ -327,7 +322,7 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
         </>
       )}
 
-      {/* Mobile: Drawer right panel */}
+      {/* Mobile drawer right panel */}
       {showDrawerRightPanel && (
         <Sheet open={true} onOpenChange={(open) => !open && closePanel()}>
           <SheetContent side="right" className="p-0 w-[90vw] max-w-[400px]">
@@ -339,7 +334,6 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
       <ChatFloatingBubbles />
       <FocusOverlay />
       <QuickChatBar isOpen={quickChatOpen} onToggle={toggleQuickChat} />
-      </div>
     </div>
   );
 }

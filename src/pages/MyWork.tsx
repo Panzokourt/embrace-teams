@@ -109,6 +109,12 @@ export default function MyWork() {
   const [todayEntries, setTodayEntries] = useState<TimeEntryToday[]>([]);
   const [allMyTasks, setAllMyTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
+  // CC KPI state
+  const [pipelineValue, setPipelineValue] = useState(0);
+  const [winRate, setWinRate] = useState(0);
+  const [activeProjectCount, setActiveProjectCount] = useState(0);
+  const [tasksCompletedToday, setTasksCompletedToday] = useState(0);
+  const [pendingInvoices] = useState(0);
   const [selectedItem, setSelectedItem] = useState<{ type: 'task' | 'deliverable'; data: any } | null>(null);
   const [activeView, setActiveView] = useState<'projects' | 'calendar'>('projects');
   const [calendarMode, setCalendarMode] = useState<'week' | 'day'>('week');

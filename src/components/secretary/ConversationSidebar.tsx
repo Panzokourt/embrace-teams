@@ -131,6 +131,21 @@ export default function ConversationSidebar({
           )}
         </div>
       </ScrollArea>
+
+      {/* Memory button */}
+      {onOpenMemory && (
+        <div className="p-3 border-t border-sidebar-border">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full gap-2 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+            onClick={onOpenMemory}
+          >
+            <Brain className="h-4 w-4" />
+            AI Μνήμη
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

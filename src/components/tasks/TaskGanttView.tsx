@@ -85,6 +85,24 @@ export function TaskGanttView({ tasks, onTaskUpdated }: TaskGanttViewProps) {
   const [editDueDate, setEditDueDate] = useState<Date | undefined>();
   const [editStatus, setEditStatus] = useState<string>('');
 
+  // Drag & resize hook
+  const { getOverriddenDates, handleMouseDown: onDragStart, isDragging, wasDragged } = useGanttDrag({
+    getDayWidth: () => {
+      if (!scrollRef.current) return 5;
+      const totalMs = timelineEnd.getTime() - timelineStart.getTime();
+      const totalDays = totalMs / (1000 * 60 * 60 * 24);
+      return scrollRef.current.scrollWidth / totalDays;
+    },
+    onDragEnd: async (itemId, startDate, endDate) => {
+      const { error } = await supabase.from('tasks').update({
+        start_date: startDate,
+        due_date: endDate,
+      }).eq('id', itemId);
+      if (error) { toast.error('Σφάλμα ενημέρωσης'); return; }
+      toast.success('Ημερομηνίες ενημερώθηκαν');
+      onTaskUpdated?.();
+    },
+  });
   // Get unique projects for filter
   const projectOptions = useMemo(() => {
     const map = new Map<string, string>();

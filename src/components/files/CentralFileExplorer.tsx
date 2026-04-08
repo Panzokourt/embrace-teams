@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Search, X, Filter, FolderOpen, Users, Briefcase, CalendarDays } from 'lucide-react';
+import { Search, X, Filter, Users, Briefcase, CalendarDays } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -13,13 +13,12 @@ import { el } from 'date-fns/locale';
 import type { FileFolder } from './FolderTree';
 import type { FileAttachment } from './FilesTableView';
 
-type FileViewMode = 'all' | 'by-client' | 'by-project' | 'by-date';
+type FileViewMode = 'by-project' | 'by-client' | 'by-date';
 type FileTypeFilter = 'all' | 'images' | 'documents' | 'videos' | 'audio';
 
 const VIEW_TABS: { value: FileViewMode; label: string; icon: React.ElementType }[] = [
-  { value: 'all', label: 'Όλα', icon: FolderOpen },
-  { value: 'by-client', label: 'Κατά Πελάτη', icon: Users },
   { value: 'by-project', label: 'Κατά Έργο', icon: Briefcase },
+  { value: 'by-client', label: 'Κατά Πελάτη', icon: Users },
   { value: 'by-date', label: 'Χρονολογικά', icon: CalendarDays },
 ];
 
@@ -55,7 +54,7 @@ export function CentralFileExplorer() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [viewMode, setViewMode] = useState<FileViewMode>('all');
+  const [viewMode, setViewMode] = useState<FileViewMode>('by-project');
   const [typeFilter, setTypeFilter] = useState<FileTypeFilter>('all');
 
   const canManage = isAdmin || isManager;
@@ -125,10 +124,6 @@ export function CentralFileExplorer() {
 
   // Build virtual folders for grouped views
   const { virtualFolders, virtualFiles } = useMemo(() => {
-    if (viewMode === 'all') {
-      return { virtualFolders: folders, virtualFiles: typeFilteredFiles };
-    }
-
     const vFolders: FileFolder[] = [];
     const vFiles: FileAttachment[] = [];
 
@@ -166,10 +161,8 @@ export function CentralFileExplorer() {
         vFiles.push({ ...f, folder_id: null });
       });
     } else if (viewMode === 'by-project') {
-      // Build project virtual folders
       const projectIds = new Set(typeFilteredFiles.map((f) => f.project_id).filter(Boolean));
 
-      // Also get real file_folders per project to show subfolders
       const projectFoldersMap = new Map<string, FileFolder[]>();
       folders.forEach((f) => {
         const pid = (f as any).project_id;
@@ -181,7 +174,6 @@ export function CentralFileExplorer() {
 
       projects.forEach((project) => {
         if (projectIds.has(project.id)) {
-          // Add project as virtual root folder
           const vpId = `vp-${project.id}`;
           vFolders.push({
             id: vpId,
@@ -192,18 +184,15 @@ export function CentralFileExplorer() {
             color: null,
           } as FileFolder);
 
-          // Add real subfolders under this virtual project folder
           const realFolders = projectFoldersMap.get(project.id) || [];
           realFolders.forEach((rf) => {
-            // Only add root-level project folders (no parent or parent is null)
             if (!rf.parent_folder_id) {
               vFolders.push({
                 ...rf,
-                id: rf.id, // keep real ID so files with folder_id match
-                parent_folder_id: vpId, // nest under virtual project folder
+                id: rf.id,
+                parent_folder_id: vpId,
               } as FileFolder);
             } else {
-              // Sub-subfolders: keep as-is (their parent_folder_id points to a real folder)
               vFolders.push(rf);
             }
           });
@@ -212,11 +201,9 @@ export function CentralFileExplorer() {
 
       typeFilteredFiles.forEach((f) => {
         if (f.project_id) {
-          // If file has a real folder_id that exists, keep it (it's now nested under the project virtual folder)
           if (f.folder_id && folders.some(fl => fl.id === f.folder_id)) {
-            vFiles.push(f); // folder_id already points to the real folder
+            vFiles.push(f);
           } else {
-            // File without a subfolder → goes directly under the virtual project folder
             vFiles.push({ ...f, folder_id: `vp-${f.project_id}` });
           }
         } else {
@@ -255,7 +242,7 @@ export function CentralFileExplorer() {
   }, [viewMode, typeFilteredFiles, folders, clients, projects]);
 
   const handleCreateFolder = async (name: string, parentId: string | null) => {
-    if (!user || viewMode !== 'all') return;
+    if (!user) return;
     try {
       const { error } = await supabase
         .from('file_folders')
@@ -327,6 +314,57 @@ export function CentralFileExplorer() {
     }
   };
 
+  const handleUploadFolder = async (fileList: FileList, targetFolderId: string | null) => {
+    if (!user) return;
+    setUploading(true);
+    try {
+      const filesArray = Array.from(fileList);
+      // Build folder structure from webkitRelativePath
+      const folderMap = new Map<string, string>(); // relativeDirPath -> folderId
+
+      for (const file of filesArray) {
+        const relativePath = (file as any).webkitRelativePath || file.name;
+        const parts = relativePath.split('/');
+        
+        // Create folder hierarchy
+        let currentParent = targetFolderId;
+        for (let i = 0; i < parts.length - 1; i++) {
+          const dirPath = parts.slice(0, i + 1).join('/');
+          if (!folderMap.has(dirPath)) {
+            const { data, error } = await supabase
+              .from('file_folders')
+              .insert([{ name: parts[i], parent_folder_id: currentParent, created_by: user.id }])
+              .select('id')
+              .single();
+            if (error) throw error;
+            folderMap.set(dirPath, data.id);
+            currentParent = data.id;
+          } else {
+            currentParent = folderMap.get(dirPath)!;
+          }
+        }
+
+        // Upload file
+        const fileName = createProjectFilesObjectKey({ userId: user.id, originalName: file.name });
+        const { error: uploadError } = await supabase.storage.from('project-files').upload(fileName, file);
+        if (uploadError) throw uploadError;
+
+        const { error: insertError } = await supabase
+          .from('file_attachments')
+          .insert([{ file_name: file.name, file_path: fileName, file_size: file.size, content_type: file.type, uploaded_by: user.id, folder_id: currentParent }]);
+        if (insertError) throw insertError;
+      }
+
+      toast.success('Ο φάκελος ανέβηκε επιτυχώς!');
+      await Promise.all([fetchFolders(), fetchFiles()]);
+    } catch (error) {
+      console.error('Error uploading folder:', error);
+      toast.error('Σφάλμα κατά το ανέβασμα φακέλου');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleDeleteFile = async (file: FileAttachment) => {
     if (!canManage && user?.id !== file.uploaded_by) {
       toast.error('Δεν έχετε δικαίωμα διαγραφής');
@@ -370,8 +408,6 @@ export function CentralFileExplorer() {
       toast.error('Σφάλμα κατά τη μετακίνηση φακέλου');
     }
   };
-
-  const isVirtualMode = viewMode !== 'all';
 
   return (
     <div className="space-y-3">
@@ -437,14 +473,16 @@ export function CentralFileExplorer() {
       <FinderColumnView
         files={virtualFiles}
         folders={virtualFolders}
+        allFolders={folders}
         onUpload={handleUpload}
+        onUploadFolder={handleUploadFolder}
         onDelete={handleDeleteFile}
         onCreateFolder={handleCreateFolder}
         onRenameFolder={handleRenameFolder}
         onDeleteFolder={handleDeleteFolder}
-        onMoveFile={isVirtualMode ? undefined : handleMoveFile}
-        onMoveFolder={isVirtualMode ? undefined : handleMoveFolder}
-        canManage={isVirtualMode ? false : canManage}
+        onMoveFile={handleMoveFile}
+        onMoveFolder={handleMoveFolder}
+        canManage={canManage}
         loading={loading}
         uploading={uploading}
         searchQuery={searchQuery}

@@ -19,6 +19,7 @@ import {
   Pencil,
   Move,
   FolderInput,
+  FolderUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +31,9 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
+  ContextMenuSub,
+  ContextMenuSubTrigger,
+  ContextMenuSubContent,
 } from '@/components/ui/context-menu';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -41,7 +45,9 @@ import type { FileAttachment } from './FilesTableView';
 interface FinderColumnViewProps {
   files: FileAttachment[];
   folders: FileFolder[];
+  allFolders?: FileFolder[];
   onUpload: (files: FileList, folderId: string | null) => Promise<void>;
+  onUploadFolder?: (files: FileList, folderId: string | null) => Promise<void>;
   onDelete: (file: FileAttachment) => Promise<void>;
   onCreateFolder: (name: string, parentId: string | null) => Promise<void>;
   onRenameFolder: (folderId: string, newName: string) => Promise<void>;
@@ -78,7 +84,9 @@ type ColumnItem =
 export function FinderColumnView({
   files,
   folders,
+  allFolders,
   onUpload,
+  onUploadFolder,
   onDelete,
   onCreateFolder,
   onRenameFolder,
@@ -101,7 +109,11 @@ export function FinderColumnView({
   const [previewOpen, setPreviewOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // The real folders list for "Move to" menus
+  const moveFolders = allFolders || folders;
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -109,7 +121,6 @@ export function FinderColumnView({
     }
   }, [path]);
 
-  // Space key for preview
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.code === 'Space' && selectedItem?.kind === 'file' && !previewOpen) {
@@ -134,14 +145,11 @@ export function FinderColumnView({
     );
   }, [files, searchQuery]);
 
-  // Compute set of folder IDs that contain at least one file or child folder
   const nonEmptyFolderIds = useMemo(() => {
     const ids = new Set<string>();
-    // Folders with files
     for (const f of files) {
       if (f.folder_id) ids.add(f.folder_id);
     }
-    // Folders with child folders
     for (const f of folders) {
       if (f.parent_folder_id) ids.add(f.parent_folder_id);
     }
@@ -178,11 +186,27 @@ export function FinderColumnView({
     fileInputRef.current?.click();
   }
 
+  function handleUploadFolderToColumn(parentId: string | null) {
+    if (folderInputRef.current) {
+      (folderInputRef.current as any).__targetFolder = parentId;
+      folderInputRef.current.click();
+    }
+  }
+
   function handleFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const target = e.target as any;
     const folderId = target.__targetFolder ?? null;
     if (e.target.files && e.target.files.length > 0) {
       onUpload(e.target.files, folderId);
+    }
+    e.target.value = '';
+  }
+
+  function handleFolderInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const target = e.target as any;
+    const folderId = target.__targetFolder ?? null;
+    if (e.target.files && e.target.files.length > 0 && onUploadFolder) {
+      onUploadFolder(e.target.files, folderId);
     }
     e.target.value = '';
   }
@@ -230,13 +254,19 @@ export function FinderColumnView({
       return;
     }
 
-    // OS file drop
+    // OS file drop — check for folder upload via webkitRelativePath
     const droppedFiles = e.dataTransfer.files;
     if (droppedFiles && droppedFiles.length > 0) {
-      const folder = dropTarget;
-      onUpload(droppedFiles, folder);
+      const hasRelativePaths = Array.from(droppedFiles).some(
+        (f: any) => f.webkitRelativePath && f.webkitRelativePath.includes('/')
+      );
+      if (hasRelativePaths && onUploadFolder) {
+        onUploadFolder(droppedFiles, dropTarget);
+      } else {
+        onUpload(droppedFiles, dropTarget);
+      }
     }
-  }, [path, onUpload, onMoveFile, onMoveFolder]);
+  }, [path, onUpload, onUploadFolder, onMoveFile, onMoveFolder]);
 
   async function handleCreateFolder(columnIndex: number) {
     if (!newFolderName.trim()) return;
@@ -271,6 +301,11 @@ export function FinderColumnView({
     setRenamingFolderId(null);
     setRenameValue('');
   }
+
+  // Build "Move to" folder list for context menus (only real folders, exclude virtual)
+  const moveTargetFolders = useMemo(() => {
+    return moveFolders.filter((f) => !f.id.startsWith('vc-') && !f.id.startsWith('vp-') && !f.id.startsWith('vd-'));
+  }, [moveFolders]);
 
   const breadcrumb = useMemo(() => {
     const items: { id: string | null; name: string }[] = [
@@ -342,6 +377,15 @@ export function FinderColumnView({
               ) : (
                 <Upload className="h-4 w-4" />
               )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleUploadFolderToColumn(path[path.length - 1] ?? null)}
+              disabled={uploading}
+              title="Ανέβασμα φακέλου"
+            >
+              <FolderUp className="h-4 w-4" />
             </Button>
             <Button
               variant="ghost"
@@ -476,11 +520,13 @@ export function FinderColumnView({
                               );
                             }
 
+                            const isVirtualFolder = folder.id.startsWith('vc-') || folder.id.startsWith('vp-') || folder.id.startsWith('vd-');
+
                             return (
                               <ContextMenu key={folder.id}>
                                 <ContextMenuTrigger asChild>
                                   <button
-                                    draggable={canManage}
+                                    draggable={canManage && !isVirtualFolder}
                                     onDragStart={(e) => handleDragStart(e, item)}
                                     onDragOver={(e) => {
                                       e.preventDefault();
@@ -508,10 +554,13 @@ export function FinderColumnView({
                                     <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
                                   </button>
                                 </ContextMenuTrigger>
-                                {canManage && (
-                                  <ContextMenuContent className="w-48">
+                                {canManage && !isVirtualFolder && (
+                                  <ContextMenuContent className="w-52">
                                     <ContextMenuItem onClick={() => handleUploadToColumn(folder.id)}>
                                       <Upload className="h-3.5 w-3.5 mr-2" /> Ανέβασμα αρχείου
+                                    </ContextMenuItem>
+                                    <ContextMenuItem onClick={() => handleUploadFolderToColumn(folder.id)}>
+                                      <FolderUp className="h-3.5 w-3.5 mr-2" /> Ανέβασμα φακέλου
                                     </ContextMenuItem>
                                     <ContextMenuItem onClick={() => {
                                       setCreatingInColumn(path.indexOf(folder.id) >= 0 ? path.indexOf(folder.id) : colIndex);
@@ -523,6 +572,31 @@ export function FinderColumnView({
                                     <ContextMenuItem onClick={() => startRenameFolder(folder)}>
                                       <Pencil className="h-3.5 w-3.5 mr-2" /> Μετονομασία
                                     </ContextMenuItem>
+                                    {onMoveFolder && moveTargetFolders.length > 0 && (
+                                      <ContextMenuSub>
+                                        <ContextMenuSubTrigger>
+                                          <Move className="h-3.5 w-3.5 mr-2" /> Μετακίνηση σε...
+                                        </ContextMenuSubTrigger>
+                                        <ContextMenuSubContent className="w-48 max-h-64 overflow-y-auto">
+                                          <ContextMenuItem onClick={() => onMoveFolder(folder.id, null)}>
+                                            <FolderInput className="h-3.5 w-3.5 mr-2" /> Ρίζα (/)
+                                          </ContextMenuItem>
+                                          <ContextMenuSeparator />
+                                          {moveTargetFolders
+                                            .filter((f) => f.id !== folder.id)
+                                            .map((target) => (
+                                              <ContextMenuItem
+                                                key={target.id}
+                                                onClick={() => onMoveFolder(folder.id, target.id)}
+                                              >
+                                                <Folder className="h-3.5 w-3.5 mr-2 text-primary/70" />
+                                                <span className="truncate">{target.name}</span>
+                                              </ContextMenuItem>
+                                            ))}
+                                        </ContextMenuSubContent>
+                                      </ContextMenuSub>
+                                    )}
+                                    <ContextMenuSeparator />
                                     <ContextMenuItem onClick={() => onDeleteFolder(folder.id)} className="text-destructive">
                                       <Trash2 className="h-3.5 w-3.5 mr-2" /> Διαγραφή
                                     </ContextMenuItem>
@@ -551,7 +625,7 @@ export function FinderColumnView({
                                   <span className="truncate flex-1">{fileData.file_name}</span>
                                 </button>
                               </ContextMenuTrigger>
-                              <ContextMenuContent className="w-48">
+                              <ContextMenuContent className="w-52">
                                 <ContextMenuItem onClick={() => {
                                   setSelectedItem(item);
                                   setPreviewOpen(true);
@@ -561,6 +635,31 @@ export function FinderColumnView({
                                 <ContextMenuItem onClick={() => handleDownload(fileData)}>
                                   <Download className="h-3.5 w-3.5 mr-2" /> Λήψη
                                 </ContextMenuItem>
+                                {canManage && onMoveFile && moveTargetFolders.length > 0 && (
+                                  <>
+                                    <ContextMenuSeparator />
+                                    <ContextMenuSub>
+                                      <ContextMenuSubTrigger>
+                                        <Move className="h-3.5 w-3.5 mr-2" /> Μετακίνηση σε...
+                                      </ContextMenuSubTrigger>
+                                      <ContextMenuSubContent className="w-48 max-h-64 overflow-y-auto">
+                                        <ContextMenuItem onClick={() => onMoveFile(fileData.id, null)}>
+                                          <FolderInput className="h-3.5 w-3.5 mr-2" /> Χωρίς φάκελο
+                                        </ContextMenuItem>
+                                        <ContextMenuSeparator />
+                                        {moveTargetFolders.map((target) => (
+                                          <ContextMenuItem
+                                            key={target.id}
+                                            onClick={() => onMoveFile(fileData.id, target.id)}
+                                          >
+                                            <Folder className="h-3.5 w-3.5 mr-2 text-primary/70" />
+                                            <span className="truncate">{target.name}</span>
+                                          </ContextMenuItem>
+                                        ))}
+                                      </ContextMenuSubContent>
+                                    </ContextMenuSub>
+                                  </>
+                                )}
                                 {canManage && (
                                   <>
                                     <ContextMenuSeparator />
@@ -579,9 +678,12 @@ export function FinderColumnView({
                 </ContextMenuTrigger>
                 {/* Empty area context menu */}
                 {canManage && (
-                  <ContextMenuContent className="w-48">
+                  <ContextMenuContent className="w-52">
                     <ContextMenuItem onClick={() => handleUploadToColumn(folderId)}>
                       <Upload className="h-3.5 w-3.5 mr-2" /> Ανέβασμα αρχείου
+                    </ContextMenuItem>
+                    <ContextMenuItem onClick={() => handleUploadFolderToColumn(folderId)}>
+                      <FolderUp className="h-3.5 w-3.5 mr-2" /> Ανέβασμα φακέλου
                     </ContextMenuItem>
                     <ContextMenuItem onClick={() => {
                       setCreatingInColumn(colIndex);
@@ -678,6 +780,16 @@ export function FinderColumnView({
         multiple
         className="hidden"
         onChange={handleFileInputChange}
+      />
+
+      {/* Hidden folder input */}
+      <input
+        ref={folderInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={handleFolderInputChange}
+        {...({ webkitdirectory: '', directory: '' } as any)}
       />
 
       {/* Preview Dialog */}

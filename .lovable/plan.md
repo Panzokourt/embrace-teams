@@ -1,46 +1,98 @@
 
 
-# Fix Onboarding Skip Bug + Persistent Setup Guide
+# Command Center — Gaming-Style, Role-Adaptive
 
-## Bug Analysis
+## Concept
 
-**Root cause**: Στο `OnboardingCompany.handleCreateCompany`, μετά τη δημιουργία εταιρείας καλείται `refreshUserData()` → αυτό θέτει `companyRole` στο AuthContext → ενεργοποιείται το `useEffect` στο Onboarding.tsx (γραμμή 54-58) που κάνει redirect στο `/` αν υπάρχει `companyRole`. Αποτέλεσμα: ο χρήστης φεύγει από το wizard αμέσως μετά το βήμα 2.
+Αντικαθιστούμε τα 4 Dashboard sub-pages με ένα ενιαίο **Command Center** με gaming-inspired UI: hex/radial layouts, glowing cards, animated progress rings, streak counters, XP integration, και real-time pulse effects. Η σελίδα προσαρμόζεται αυτόματα ανάλογα με τον ρόλο (owner/admin/manager/member/viewer).
 
-## Fix 1: Onboarding redirect guard
+## UI Design — Gaming Elements
 
-Στο `Onboarding.tsx`, αλλάζω το useEffect ώστε **να μην κάνει redirect αν το onboarding δεν έχει ολοκληρωθεί** (`onboarding_completed === false`). Αν ο χρήστης έχει company role ΑΛΛΑ δεν έχει τελειώσει onboarding, παραμένει στο wizard.
-
-```typescript
-useEffect(() => {
-  if (companyRole && profile?.onboarding_completed) {
-    navigate('/', { replace: true });
-  }
-}, [companyRole, profile, navigate]);
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  ⚡ COMMAND CENTER          [Greeting + Level Badge + Streak]│
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─── HERO ZONE ────────────────────────────────────────┐  │
+│  │  XP Progress Ring (animated)  │  Daily Streak 🔥      │  │
+│  │  Level title + glow           │  Tasks completed today │  │
+│  │  "12 XP μέχρι το Level 6"    │  Hours logged          │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                                                             │
+│  ┌─── MISSION CARDS (hex-grid style) ───────────────────┐  │
+│  │  ╔══════╗  ╔══════╗  ╔══════╗  ╔══════╗              │  │
+│  │  ║ Rev  ║  ║ Proj ║  ║ Tasks║  ║ Over ║  (role-based)│  │
+│  │  ║ €12k ║  ║  8   ║  ║  23  ║  ║  2!  ║              │  │
+│  │  ╚══════╝  ╚══════╝  ╚══════╝  ╚══════╝              │  │
+│  │  Glow border based on health (green/amber/red)        │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                                                             │
+│  ┌─── PANELS (2-3 columns) ─────────────────────────────┐  │
+│  │  [Active Missions]     │  [Team Radar]                │  │
+│  │  My tasks as quest list│  Workload heatmap / bars     │  │
+│  │  with XP rewards shown │  (admin/manager only)        │  │
+│  │                        │                              │  │
+│  │  [Pipeline Funnel]     │  [AI Intel Feed]             │  │
+│  │  (owner only)          │  Brain insights + activity   │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                                                             │
+│  ┌─── QUICK ACTIONS BAR (floating, bottom) ─────────────┐  │
+│  │  [+ Task]  [+ Project]  [Start Timer]  [Secretary]    │  │
+│  └──────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Fix 2: Persistent Setup Guide (Onboarding Checklist)
+## Gaming UI Details
 
-Νέο component `SetupGuide` που εμφανίζεται μέσα στην εφαρμογή (στο TopBar ή ως floating widget) και δείχνει στον χρήστη τα βήματα onboarding και ποια έχει ολοκληρώσει.
+- **Hero Zone**: Animated SVG ring (XP progress), pulsing glow ανάλογα με level, streak counter με 🔥 animation
+- **Mission Cards (KPIs)**: Cards με glowing borders (green=healthy, amber=warning, red=critical), subtle hover scale effect, icon pulse animation
+- **Active Missions**: Tasks σαν "quests" — δείχνουν estimated XP reward, priority badge σαν difficulty tier (Easy/Medium/Hard/Epic)
+- **Team Radar** (admin/manager): Horizontal bars ή mini avatars με workload percentage, color-coded
+- **AI Intel Feed**: Brain insights + recent activity σαν "intel reports", dark-themed cards με scan-line effect
+- **Quick Actions**: Floating bar, pill-shaped buttons με glow hover
 
-### Λειτουργικότητα
-- Εμφανίζεται **μόνο αν `onboarding_completed === false`** (ή αν ο χρήστης το ανοίξει χειροκίνητα)
-- Checklist items: Company ✓, Profile, Team, Client, Docs, AI Setup
-- Κάθε item ελέγχεται δυναμικά (π.χ. "Profile" = has phone or job_title, "Team" = has invited members, "Client" = has at least 1 client)
-- Click σε ημιτελές βήμα → ανοίγει modal/drawer με τη φόρμα αντίστοιχου βήματος
-- Progress ring στο TopBar δείχνει ποσοστό ολοκλήρωσης
-- Κουμπί "Ολοκλήρωση Setup" κάνει mark onboarding_completed = true
+## Role-Based Visibility
 
-### Θέση στο UI
-- Νέο icon button στο TopBar (δίπλα στο XP Badge) με progress indicator
-- Popover/Drawer με τη λίστα βημάτων
-- Badge notification αν υπάρχουν εκκρεμή βήματα
+| Component | Owner/Admin | Manager | Member | Viewer/Client |
+|-----------|:-----------:|:-------:|:------:|:-------------:|
+| Hero Zone (XP/Streak) | ✓ | ✓ | ✓ | - |
+| KPI: Revenue, Pipeline | ✓ | ✓ | - | - |
+| KPI: My Tasks, Overdue | ✓ | ✓ | ✓ | - |
+| KPI: Active Projects | ✓ | ✓ | ✓ | ✓ |
+| Panel: Active Missions | ✓ | ✓ | ✓ | - |
+| Panel: Team Radar | ✓ | ✓ | - | - |
+| Panel: Pipeline Funnel | ✓ | - | - | - |
+| Panel: AI Intel | ✓ | ✓ | - | - |
+| Panel: Project Progress | ✓ | ✓ | ✓ | ✓ |
+| Quick: +Project, +Client | ✓ | ✓ | - | - |
+| Quick: +Task, Timer | ✓ | ✓ | ✓ | - |
+
+## Data Sources
+
+Χρησιμοποιεί τα ίδια queries με το υπάρχον Dashboard.tsx (invoices, projects, tasks, time_entries, tenders) + useUserXP hook για gamification data.
+
+## Sidebar Change
+
+Η κατηγορία `overview` αλλάζει από 4 sub-items σε 1:
+```
+overview: [
+  { title: 'Command Center', href: '/command-center', icon: Radar }
+]
+```
 
 ## Files
 
 | File | Αλλαγή |
 |------|--------|
-| `src/pages/Onboarding.tsx` | Fix redirect guard — check `onboarding_completed` πριν redirect |
-| `src/hooks/useOnboardingProgress.ts` | Νέο — hook που ελέγχει ποια βήματα ολοκληρώθηκαν (queries profiles, clients, invitations κλπ) |
-| `src/components/onboarding/SetupGuide.tsx` | Νέο — checklist popover με progress ring |
-| `src/components/layout/TopBar.tsx` | Προσθήκη SetupGuide button/icon όταν onboarding incomplete |
+| `src/pages/CommandCenter.tsx` | Νέο — orchestrator, data fetching, role-based layout |
+| `src/components/command-center/CCHeroZone.tsx` | Νέο — animated XP ring, streak, level display |
+| `src/components/command-center/CCMissionCards.tsx` | Νέο — glowing KPI cards grid |
+| `src/components/command-center/CCActiveMissions.tsx` | Νέο — task list as quests with XP rewards |
+| `src/components/command-center/CCTeamRadar.tsx` | Νέο — team workload visualization |
+| `src/components/command-center/CCIntelFeed.tsx` | Νέο — AI insights + activity feed |
+| `src/components/command-center/CCQuickActions.tsx` | Νέο — floating action bar |
+| `src/components/layout/AppSidebar.tsx` | Αλλαγή overview category → 1 item "Command Center" |
+| `src/App.tsx` | Route `/command-center`, redirect `/dashboards/*` → `/command-center`, default `/` → CommandCenter |
+
+Dashboard.tsx **δεν διαγράφεται** — αφαιρείται μόνο από routes (εύκολη επαναφορά).
 

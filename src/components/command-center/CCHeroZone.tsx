@@ -8,32 +8,31 @@ interface CCHeroZoneProps {
 }
 
 function XPRing({ progress, level }: { progress: number; level: number }) {
-  const radius = 54;
   const stroke = 6;
   const normalizedProgress = Math.min(100, Math.max(0, progress));
-  const circumference = 2 * Math.PI * radius;
-  const progressOffset = circumference - (normalizedProgress / 100) * circumference;
-  const trackColor = 'hsl(var(--muted))';
+  const progressDegrees = (normalizedProgress / 100) * 360;
+  const trackColor = 'hsl(var(--border))';
 
   const glowColor = level >= 20 ? 'hsl(38 92% 50%)' :
     level >= 15 ? 'hsl(270 60% 55%)' :
     level >= 10 ? 'hsl(210 80% 55%)' :
     'hsl(var(--primary))';
 
+  const ringBackground = `conic-gradient(from -90deg, ${glowColor} 0deg ${progressDegrees}deg, ${trackColor} ${progressDegrees}deg 360deg)`;
+
   return (
-    <div className="relative w-32 h-32">
-      <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
-        <circle cx="60" cy="60" r={radius} fill="none"
-          stroke={trackColor} strokeWidth={stroke} opacity={0.35} />
-        <circle cx="60" cy="60" r={radius} fill="none"
-          stroke={glowColor} strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={progressOffset}
-          className="transition-all duration-1000 ease-out"
-          style={{ filter: normalizedProgress > 0 ? `drop-shadow(0 0 6px ${glowColor})` : 'none' }} />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
+    <div
+      className="relative grid h-32 w-32 place-items-center rounded-full transition-all duration-700 ease-out"
+      style={{
+        backgroundImage: ringBackground,
+        boxShadow: normalizedProgress > 0 ? `0 0 12px ${glowColor}` : 'none',
+      }}
+    >
+      <div
+        className="absolute rounded-full bg-card"
+        style={{ inset: stroke }}
+      />
+      <div className="relative z-10 flex flex-col items-center justify-center">
         <span className="text-3xl font-bold text-foreground">{level}</span>
         <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Level</span>
       </div>

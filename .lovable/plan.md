@@ -1,30 +1,46 @@
 
 
-# Fix XP Ring Progress Display
+# Fix Layout — TopBar Full Width + Sidebar Full Height
 
-## Bug
+## Problem
 
-`strokeDasharray="100"` means a single dash of 100 units — the full circle length (since `pathLength=100`). Offsetting a 100-unit dash on a 100-unit circle still wraps around and fills everything.
+Μετά την αλλαγή layout, η TopBar δεν πιάνει όλο το εύρος (λείπει δεξιά), και το sidebar rail κόβεται. Η τρέχουσα δομή είναι:
+
+```text
+┌─────────────────────────────┐
+│ TopBar (full width)         │
+├────┬────────────────┬───────┤
+│Side│ Content        │ Right │
+│bar │                │ Panel │
+└────┴────────────────┴───────┘
+```
+
+Το πρόβλημα: η TopBar πρέπει να πιάνει **ακριβώς** το εύρος μεταξύ sidebar και right panel, αφήνοντας sidebar + right panel σε πλήρες ύψος. Η σωστή δομή:
+
+```text
+┌────┬────────────────┬───────┐
+│    │ TopBar         │       │
+│Side├────────────────┤ Right │
+│bar │ Content        │ Panel │
+│    │                │       │
+└────┴────────────────┴───────┘
+```
 
 ## Fix
 
-In `src/components/command-center/CCHeroZone.tsx`, line 29-30, change:
+### `src/components/layout/AppLayout.tsx`
 
-```tsx
-// Before (broken):
-strokeDasharray="100"
-strokeDashoffset={100 - normalizedProgress}
+Επαναφορά σε horizontal-first layout: Sidebar | (TopBar + Content) | RightPanel
 
-// After (correct):
-strokeDasharray={`${normalizedProgress} ${100 - normalizedProgress}`}
-strokeDashoffset={0}
-```
+- Αλλαγή root container πίσω σε `flex flex-row h-screen`
+- Sidebar στο αριστερό column (full height)
+- Middle column: `flex flex-col` → TopBar + Content
+- Right panel στο δεξί column (full height)
+- Αυτό εξασφαλίζει ότι sidebar rail φαίνεται πλήρες, TopBar πιάνει ακριβώς τον χώρο content, και right panel δεν κόβεται
 
-This creates a dash exactly as long as the progress (e.g. 31 units for 31%), followed by a gap for the rest. No offset needed.
-
-## File
+### Αλλαγές
 
 | File | Change |
 |------|--------|
-| `src/components/command-center/CCHeroZone.tsx` | Fix strokeDasharray to use progress-based dash/gap values |
+| `src/components/layout/AppLayout.tsx` | Restructure: sidebar + (topbar/content column) + right panel as 3 horizontal siblings |
 

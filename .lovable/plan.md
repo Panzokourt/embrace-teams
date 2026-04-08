@@ -1,94 +1,55 @@
 
 
-# Οικονομικός Κύκλος Ζωής Έργου (Project Financial Lifecycle)
+# Ενοποίηση Οικονομικών Έργου — Μία Ενιαία Σελίδα
 
-## Ιδέα
+## Πρόβλημα
 
-Ένα νέο σύστημα **Financial Milestones** ανά έργο, που καταγράφει τα στάδια: **Κοστολόγηση → Προσφορά → Ανάθεση → Παράδοση → Τιμολόγηση → Είσπραξη**, με timestamps και μετρήσεις χρόνου μεταξύ τους. Ενσωματώνεται στο υπάρχον `ProjectFinancialsHub` ως νέο tab και στο overview ως visual stepper.
+4 sub-tabs με μεγάλη επικάλυψη:
+- **Budget Overview**: KPI cards (budget, invoiced, paid, expenses) + progress bars
+- **Τιμολόγια & Έξοδα**: Τα ίδια summary cards + CRUD λίστα τιμολογίων/εξόδων
+- **P&L Report**: Ξανά τα ίδια KPIs + P&L statement + Budget vs Actual + ανά παραδοτέο
 
-## Database
+Ο χρήστης βλέπει τα ίδια νούμερα σε 3 διαφορετικά tabs. Η μόνη πραγματικά μοναδική λειτουργικότητα είναι: ο stepper, η λίστα τιμολογίων/εξόδων, και το P&L breakdown.
 
-### Νέος πίνακας: `project_financial_milestones`
+## Λύση — Ενιαία σελίδα χωρίς sub-tabs
 
-```text
-id              UUID PK
-project_id      UUID FK → projects (NOT NULL)
-company_id      UUID FK → companies (NOT NULL)
-
--- Κάθε milestone = μία ημερομηνία + optional metadata
-costing_at          TIMESTAMPTZ  -- πότε ολοκληρώθηκε η κοστολόγηση
-costing_amount      NUMERIC      -- κόστος εκτίμησης
-costing_notes       TEXT
-
-proposal_sent_at    TIMESTAMPTZ  -- πότε στάλθηκε η προσφορά
-proposal_amount     NUMERIC      -- ποσό προσφοράς
-proposal_reference  TEXT         -- αρ. προσφοράς
-
-proposal_accepted_at TIMESTAMPTZ -- πότε εγκρίθηκε η προσφορά
-proposal_rejected_at TIMESTAMPTZ -- αν απορρίφθηκε
-
-delivery_at         TIMESTAMPTZ  -- πότε παραδόθηκε το έργο
-delivery_notes      TEXT
-
-invoiced_at         TIMESTAMPTZ  -- πότε εκδόθηκε τιμολόγιο
-invoice_id          UUID FK → invoices (optional link)
-
-collected_at        TIMESTAMPTZ  -- πότε εισπράχθηκε
-collected_amount    NUMERIC
-
--- Για internal projects
-is_internal_costing BOOLEAN DEFAULT false  -- αν δεν υπάρχει πελάτης, skip proposal
-
-updated_by          UUID FK → profiles
-created_at          TIMESTAMPTZ DEFAULT now()
-updated_at          TIMESTAMPTZ DEFAULT now()
-```
-
-Ένα row ανά project. Κάθε πεδίο `_at` γεμίζει όταν ο χρήστης "κλείνει" αυτό το βήμα. Τα `NULL` σημαίνουν "δεν έχει γίνει ακόμα".
-
-## UI Components
-
-### 1. Visual Stepper — `ProjectFinancialStepper.tsx`
-
-Horizontal stepper (παρόμοιο με task status stepper) που δείχνει τα 6 στάδια:
+Αφαιρούμε τα sub-tabs και δημιουργούμε μία ροή:
 
 ```text
-[Κοστολόγηση] → [Προσφορά] → [Ανάθεση] → [Παράδοση] → [Τιμολόγηση] → [Είσπραξη]
-     ✓              ✓            ●
+┌─────────────────────────────────────────────┐
+│  STEPPER (Κοστολόγηση → ... → Είσπραξη)     │
+├─────────────────────────────────────────────┤
+│  4 KPI Cards (Budget | Έσοδα | Έξοδα | Κέρδος) │
+├─────────────────────────────────────────────┤
+│  Budget Progress Bars (2)                    │
+├─────────────────────────────────────────────┤
+│  Τιμολόγια (λίστα + CRUD)                   │
+├─────────────────────────────────────────────┤
+│  Έξοδα (λίστα + CRUD)                       │
+├─────────────────────────────────────────────┤
+│  P&L Statement (collapsible)                 │
+└─────────────────────────────────────────────┘
 ```
 
-- Ολοκληρωμένα = πράσινο check + ημερομηνία κάτω
-- Τρέχον = highlighted ring
-- Μελλοντικά = dimmed
-- Κλικ σε step → expand panel κάτω για συμπλήρωση (amount, notes, date)
-- Αυτόματος υπολογισμός χρόνων μεταξύ σταδίων (π.χ. "12 ημέρες από κοστολόγηση σε προσφορά")
-- Για **internal projects**: τα βήματα Προσφορά/Ανάθεση γίνονται optional/skippable
+### Τι κρατάμε
+- **Stepper** — ως έχει, πάνω-πάνω
+- **4 KPI cards** — ένα μόνο σετ (Budget, Εισπράξεις, Έξοδα, Κέρδος/Margin)
+- **2 Progress bars** — budget utilization + collection rate
+- **Τιμολόγια λίστα** — CRUD (από ProjectFinancialsManager)
+- **Έξοδα λίστα** — CRUD (από ProjectFinancialsManager)
+- **P&L Statement** — collapsible section στο τέλος (summary + ανά κατηγορία εξόδων)
 
-### 2. Νέο tab στο `ProjectFinancialsHub` — "Οικονομικός Κύκλος"
-
-Προστίθεται ως πρώτο tab, πριν το Budget Overview:
-- Πάνω: ο stepper
-- Κάτω: timeline cards με τα ολοκληρωμένα milestones + χρόνους
-- KPI row: "Μέσος χρόνος κοστολόγησης→τιμολόγησης", "Ημέρες μέχρι είσπραξη"
-
-### 3. Σύνδεση με υπάρχοντα
-
-- Όταν ο χρήστης κλείνει το βήμα "Τιμολόγηση", μπορεί να **συνδέσει υπάρχον invoice** ή να δημιουργήσει νέο
-- Όταν κλείνει "Είσπραξη", ελέγχει αν το linked invoice είναι paid
-- Η κοστολόγηση μπορεί να τραβήξει τα project expenses ως βάση
+### Τι αφαιρούμε
+- Όλα τα duplicate KPI cards (Budget Overview + Τιμολόγια summary + P&L summary)
+- Budget vs Actual tab (ενσωματώνεται στα progress bars)
+- Ανά Παραδοτέο tab (τα παραδοτέα έχουν ήδη δικό τους tab στο project)
+- Τα nested tabs μέσα στο P&L
 
 ## Αλλαγές αρχείων
 
 | Αρχείο | Αλλαγή |
 |--------|--------|
-| **Migration** | Νέος πίνακας `project_financial_milestones` + RLS |
-| `src/components/projects/ProjectFinancialStepper.tsx` | **Νέο** — Visual stepper + edit panels |
-| `src/components/projects/ProjectFinancialsHub.tsx` | Νέο tab "Κύκλος Ζωής" με τον stepper |
-| `src/pages/ProjectDetail.tsx` | Mini stepper badge στο header area |
-
-## Τι δεν αλλάζει
-
-- Invoices/Expenses/Contracts tables — παραμένουν ως έχουν
-- ProjectWorkflowTracker (intake workflows) — ξεχωριστό σύστημα
-- P&L Report — παραμένει
+| `ProjectFinancialsHub.tsx` | Αφαίρεση tabs, ενιαία ροή: Stepper → KPIs → Progress → Invoices/Expenses → P&L |
+| `ProjectFinancialsManager.tsx` | Αφαίρεση summary cards (εμφανίζονται στο Hub), export μόνο τις λίστες |
+| `ProjectPLReport.tsx` | Απλοποίηση: μόνο P&L statement section, χωρίς KPIs/tabs |
 

@@ -74,10 +74,10 @@ export function ProjectPLReport({ projectId, projectBudget, agencyFeePercentage 
         <div className="space-y-2">
           <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Έξοδα</h4>
           <div className="grid grid-cols-2 gap-1.5 pl-3 text-sm">
-            {Object.entries(pl.expensesByCategory).map(([cat, amount]) => (
+          {Object.entries(pl.expensesByCategory).map(([cat, amount]) => (
               <div key={cat} className="contents">
                 <span className="text-muted-foreground">{cat}</span>
-                <span className="text-right font-medium text-destructive">-{fmt(amount)}</span>
+                <span className="text-right font-medium text-destructive">-{fmt(amount as number)}</span>
               </div>
             ))}
             <span className="font-semibold border-t border-border pt-2">Σύνολο Εξόδων</span>

@@ -186,9 +186,16 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
         try {
           const parsed = await parseFiles([file]);
           if (parsed.length > 0) {
+            // Truncate to ~80K chars to stay within Claude's context limit
+            const MAX_CHARS = 80000;
+            let docText = parsed[0].content;
+            const truncated = docText.length > MAX_CHARS;
+            if (truncated) {
+              docText = docText.slice(0, MAX_CHARS) + '\n\n... [Περικόπηκε λόγω μεγέθους]';
+            }
             contentParts.push({
               type: 'text',
-              text: `📎 ${file.name} (${parsed[0].metadata.pagesProcessed || '?'} σελίδες, ${parsed[0].metadata.wordCount} λέξεις)\n\n${parsed[0].content}`,
+              text: `📎 ${file.name} (${parsed[0].metadata.pagesProcessed || '?'} σελίδες, ${parsed[0].metadata.wordCount} λέξεις${truncated ? ', περικοπή' : ''})\n\n${docText}`,
             });
           }
         } catch (err) {

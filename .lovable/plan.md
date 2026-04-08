@@ -1,51 +1,45 @@
 
 
-# Fix Smart Reschedule & Add Rescheduled Indicator
+# Quick Chat Bar — Floating Bottom AI Chat
 
-## Problems
-1. **AI modifies estimated_hours**: The system prompt tells the AI to split tasks across days using estimated_hours, but the tool schema only has `task_id` and `due_date`. The user reports estimated_hours being changed — this is likely the AI returning extra fields or the frontend misinterpreting data. Need to add explicit instruction "NEVER modify estimated_hours" to the prompt and ensure the frontend only updates `due_date`.
-2. **No visual indicator for rescheduled tasks**: When overdue tasks get moved to new dates, there's no trace of the original date or indication that the task was rescheduled.
+## Concept
+A compact chat bar fixed at the bottom of the screen (like the uploaded screenshot), triggered by a TopBar button or keyboard shortcut (⌘+I). It connects to the same Secretary AI agent but in a minimal, non-intrusive overlay — no sidebar, no full page.
 
 ## Changes
 
-### 1. Database: Add `rescheduled_from` column to tasks
-Add a nullable `rescheduled_from` timestamp column to the `tasks` table. When smart reschedule moves a task, the original `due_date` is stored here.
+### 1. New `QuickChatBar` Component
+A fixed-position bar at the bottom center of the viewport:
+- Collapsed state: single-line input with placeholder "What can I help you with today?", "New Chat" dropdown, send button
+- Expanded state: shows recent messages above the input (max ~300px height), scrollable
+- Uses the same `sendMessage` logic from SecretaryChat (calls `secretary-agent` edge function with SSE streaming)
+- Maintains its own lightweight conversation state (messages array, conversationId)
+- "New Chat" button resets the conversation
+- Shortcut: `⌘+I` (or `Ctrl+I`) toggles visibility
+- Clicking outside or pressing `Escape` collapses/hides it
+- Smooth slide-up animation on open
 
-```sql
-ALTER TABLE public.tasks ADD COLUMN rescheduled_from timestamptz DEFAULT NULL;
-```
+### 2. TopBar: Add Quick Chat Button
+Add a sparkle/bot icon button next to the Work Mode button in the right actions area. Clicking it toggles the QuickChatBar visibility via a shared state (context or callback prop).
 
-### 2. Edge Function: Reinforce no estimated_hours modification
-Update the system prompt in `smart-reschedule/index.ts`:
-- Add explicit rule: "NEVER change estimated_hours — use the provided values as-is for scheduling duration, but do NOT return them"
-- Ensure the tool schema remains `task_id` + `due_date` only (already correct)
+### 3. State Management
+Add `quickChatOpen` state in the main layout (`AppLayout` or similar) and pass toggle function to TopBar. The `QuickChatBar` component mounts globally (always in DOM, visibility toggled).
 
-### 3. Frontend: Store original date on reschedule
-In `MyWorkCalendar.tsx` `handleSmartReschedule`, when updating tasks:
-- Save the old `due_date` as `rescheduled_from` before setting the new one
-- Only update `due_date` (not estimated_hours — already the case, but verify)
+### 4. Keyboard Shortcut
+Global `⌘+I` / `Ctrl+I` listener in the QuickChatBar component to toggle open/close.
 
-```typescript
-// For each assignment, store original due_date
-const task = allTasks.find(t => t.id === a.task_id);
-await supabase.from('tasks').update({
-  due_date: a.due_date,
-  rescheduled_from: task?.due_date || null,
-}).eq('id', a.task_id);
-```
+## Technical Details
 
-### 4. Calendar: Rescheduled indicator
-In the calendar task block rendering, if a task has `rescheduled_from`, show a small icon (e.g. `↻` or a `RefreshCw` icon) with a tooltip showing the original date.
-
-### 5. Tasks views: Rescheduled badge
-In task list/table views, show a small "Μεταφέρθηκε" badge or icon next to tasks that have `rescheduled_from` set, with the original date in a tooltip.
+- The bar reuses the SSE streaming logic from SecretaryChat (fetch to `secretary-agent`, parse SSE events)
+- Messages rendered with ReactMarkdown (same as SecretaryChat)
+- Conversation persisted to `secretary_conversations` / `secretary_messages` tables
+- The bar sits at `fixed bottom-0 left-1/2 -translate-x-1/2` with `max-w-2xl w-full`
+- z-index high enough to overlay content but below modals
 
 ## Files
 
 | File | Change |
 |------|--------|
-| Migration | Add `rescheduled_from` column to `tasks` |
-| `supabase/functions/smart-reschedule/index.ts` | Add "NEVER modify estimated_hours" to prompt |
-| `src/components/my-work/MyWorkCalendar.tsx` | Save `rescheduled_from` on reschedule, show `↻` icon on rescheduled task blocks |
-| `src/components/tasks/TasksTableView.tsx` | Show rescheduled indicator in task rows |
+| `src/components/quick-chat/QuickChatBar.tsx` | New — floating bottom chat bar with streaming AI, conversation management |
+| `src/components/layout/TopBar.tsx` | Add bot/sparkle icon button that toggles quick chat |
+| `src/components/layout/AppLayout.tsx` (or equivalent) | Add `quickChatOpen` state, render `QuickChatBar`, pass toggle to TopBar |
 

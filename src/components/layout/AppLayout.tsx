@@ -341,7 +341,6 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
       <QuickChatBar isOpen={quickChatOpen} onToggle={toggleQuickChat} />
       </div>
     </div>
-    </div>
   );
 }
 

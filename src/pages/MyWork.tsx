@@ -535,6 +535,22 @@ export default function MyWork() {
       {/* ── Quick Notes ── */}
       <QuickNotes />
 
+      {/* ── Team Radar + Intel Feed (admin/manager only) ── */}
+      {(showTeamRadar || showIntel) && (
+        <div className="grid gap-5 lg:grid-cols-2">
+          {showTeamRadar && <CCTeamRadar />}
+          {showIntel && <CCIntelFeed />}
+        </div>
+      )}
+
+      {/* ── Quick Actions ── */}
+      {!isViewer && (
+        <CCQuickActions
+          isAdmin={isAdmin || isOwner}
+          isManager={isManager}
+          isMember={isMember}
+        />
+      )}
 
       </div>
 

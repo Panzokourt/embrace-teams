@@ -1859,8 +1859,31 @@ serve(async (req) => {
     const companyRole = companyRoleRes.data;
     const companyId = companyRole?.company_id || "";
 
-    // Fetch Brain alerts (high-priority insights from last 48h)
-    const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    // Fetch Brain alerts and user memories in parallel
+    const twoDaysAgo2 = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+
+    const [brainAlertsRes, memoriesRes] = await Promise.all([
+      supabase
+        .from("brain_insights")
+        .select("id, title, category, priority, body")
+        .eq("company_id", companyId)
+        .eq("is_dismissed", false)
+        .eq("is_actioned", false)
+        .eq("priority", "high")
+        .gte("created_at", twoDaysAgo2)
+        .order("created_at", { ascending: false })
+        .limit(5),
+      supabase
+        .from("secretary_memory")
+        .select("category, key, content, updated_at")
+        .eq("user_id", userId)
+        .eq("company_id", companyId)
+        .order("updated_at", { ascending: false })
+        .limit(15),
+    ]);
+
+    const brainAlerts = brainAlertsRes.data;
+    const userMemories = memoriesRes.data || [];
     const { data: brainAlerts } = await supabase
       .from("brain_insights")
       .select("id, title, category, priority, body")

@@ -565,6 +565,70 @@ const toolDefinitions = [
       parameters: { type: "object", properties: {} },
     },
   },
+  // ── MEMORY TOOLS ──
+  {
+    type: "function",
+    function: {
+      name: "save_memory",
+      description: "Save an important fact, file analysis summary, decision, or user preference to persistent memory. Call this after analyzing files, making decisions, or learning user preferences. This helps you remember across conversations.",
+      parameters: {
+        type: "object",
+        properties: {
+          category: { type: "string", enum: ["general", "file_analysis", "decision", "preference", "project_context"], description: "Memory category" },
+          key: { type: "string", description: "Short identifier, e.g. 'creative_brief_govgr' or 'user_prefers_greek'" },
+          content: { type: "string", description: "The memory content - summary, key findings, decisions made" },
+          metadata: { type: "object", description: "Optional metadata (file names, entity IDs, etc.)" },
+        },
+        required: ["category", "key", "content"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "recall_memory",
+      description: "Search your persistent memory for relevant information. Use when the user references something discussed before, asks about previous analyses, or you need context from past interactions.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Search query" },
+          category: { type: "string", enum: ["general", "file_analysis", "decision", "preference", "project_context"], description: "Optional category filter" },
+          limit: { type: "number", description: "Max results (default 10)" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_past_chats",
+      description: "Search through previous Secretary conversations for relevant context. Use when the user says 'we discussed this before' or you need to find past conversation details.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Search query" },
+          limit: { type: "number", description: "Max results (default 20)" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_chat_channels",
+      description: "Search through team chat channels for relevant messages. Use when the user asks about team discussions or you need context from internal communications.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Search query" },
+          limit: { type: "number", description: "Max results (default 20)" },
+        },
+        required: ["query"],
+      },
+    },
+  },
 ];
 
 // ── Tool execution ────────────────────────────────────────────────

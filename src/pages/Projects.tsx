@@ -35,6 +35,7 @@ import { toast } from 'sonner';
 import {
   FolderKanban, Plus, Search, Calendar, DollarSign, Loader2,
   Paperclip, Sparkles, Upload, Building2, Users2,
+  Circle, Clock, AlertCircle, CheckCircle2, XCircle, Handshake,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import {
@@ -46,6 +47,7 @@ import { DraggableCard } from '@/components/dnd/DraggableCard';
 import { DroppableColumn } from '@/components/dnd/DroppableColumn';
 import { cn } from '@/lib/utils';
 import { GripVertical, Pencil, Trash2 } from 'lucide-react';
+import { el } from 'date-fns/locale';
 import { el } from 'date-fns/locale';
 
 type ProjectStatus = 'lead' | 'proposal' | 'negotiation' | 'won' | 'active' | 'completed' | 'cancelled' | 'lost' | 'tender';

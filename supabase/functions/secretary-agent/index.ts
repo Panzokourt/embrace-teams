@@ -633,6 +633,55 @@ const toolDefinitions = [
       },
     },
   },
+  // ── WIKI & FILES TOOLS ──
+  {
+    type: "function",
+    function: {
+      name: "search_wiki",
+      description: "Search the company Knowledge Base (wiki) for articles about policies, procedures, know-how, or any documented knowledge. Use when the user asks about processes, guidelines, or information that may be documented.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Search query" },
+          tags: { type: "array", items: { type: "string" }, description: "Optional tag filters" },
+          limit: { type: "number", description: "Max results (default 10)" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "save_to_wiki",
+      description: "Save content as a Knowledge Base article. Use after analyzing files, generating insights, or when the user wants to document something. Creates a new article or updates an existing one.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Article title" },
+          body: { type: "string", description: "Article content in markdown. Use [[Page Title]] syntax for cross-references." },
+          tags: { type: "array", items: { type: "string" }, description: "Tags for categorization" },
+          existing_article_id: { type: "string", description: "If updating an existing article, provide its ID" },
+          article_type: { type: "string", enum: ["wiki", "policy", "how-to", "faq"], description: "Type of article (default: wiki)" },
+        },
+        required: ["title", "body"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_project_files",
+      description: "List files and folders for a specific project or folder. Use when the user asks about project documents or you need to understand what files exist.",
+      parameters: {
+        type: "object",
+        properties: {
+          project_id: { type: "string", description: "Project ID to list files for" },
+          folder_id: { type: "string", description: "Specific folder ID to list contents of" },
+        },
+      },
+    },
+  },
 ];
 
 // ── Tool execution ────────────────────────────────────────────────

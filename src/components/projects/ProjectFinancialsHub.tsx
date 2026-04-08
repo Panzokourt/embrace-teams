@@ -5,13 +5,15 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { ProjectFinancialsManager } from '@/components/projects/ProjectFinancialsManager';
 import { ProjectPLReport } from '@/components/projects/ProjectPLReport';
-import { DollarSign, Receipt, BarChart3, TrendingUp, TrendingDown, Wallet, Target } from 'lucide-react';
+import { ProjectFinancialStepper } from '@/components/projects/ProjectFinancialStepper';
+import { DollarSign, Receipt, BarChart3, TrendingUp, TrendingDown, Wallet, Target, Activity } from 'lucide-react';
 
 interface ProjectFinancialsHubProps {
   projectId: string;
   clientId?: string | null;
   projectBudget: number;
   agencyFeePercentage: number;
+  isInternal?: boolean;
 }
 
 interface KPIData {
@@ -200,11 +202,16 @@ export function ProjectFinancialsHub({
   clientId,
   projectBudget,
   agencyFeePercentage,
+  isInternal,
 }: ProjectFinancialsHubProps) {
   return (
     <div className="space-y-4">
-      <Tabs defaultValue="overview" className="space-y-4">
+      <Tabs defaultValue="lifecycle" className="space-y-4">
         <TabsList className="bg-muted/50">
+          <TabsTrigger value="lifecycle" className="gap-1.5">
+            <Activity className="h-3.5 w-3.5" />
+            Κύκλος Ζωής
+          </TabsTrigger>
           <TabsTrigger value="overview" className="gap-1.5">
             <BarChart3 className="h-3.5 w-3.5" />
             Budget Overview
@@ -218,6 +225,10 @@ export function ProjectFinancialsHub({
             P&L Report
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="lifecycle">
+          <ProjectFinancialStepper projectId={projectId} isInternal={isInternal} />
+        </TabsContent>
 
         <TabsContent value="overview">
           <BudgetOverview

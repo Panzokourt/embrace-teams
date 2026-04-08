@@ -171,7 +171,11 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
 
       // Plain text files → read directly
       if (TEXT_EXTENSIONS.includes(ext) || file.type.startsWith('text/')) {
-        const text = await file.text();
+        let text = await file.text();
+        const MAX_TEXT = 80000;
+        if (text.length > MAX_TEXT) {
+          text = text.slice(0, MAX_TEXT) + '\n\n... [Περικόπηκε λόγω μεγέθους]';
+        }
         contentParts.push({
           type: 'text',
           text: `📎 ${file.name}\n\n${text}`,

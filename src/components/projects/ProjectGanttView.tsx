@@ -299,14 +299,50 @@ export function ProjectGanttView({ projects, onProjectUpdated }: ProjectGanttVie
                                 <PopoverTrigger asChild>
                                   <TooltipTrigger asChild>
                                     <div
-                                      className="absolute top-1.5 h-6 rounded-md cursor-pointer z-20 transition-all hover:brightness-110 hover:shadow-md overflow-hidden"
-                                      style={{ left: `${pos.leftPct}%`, width: `${Math.max(pos.widthPct, 1)}%`, backgroundColor: isOverdue ? '#ef4444' : cfg.barColor, opacity: 0.85 }}
-                                      onClick={(e) => handleBarClick(project, e)}
+                                      className="absolute top-1.5 h-6 rounded-md cursor-grab z-20 transition-all hover:brightness-110 hover:shadow-md overflow-hidden group/bar"
+                                      style={{
+                                        left: `${(() => {
+                                          const dates = getOverriddenDates(project.id, project.start_date || '', project.end_date || '');
+                                          const oStart = parseISO(dates.start);
+                                          const oEnd = parseISO(dates.end);
+                                          const oPos = getBarPosition(oStart, oEnd, timelineStart, timelineEnd);
+                                          return oPos ? oPos.leftPct : pos.leftPct;
+                                        })()}%`,
+                                        width: `${(() => {
+                                          const dates = getOverriddenDates(project.id, project.start_date || '', project.end_date || '');
+                                          const oStart = parseISO(dates.start);
+                                          const oEnd = parseISO(dates.end);
+                                          const oPos = getBarPosition(oStart, oEnd, timelineStart, timelineEnd);
+                                          return Math.max(oPos ? oPos.widthPct : pos.widthPct, 1);
+                                        })()}%`,
+                                        backgroundColor: isOverdue ? '#ef4444' : cfg.barColor,
+                                        opacity: isDragging(project.id) ? 0.7 : 0.85,
+                                      }}
+                                      onClick={(e) => { if (!wasDragged()) handleBarClick(project, e); }}
+                                      onMouseDown={(e) => {
+                                        if (project.start_date && project.end_date) {
+                                          onDragStart(e, project.id, 'move', project.start_date, project.end_date);
+                                        }
+                                      }}
                                     >
+                                      {/* Resize handle left */}
+                                      {project.start_date && project.end_date && (
+                                        <div
+                                          className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover/bar:opacity-100 bg-white/20 rounded-l-md z-30"
+                                          onMouseDown={(e) => { e.stopPropagation(); onDragStart(e, project.id, 'resize-start', project.start_date!, project.end_date!); }}
+                                        />
+                                      )}
                                       {progress > 0 && <div className="absolute inset-0 opacity-30 bg-background" style={{ width: `${100 - progress}%`, right: 0, left: 'auto' }} />}
                                       <div className="px-1.5 flex items-center h-full">
-                                        <span className="text-[10px] font-medium text-white truncate drop-shadow-sm">{pos.widthPct > 3 ? project.name : ''}</span>
+                                        <span className="text-[10px] font-medium text-white truncate drop-shadow-sm select-none">{pos.widthPct > 3 ? project.name : ''}</span>
                                       </div>
+                                      {/* Resize handle right */}
+                                      {project.start_date && project.end_date && (
+                                        <div
+                                          className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover/bar:opacity-100 bg-white/20 rounded-r-md z-30"
+                                          onMouseDown={(e) => { e.stopPropagation(); onDragStart(e, project.id, 'resize-end', project.start_date!, project.end_date!); }}
+                                        />
+                                      )}
                                     </div>
                                   </TooltipTrigger>
                                 </PopoverTrigger>

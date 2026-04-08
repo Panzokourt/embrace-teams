@@ -2016,7 +2016,7 @@ serve(async (req) => {
     }
     const userId = claimsData.claims.sub;
 
-    const { messages, current_page } = await req.json();
+    const { messages, current_page, page_context } = await req.json();
 
     // Fetch user context in parallel
     const today = new Date().toISOString().split("T")[0];
@@ -2105,18 +2105,68 @@ serve(async (req) => {
       brainAlertParts.push(`Αν σχετίζονται με αυτά που ρωτά ο χρήστης, ανέφερέ τα και πρότεινε "Θες να φτιάξω project/task γι' αυτό;"`);
     }
 
-    // Build context awareness
+    // Build context awareness — rich page context from sidebar
     let pageContext = "";
-    if (current_page) {
+    if (page_context && page_context.pageType !== "general") {
+      const pc = page_context;
+      const pd = pc.pageData || {};
+      const lines: string[] = [`\n## Τρέχουσα Σελίδα\nΟ χρήστης βλέπει αυτή τη στιγμή: [${pc.pageType}] "${pc.pageName}"`];
+
+      if (pc.pageType === "task") {
+        if (pd.title) lines.push(`- Τίτλος: ${pd.title}`);
+        if (pd.status) lines.push(`- Status: ${pd.status}`);
+        if (pd.priority) lines.push(`- Priority: ${pd.priority}`);
+        if (pd.due_date) lines.push(`- Deadline: ${pd.due_date}`);
+        if (pd.assigned_to) lines.push(`- Υπεύθυνος: ${pd.assigned_to}`);
+        if (pd.project_name) lines.push(`- Project: "${pd.project_name}" (id: ${pd.project_id})`);
+        if (pd.description) lines.push(`- Περιγραφή: ${pd.description}`);
+        lines.push(`- ${pd.subtasks_count || 0} subtasks (${pd.subtasks_completed || 0} ολοκληρωμένα), ${pd.comments_count || 0} σχόλια`);
+      } else if (pc.pageType === "project") {
+        if (pd.name) lines.push(`- Όνομα: ${pd.name}`);
+        if (pd.status) lines.push(`- Status: ${pd.status}`);
+        if (pd.client_name) lines.push(`- Πελάτης: ${pd.client_name} (id: ${pd.client_id})`);
+        if (pd.budget) lines.push(`- Budget: €${pd.budget}`);
+        if (pd.progress != null) lines.push(`- Progress: ${pd.progress}%`);
+        if (pd.start_date) lines.push(`- Περίοδος: ${pd.start_date} → ${pd.end_date || "N/A"}`);
+        if (pd.total_tasks) lines.push(`- Tasks: ${pd.total_tasks} σύνολο (${JSON.stringify(pd.tasks_by_status)})`);
+        if (pd.team?.length) lines.push(`- Ομάδα: ${pd.team.map((m: any) => `${m.name} (${m.role})`).join(", ")}`);
+      } else if (pc.pageType === "client") {
+        if (pd.name) lines.push(`- Όνομα: ${pd.name}`);
+        if (pd.email) lines.push(`- Email: ${pd.email}`);
+        if (pd.phone) lines.push(`- Τηλ: ${pd.phone}`);
+        if (pd.sector) lines.push(`- Κλάδος: ${pd.sector}`);
+        lines.push(`- Projects: ${pd.active_projects || 0} ενεργά / ${pd.total_projects || 0} σύνολο`);
+        if (pd.recent_projects?.length) lines.push(`- Πρόσφατα: ${pd.recent_projects.map((p: any) => `${p.name} (${p.status})`).join(", ")}`);
+      } else if (pc.pageType === "article") {
+        if (pd.title) lines.push(`- Τίτλος: ${pd.title}`);
+        if (pd.type) lines.push(`- Τύπος: ${pd.type}`);
+        if (pd.status) lines.push(`- Status: ${pd.status}`);
+        if (pd.tags?.length) lines.push(`- Tags: ${pd.tags.join(", ")}`);
+        if (pd.word_count) lines.push(`- ${pd.word_count} λέξεις, ${pd.backlinks_count || 0} backlinks`);
+      } else if (pc.pageType === "brain") {
+        if (pd.latest_insights?.length) {
+          lines.push(`- Τελευταία insights:`);
+          pd.latest_insights.forEach((i: any) => lines.push(`  • [${i.priority}/${i.category}] ${i.title}`));
+        }
+      } else if (pc.pageType === "calendar") {
+        lines.push(`- ${pd.today_events_count || 0} events σήμερα`);
+        if (pd.upcoming?.length) {
+          lines.push(`- Επόμενα:`);
+          pd.upcoming.forEach((e: any) => lines.push(`  • ${e.title} (${e.time})`));
+        }
+      } else if (pc.pageType === "timesheets") {
+        lines.push(`- Ώρες εβδομάδας: ${pd.week_logged_hours || 0}h (${pd.week_logged_minutes || 0} λεπτά)`);
+      }
+
+      lines.push(`\nΣΗΜΑΝΤΙΚΟ: Απάντα ΠΑΝΤΑ με context αυτής της σελίδας. Αν ο χρήστης ρωτήσει "τι status έχει;" ή "ποιος το κάνει;" εννοεί αυτό το ${pc.pageType}. Μην ρωτάς "ποιο εννοείς;". Χρησιμοποίησε τα entity IDs για tool calls χωρίς να τα ρωτάς.`);
+      pageContext = lines.join("\n");
+    } else if (current_page) {
       pageContext = `\nΟ χρήστης βρίσκεται στη σελίδα: ${current_page}
 Προσάρμοσε τις προτάσεις σου ανάλογα:
-- Αν είναι σε /projects/:id → πρότεινε ενέργειες για αυτό το project (tasks, team, status update)
+- Αν είναι σε /projects/:id → πρότεινε ενέργειες για αυτό το project
 - Αν είναι σε /tasks → πρότεινε δημιουργία/ενημέρωση tasks
 - Αν είναι σε /clients/:id → πρότεινε ενέργειες για τον πελάτη
 - Αν είναι σε /calendar → πρότεινε δημιουργία events
-- Αν είναι σε /timesheets → πρότεινε καταχώρηση χρόνου
-- Αν είναι σε /chat → πρότεινε αποστολή μηνυμάτων
-- Αν είναι σε /dashboard → προσφέρε γενική επισκόπηση
 - Αν είναι σε /brain → πρότεινε ανάλυση Brain ή εμφάνιση insights`;
     }
 

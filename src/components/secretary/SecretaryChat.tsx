@@ -9,6 +9,7 @@ import ConversationSidebar from "./ConversationSidebar";
 import { parseAndRenderContent } from "./ActionRenderer";
 import { useLocation } from "react-router-dom";
 import { useDocumentParser } from "@/hooks/useDocumentParser";
+import { usePageContext } from "@/hooks/usePageContext";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -99,6 +100,7 @@ export default function SecretaryChat({ mode, registerSendHandler, onOpenMemory 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
   const location = useLocation();
+  const pageContext = usePageContext();
 
   const { parseFiles } = useDocumentParser();
   const quickActions = useMemo(() => getContextualQuickActions(location.pathname), [location.pathname]);
@@ -330,6 +332,7 @@ export default function SecretaryChat({ mode, registerSendHandler, onOpenMemory 
           body: JSON.stringify({
             messages: payloadMessages,
             current_page: location.pathname,
+            page_context: mode === "panel" ? pageContext : undefined,
           }),
         }
       );

@@ -58,6 +58,7 @@ interface MyProject {
 }
 
 type SortMode = 'manual' | 'date' | 'priority' | 'project' | 'status';
+type SortDir = 'asc' | 'desc';
 
 const SORT_OPTIONS: { value: SortMode; label: string }[] = [
   { value: 'manual', label: 'Χειροκίνητα' },
@@ -93,6 +94,7 @@ export function TodayTasksCard({
   userId, myProjects, onTaskCreated, onTaskUpdated,
 }: TodayTasksCardProps) {
   const [sortMode, setSortMode] = useState<SortMode>('date');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [manualOrder, setManualOrder] = useState<string[]>([]);
   const [expandedSubtasks, setExpandedSubtasks] = useState<Set<string>>(new Set());
   const [subtasksData, setSubtasksData] = useState<Record<string, TaskItem[]>>({});
@@ -126,19 +128,20 @@ export function TodayTasksCard({
 
   const sortedTasks = useMemo(() => {
     const tasks = [...todayTasks];
+    const dir = sortDir === 'asc' ? 1 : -1;
     switch (sortMode) {
       case 'date':
         return tasks.sort((a, b) => {
           if (!a.due_date) return 1;
           if (!b.due_date) return -1;
-          return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+          return dir * (new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
         });
       case 'priority':
-        return tasks.sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 99) - (PRIORITY_ORDER[b.priority] ?? 99));
+        return tasks.sort((a, b) => dir * ((PRIORITY_ORDER[a.priority] ?? 99) - (PRIORITY_ORDER[b.priority] ?? 99)));
       case 'project':
-        return tasks.sort((a, b) => ((a.project as any)?.name || '').localeCompare((b.project as any)?.name || ''));
+        return tasks.sort((a, b) => dir * ((a.project as any)?.name || '').localeCompare((b.project as any)?.name || ''));
       case 'status':
-        return tasks.sort((a, b) => a.status.localeCompare(b.status));
+        return tasks.sort((a, b) => dir * a.status.localeCompare(b.status));
       case 'manual':
         if (manualOrder.length === 0) return tasks;
         return tasks.sort((a, b) => {
@@ -149,7 +152,7 @@ export function TodayTasksCard({
       default:
         return tasks;
     }
-  }, [todayTasks, sortMode, manualOrder]);
+  }, [todayTasks, sortMode, sortDir, manualOrder]);
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -228,17 +231,29 @@ export function TodayTasksCard({
                   {SORT_OPTIONS.find(o => o.value === sortMode)?.label}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-40 p-1" align="end">
+              <PopoverContent className="w-44 p-1" align="end">
                 {SORT_OPTIONS.map(opt => (
                   <button
                     key={opt.value}
                     className={cn(
-                      "w-full text-left text-sm px-3 py-1.5 rounded-lg hover:bg-accent/50 transition-colors",
+                      "w-full text-left text-sm px-3 py-1.5 rounded-lg hover:bg-accent/50 transition-colors flex items-center justify-between",
                       sortMode === opt.value && "bg-accent font-medium"
                     )}
-                    onClick={() => setSortMode(opt.value)}
+                    onClick={() => {
+                      if (sortMode === opt.value && opt.value !== 'manual') {
+                        setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+                      } else {
+                        setSortMode(opt.value);
+                        setSortDir('asc');
+                      }
+                    }}
                   >
                     {opt.label}
+                    {sortMode === opt.value && opt.value !== 'manual' && (
+                      <span className="text-[10px] text-muted-foreground">
+                        {sortDir === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
                   </button>
                 ))}
               </PopoverContent>

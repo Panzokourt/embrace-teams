@@ -18,6 +18,7 @@ import { ProjectContractsCard } from '@/components/projects/ProjectContractsCard
 import { ProjectCommentsAndHistory } from '@/components/projects/ProjectCommentsAndHistory';
 import { ProjectMediaPlansCard } from '@/components/projects/ProjectMediaPlansCard';
 import { ProjectWorkflowTracker } from '@/components/projects/ProjectWorkflowTracker';
+import { ProjectFinancialStepperMini } from '@/components/projects/ProjectFinancialStepper';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';

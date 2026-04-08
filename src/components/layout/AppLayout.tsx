@@ -251,9 +251,19 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
 
   return (
     <div className={cn(
-      "flex h-screen bg-background relative overflow-hidden",
+      "flex flex-col h-screen bg-background relative overflow-hidden",
       density === 'compact' ? 'density-compact' : 'density-comfortable'
     )}>
+      {/* Full-width TopBar */}
+      <TopBar
+        onPanelToggle={togglePanelSimple}
+        rightPanelOpen={rightPanelOpen}
+        onMobileMenuToggle={() => setMobileSidebarOpen(true)}
+        showHamburger={sidebarMode === 'hidden'}
+        onQuickChatToggle={toggleQuickChat}
+      />
+
+      <div className="flex flex-1 min-h-0 overflow-hidden">
       {/* Mobile sidebar as Sheet */}
       {sidebarMode === 'hidden' && (
         <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
@@ -284,13 +294,6 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
 
       {/* Main content area */}
       <div className="flex-1 min-w-0 flex flex-col h-full">
-        <TopBar
-          onPanelToggle={togglePanelSimple}
-          rightPanelOpen={rightPanelOpen}
-          onMobileMenuToggle={() => setMobileSidebarOpen(true)}
-          showHamburger={sidebarMode === 'hidden'}
-          onQuickChatToggle={toggleQuickChat}
-        />
         <main className="flex-1 overflow-auto">
           <Outlet />
         </main>
@@ -336,6 +339,8 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
       <ChatFloatingBubbles />
       <FocusOverlay />
       <QuickChatBar isOpen={quickChatOpen} onToggle={toggleQuickChat} />
+      </div>
+    </div>
     </div>
   );
 }

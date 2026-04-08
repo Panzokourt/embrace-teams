@@ -52,10 +52,10 @@ export default function Onboarding() {
 
   // If user already has an active company role, redirect
   useEffect(() => {
-    if (companyRole) {
+    if (companyRole && profile?.onboarding_completed) {
       navigate('/', { replace: true });
     }
-  }, [companyRole, navigate]);
+  }, [companyRole, profile, navigate]);
 
   // Auto-onboard check on mount
   useEffect(() => {

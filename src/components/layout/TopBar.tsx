@@ -161,7 +161,7 @@ export default function TopBar({ onPanelToggle, rightPanelOpen, onMobileMenuTogg
       {!isMobile && <div className="w-px h-5 bg-border/50 shrink-0" />}
 
       {/* Search */}
-      <div className="flex-1 min-w-0 max-w-xl">
+      <div className="flex-1 min-w-0 max-w-2xl">
         <Popover open={searchOpen} onOpenChange={setSearchOpen}>
           <PopoverTrigger asChild>
             <button

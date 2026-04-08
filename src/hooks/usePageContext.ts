@@ -119,7 +119,7 @@ export function usePageContext(): PageContext {
     const [projectRes, taskCountsRes, teamRes] = await Promise.all([
       supabase
         .from("projects")
-        .select("id, name, status, budget, net_budget, progress, start_date, end_date, client_id, clients(name)")
+        .select("id, name, status, budget, progress, start_date, end_date, client_id, clients(name)")
         .eq("id", projectId)
         .single(),
       supabase

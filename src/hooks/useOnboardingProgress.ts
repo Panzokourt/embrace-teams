@@ -13,11 +13,12 @@ export function useOnboardingProgress() {
   const { user, profile, company } = useAuth();
   const [steps, setSteps] = useState<OnboardingStep[]>([]);
   const [loading, setLoading] = useState(true);
+  const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | null>(null);
 
-  const isComplete = profile?.onboarding_completed === true;
+  const isComplete = onboardingCompleted === true;
 
   useEffect(() => {
-    if (!user || isComplete) {
+    if (!user) {
       setLoading(false);
       return;
     }
@@ -25,9 +26,23 @@ export function useOnboardingProgress() {
     const checkProgress = async () => {
       setLoading(true);
       try {
-        const companyDone = !!company?.id;
+        // Fetch onboarding status from DB directly
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('onboarding_completed, phone, job_title, avatar_url')
+          .eq('id', user.id)
+          .single();
 
-        const profileDone = !!(profile?.phone || profile?.job_title || profile?.avatar_url);
+        const completed = profileData?.onboarding_completed === true;
+        setOnboardingCompleted(completed);
+
+        if (completed) {
+          setLoading(false);
+          return;
+        }
+
+        const companyDone = !!company?.id;
+        const profileDone = !!(profileData?.phone || profileData?.job_title || profileData?.avatar_url);
 
         let teamDone = false;
         let clientDone = false;
@@ -66,7 +81,7 @@ export function useOnboardingProgress() {
     };
 
     checkProgress();
-  }, [user, profile, company, isComplete]);
+  }, [user, profile, company]);
 
   const completedCount = steps.filter(s => s.completed).length;
   const totalCount = steps.length || 6;
@@ -75,6 +90,7 @@ export function useOnboardingProgress() {
   const markComplete = async () => {
     if (!user) return;
     await supabase.from('profiles').update({ onboarding_completed: true }).eq('id', user.id);
+    setOnboardingCompleted(true);
   };
 
   return { steps, completedCount, totalCount, percent, isComplete, loading, markComplete };

@@ -27,12 +27,12 @@ export default function CCTeamRadar() {
 
       const { data: tasks } = await supabase
         .from('tasks')
-        .select('assignee_id')
+        .select('assigned_to')
         .in('status', ['todo', 'in_progress', 'review', 'internal_review', 'client_review']);
 
       const countMap: Record<string, number> = {};
       tasks?.forEach(t => {
-        if (t.assignee_id) countMap[t.assignee_id] = (countMap[t.assignee_id] || 0) + 1;
+        if (t.assigned_to) countMap[t.assigned_to] = (countMap[t.assigned_to] || 0) + 1;
       });
 
       const result = profiles.map(p => ({

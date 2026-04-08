@@ -37,11 +37,17 @@ export default function CommandCenter() {
 
   const fetchData = async () => {
     try {
+      const today = new Date().toISOString().split('T')[0];
+      const todayStart = `${today}T00:00:00`;
+      const todayEnd = `${today}T23:59:59`;
+
       const [projectsRes, tasksRes, timeRes] = await Promise.all([
-        supabase.from('projects').select('id, status, budget'),
-        supabase.from('tasks').select('id, title, status, priority, due_date, assignee_id, project_id'),
-        supabase.from('time_entries').select('hours, date').eq('user_id', user!.id)
-          .eq('date', new Date().toISOString().split('T')[0]),
+        supabase.from('projects').select('id, status, budget, name'),
+        supabase.from('tasks').select('id, title, status, priority, due_date, assigned_to, project_id'),
+        supabase.from('time_entries').select('duration_minutes, start_time')
+          .eq('user_id', user!.id)
+          .gte('start_time', todayStart)
+          .lte('start_time', todayEnd),
       ]);
 
       const projects = projectsRes.data || [];
@@ -55,25 +61,14 @@ export default function CommandCenter() {
       const lostProjects = projects.filter(p => p.status === 'lost');
       const totalDecided = wonProjects.length + lostProjects.length;
 
-      const today = new Date().toISOString().split('T')[0];
-      const myPendingTasks = tasks.filter(t => t.assignee_id === user!.id && t.status !== 'completed');
+      const myPendingTasks = tasks.filter(t => t.assigned_to === user!.id && t.status !== 'completed');
       const overdueTasks = tasks.filter(t => t.due_date && t.due_date < today && t.status !== 'completed');
       const todayCompleted = tasks.filter(t =>
-        t.assignee_id === user!.id && t.status === 'completed'
+        t.assigned_to === user!.id && t.status === 'completed'
       );
 
-      // Get project names for tasks
       const projectMap: Record<string, string> = {};
-      projects.forEach(p => { projectMap[p.id] = ''; });
-      // Fetch project names
-      const projectIds = [...new Set(myPendingTasks.map(t => t.project_id).filter(Boolean))];
-      if (projectIds.length > 0) {
-        const { data: projNames } = await supabase
-          .from('projects')
-          .select('id, name')
-          .in('id', projectIds);
-        projNames?.forEach(p => { projectMap[p.id] = p.name; });
-      }
+      projects.forEach(p => { projectMap[p.id] = p.name; });
 
       const myActiveTasks = myPendingTasks.map(t => ({
         id: t.id,
@@ -84,6 +79,8 @@ export default function CommandCenter() {
         due_date: t.due_date,
       }));
 
+      const hoursToday = timeEntries.reduce((s, e) => s + ((e.duration_minutes || 0) / 60), 0);
+
       setData({
         pipelineValue: pipelineProjects.reduce((s, p) => s + (p.budget || 0), 0),
         activeProjects: activeProjects.length,
@@ -92,7 +89,7 @@ export default function CommandCenter() {
         winRate: totalDecided > 0 ? Math.round((wonProjects.length / totalDecided) * 100) : 0,
         pendingInvoices: 0,
         tasksCompletedToday: todayCompleted.length,
-        hoursToday: timeEntries.reduce((s, e) => s + (e.hours || 0), 0),
+        hoursToday,
         myActiveTasks,
       });
     } catch (err) {

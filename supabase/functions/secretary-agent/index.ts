@@ -1884,16 +1884,7 @@ serve(async (req) => {
 
     const brainAlerts = brainAlertsRes.data;
     const userMemories = memoriesRes.data || [];
-    const { data: brainAlerts } = await supabase
-      .from("brain_insights")
-      .select("id, title, category, priority, body")
-      .eq("company_id", companyId)
-      .eq("is_dismissed", false)
-      .eq("is_actioned", false)
-      .eq("priority", "high")
-      .gte("created_at", twoDaysAgo)
-      .order("created_at", { ascending: false })
-      .limit(5);
+    // (brain alerts already fetched above in parallel)
 
     const overdueCount = overdueRes.count || 0;
     const behindScheduleCount = (behindScheduleRes.data || []).length;

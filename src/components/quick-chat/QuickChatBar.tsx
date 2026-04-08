@@ -471,7 +471,9 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
                   )}
                   {msg.role === 'assistant' ? (
                     <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:m-0 [&>ul]:m-0 [&>ol]:m-0">
-                      <ReactMarkdown>{getDisplayText(msg) || '...'}</ReactMarkdown>
+                      {parseAndRenderContent(getDisplayText(msg) || '...', (text) => sendMessage(text)).map((part, pi) =>
+                        typeof part === 'string' ? <ReactMarkdown key={pi}>{part}</ReactMarkdown> : <div key={pi}>{part}</div>
+                      )}
                     </div>
                   ) : (
                     <span>{getDisplayText(msg) || (msg.attachments ? '' : '...')}</span>

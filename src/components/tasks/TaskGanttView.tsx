@@ -15,11 +15,12 @@ import {
 } from 'lucide-react';
 import {
   format, addWeeks, addMonths, startOfWeek, eachWeekOfInterval, eachMonthOfInterval,
-  isBefore, isAfter, parseISO,
+  isBefore, isAfter, parseISO, differenceInDays,
 } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { STATUS_COLORS } from '@/components/shared/mondayStyleConfig';
+import { useGanttDrag } from '@/hooks/useGanttDrag';
 
 type TaskStatus = 'todo' | 'in_progress' | 'review' | 'internal_review' | 'client_review' | 'completed';
 

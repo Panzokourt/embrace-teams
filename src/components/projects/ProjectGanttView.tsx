@@ -13,10 +13,11 @@ import {
 } from 'lucide-react';
 import {
   format, addWeeks, addMonths, eachWeekOfInterval, eachMonthOfInterval,
-  isBefore, isAfter, parseISO,
+  isBefore, isAfter, parseISO, differenceInDays,
 } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { useGanttDrag } from '@/hooks/useGanttDrag';
 
 type ProjectStatus = 'lead' | 'proposal' | 'negotiation' | 'won' | 'active' | 'completed' | 'cancelled' | 'lost' | 'tender';
 

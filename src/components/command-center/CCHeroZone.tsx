@@ -26,8 +26,8 @@ function XPRing({ progress, level }: { progress: number; level: number }) {
           stroke={glowColor} strokeWidth={stroke}
           strokeLinecap="round"
           pathLength={100}
-          strokeDasharray="100"
-          strokeDashoffset={100 - normalizedProgress}
+          strokeDasharray={`${normalizedProgress} ${100 - normalizedProgress}`}
+          strokeDashoffset="0"
           className="transition-all duration-1000 ease-out"
           style={{ filter: `drop-shadow(0 0 6px ${glowColor})` }} />
       </svg>

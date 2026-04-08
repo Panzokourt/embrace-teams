@@ -565,6 +565,70 @@ const toolDefinitions = [
       parameters: { type: "object", properties: {} },
     },
   },
+  // ── MEMORY TOOLS ──
+  {
+    type: "function",
+    function: {
+      name: "save_memory",
+      description: "Save an important fact, file analysis summary, decision, or user preference to persistent memory. Call this after analyzing files, making decisions, or learning user preferences. This helps you remember across conversations.",
+      parameters: {
+        type: "object",
+        properties: {
+          category: { type: "string", enum: ["general", "file_analysis", "decision", "preference", "project_context"], description: "Memory category" },
+          key: { type: "string", description: "Short identifier, e.g. 'creative_brief_govgr' or 'user_prefers_greek'" },
+          content: { type: "string", description: "The memory content - summary, key findings, decisions made" },
+          metadata: { type: "object", description: "Optional metadata (file names, entity IDs, etc.)" },
+        },
+        required: ["category", "key", "content"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "recall_memory",
+      description: "Search your persistent memory for relevant information. Use when the user references something discussed before, asks about previous analyses, or you need context from past interactions.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Search query" },
+          category: { type: "string", enum: ["general", "file_analysis", "decision", "preference", "project_context"], description: "Optional category filter" },
+          limit: { type: "number", description: "Max results (default 10)" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_past_chats",
+      description: "Search through previous Secretary conversations for relevant context. Use when the user says 'we discussed this before' or you need to find past conversation details.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Search query" },
+          limit: { type: "number", description: "Max results (default 20)" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_chat_channels",
+      description: "Search through team chat channels for relevant messages. Use when the user asks about team discussions or you need context from internal communications.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Search query" },
+          limit: { type: "number", description: "Max results (default 20)" },
+        },
+        required: ["query"],
+      },
+    },
+  },
 ];
 
 // ── Tool execution ────────────────────────────────────────────────
@@ -1596,6 +1660,138 @@ Respond in Greek. Be thorough but concise.`;
         };
       }
 
+      // ── MEMORY TOOL EXECUTORS ──
+
+      case "save_memory": {
+        // Upsert memory by key to avoid duplicates
+        const { data: existing } = await supabase
+          .from("secretary_memory")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("company_id", companyId)
+          .eq("key", args.key)
+          .limit(1)
+          .maybeSingle();
+
+        if (existing) {
+          const { error } = await supabase
+            .from("secretary_memory")
+            .update({
+              content: args.content,
+              category: args.category || "general",
+              metadata: args.metadata || {},
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", existing.id);
+          if (error) throw error;
+          return { success: true, action: "updated", key: args.key };
+        } else {
+          const { error } = await supabase.from("secretary_memory").insert({
+            user_id: userId,
+            company_id: companyId,
+            category: args.category || "general",
+            key: args.key,
+            content: args.content,
+            metadata: args.metadata || {},
+          });
+          if (error) throw error;
+          return { success: true, action: "saved", key: args.key };
+        }
+      }
+
+      case "recall_memory": {
+        const limit = args.limit || 10;
+        let q = supabase
+          .from("secretary_memory")
+          .select("id, category, key, content, metadata, created_at, updated_at")
+          .eq("user_id", userId)
+          .eq("company_id", companyId)
+          .order("updated_at", { ascending: false })
+          .limit(limit);
+
+        if (args.category) q = q.eq("category", args.category);
+
+        // Try full-text search first
+        if (args.query) {
+          const { data: ftsData } = await supabase
+            .from("secretary_memory")
+            .select("id, category, key, content, metadata, created_at, updated_at")
+            .eq("user_id", userId)
+            .eq("company_id", companyId)
+            .textSearch("content", args.query, { type: "plain" })
+            .order("updated_at", { ascending: false })
+            .limit(limit);
+
+          if (ftsData && ftsData.length > 0) {
+            return { memories: ftsData, count: ftsData.length, search_type: "full_text" };
+          }
+
+          // Fallback: ilike search
+          const { data: ilikeData } = await supabase
+            .from("secretary_memory")
+            .select("id, category, key, content, metadata, created_at, updated_at")
+            .eq("user_id", userId)
+            .eq("company_id", companyId)
+            .or(`content.ilike.%${args.query}%,key.ilike.%${args.query}%`)
+            .order("updated_at", { ascending: false })
+            .limit(limit);
+
+          return { memories: ilikeData || [], count: (ilikeData || []).length, search_type: "fuzzy" };
+        }
+
+        const { data, error } = await q;
+        if (error) throw error;
+        return { memories: data || [], count: (data || []).length };
+      }
+
+      case "search_past_chats": {
+        const limit = args.limit || 20;
+        // Search in secretary_messages using ilike
+        const { data, error } = await supabase
+          .from("secretary_messages")
+          .select("id, conversation_id, role, content, created_at")
+          .eq("role", "assistant")
+          .ilike("content", `%${args.query}%`)
+          .order("created_at", { ascending: false })
+          .limit(limit);
+
+        if (error) throw error;
+
+        // Filter to only conversations belonging to this user
+        const convIds = [...new Set((data || []).map((m: any) => m.conversation_id))];
+        const { data: userConvs } = await supabase
+          .from("secretary_conversations")
+          .select("id, title")
+          .eq("user_id", userId)
+          .in("id", convIds);
+
+        const validConvIds = new Set((userConvs || []).map((c: any) => c.id));
+        const convTitles: Record<string, string> = {};
+        for (const c of userConvs || []) convTitles[c.id] = c.title;
+
+        const filtered = (data || [])
+          .filter((m: any) => validConvIds.has(m.conversation_id))
+          .map((m: any) => ({
+            ...m,
+            conversation_title: convTitles[m.conversation_id] || "Untitled",
+            content_preview: m.content.length > 300 ? m.content.slice(0, 300) + "..." : m.content,
+          }));
+
+        return { messages: filtered, count: filtered.length };
+      }
+
+      case "search_chat_channels": {
+        const limit = args.limit || 20;
+        // Use the existing search_chat_messages DB function
+        const { data, error } = await supabase.rpc("search_chat_messages", {
+          _query: args.query,
+          _company_id: companyId,
+          _limit: limit,
+        });
+        if (error) throw error;
+        return { messages: data || [], count: (data || []).length };
+      }
+
       default:
         return { error: `Unknown tool: ${toolName}` };
     }
@@ -1663,18 +1859,32 @@ serve(async (req) => {
     const companyRole = companyRoleRes.data;
     const companyId = companyRole?.company_id || "";
 
-    // Fetch Brain alerts (high-priority insights from last 48h)
-    const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
-    const { data: brainAlerts } = await supabase
-      .from("brain_insights")
-      .select("id, title, category, priority, body")
-      .eq("company_id", companyId)
-      .eq("is_dismissed", false)
-      .eq("is_actioned", false)
-      .eq("priority", "high")
-      .gte("created_at", twoDaysAgo)
-      .order("created_at", { ascending: false })
-      .limit(5);
+    // Fetch Brain alerts and user memories in parallel
+    const twoDaysAgo2 = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+
+    const [brainAlertsRes, memoriesRes] = await Promise.all([
+      supabase
+        .from("brain_insights")
+        .select("id, title, category, priority, body")
+        .eq("company_id", companyId)
+        .eq("is_dismissed", false)
+        .eq("is_actioned", false)
+        .eq("priority", "high")
+        .gte("created_at", twoDaysAgo2)
+        .order("created_at", { ascending: false })
+        .limit(5),
+      supabase
+        .from("secretary_memory")
+        .select("category, key, content, updated_at")
+        .eq("user_id", userId)
+        .eq("company_id", companyId)
+        .order("updated_at", { ascending: false })
+        .limit(15),
+    ]);
+
+    const brainAlerts = brainAlertsRes.data;
+    const userMemories = memoriesRes.data || [];
+    // (brain alerts already fetched above in parallel)
 
     const overdueCount = overdueRes.count || 0;
     const behindScheduleCount = (behindScheduleRes.data || []).length;
@@ -1831,6 +2041,14 @@ Risk Radar:
 Χρησιμοποίησε markdown στις απαντήσεις σου.
 
 Αν ο χρήστης αναφέρει κάποιον/κάτι με @[Όνομα](type:id), αυτό σημαίνει ότι αναφέρεται σε συγκεκριμένο entity. Χρησιμοποίησε το id για να το βρεις.
+
+Memory & Context:
+- Έχεις μόνιμη μνήμη (save_memory/recall_memory). Αποθήκευε σημαντικές πληροφορίες αυτόματα.
+- Μετά από ανάλυση αρχείου, ΠΑΝΤΑ κάλεσε save_memory με category "file_analysis" και τα key findings.
+- Μετά από σημαντική απόφαση χρήστη, κάλεσε save_memory με category "decision".
+- Μπορείς να ψάξεις παλιές συνομιλίες (search_past_chats) και team chat channels (search_chat_channels).
+- Αν ο χρήστης αναφέρει κάτι που συζητήθηκε πριν, χρησιμοποίησε recall_memory ή search_past_chats.
+${userMemories.length > 0 ? `\nΑποθηκευμένη Μνήμη Χρήστη (${userMemories.length} εγγραφές):\n${userMemories.map((m: any) => `- [${m.category}] ${m.key}: ${m.content.length > 200 ? m.content.slice(0, 200) + "..." : m.content}`).join("\n")}` : ""}
 
 Context δεδομένων χρήστη:
 ${contextParts.join("\n")}`;

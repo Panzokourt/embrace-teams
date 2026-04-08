@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,7 +10,9 @@ const corsHeaders = {
 const SYSTEM_PROMPT = `Είσαι ο AI βοηθός μιας εταιρείας. Απαντάς σε ελληνικά εκτός αν ο χρήστης γράψει σε άλλη γλώσσα.
 Μπορείς να αναλύσεις έγγραφα, εικόνες και αρχεία που σου στέλνει ο χρήστης.
 Δίνεις αναλυτικές, χρήσιμες και δομημένες απαντήσεις.
-Χρησιμοποιείς markdown formatting (headers, bullets, bold) για ευανάγνωστες απαντήσεις.`;
+Χρησιμοποιείς markdown formatting (headers, bullets, bold) για ευανάγνωστες απαντήσεις.
+
+ΣΗΜΑΝΤΙΚΟ: Μετά από κάθε ανάλυση αρχείου, παρέθεσε ένα σύντομο "📝 Σύνοψη για μνήμη:" section στο τέλος της απάντησης με τα key findings σε 2-3 bullet points. Αυτό βοηθά το σύστημα να αποθηκεύσει τα ευρήματα.`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -17,7 +20,46 @@ serve(async (req) => {
   }
 
   try {
+    // Auth
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const userId = claimsData.claims.sub;
+
     const { messages, current_page } = await req.json();
+
+    // Fetch user company and memories in parallel
+    const [companyRoleRes, memoriesRes] = await Promise.all([
+      supabase.from("user_company_roles").select("company_id").eq("user_id", userId).limit(1).single(),
+      supabase
+        .from("secretary_memory")
+        .select("category, key, content")
+        .eq("user_id", userId)
+        .order("updated_at", { ascending: false })
+        .limit(10),
+    ]);
+
+    const companyId = companyRoleRes.data?.company_id || "";
+    const userMemories = memoriesRes.data || [];
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -25,19 +67,16 @@ serve(async (req) => {
     }
 
     // Convert messages to OpenAI-compatible format
-    // Images need to be in the OpenAI vision format
     const convertedMessages = (messages || []).map((msg: any) => {
       if (typeof msg.content === "string") {
         return { role: msg.role, content: msg.content };
       }
-      // Array content (multimodal) — convert to OpenAI format
       if (Array.isArray(msg.content)) {
         const parts = msg.content.map((part: any) => {
           if (part.type === "text") {
             return { type: "text", text: part.text };
           }
           if (part.type === "image") {
-            // Convert from Anthropic format to OpenAI format
             const dataUri = `data:${part.source.media_type};base64,${part.source.data}`;
             return {
               type: "image_url",
@@ -51,9 +90,14 @@ serve(async (req) => {
       return msg;
     });
 
-    const systemContent = current_page
-      ? `${SYSTEM_PROMPT}\n\nΟ χρήστης βρίσκεται στη σελίδα: ${current_page}`
-      : SYSTEM_PROMPT;
+    // Build system content with memory context
+    let systemContent = SYSTEM_PROMPT;
+    if (current_page) {
+      systemContent += `\n\nΟ χρήστης βρίσκεται στη σελίδα: ${current_page}`;
+    }
+    if (userMemories.length > 0) {
+      systemContent += `\n\nΑποθηκευμένη Μνήμη (${userMemories.length} εγγραφές):\n${userMemories.map((m: any) => `- [${m.category}] ${m.key}: ${m.content.length > 200 ? m.content.slice(0, 200) + "..." : m.content}`).join("\n")}`;
+    }
 
     const response = await fetch(
       "https://ai.gateway.lovable.dev/v1/chat/completions",
@@ -95,7 +139,7 @@ serve(async (req) => {
       );
     }
 
-    // Transform OpenAI SSE stream to our custom SSE format (type: delta/done)
+    // Transform OpenAI SSE stream to our custom SSE format
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     const encoder = new TextEncoder();
@@ -118,6 +162,26 @@ serve(async (req) => {
               if (!line.startsWith("data: ")) continue;
               const jsonStr = line.slice(6).trim();
               if (jsonStr === "[DONE]") {
+                // Auto-save memory from Gemini response if it contains file analysis
+                if (fullReply.length > 100 && companyId) {
+                  try {
+                    // Extract a summary key from the reply
+                    const summaryMatch = fullReply.match(/📝 Σύνοψη για μνήμη:([\s\S]*?)(?:$|:::)/);
+                    if (summaryMatch) {
+                      await supabase.from("secretary_memory").insert({
+                        user_id: userId,
+                        company_id: companyId,
+                        category: "file_analysis",
+                        key: `gemini_analysis_${Date.now()}`,
+                        content: summaryMatch[1].trim().slice(0, 2000),
+                        metadata: { source: "quick-chat-gemini", page: current_page },
+                      });
+                    }
+                  } catch (memErr) {
+                    console.error("Memory save error:", memErr);
+                  }
+                }
+
                 controller.enqueue(
                   encoder.encode(`data: ${JSON.stringify({ type: "done", reply: fullReply })}\n\n`)
                 );

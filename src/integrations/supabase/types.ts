@@ -5428,6 +5428,60 @@ export type Database = {
           },
         ]
       }
+      secretary_memory: {
+        Row: {
+          category: string
+          company_id: string
+          content: string
+          created_at: string | null
+          id: string
+          key: string
+          metadata: Json | null
+          source_conversation_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          company_id: string
+          content: string
+          created_at?: string | null
+          id?: string
+          key: string
+          metadata?: Json | null
+          source_conversation_id?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          category?: string
+          company_id?: string
+          content?: string
+          created_at?: string | null
+          id?: string
+          key?: string
+          metadata?: Json | null
+          source_conversation_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "secretary_memory_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "secretary_memory_source_conversation_id_fkey"
+            columns: ["source_conversation_id"]
+            isOneToOne: false
+            referencedRelation: "secretary_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       secretary_messages: {
         Row: {
           content: string

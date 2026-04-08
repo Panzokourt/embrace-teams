@@ -27,7 +27,7 @@ const PAGE_NAMES: Record<string, string> = {
   "/knowledge": "Knowledge Base",
   "/settings": "Settings",
   "/leaderboard": "Leaderboard",
-  "/governance": "Governance",
+  
   "/blueprints": "Blueprints",
   "/pricing": "Pricing",
   "/workflows": "Workflows",

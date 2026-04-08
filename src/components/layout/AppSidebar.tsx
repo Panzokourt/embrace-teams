@@ -47,7 +47,7 @@ interface NavItem {
   adminOnly?: boolean;
 }
 
-type CategoryId = 'work' | 'clients' | 'communication' | 'revenue' | 'operations' | 'intelligence' | 'governance' | 'settings';
+type CategoryId = 'work' | 'clients' | 'communication' | 'revenue' | 'operations' | 'intelligence' | 'settings';
 type CategoryIdOrNull = CategoryId | null;
 
 interface Category {
@@ -64,7 +64,7 @@ const categories: Category[] = [
 { id: 'revenue', icon: DollarSign, label: 'Revenue', routePrefixes: ['/financials', '/pricing'] },
 { id: 'operations', icon: Users, label: 'Operations', routePrefixes: ['/hr', '/timesheets', '/knowledge', '/operations'] },
 { id: 'intelligence', icon: BarChart3, label: 'Intelligence', routePrefixes: ['/reports', '/brain'] },
-{ id: 'governance', icon: ShieldCheck, label: 'Governance', routePrefixes: ['/governance'] },
+
 { id: 'settings', icon: Settings, label: 'Settings', routePrefixes: ['/settings'] }];
 
 
@@ -97,12 +97,6 @@ const categoryNavItems: Record<CategoryId, NavItem[]> = {
   { title: 'Reports Hub', href: '/reports', icon: BarChart3, permission: 'financials.view' },
   { title: 'Brain', href: '/brain', icon: Zap }],
 
-  governance: [
-  { title: 'Dashboard', href: '/governance', icon: ShieldCheck },
-  { title: 'Digital Assets', href: '/governance/assets', icon: Globe },
-  { title: 'Access Control', href: '/governance/access', icon: UserCog },
-  { title: 'Vault', href: '/governance/vault', icon: FileArchive },
-  { title: 'Compliance', href: '/governance/compliance', icon: FileText }],
 
   settings: [
   { title: 'General', href: '/settings', icon: Settings, permission: 'settings.company' },
@@ -118,7 +112,7 @@ function detectCategory(pathname: string): CategoryIdOrNull {
   if (pathname.startsWith('/financials') || pathname.startsWith('/pricing')) return 'revenue';
   if (pathname.startsWith('/hr') || pathname.startsWith('/timesheets') || pathname.startsWith('/knowledge') || pathname.startsWith('/operations')) return 'operations';
   if (pathname.startsWith('/reports') || pathname.startsWith('/brain')) return 'intelligence';
-  if (pathname.startsWith('/governance')) return 'governance';
+  
   if (pathname.startsWith('/settings')) return 'settings';
   if (pathname.startsWith('/dashboards')) return 'work';
   return null;

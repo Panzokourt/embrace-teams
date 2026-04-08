@@ -36,12 +36,6 @@ import Contacts from "@/pages/Contacts";
 import ContactDetail from "@/pages/ContactDetail";
 import Inbox from "@/pages/Inbox";
 import Leaderboard from "@/pages/Leaderboard";
-import Governance from "@/pages/Governance";
-import GovernanceAssets from "@/pages/GovernanceAssets";
-import GovernanceAssetDetail from "@/pages/GovernanceAssetDetail";
-import GovernanceAccess from "@/pages/GovernanceAccess";
-import GovernanceVault from "@/pages/GovernanceVault";
-import GovernanceCompliance from "@/pages/GovernanceCompliance";
 import Knowledge from "@/pages/Knowledge";
 import KnowledgeArticle from "@/pages/KnowledgeArticle";
 import { ChatProvider } from "@/contexts/ChatContext";
@@ -110,12 +104,6 @@ const App = () => (
                   <Route path="/contacts/:id" element={<ContactDetail />} />
                   <Route path="/inbox" element={<Inbox />} />
                   <Route path="/leaderboard" element={<Leaderboard />} />
-                  <Route path="/governance" element={<Governance />} />
-                  <Route path="/governance/assets" element={<GovernanceAssets />} />
-                  <Route path="/governance/assets/:id" element={<GovernanceAssetDetail />} />
-                  <Route path="/governance/access" element={<GovernanceAccess />} />
-                  <Route path="/governance/vault" element={<GovernanceVault />} />
-                  <Route path="/governance/compliance" element={<GovernanceCompliance />} />
                   <Route path="/knowledge" element={<Knowledge />} />
                   <Route path="/knowledge/articles/:id" element={<KnowledgeArticle />} />
                   {/* Redirects from removed KB sub-pages */}

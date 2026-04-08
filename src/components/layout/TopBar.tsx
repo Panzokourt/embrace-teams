@@ -36,7 +36,7 @@ interface TopBarProps {
   onQuickChatToggle?: () => void;
 }
 
-export default function TopBar({ onPanelToggle, rightPanelOpen, onMobileMenuToggle, showHamburger }: TopBarProps) {
+export default function TopBar({ onPanelToggle, rightPanelOpen, onMobileMenuToggle, showHamburger, onQuickChatToggle }: TopBarProps) {
   const navigate = useNavigate();
   const { enterFocus } = useFocusMode();
   const { user } = useAuth();

@@ -112,7 +112,7 @@ function detectCategory(pathname: string): CategoryIdOrNull {
   if (pathname.startsWith('/financials') || pathname.startsWith('/pricing')) return 'revenue';
   if (pathname.startsWith('/hr') || pathname.startsWith('/timesheets') || pathname.startsWith('/knowledge') || pathname.startsWith('/operations')) return 'operations';
   if (pathname.startsWith('/reports') || pathname.startsWith('/brain')) return 'intelligence';
-  if (pathname.startsWith('/governance')) return 'governance';
+  
   if (pathname.startsWith('/settings')) return 'settings';
   if (pathname.startsWith('/dashboards')) return 'work';
   return null;

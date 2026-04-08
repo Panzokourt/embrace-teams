@@ -104,7 +104,7 @@ const App = () => (
                   <Route path="/settings/organization" element={<OrganizationSettings />} />
                   <Route path="/calendar" element={<CalendarHub />} />
                   <Route path="/files" element={<Files />} />
-                  <Route path="/blueprints" element={<Blueprints />} />
+                  <Route path="/blueprints" element={<Navigate to="/knowledge?tab=blueprints" replace />} />
                   <Route path="/chat" element={<Chat />} />
                   <Route path="/contacts" element={<Contacts />} />
                   <Route path="/contacts/:id" element={<ContactDetail />} />

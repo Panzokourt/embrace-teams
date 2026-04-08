@@ -12,6 +12,8 @@ import { KBSourceUploader } from '@/components/knowledge/KBSourceUploader';
 import { KBSourceList } from '@/components/knowledge/KBSourceList';
 import { KBAskChat } from '@/components/knowledge/KBAskChat';
 import { KBHealthCheck } from '@/components/knowledge/KBHealthCheck';
+import { ProjectTemplatesManager } from '@/components/settings/ProjectTemplatesManager';
+import { BriefsList } from '@/components/blueprints/BriefsList';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,16 +23,26 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Plus, BookOpen, FileText, AlertTriangle, Archive, FileStack, ClipboardCheck, Download, MessageCircleQuestion, Activity } from 'lucide-react';
+import { Plus, BookOpen, FileText, AlertTriangle, Download, FileStack, MessageCircleQuestion, Settings2 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { KBArticle } from '@/hooks/useKnowledgeBase';
 import type { HealthReport } from '@/hooks/useKBCompiler';
 
+type ManageSection = 'reviews' | 'sources' | 'health';
+
 export default function Knowledge() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'articles';
+  const activeTab = searchParams.get('tab') || 'wiki';
+
+  // Migrate old tab values
+  useEffect(() => {
+    const oldTabs: Record<string, string> = { articles: 'wiki', playbook: 'wiki', templates: 'blueprints', reviews: 'manage', sources: 'manage', health: 'manage' };
+    if (oldTabs[activeTab]) {
+      setSearchParams({ tab: oldTabs[activeTab] }, { replace: true });
+    }
+  }, [activeTab]);
 
   const {
     categories, articles, templates, categoriesLoading,
@@ -49,6 +61,10 @@ export default function Knowledge() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editArticle, setEditArticle] = useState<KBArticle | null>(null);
   const [healthReport, setHealthReport] = useState<HealthReport | null>(null);
+  const [manageSection, setManageSection] = useState<ManageSection>('reviews');
+
+  // Blueprints sub-section
+  const [blueprintSection, setBlueprintSection] = useState<'briefs' | 'projects' | 'documents'>('briefs');
 
   // Template creation
   const [tplCreateOpen, setTplCreateOpen] = useState(false);
@@ -61,14 +77,6 @@ export default function Knowledge() {
       seedCategories.mutate();
     }
   }, [categoriesLoading, categories.length]);
-
-  // Playbook categories
-  const companyRoot = categories.find(c => c.slug === 'company' && c.level === 1);
-  const companyCats = useMemo(() => {
-    if (!companyRoot) return categories;
-    const ids = new Set([companyRoot.id, ...categories.filter(c => c.parent_id === companyRoot.id).map(c => c.id)]);
-    return categories.filter(c => ids.has(c.id));
-  }, [categories, companyRoot]);
 
   const filteredArticles = useMemo(() => {
     let list = articles.filter(a => a.status !== 'deprecated');
@@ -87,20 +95,6 @@ export default function Knowledge() {
     return list;
   }, [articles, selectedCategory, search, categories]);
 
-  const playbookArticles = useMemo(() => {
-    const catIds = new Set(companyCats.map(c => c.id));
-    let list = articles.filter(a => a.status !== 'deprecated' && a.category_id && catIds.has(a.category_id));
-    if (selectedCategory) {
-      const subIds = new Set([selectedCategory, ...categories.filter(c => c.parent_id === selectedCategory).map(c => c.id)]);
-      list = list.filter(a => a.category_id && subIds.has(a.category_id));
-    }
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter(a => a.title.toLowerCase().includes(q) || a.body.toLowerCase().includes(q));
-    }
-    return list;
-  }, [articles, companyCats, selectedCategory, search, categories]);
-
   const filteredTemplates = useMemo(() => {
     let list = templates.filter(t => t.status !== 'deprecated');
     if (search) {
@@ -110,23 +104,16 @@ export default function Knowledge() {
     return list;
   }, [templates, search]);
 
-  const totalWords = useMemo(() =>
-    articles.filter(a => a.status !== 'deprecated').reduce((sum, a) => sum + (a.body?.split(/\s+/).length || 0), 0),
-    [articles]
-  );
+  const recentArticles = useMemo(() =>
+    [...articles].filter(a => a.status !== 'deprecated').sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 6),
+    [articles]);
 
   const stats = useMemo(() => ({
     total: articles.length,
     drafts: articles.filter(a => a.status === 'draft').length,
     pendingReview: articles.filter(a => a.next_review_date && new Date(a.next_review_date) <= new Date() && a.status !== 'deprecated').length,
-    deprecated: articles.filter(a => a.status === 'deprecated').length,
     sources: sources.length,
-    totalWords,
-  }), [articles, sources, totalWords]);
-
-  const recentArticles = useMemo(() =>
-    [...articles].filter(a => a.status !== 'deprecated').sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 6),
-    [articles]);
+  }), [articles, sources]);
 
   const setTab = (tab: string) => {
     setSearchParams({ tab });
@@ -145,6 +132,28 @@ export default function Knowledge() {
     setHealthReport(result);
   };
 
+  // Dynamic header actions
+  const headerActions = () => {
+    if (activeTab === 'wiki') {
+      return (
+        <div className="flex gap-2">
+          <KBCategoryManager categories={categories} onCreate={(d) => createCategory.mutate(d)} onDelete={() => {}} />
+          <Button onClick={() => setEditorOpen(true)} className="gap-1">
+            <Plus className="h-4 w-4" /> Νέο Άρθρο
+          </Button>
+        </div>
+      );
+    }
+    if (activeTab === 'blueprints' && blueprintSection === 'documents') {
+      return (
+        <Button onClick={() => setTplCreateOpen(true)} className="gap-1">
+          <Plus className="h-4 w-4" /> Νέο Template
+        </Button>
+      );
+    }
+    return null;
+  };
+
   return (
     <div className="page-shell">
       <PageHeader
@@ -152,24 +161,11 @@ export default function Knowledge() {
         title="Knowledge Base"
         subtitle="Κεντρική βάση γνώσης της εταιρείας"
         breadcrumbs={[{ label: 'Knowledge Base' }]}
-        actions={
-          <div className="flex gap-2">
-            <KBCategoryManager categories={categories} onCreate={(d) => createCategory.mutate(d)} onDelete={() => {}} />
-            {activeTab === 'templates' ? (
-              <Button onClick={() => setTplCreateOpen(true)} className="gap-1">
-                <Plus className="h-4 w-4" /> Νέο Template
-              </Button>
-            ) : activeTab !== 'sources' && activeTab !== 'ask' && activeTab !== 'health' ? (
-              <Button onClick={() => setEditorOpen(true)} className="gap-1">
-                <Plus className="h-4 w-4" /> Νέο Άρθρο
-              </Button>
-            ) : null}
-          </div>
-        }
+        actions={headerActions()}
       />
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 wide:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 wide:grid-cols-4 gap-4">
         <Card><CardContent className="p-4 text-center">
           <FileText className="h-5 w-5 mx-auto text-primary mb-1" />
           <p className="text-2xl font-bold">{stats.total}</p>
@@ -186,50 +182,31 @@ export default function Knowledge() {
           <p className="text-xs text-muted-foreground">Pending Review</p>
         </CardContent></Card>
         <Card><CardContent className="p-4 text-center">
-          <Archive className="h-5 w-5 mx-auto text-muted-foreground mb-1" />
-          <p className="text-2xl font-bold">{stats.deprecated}</p>
-          <p className="text-xs text-muted-foreground">Αρχειοθετημένα</p>
-        </CardContent></Card>
-        <Card><CardContent className="p-4 text-center">
           <Download className="h-5 w-5 mx-auto text-primary mb-1" />
           <p className="text-2xl font-bold">{stats.sources}</p>
           <p className="text-xs text-muted-foreground">Πηγές</p>
         </CardContent></Card>
-        <Card><CardContent className="p-4 text-center">
-          <BookOpen className="h-5 w-5 mx-auto text-primary mb-1" />
-          <p className="text-2xl font-bold">{stats.totalWords.toLocaleString()}</p>
-          <p className="text-xs text-muted-foreground">Λέξεις Wiki</p>
-        </CardContent></Card>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — 4 clean tabs */}
       <Tabs value={activeTab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="articles" className="gap-1.5">
-            <FileText className="h-3.5 w-3.5" /> Άρθρα
+          <TabsTrigger value="wiki" className="gap-1.5">
+            <BookOpen className="h-3.5 w-3.5" /> Wiki
           </TabsTrigger>
-          <TabsTrigger value="playbook" className="gap-1.5">
-            <BookOpen className="h-3.5 w-3.5" /> Playbook
-          </TabsTrigger>
-          <TabsTrigger value="templates" className="gap-1.5">
-            <FileStack className="h-3.5 w-3.5" /> Templates
-          </TabsTrigger>
-          <TabsTrigger value="reviews" className="gap-1.5">
-            <ClipboardCheck className="h-3.5 w-3.5" /> Reviews
-          </TabsTrigger>
-          <TabsTrigger value="sources" className="gap-1.5">
-            <Download className="h-3.5 w-3.5" /> Πηγές
+          <TabsTrigger value="blueprints" className="gap-1.5">
+            <FileStack className="h-3.5 w-3.5" /> Blueprints
           </TabsTrigger>
           <TabsTrigger value="ask" className="gap-1.5">
-            <MessageCircleQuestion className="h-3.5 w-3.5" /> Ask Wiki
+            <MessageCircleQuestion className="h-3.5 w-3.5" /> Ask AI
           </TabsTrigger>
-          <TabsTrigger value="health" className="gap-1.5">
-            <Activity className="h-3.5 w-3.5" /> Health
+          <TabsTrigger value="manage" className="gap-1.5">
+            <Settings2 className="h-3.5 w-3.5" /> Manage
           </TabsTrigger>
         </TabsList>
 
-        {/* Articles Tab */}
-        <TabsContent value="articles" className="space-y-4 mt-4">
+        {/* ===== Wiki Tab (merged Articles + Playbook) ===== */}
+        <TabsContent value="wiki" className="space-y-4 mt-4">
           <KBSearchBar value={search} onChange={setSearch} />
           <div className="grid narrow:grid-cols-[240px_1fr] gap-6">
             <div className="space-y-2">
@@ -238,51 +215,67 @@ export default function Knowledge() {
             </div>
             <div>
               <h3 className="text-sm font-medium mb-3">
-                {search ? `Αποτελέσματα (${filteredArticles.length})` : 'Πρόσφατα Άρθρα'}
+                {search || selectedCategory ? `Αποτελέσματα (${filteredArticles.length})` : 'Πρόσφατα Άρθρα'}
               </h3>
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {(search ? filteredArticles : recentArticles).map(article => (
+                {(search || selectedCategory ? filteredArticles : recentArticles).map(article => (
                   <KBArticleCard key={article.id} article={article} onClick={() => navigate(`/knowledge/articles/${article.id}`)} />
                 ))}
               </div>
-              {filteredArticles.length === 0 && (
+              {filteredArticles.length === 0 && (search || selectedCategory) && (
                 <p className="text-sm text-muted-foreground py-8 text-center">Δεν βρέθηκαν άρθρα.</p>
               )}
             </div>
           </div>
         </TabsContent>
 
-        {/* Playbook Tab */}
-        <TabsContent value="playbook" className="space-y-4 mt-4">
-          <KBSearchBar value={search} onChange={setSearch} />
-          <div className="grid narrow:grid-cols-[240px_1fr] gap-6">
-            <KBCategoryTree categories={companyCats} selectedId={selectedCategory} onSelect={setSelectedCategory} />
-            <div className="grid sm:grid-cols-2 gap-3">
-              {playbookArticles.map(article => (
-                <KBArticleCard key={article.id} article={article} onClick={() => navigate(`/knowledge/articles/${article.id}`)} />
-              ))}
-              {playbookArticles.length === 0 && (
-                <p className="text-sm text-muted-foreground py-8 col-span-2 text-center">Δεν βρέθηκαν άρθρα στο playbook.</p>
+        {/* ===== Blueprints Tab (merged Blueprints page + KB Templates) ===== */}
+        <TabsContent value="blueprints" className="space-y-4 mt-4">
+          <div className="flex gap-2 border-b pb-2">
+            <Button
+              variant={blueprintSection === 'briefs' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setBlueprintSection('briefs')}
+            >
+              Προ-φόρμες
+            </Button>
+            <Button
+              variant={blueprintSection === 'projects' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setBlueprintSection('projects')}
+            >
+              Project Templates
+            </Button>
+            <Button
+              variant={blueprintSection === 'documents' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setBlueprintSection('documents')}
+            >
+              Document Templates
+            </Button>
+          </div>
+
+          {blueprintSection === 'briefs' && <BriefsList />}
+
+          {blueprintSection === 'projects' && <ProjectTemplatesManager />}
+
+          {blueprintSection === 'documents' && (
+            <div className="space-y-4">
+              <KBSearchBar value={search} onChange={setSearch} placeholder="Αναζήτηση templates..." />
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredTemplates.map(tpl => (
+                  <KBTemplateCard
+                    key={tpl.id}
+                    template={tpl}
+                    onUse={() => useTemplate.mutate({ templateId: tpl.id })}
+                    onEdit={() => {}}
+                  />
+                ))}
+              </div>
+              {filteredTemplates.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-8">Δεν βρέθηκαν templates.</p>
               )}
             </div>
-          </div>
-        </TabsContent>
-
-        {/* Templates Tab */}
-        <TabsContent value="templates" className="space-y-4 mt-4">
-          <KBSearchBar value={search} onChange={setSearch} placeholder="Αναζήτηση templates..." />
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredTemplates.map(tpl => (
-              <KBTemplateCard
-                key={tpl.id}
-                template={tpl}
-                onUse={() => useTemplate.mutate({ templateId: tpl.id })}
-                onEdit={() => {}}
-              />
-            ))}
-          </div>
-          {filteredTemplates.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-8">Δεν βρέθηκαν templates.</p>
           )}
         </TabsContent>
 
@@ -321,13 +314,63 @@ export default function Knowledge() {
           </Card>
         </TabsContent>
 
-        {/* Health Check Tab */}
-        <TabsContent value="health" className="space-y-4 mt-4">
-          <KBHealthCheck
-            report={healthReport}
-            onRun={handleRunHealth}
-            isLoading={healthCheck.isPending}
-          />
+        {/* ===== Manage Tab (Reviews + Sources + Health) ===== */}
+        <TabsContent value="manage" className="space-y-4 mt-4">
+          <div className="flex gap-2 border-b pb-2">
+            <Button
+              variant={manageSection === 'reviews' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setManageSection('reviews')}
+            >
+              Reviews
+            </Button>
+            <Button
+              variant={manageSection === 'sources' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setManageSection('sources')}
+            >
+              Πηγές
+            </Button>
+            <Button
+              variant={manageSection === 'health' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setManageSection('health')}
+            >
+              Health Check
+            </Button>
+          </div>
+
+          {manageSection === 'reviews' && (
+            <KBReviewQueue
+              articles={articles}
+              onApprove={(id) => updateArticle.mutate({ id, status: 'approved' })}
+              onDeprecate={(id) => deleteArticle.mutate(id)}
+              onSelect={(article) => setEditArticle(article)}
+            />
+          )}
+
+          {manageSection === 'sources' && (
+            <div className="grid lg:grid-cols-[1fr_350px] gap-6">
+              <KBSourceList
+                sources={sources}
+                onCompile={(id) => compileSource.mutate(id)}
+                onDelete={(id) => deleteSource.mutate(id)}
+                compilingId={compileSource.isPending ? (compileSource.variables as string) : undefined}
+              />
+              <KBSourceUploader
+                onSubmit={(data) => createSource.mutate(data)}
+                isLoading={createSource.isPending}
+              />
+            </div>
+          )}
+
+          {manageSection === 'health' && (
+            <KBHealthCheck
+              report={healthReport}
+              onRun={handleRunHealth}
+              isLoading={healthCheck.isPending}
+            />
+          )}
         </TabsContent>
       </Tabs>
 
@@ -335,8 +378,7 @@ export default function Knowledge() {
       <KBArticleEditor
         open={editorOpen}
         onOpenChange={setEditorOpen}
-        categories={activeTab === 'playbook' ? companyCats : categories}
-        article={activeTab === 'playbook' ? { category_id: companyRoot?.id } : undefined}
+        categories={categories}
         onSave={(data) => createArticle.mutate(data)}
       />
 

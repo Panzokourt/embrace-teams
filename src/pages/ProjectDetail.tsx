@@ -794,6 +794,7 @@ export default function ProjectDetailPage() {
                 clientId={project.client_id}
                 projectBudget={project.budget}
                 agencyFeePercentage={project.agency_fee_percentage || 0}
+                isInternal={project.is_internal}
               />
             </TabsContent>
           )}

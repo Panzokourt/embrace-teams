@@ -471,7 +471,13 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
                   )}
                   {msg.role === 'assistant' ? (
                     <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:m-0 [&>ul]:m-0 [&>ol]:m-0">
-                      {parseAndRenderContent(getDisplayText(msg) || '...', (text) => sendMessage(text)).map((part, pi) =>
+                      {parseAndRenderContent(getDisplayText(msg) || '...', (text) => {
+                        setInput(text);
+                        setTimeout(() => {
+                          const btn = document.querySelector('[data-quick-chat-send]') as HTMLButtonElement;
+                          btn?.click();
+                        }, 50);
+                      }).map((part, pi) =>
                         typeof part === 'string' ? <ReactMarkdown key={pi}>{part}</ReactMarkdown> : <div key={pi}>{part}</div>
                       )}
                     </div>

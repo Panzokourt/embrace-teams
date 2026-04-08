@@ -1,34 +1,70 @@
 
 
-# Setup Guide — Λειτουργικά Deep Links ανά Βήμα
+# Knowledge Base Restructure
 
-## Πρόβλημα
+## Current Problem
 
-Όλα τα βήματα στο Setup Guide popover πηγαίνουν στο `/onboarding` (full wizard). Αυτό δεν είναι χρήσιμο αφού ο χρήστης είναι ήδη μέσα στην εφαρμογή — πρέπει κάθε βήμα να οδηγεί στη σωστή σελίδα.
+7 tabs with overlap and confusion:
+- **Άρθρα** and **Playbook** show the same articles, just filtered by category — redundant
+- **Templates** (KB templates like SOPs/checklists) overlaps conceptually with the separate **Blueprints** page (briefs + project templates)
+- Too many tabs cluttering the navigation
 
-## Λύση
+## Proposed New Structure
 
-Κάθε step θα έχει ένα `route` property που οδηγεί στη σχετική σελίδα:
+4 clean tabs instead of 7:
 
-| Step | Route |
-|------|-------|
-| Εταιρεία | `/settings/organization` |
-| Προφίλ | `/settings` |
-| Ομάδα | `/hr?tab=staff` |
-| Πελάτης | `/clients` |
-| Έγγραφα | `/knowledge` |
-| AI Setup | `/knowledge?tab=wiki` |
+```text
+┌──────────┬────────────┬──────────┬──────────┐
+│  📚 Wiki │ 📋 Blueprints │ 🤖 Ask AI │ ⚙️ Manage │
+└──────────┴────────────┴──────────┴──────────┘
+```
 
-## Αλλαγές
+### Tab 1: Wiki (merges Άρθρα + Playbook)
+- All articles in one view with the category tree sidebar (which already includes Company/Departments/Clients etc.)
+- Clicking "Company" categories = the old Playbook behavior
+- No need for a separate Playbook tab — it's just a category filter
+- Search bar works across all articles
 
-### 1. `src/hooks/useOnboardingProgress.ts`
-- Προσθήκη `route: string` στο `OnboardingStep` interface
-- Κάθε step παίρνει το αντίστοιχο route
+### Tab 2: Blueprints (merges Templates + old Blueprints page)
+- Sub-tabs or sections within:
+  - **Προ-φόρμες (Briefs)** — the existing `BriefsList` component from `/blueprints`
+  - **Project Templates** — the existing `ProjectTemplatesManager` from `/blueprints`
+  - **Document Templates** — the existing KB templates (SOPs, checklists, reports)
+- Remove `/blueprints` as a standalone route; redirect to `/knowledge?tab=blueprints`
+- Update sidebar link accordingly
 
-### 2. `src/components/onboarding/SetupGuide.tsx`
-- Κάθε step button κάνει `navigate(step.route)` αντί για `navigate('/onboarding')`
-- Το "Συνέχεια Setup" button βρίσκει τo πρώτο incomplete step και πηγαίνει εκεί
-- Αφαιρείται η γενική αναφορά στο `/onboarding`
+### Tab 3: Ask AI (unchanged)
+- The existing Ask Wiki chat — no changes needed
 
-Δεν χρειάζεται δημιουργία νέων σελίδων — όλες υπάρχουν ήδη.
+### Tab 4: Manage (merges Reviews + Πηγές + Health)
+- Three sections/sub-tabs:
+  - **Reviews** — article review queue
+  - **Πηγές (Sources)** — raw source upload & compile
+  - **Health Check** — wiki health analysis
+- These are all "maintenance" tools, grouped together
+
+## KPI Cards
+Keep them but simplify — show only 4:
+- Total Articles | Drafts | Pending Review | Sources
+
+## Sidebar Changes
+- Remove `/blueprints` route from sidebar
+- Change its link to point to `/knowledge?tab=blueprints`
+- Update category detection in sidebar
+
+## Files to Change
+
+| File | Change |
+|------|--------|
+| `src/pages/Knowledge.tsx` | Restructure tabs: Wiki, Blueprints, Ask AI, Manage |
+| `src/pages/Blueprints.tsx` | Redirect to `/knowledge?tab=blueprints` |
+| `src/App.tsx` | Update `/blueprints` route to redirect |
+| `src/components/layout/AppSidebar.tsx` | Update blueprints link to `/knowledge?tab=blueprints` |
+| `src/hooks/useOnboardingProgress.ts` | Update route if blueprints was referenced |
+
+## What stays untouched
+- All AI Wiki infrastructure (kb-compiler edge function, ask/compile/health)
+- Article editor, version history, backlinks
+- Category tree and category management
+- All existing components — we're reorganizing, not rewriting
 

@@ -111,6 +111,15 @@ export default function CommandCenter() {
 
   return (
     <div className="p-4 md:p-6 space-y-5 max-w-7xl mx-auto animate-fade-in">
+      {/* Quick Actions */}
+      {!isViewer && (
+        <CCQuickActions
+          isAdmin={isAdmin || isOwner}
+          isManager={isManager}
+          isMember={isMember}
+        />
+      )}
+
       {/* Hero Zone — always visible for non-viewers */}
       {!isViewer && (
         <CCHeroZone
@@ -144,14 +153,8 @@ export default function CommandCenter() {
         </div>
       </div>
 
-      {/* Quick Actions */}
-      {!isViewer && (
-        <CCQuickActions
-          isAdmin={isAdmin || isOwner}
-          isManager={isManager}
-          isMember={isMember}
-        />
-      )}
+
+
     </div>
   );
 }

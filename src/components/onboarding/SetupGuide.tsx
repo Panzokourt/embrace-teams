@@ -78,7 +78,7 @@ export default function SetupGuide() {
         </div>
 
         <div className="p-3 border-t border-border/40 flex gap-2">
-          <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={handleGoToOnboarding}>
+          <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={handleContinueSetup}>
             Συνέχεια Setup
           </Button>
           <Button size="sm" className="flex-1 text-xs" onClick={handleFinish}>

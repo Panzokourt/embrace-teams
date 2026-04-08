@@ -67,12 +67,12 @@ export function useOnboardingProgress() {
         }
 
         setSteps([
-          { key: 'company', label: 'Εταιρεία', description: 'Ρύθμιση εταιρείας', completed: companyDone },
-          { key: 'profile', label: 'Προφίλ', description: 'Στοιχεία προφίλ', completed: profileDone },
-          { key: 'team', label: 'Ομάδα', description: 'Πρόσκληση μελών', completed: teamDone },
-          { key: 'client', label: 'Πελάτης', description: 'Πρώτος πελάτης', completed: clientDone },
-          { key: 'docs', label: 'Έγγραφα', description: 'Εταιρικά αρχεία', completed: docsDone },
-          { key: 'ai', label: 'AI Setup', description: 'Εκπαίδευση AI', completed: aiDone },
+          { key: 'company', label: 'Εταιρεία', description: 'Ρύθμιση εταιρείας', completed: companyDone, route: '/settings/organization' },
+          { key: 'profile', label: 'Προφίλ', description: 'Στοιχεία προφίλ', completed: profileDone, route: '/settings' },
+          { key: 'team', label: 'Ομάδα', description: 'Πρόσκληση μελών', completed: teamDone, route: '/hr?tab=staff' },
+          { key: 'client', label: 'Πελάτης', description: 'Πρώτος πελάτης', completed: clientDone, route: '/clients' },
+          { key: 'docs', label: 'Έγγραφα', description: 'Εταιρικά αρχεία', completed: docsDone, route: '/knowledge' },
+          { key: 'ai', label: 'AI Setup', description: 'Εκπαίδευση AI', completed: aiDone, route: '/knowledge?tab=wiki' },
         ]);
       } catch (err) {
         console.error('Onboarding progress check error:', err);

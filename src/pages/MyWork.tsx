@@ -304,254 +304,249 @@ export default function MyWork() {
         />
       )}
 
-      {/* ── CC Hero Zone ── */}
+      {/* ── Hero Zone ── */}
       {!isViewer && (
-        <CCHeroZone
-          tasksCompletedToday={tasksCompletedToday}
-          hoursToday={todayHours}
-        />
+        <CollapsibleSection id="cc-hero" title="Status" icon={<CheckSquare className="h-3.5 w-3.5 text-primary" />}>
+          <div className="p-0">
+            <CCHeroZone
+              tasksCompletedToday={tasksCompletedToday}
+              hoursToday={todayHours}
+            />
+          </div>
+        </CollapsibleSection>
       )}
 
-      {/* ── CC Mission Cards (KPIs) ── */}
-      <CCMissionCards
-        pipelineValue={pipelineValue}
-        activeProjects={activeProjectCount}
-        myTasks={allMyTasks.length}
-        overdueTasks={overdueCount}
-        winRate={winRate}
-        pendingInvoices={pendingInvoices}
-        showFinancials={showFinancials}
-      />
-
-      {/* ── View Toggle ── */}
-      <div className="inline-flex items-center gap-1 p-1 rounded-[10px] bg-muted/50">
-        <Button
-          variant={activeView === 'projects' ? 'default' : 'ghost'}
-          size="sm" className="gap-1.5 rounded-[8px] h-8 px-3 text-[13px]"
-          onClick={() => setActiveView('projects')}
-        >
-          <FolderKanban className="h-3.5 w-3.5" /> Έργα
-        </Button>
-        <Button
-          variant={activeView === 'calendar' ? 'default' : 'ghost'}
-          size="sm" className="gap-1.5 rounded-[8px] h-8 px-3 text-[13px]"
-          onClick={() => setActiveView('calendar')}
-        >
-          <CalendarDays className="h-3.5 w-3.5" /> Ημερολόγιο
-        </Button>
-      </div>
-
-      {/* ── Main Content ── */}
-      {activeView === 'projects' ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Today's Tasks */}
-          <TodayTasksCard
-            todayTasks={todayTasks}
-            onTaskComplete={toggleTaskComplete}
-            onTaskClick={(task) => setSelectedItem({ type: 'task', data: task })}
-            activeTimer={activeTimer}
-            startTimer={startTimer}
-            stopTimer={stopTimer}
-            userId={user!.id}
-            myProjects={myProjects}
-            onTaskCreated={() => fetchAll()}
-            onTaskUpdated={(taskId, updates) => {
-              setAllMyTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
-            }}
+      {/* ── Mission Cards (KPIs) ── */}
+      <CollapsibleSection id="cc-kpis" title="KPIs" icon={<AlertTriangle className="h-3.5 w-3.5 text-primary" />}>
+        <CardContent className="pt-0 px-5 pb-4">
+          <CCMissionCards
+            pipelineValue={pipelineValue}
+            activeProjects={activeProjectCount}
+            myTasks={allMyTasks.length}
+            overdueTasks={overdueCount}
+            winRate={winRate}
+            pendingInvoices={pendingInvoices}
+            showFinancials={showFinancials}
           />
+        </CardContent>
+      </CollapsibleSection>
 
-          {/* Active Projects */}
-          <Card className="border-border/30 shadow-sm">
-            <CardHeader className="pb-3 px-5">
-              <CardTitle className="text-[13px] font-semibold tracking-tight flex items-center gap-2.5">
-                <span className="h-7 w-7 rounded-lg bg-primary/8 flex items-center justify-center">
-                  <FolderKanban className="h-3.5 w-3.5 text-primary" />
-                </span>
-                Τα Ενεργά Έργα μου
-                <Badge variant="secondary" className="text-[10px] ml-1">{topLevelProjects.length}</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {topLevelProjects.length === 0 ? (
-                <p className="text-sm text-muted-foreground px-6 py-6">Κανένα ενεργό έργο</p>
-              ) : (
-                <div className="overflow-y-auto max-h-[60vh] divide-y divide-border/20">
-                    {topLevelProjects.map(project => (
-                      <ProjectRow
-                        key={project.id}
-                        project={project}
-                        subProjects={getSubProjects(project.id)}
-                        expanded={expandedProjects.has(project.id)}
-                        onToggle={() => toggleProject(project.id)}
-                        tasks={projectTasks[project.id] || []}
-                        deliverables={projectDeliverables[project.id] || []}
-                        onTaskComplete={toggleTaskComplete}
-                        onItemClick={setSelectedItem}
-                        activeTimer={activeTimer}
-                        startTimer={startTimer}
-                        stopTimer={stopTimer}
-                        expandedProjects={expandedProjects}
-                        onToggleProject={toggleProject}
-                        projectTasks={projectTasks}
-                        projectDeliverables={projectDeliverables}
-                        myTasks={allMyTasks}
-                      />
-                    ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      ) : (
-        /* ── Calendar View ── */
-        <MyWorkCalendar
-          tasks={allMyTasks}
-          calendarDate={calendarDate}
-          calendarMode={calendarMode}
-          onCalendarDateChange={setCalendarDate}
-          onCalendarModeChange={setCalendarMode}
-          onTaskClick={(task) => setSelectedItem({ type: 'task', data: task })}
-          onTaskUpdated={() => fetchAll()}
-          activeTimer={activeTimer}
-          startTimer={startTimer}
-          stopTimer={stopTimer}
-        />
-      )}
+      {/* ── Projects / Calendar ── */}
+      <CollapsibleSection id="cc-work" title="Εργασίες" icon={<FolderKanban className="h-3.5 w-3.5 text-primary" />}>
+        <CardContent className="pt-0 px-5 pb-4 space-y-4">
+          {/* View Toggle */}
+          <div className="inline-flex items-center gap-1 p-1 rounded-[10px] bg-muted/50">
+            <Button
+              variant={activeView === 'projects' ? 'default' : 'ghost'}
+              size="sm" className="gap-1.5 rounded-[8px] h-8 px-3 text-[13px]"
+              onClick={() => setActiveView('projects')}
+            >
+              <FolderKanban className="h-3.5 w-3.5" /> Έργα
+            </Button>
+            <Button
+              variant={activeView === 'calendar' ? 'default' : 'ghost'}
+              size="sm" className="gap-1.5 rounded-[8px] h-8 px-3 text-[13px]"
+              onClick={() => setActiveView('calendar')}
+            >
+              <CalendarDays className="h-3.5 w-3.5" /> Ημερολόγιο
+            </Button>
+          </div>
 
-      {/* ── Bottom Strip: Approvals + Time Tracking ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Approvals */}
-        <Card className="border-border/30 shadow-sm">
-          <CardHeader className="pb-3 px-5">
-            <CardTitle className="text-[13px] font-semibold tracking-tight flex items-center gap-2.5">
-              <span className="h-7 w-7 rounded-lg bg-primary/8 flex items-center justify-center">
-                <ClipboardCheck className="h-3.5 w-3.5 text-primary" />
-              </span>
-              Εγκρίσεις
-              {approvalCount > 0 && <Badge variant="secondary" className="text-[10px]">{approvalCount}</Badge>}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {approvalCount === 0 ? (
-              <p className="text-sm text-muted-foreground px-6 py-4">Δεν υπάρχουν εκκρεμείς εγκρίσεις 🎉</p>
-            ) : (
-              <div className="overflow-y-auto max-h-[40vh] divide-y divide-border/20">
-                {/* Sent for approval */}
-                {sentForApproval.length > 0 && (
-                  <>
-                    <div className="px-4 py-2 bg-muted/30 rounded-[10px] mx-2 mt-1">
-                      <span className="text-[11px] font-semibold flex items-center gap-1.5">
-                        <Send className="h-3 w-3" /> Έστειλα για Έγκριση ({sentForApproval.length})
-                      </span>
+          {activeView === 'projects' ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <TodayTasksCard
+                todayTasks={todayTasks}
+                onTaskComplete={toggleTaskComplete}
+                onTaskClick={(task) => setSelectedItem({ type: 'task', data: task })}
+                activeTimer={activeTimer}
+                startTimer={startTimer}
+                stopTimer={stopTimer}
+                userId={user!.id}
+                myProjects={myProjects}
+                onTaskCreated={() => fetchAll()}
+                onTaskUpdated={(taskId, updates) => {
+                  setAllMyTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
+                }}
+              />
+
+              <Card className="border-border/30 shadow-sm">
+                <CardHeader className="pb-3 px-5">
+                  <CardTitle className="text-[13px] font-semibold tracking-tight flex items-center gap-2.5">
+                    <span className="h-7 w-7 rounded-lg bg-primary/8 flex items-center justify-center">
+                      <FolderKanban className="h-3.5 w-3.5 text-primary" />
+                    </span>
+                    Τα Ενεργά Έργα μου
+                    <Badge variant="secondary" className="text-[10px] ml-1">{topLevelProjects.length}</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {topLevelProjects.length === 0 ? (
+                    <p className="text-sm text-muted-foreground px-6 py-6">Κανένα ενεργό έργο</p>
+                  ) : (
+                    <div className="overflow-y-auto max-h-[60vh] divide-y divide-border/20">
+                        {topLevelProjects.map(project => (
+                          <ProjectRow
+                            key={project.id}
+                            project={project}
+                            subProjects={getSubProjects(project.id)}
+                            expanded={expandedProjects.has(project.id)}
+                            onToggle={() => toggleProject(project.id)}
+                            tasks={projectTasks[project.id] || []}
+                            deliverables={projectDeliverables[project.id] || []}
+                            onTaskComplete={toggleTaskComplete}
+                            onItemClick={setSelectedItem}
+                            activeTimer={activeTimer}
+                            startTimer={startTimer}
+                            stopTimer={stopTimer}
+                            expandedProjects={expandedProjects}
+                            onToggleProject={toggleProject}
+                            projectTasks={projectTasks}
+                            projectDeliverables={projectDeliverables}
+                            myTasks={allMyTasks}
+                          />
+                        ))}
                     </div>
-                    {sentForApproval.slice(0, 5).map(task => (
-                      <div key={task.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30 transition-colors">
-                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setSelectedItem({ type: 'task', data: task })}>
-                          <p className="text-sm font-medium text-foreground truncate">{task.title}</p>
-                          <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
-                        </div>
-                        <span className="text-[10px] font-medium rounded-full px-2 py-0.5" style={getStatusStyle(task.status)}>{getStatusLabel(task.status)}</span>
-                      </div>
-                    ))}
-                  </>
-                )}
-                {/* Need my approval */}
-                {needMyApproval.length > 0 && (
-                  <>
-                    <div className="px-4 py-2 bg-muted/30 rounded-[10px] mx-2 mt-1">
-                      <span className="text-[11px] font-semibold flex items-center gap-1.5">
-                        <Inbox className="h-3 w-3" /> Πρέπει να Εγκρίνω ({needMyApproval.length})
-                      </span>
-                    </div>
-                    {needMyApproval.slice(0, 5).map(task => (
-                      <div key={task.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30 transition-colors">
-                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setSelectedItem({ type: 'task', data: task })}>
-                          <p className="text-sm font-medium text-foreground truncate">{task.title}</p>
-                          <div className="flex items-center gap-1.5">
-                            <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
-                            {(task as any).assignee?.full_name && <span className="text-xs text-muted-foreground">· {(task as any).assignee.full_name}</span>}
-                          </div>
-                        </div>
-                        <div className="flex gap-1">
-                          <Button size="icon" variant="ghost" className="h-7 w-7 rounded-[10px] text-success hover:text-success hover:bg-success/10" onClick={() => approveReviewTask(task)}>
-                            <Check className="h-4 w-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-7 w-7 rounded-[10px] text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => rejectReviewTask(task)}>
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <MyWorkCalendar
+              tasks={allMyTasks}
+              calendarDate={calendarDate}
+              calendarMode={calendarMode}
+              onCalendarDateChange={setCalendarDate}
+              onCalendarModeChange={setCalendarMode}
+              onTaskClick={(task) => setSelectedItem({ type: 'task', data: task })}
+              onTaskUpdated={() => fetchAll()}
+              activeTimer={activeTimer}
+              startTimer={startTimer}
+              stopTimer={stopTimer}
+            />
+          )}
+        </CardContent>
+      </CollapsibleSection>
 
-        {/* Time Tracking Widget */}
-        <Card className="border-border/30 shadow-sm">
-          <CardHeader className="pb-3 px-5">
-            <CardTitle className="text-[13px] font-semibold tracking-tight flex items-center gap-2.5">
-              <span className="h-7 w-7 rounded-lg bg-primary/8 flex items-center justify-center">
-                <Timer className="h-3.5 w-3.5 text-primary" />
-              </span>
-              Time Tracking
-              <Badge variant="secondary" className="text-[10px] ml-auto">{todayHours}h σήμερα</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {/* Active Timer */}
-            {activeTimer?.is_running ? (
-              <div className="flex items-center gap-3 bg-primary/5 border border-primary/15 rounded-[12px] px-4 py-3">
-                <Timer className="h-4 w-4 text-primary animate-pulse shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{activeTimer.task?.title || 'Timer'}</p>
-                  <p className="text-lg font-mono font-bold text-primary">{formatElapsed(elapsed)}</p>
-                </div>
-                <Button size="sm" variant="destructive" className="gap-1.5 shrink-0" onClick={() => stopTimer()}>
-                  <StopCircle className="h-3.5 w-3.5" /> Stop
-                </Button>
-              </div>
-            ) : (
-              <div className="text-sm text-muted-foreground bg-muted/30 rounded-[12px] px-4 py-3 text-center">
-                Κανένα ενεργό timer
-              </div>
-            )}
-
-            {/* Today's entries */}
-            {todayEntries.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground font-medium">Σήμερα</p>
-                <div className="overflow-y-auto max-h-32">
-                  {todayEntries.slice(0, 5).map(entry => (
-                    <div key={entry.id} className="flex items-center gap-2 py-1.5 text-sm">
-                      <span className="text-xs text-muted-foreground tabular-nums w-10">{format(new Date(entry.start_time), 'HH:mm')}</span>
-                      <span className="flex-1 truncate text-foreground text-sm">{entry.task?.title || entry.description || 'Timer'}</span>
-                      <span className="text-xs font-mono text-muted-foreground tabular-nums">{entry.duration_minutes}λ</span>
+      {/* ── Approvals ── */}
+      <CollapsibleSection id="cc-approvals" title="Εγκρίσεις" icon={<ClipboardCheck className="h-3.5 w-3.5 text-primary" />}
+        badge={approvalCount > 0 ? <Badge variant="secondary" className="text-[10px]">{approvalCount}</Badge> : undefined}>
+        <CardContent className="p-0">
+          {approvalCount === 0 ? (
+            <p className="text-sm text-muted-foreground px-6 py-4">Δεν υπάρχουν εκκρεμείς εγκρίσεις 🎉</p>
+          ) : (
+            <div className="overflow-y-auto max-h-[40vh] divide-y divide-border/20">
+              {sentForApproval.length > 0 && (
+                <>
+                  <div className="px-4 py-2 bg-muted/30 rounded-[10px] mx-2 mt-1">
+                    <span className="text-[11px] font-semibold flex items-center gap-1.5">
+                      <Send className="h-3 w-3" /> Έστειλα για Έγκριση ({sentForApproval.length})
+                    </span>
+                  </div>
+                  {sentForApproval.slice(0, 5).map(task => (
+                    <div key={task.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30 transition-colors">
+                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setSelectedItem({ type: 'task', data: task })}>
+                        <p className="text-sm font-medium text-foreground truncate">{task.title}</p>
+                        <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
+                      </div>
+                      <span className="text-[10px] font-medium rounded-full px-2 py-0.5" style={getStatusStyle(task.status)}>{getStatusLabel(task.status)}</span>
                     </div>
                   ))}
-                </div>
-              </div>
-            )}
+                </>
+              )}
+              {needMyApproval.length > 0 && (
+                <>
+                  <div className="px-4 py-2 bg-muted/30 rounded-[10px] mx-2 mt-1">
+                    <span className="text-[11px] font-semibold flex items-center gap-1.5">
+                      <Inbox className="h-3 w-3" /> Πρέπει να Εγκρίνω ({needMyApproval.length})
+                    </span>
+                  </div>
+                  {needMyApproval.slice(0, 5).map(task => (
+                    <div key={task.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30 transition-colors">
+                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setSelectedItem({ type: 'task', data: task })}>
+                        <p className="text-sm font-medium text-foreground truncate">{task.title}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-xs text-muted-foreground">{(task.project as any)?.name}</p>
+                          {(task as any).assignee?.full_name && <span className="text-xs text-muted-foreground">· {(task as any).assignee.full_name}</span>}
+                        </div>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button size="icon" variant="ghost" className="h-7 w-7 rounded-[10px] text-success hover:text-success hover:bg-success/10" onClick={() => approveReviewTask(task)}>
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-7 w-7 rounded-[10px] text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => rejectReviewTask(task)}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </CollapsibleSection>
 
-            <Button variant="outline" size="sm" className="w-full gap-1.5" onClick={() => navigate('/timesheets')}>
-              <ArrowRight className="h-3.5 w-3.5" /> Timesheets
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      {/* ── Time Tracking ── */}
+      <CollapsibleSection id="cc-time" title="Time Tracking" icon={<Timer className="h-3.5 w-3.5 text-primary" />}
+        badge={<Badge variant="secondary" className="text-[10px] ml-auto">{todayHours}h σήμερα</Badge>}>
+        <CardContent className="space-y-3">
+          {activeTimer?.is_running ? (
+            <div className="flex items-center gap-3 bg-primary/5 border border-primary/15 rounded-[12px] px-4 py-3">
+              <Timer className="h-4 w-4 text-primary animate-pulse shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{activeTimer.task?.title || 'Timer'}</p>
+                <p className="text-lg font-mono font-bold text-primary">{formatElapsed(elapsed)}</p>
+              </div>
+              <Button size="sm" variant="destructive" className="gap-1.5 shrink-0" onClick={() => stopTimer()}>
+                <StopCircle className="h-3.5 w-3.5" /> Stop
+              </Button>
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground bg-muted/30 rounded-[12px] px-4 py-3 text-center">
+              Κανένα ενεργό timer
+            </div>
+          )}
+          {todayEntries.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground font-medium">Σήμερα</p>
+              <div className="overflow-y-auto max-h-32">
+                {todayEntries.slice(0, 5).map(entry => (
+                  <div key={entry.id} className="flex items-center gap-2 py-1.5 text-sm">
+                    <span className="text-xs text-muted-foreground tabular-nums w-10">{format(new Date(entry.start_time), 'HH:mm')}</span>
+                    <span className="flex-1 truncate text-foreground text-sm">{entry.task?.title || entry.description || 'Timer'}</span>
+                    <span className="text-xs font-mono text-muted-foreground tabular-nums">{entry.duration_minutes}λ</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <Button variant="outline" size="sm" className="w-full gap-1.5" onClick={() => navigate('/timesheets')}>
+            <ArrowRight className="h-3.5 w-3.5" /> Timesheets
+          </Button>
+        </CardContent>
+      </CollapsibleSection>
 
       {/* ── Quick Notes ── */}
       <QuickNotes />
 
       {/* ── Team Radar + Intel Feed (admin/manager only) ── */}
-      {(showTeamRadar || showIntel) && (
-        <div className="grid gap-5 lg:grid-cols-2">
-          {showTeamRadar && <CCTeamRadar />}
-          {showIntel && <CCIntelFeed />}
-        </div>
+      {showTeamRadar && (
+        <CollapsibleSection id="cc-team-radar" title="Team Radar" icon={<ListChecks className="h-3.5 w-3.5 text-primary" />}>
+          <CardContent className="pt-0 px-5 pb-4">
+            <CCTeamRadar />
+          </CardContent>
+        </CollapsibleSection>
       )}
+      {showIntel && (
+        <CollapsibleSection id="cc-intel" title="Intel Feed" icon={<AlertTriangle className="h-3.5 w-3.5 text-primary" />}>
+          <CardContent className="pt-0 px-5 pb-4">
+            <CCIntelFeed />
+          </CardContent>
+        </CollapsibleSection>
+      )}
+
+      {/* Show hidden sections button */}
+      <ShowHiddenSections />
 
 
       </div>

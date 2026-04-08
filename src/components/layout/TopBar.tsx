@@ -228,6 +228,21 @@ export default function TopBar({ onPanelToggle, rightPanelOpen, onMobileMenuTogg
           {isNarrow && <TooltipContent>Work Mode</TooltipContent>}
         </Tooltip>
 
+        {/* Quick Chat */}
+        <Tooltip delayDuration={300}>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onQuickChatToggle}
+              className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
+            >
+              <Sparkles className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>AI Chat (⌘I)</TooltipContent>
+        </Tooltip>
+
         {/* Panel toggle */}
         <Tooltip delayDuration={300}>
           <TooltipTrigger asChild>

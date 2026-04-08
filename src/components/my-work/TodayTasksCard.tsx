@@ -231,17 +231,29 @@ export function TodayTasksCard({
                   {SORT_OPTIONS.find(o => o.value === sortMode)?.label}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-40 p-1" align="end">
+              <PopoverContent className="w-44 p-1" align="end">
                 {SORT_OPTIONS.map(opt => (
                   <button
                     key={opt.value}
                     className={cn(
-                      "w-full text-left text-sm px-3 py-1.5 rounded-lg hover:bg-accent/50 transition-colors",
+                      "w-full text-left text-sm px-3 py-1.5 rounded-lg hover:bg-accent/50 transition-colors flex items-center justify-between",
                       sortMode === opt.value && "bg-accent font-medium"
                     )}
-                    onClick={() => setSortMode(opt.value)}
+                    onClick={() => {
+                      if (sortMode === opt.value && opt.value !== 'manual') {
+                        setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+                      } else {
+                        setSortMode(opt.value);
+                        setSortDir('asc');
+                      }
+                    }}
                   >
                     {opt.label}
+                    {sortMode === opt.value && opt.value !== 'manual' && (
+                      <span className="text-[10px] text-muted-foreground">
+                        {sortDir === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
                   </button>
                 ))}
               </PopoverContent>

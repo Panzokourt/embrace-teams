@@ -88,7 +88,7 @@ export default function CCMissionCards({
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <div className="flex gap-3 overflow-x-auto" style={{ minWidth: 0 }}>
       {cards.map((card) => (
         <div
           key={card.id}

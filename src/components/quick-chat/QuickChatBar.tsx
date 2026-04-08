@@ -246,9 +246,10 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
     await supabase.from('secretary_messages').insert({ conversation_id: convId, role, content });
   };
 
-  const sendMessage = useCallback(async () => {
-    const text = input.trim();
+  const sendMessage = useCallback(async (overrideText?: string) => {
+    const text = (overrideText ?? input).trim();
     if ((!text && attachedFiles.length === 0) || loading) return;
+    if (overrideText) setInput('');
 
     const currentFiles = [...attachedFiles];
     const attachmentMeta = currentFiles.map(f => ({ name: f.name, type: f.type }));

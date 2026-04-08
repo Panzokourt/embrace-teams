@@ -10,8 +10,7 @@ interface CCHeroZoneProps {
 function XPRing({ progress, level }: { progress: number; level: number }) {
   const radius = 54;
   const stroke = 6;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (progress / 100) * circumference;
+  const normalizedProgress = Math.min(100, Math.max(0, progress));
 
   const glowColor = level >= 20 ? 'hsl(38 92% 50%)' :
     level >= 15 ? 'hsl(270 60% 55%)' :
@@ -26,8 +25,9 @@ function XPRing({ progress, level }: { progress: number; level: number }) {
         <circle cx="60" cy="60" r={radius} fill="none"
           stroke={glowColor} strokeWidth={stroke}
           strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
+          pathLength={100}
+          strokeDasharray="100"
+          strokeDashoffset={100 - normalizedProgress}
           className="transition-all duration-1000 ease-out"
           style={{ filter: `drop-shadow(0 0 6px ${glowColor})` }} />
       </svg>

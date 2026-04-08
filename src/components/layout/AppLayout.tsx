@@ -8,6 +8,7 @@ import VoiceCommandProvider, { useVoiceCommand } from '@/components/secretary/Vo
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Loader2 } from 'lucide-react';
 import ChatFloatingBubbles from '@/components/chat/ChatFloatingBubbles';
+import QuickChatBar from '@/components/quick-chat/QuickChatBar';
 import { FocusModeProvider } from '@/contexts/FocusContext';
 import FocusOverlay from '@/components/focus/FocusOverlay';
 import { LayoutProvider, useLayout } from '@/contexts/LayoutContext';

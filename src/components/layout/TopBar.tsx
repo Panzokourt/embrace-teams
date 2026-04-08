@@ -33,6 +33,7 @@ interface TopBarProps {
   rightPanelOpen?: boolean;
   onMobileMenuToggle?: () => void;
   showHamburger?: boolean;
+  onQuickChatToggle?: () => void;
 }
 
 export default function TopBar({ onPanelToggle, rightPanelOpen, onMobileMenuToggle, showHamburger }: TopBarProps) {

@@ -289,6 +289,7 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
           rightPanelOpen={rightPanelOpen}
           onMobileMenuToggle={() => setMobileSidebarOpen(true)}
           showHamburger={sidebarMode === 'hidden'}
+          onQuickChatToggle={toggleQuickChat}
         />
         <main className="flex-1 overflow-auto">
           <Outlet />

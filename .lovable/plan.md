@@ -1,45 +1,69 @@
 
 
-# Quick Chat Bar — Floating Bottom AI Chat
+# QuickChatBar: File Upload & AI Document Understanding
 
-## Concept
-A compact chat bar fixed at the bottom of the screen (like the uploaded screenshot), triggered by a TopBar button or keyboard shortcut (⌘+I). It connects to the same Secretary AI agent but in a minimal, non-intrusive overlay — no sidebar, no full page.
+## Problem
+The QuickChatBar has no way to attach files. The user wants to upload documents (PDF, DOCX, images, etc.) both via button and drag & drop, and have the AI agent understand the file contents deeply — similar to how Claude handles file attachments natively.
 
 ## Changes
 
-### 1. New `QuickChatBar` Component
-A fixed-position bar at the bottom center of the viewport:
-- Collapsed state: single-line input with placeholder "What can I help you with today?", "New Chat" dropdown, send button
-- Expanded state: shows recent messages above the input (max ~300px height), scrollable
-- Uses the same `sendMessage` logic from SecretaryChat (calls `secretary-agent` edge function with SSE streaming)
-- Maintains its own lightweight conversation state (messages array, conversationId)
-- "New Chat" button resets the conversation
-- Shortcut: `⌘+I` (or `Ctrl+I`) toggles visibility
-- Clicking outside or pressing `Escape` collapses/hides it
-- Smooth slide-up animation on open
+### 1. QuickChatBar: File Upload UI
+- Add a **Paperclip button** next to the input (left side, before text input)
+- Add **drag & drop** support on the entire QuickChatBar container — show a visual drop zone overlay when dragging files over it
+- Hidden `<input type="file" multiple>` triggered by the paperclip button
+- Show attached files as small chips below the input before sending (file name + remove button)
+- Support multiple files at once
 
-### 2. TopBar: Add Quick Chat Button
-Add a sparkle/bot icon button next to the Work Mode button in the right actions area. Clicking it toggles the QuickChatBar visibility via a shared state (context or callback prop).
+### 2. File Processing Pipeline (client-side)
+When files are attached and the message is sent:
+- **Text files** (CSV, TXT, JSON, XML, MD, LOG): read directly via `file.text()`
+- **PDFs**: use the existing `useDocumentParser` hook (client-side pdf.js extraction, fallback to OCR via `parse-document` edge function)
+- **Images** (JPEG, PNG, WEBP): convert to base64 for Claude's vision API
+- **DOCX/PPTX**: send to `parse-document` edge function for extraction
+- The parsed content is included in the user message sent to `secretary-agent`
 
-### 3. State Management
-Add `quickChatOpen` state in the main layout (`AppLayout` or similar) and pass toggle function to TopBar. The `QuickChatBar` component mounts globally (always in DOM, visibility toggled).
+### 3. Secretary Agent: Enhanced File Handling
+Update the `secretary-agent` edge function to accept multimodal messages:
+- Accept messages with `content` as an array (Anthropic multimodal format): `[{type: "text", text: "..."}, {type: "image", source: {type: "base64", ...}}]`
+- For text-based files: content is injected as text blocks with file metadata headers
+- For images: sent as vision blocks so Claude can actually "see" them
+- Increase context handling — currently `analyze_uploaded_file` truncates at 30K chars; for direct message attachments, allow larger content (Claude supports 200K tokens)
 
-### 4. Keyboard Shortcut
-Global `⌘+I` / `Ctrl+I` listener in the QuickChatBar component to toggle open/close.
+### 4. Message Display
+- User messages with attachments show file chips (icon + name) above the message text
+- Different icons for different file types (PDF, image, document, spreadsheet)
 
 ## Technical Details
 
-- The bar reuses the SSE streaming logic from SecretaryChat (fetch to `secretary-agent`, parse SSE events)
-- Messages rendered with ReactMarkdown (same as SecretaryChat)
-- Conversation persisted to `secretary_conversations` / `secretary_messages` tables
-- The bar sits at `fixed bottom-0 left-1/2 -translate-x-1/2` with `max-w-2xl w-full`
-- z-index high enough to overlay content but below modals
+**QuickChatBar changes:**
+- New state: `attachedFiles: File[]`, `parsedAttachments: ParsedAttachment[]`
+- Drag events: `onDragOver`, `onDragLeave`, `onDrop` on the container div
+- `useDocumentParser` hook for PDF/DOCX parsing
+- On send: parse all files → build multimodal message payload → send to secretary-agent
+
+**Message payload format to secretary-agent:**
+```typescript
+// For text files
+{ role: "user", content: [
+  { type: "text", text: "📎 report.pdf (15 σελίδες)\n\n[content...]" },
+  { type: "text", text: "User's actual message" }
+]}
+
+// For images
+{ role: "user", content: [
+  { type: "image", source: { type: "base64", media_type: "image/jpeg", data: "..." }},
+  { type: "text", text: "User's message about the image" }
+]}
+```
+
+**secretary-agent changes:**
+- In the message conversion code (line ~1852), handle `content` being either a string or an array
+- Pass array content directly to Anthropic API (it natively supports this format)
 
 ## Files
 
 | File | Change |
 |------|--------|
-| `src/components/quick-chat/QuickChatBar.tsx` | New — floating bottom chat bar with streaming AI, conversation management |
-| `src/components/layout/TopBar.tsx` | Add bot/sparkle icon button that toggles quick chat |
-| `src/components/layout/AppLayout.tsx` (or equivalent) | Add `quickChatOpen` state, render `QuickChatBar`, pass toggle to TopBar |
+| `src/components/quick-chat/QuickChatBar.tsx` | Add paperclip button, drag & drop, file chips, parsing logic, multimodal message building |
+| `supabase/functions/secretary-agent/index.ts` | Handle multimodal message content (array format) in message conversion |
 

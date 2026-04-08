@@ -570,7 +570,7 @@ const toolDefinitions = [
     type: "function",
     function: {
       name: "save_memory",
-      description: "Save an important fact, file analysis summary, decision, or user preference to persistent memory. Call this after analyzing files, making decisions, or learning user preferences. This helps you remember across conversations.",
+      description: "Save an important fact, file analysis summary, decision, or user preference to persistent memory. Call this after analyzing files, making decisions, or learning user preferences. This helps you remember across conversations. Always include project_id or client_id when the memory is related to a specific project or client.",
       parameters: {
         type: "object",
         properties: {
@@ -578,6 +578,8 @@ const toolDefinitions = [
           key: { type: "string", description: "Short identifier, e.g. 'creative_brief_govgr' or 'user_prefers_greek'" },
           content: { type: "string", description: "The memory content - summary, key findings, decisions made" },
           metadata: { type: "object", description: "Optional metadata (file names, entity IDs, etc.)" },
+          project_id: { type: "string", description: "Project UUID if this memory relates to a specific project" },
+          client_id: { type: "string", description: "Client UUID if this memory relates to a specific client" },
         },
         required: ["category", "key", "content"],
       },
@@ -593,6 +595,8 @@ const toolDefinitions = [
         properties: {
           query: { type: "string", description: "Search query" },
           category: { type: "string", enum: ["general", "file_analysis", "decision", "preference", "project_context"], description: "Optional category filter" },
+          project_id: { type: "string", description: "Optional project UUID to filter memories for a specific project" },
+          client_id: { type: "string", description: "Optional client UUID to filter memories for a specific client" },
           limit: { type: "number", description: "Max results (default 10)" },
         },
         required: ["query"],
@@ -1680,6 +1684,8 @@ Respond in Greek. Be thorough but concise.`;
               content: args.content,
               category: args.category || "general",
               metadata: args.metadata || {},
+              project_id: args.project_id || null,
+              client_id: args.client_id || null,
               updated_at: new Date().toISOString(),
             })
             .eq("id", existing.id);
@@ -1693,6 +1699,8 @@ Respond in Greek. Be thorough but concise.`;
             key: args.key,
             content: args.content,
             metadata: args.metadata || {},
+            project_id: args.project_id || null,
+            client_id: args.client_id || null,
           });
           if (error) throw error;
           return { success: true, action: "saved", key: args.key };
@@ -1701,43 +1709,55 @@ Respond in Greek. Be thorough but concise.`;
 
       case "recall_memory": {
         const limit = args.limit || 10;
-        let q = supabase
-          .from("secretary_memory")
-          .select("id, category, key, content, metadata, created_at, updated_at")
-          .eq("user_id", userId)
-          .eq("company_id", companyId)
-          .order("updated_at", { ascending: false })
-          .limit(limit);
+        const selectCols = "id, category, key, content, metadata, project_id, client_id, created_at, updated_at";
 
-        if (args.category) q = q.eq("category", args.category);
+        const applyFilters = (q: any) => {
+          if (args.category) q = q.eq("category", args.category);
+          if (args.project_id) q = q.eq("project_id", args.project_id);
+          if (args.client_id) q = q.eq("client_id", args.client_id);
+          return q;
+        };
 
         // Try full-text search first
         if (args.query) {
-          const { data: ftsData } = await supabase
+          let ftsQ = supabase
             .from("secretary_memory")
-            .select("id, category, key, content, metadata, created_at, updated_at")
+            .select(selectCols)
             .eq("user_id", userId)
             .eq("company_id", companyId)
             .textSearch("content", args.query, { type: "plain" })
             .order("updated_at", { ascending: false })
             .limit(limit);
+          ftsQ = applyFilters(ftsQ);
+          const { data: ftsData } = await ftsQ;
 
           if (ftsData && ftsData.length > 0) {
             return { memories: ftsData, count: ftsData.length, search_type: "full_text" };
           }
 
           // Fallback: ilike search
-          const { data: ilikeData } = await supabase
+          let ilikeQ = supabase
             .from("secretary_memory")
-            .select("id, category, key, content, metadata, created_at, updated_at")
+            .select(selectCols)
             .eq("user_id", userId)
             .eq("company_id", companyId)
             .or(`content.ilike.%${args.query}%,key.ilike.%${args.query}%`)
             .order("updated_at", { ascending: false })
             .limit(limit);
+          ilikeQ = applyFilters(ilikeQ);
+          const { data: ilikeData } = await ilikeQ;
 
           return { memories: ilikeData || [], count: (ilikeData || []).length, search_type: "fuzzy" };
         }
+
+        let q = supabase
+          .from("secretary_memory")
+          .select(selectCols)
+          .eq("user_id", userId)
+          .eq("company_id", companyId)
+          .order("updated_at", { ascending: false })
+          .limit(limit);
+        q = applyFilters(q);
 
         const { data, error } = await q;
         if (error) throw error;
@@ -1875,7 +1895,7 @@ serve(async (req) => {
         .limit(5),
       supabase
         .from("secretary_memory")
-        .select("category, key, content, updated_at")
+        .select("category, key, content, project_id, client_id, updated_at")
         .eq("user_id", userId)
         .eq("company_id", companyId)
         .order("updated_at", { ascending: false })
@@ -2046,9 +2066,11 @@ Memory & Context:
 - Έχεις μόνιμη μνήμη (save_memory/recall_memory). Αποθήκευε σημαντικές πληροφορίες αυτόματα.
 - Μετά από ανάλυση αρχείου, ΠΑΝΤΑ κάλεσε save_memory με category "file_analysis" και τα key findings.
 - Μετά από σημαντική απόφαση χρήστη, κάλεσε save_memory με category "decision".
+- ΠΑΝΤΑ συμπερίλαβε project_id και/ή client_id στο save_memory αν η μνήμη σχετίζεται με συγκεκριμένο project ή client.
+- Όταν ανακαλείς μνήμες σε context project/client, φιλτράρισε με project_id/client_id για πιο relevant αποτελέσματα.
 - Μπορείς να ψάξεις παλιές συνομιλίες (search_past_chats) και team chat channels (search_chat_channels).
 - Αν ο χρήστης αναφέρει κάτι που συζητήθηκε πριν, χρησιμοποίησε recall_memory ή search_past_chats.
-${userMemories.length > 0 ? `\nΑποθηκευμένη Μνήμη Χρήστη (${userMemories.length} εγγραφές):\n${userMemories.map((m: any) => `- [${m.category}] ${m.key}: ${m.content.length > 200 ? m.content.slice(0, 200) + "..." : m.content}`).join("\n")}` : ""}
+${userMemories.length > 0 ? `\nΑποθηκευμένη Μνήμη Χρήστη (${userMemories.length} εγγραφές):\n${userMemories.map((m: any) => `- [${m.category}]${m.project_id ? ` (project:${m.project_id})` : ""}${m.client_id ? ` (client:${m.client_id})` : ""} ${m.key}: ${m.content.length > 200 ? m.content.slice(0, 200) + "..." : m.content}`).join("\n")}` : ""}
 
 Context δεδομένων χρήστη:
 ${contextParts.join("\n")}`;

@@ -13,6 +13,7 @@ interface ProjectFinancialsHubProps {
   clientId?: string | null;
   projectBudget: number;
   agencyFeePercentage: number;
+  isInternal?: boolean;
 }
 
 interface KPIData {

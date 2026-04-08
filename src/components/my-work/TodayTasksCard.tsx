@@ -95,6 +95,7 @@ export function TodayTasksCard({
 }: TodayTasksCardProps) {
   const [sortMode, setSortMode] = useState<SortMode>('date');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [manualOrder, setManualOrder] = useState<string[]>([]);
   const [expandedSubtasks, setExpandedSubtasks] = useState<Set<string>>(new Set());
   const [subtasksData, setSubtasksData] = useState<Record<string, TaskItem[]>>({});
   const [subtaskCounts, setSubtaskCounts] = useState<Record<string, number>>({});

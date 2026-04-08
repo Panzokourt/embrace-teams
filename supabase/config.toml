@@ -33,6 +33,8 @@ project_id = "qsykyiqplslvmxdfudxq"
     verify_jwt = false
   [functions.process-email-queue]
     verify_jwt = true
+  [functions.quick-chat-gemini]
+    verify_jwt = false
   [functions.secretary-agent]
     verify_jwt = false
   [functions.seed-dummy-data]

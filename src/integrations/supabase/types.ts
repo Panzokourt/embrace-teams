@@ -980,10 +980,12 @@ export type Database = {
       companies: {
         Row: {
           allow_domain_requests: boolean
+          company_size: string | null
           created_at: string
           domain: string
           domain_verified: boolean
           id: string
+          industry: string | null
           logo_url: string | null
           name: string
           settings: Json | null
@@ -992,10 +994,12 @@ export type Database = {
         }
         Insert: {
           allow_domain_requests?: boolean
+          company_size?: string | null
           created_at?: string
           domain: string
           domain_verified?: boolean
           id?: string
+          industry?: string | null
           logo_url?: string | null
           name: string
           settings?: Json | null
@@ -1004,10 +1008,12 @@ export type Database = {
         }
         Update: {
           allow_domain_requests?: boolean
+          company_size?: string | null
           created_at?: string
           domain?: string
           domain_verified?: boolean
           id?: string
+          industry?: string | null
           logo_url?: string | null
           name?: string
           settings?: Json | null

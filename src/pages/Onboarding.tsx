@@ -2,19 +2,22 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import {
-  Loader2, PartyPopper, Building2, User, Settings, Rocket,
-  ChevronRight, ChevronLeft, Sun, Moon, Link2, ArrowLeft, Clock
-} from 'lucide-react';
-import { useTheme } from '@/contexts/ThemeContext';
+import { Loader2, Clock } from 'lucide-react';
 import olsenyLogo from '@/assets/olseny-logo.png';
 
-type WizardStep = 'loading' | 'welcome' | 'company' | 'profile' | 'preferences' | 'ready' | 'pending';
+import OnboardingWelcome from '@/components/onboarding/OnboardingWelcome';
+import OnboardingCompany from '@/components/onboarding/OnboardingCompany';
+import OnboardingProfile from '@/components/onboarding/OnboardingProfile';
+import OnboardingTeamInvite from '@/components/onboarding/OnboardingTeamInvite';
+import OnboardingFirstClient from '@/components/onboarding/OnboardingFirstClient';
+import OnboardingCompanyDocs from '@/components/onboarding/OnboardingCompanyDocs';
+import OnboardingAISetup from '@/components/onboarding/OnboardingAISetup';
+import OnboardingReady from '@/components/onboarding/OnboardingReady';
+
+type WizardStep = 'loading' | 'welcome' | 'company' | 'profile' | 'team' | 'client' | 'docs' | 'ai-setup' | 'ready' | 'pending';
 
 interface DomainCompany {
   id: string;
@@ -24,8 +27,7 @@ interface DomainCompany {
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const { user, profile, companyRole, signOut, refreshUserData } = useAuth();
-  const { theme, setTheme } = useTheme();
+  const { user, profile, company, companyRole, signOut, refreshUserData } = useAuth();
 
   const [step, setStep] = useState<WizardStep>('loading');
   const [loading, setLoading] = useState(false);
@@ -38,17 +40,15 @@ export default function Onboarding() {
   const [suggestedCompanyName, setSuggestedCompanyName] = useState('');
   const [invitationCompanyName, setInvitationCompanyName] = useState('');
 
-  // Company setup state
-  const [companyMode, setCompanyMode] = useState<'create' | 'join' | null>(null);
-  const [companyName, setCompanyName] = useState('');
-  const [companyDomain, setCompanyDomain] = useState('');
-
   // Profile fields
   const [phone, setPhone] = useState('');
   const [jobTitle, setJobTitle] = useState('');
 
   // Pending info
   const [pendingCompanyName, setPendingCompanyName] = useState('');
+
+  // Docs upload state
+  const [uploadedSourceIds, setUploadedSourceIds] = useState<string[]>([]);
 
   // If user already has an active company role, redirect
   useEffect(() => {
@@ -72,7 +72,6 @@ export default function Onboarding() {
           case 'invitation_accepted':
             setInvitationCompanyName(result.company_name || '');
             await refreshUserData();
-            // Skip to profile step — company already set
             setStep('profile');
             toast.success(`Η πρόσκλησή σας για "${result.company_name}" έγινε αποδεκτή!`);
             return;
@@ -87,11 +86,6 @@ export default function Onboarding() {
             setIsPersonalEmail(result.is_personal_email || false);
             setDomainCompanies(result.domain_companies || []);
             setSuggestedCompanyName(result.suggested_company_name || '');
-            // Pre-fill company name from domain
-            if (result.suggested_company_name) {
-              setCompanyName(result.suggested_company_name);
-              setCompanyDomain(result.domain || '');
-            }
             setStep('welcome');
             return;
 
@@ -109,9 +103,9 @@ export default function Onboarding() {
   }, [user]);
 
   // Wizard steps (excluding loading and pending)
-  const wizardSteps: WizardStep[] = ['welcome', 'company', 'profile', 'preferences', 'ready'];
+  const wizardSteps: WizardStep[] = ['welcome', 'company', 'profile', 'team', 'client', 'docs', 'ai-setup', 'ready'];
   const currentIndex = wizardSteps.indexOf(step);
-  const progressPercent = step === 'loading' ? 0 : step === 'pending' ? 50
+  const progressPercent = step === 'loading' ? 0 : step === 'pending' ? 25
     : ((currentIndex + 1) / wizardSteps.length) * 100;
 
   const goNext = () => {
@@ -124,61 +118,7 @@ export default function Onboarding() {
       setStep(wizardSteps[currentIndex - 1]);
     }
   };
-
-  const handleCreateCompany = async () => {
-    if (!companyName.trim()) return;
-    setLoading(true);
-    try {
-      // Auto-generate domain: corporate email → emailDomain, personal → unique slug
-      const autoDomain = isPersonalEmail
-        ? `${companyName.trim().toLowerCase().replace(/\s+/g, '-')}-${user!.id.slice(0, 8)}.personal`
-        : emailDomain || 'default.com';
-
-      const { error } = await supabase.rpc('create_company_with_owner', {
-        _name: companyName.trim(),
-        _domain: autoDomain,
-      });
-      if (error) {
-        if (error.code === '23505') {
-          toast.error('Υπάρχει ήδη εταιρεία με αυτό το domain. Ζητήστε πρόσβαση από τον διαχειριστή.');
-        } else {
-          throw error;
-        }
-        return;
-      }
-      toast.success('Η εταιρεία δημιουργήθηκε!');
-      await refreshUserData();
-      goNext();
-    } catch (error: any) {
-      toast.error(error.message || 'Σφάλμα δημιουργίας');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRequestJoin = async (company: DomainCompany) => {
-    setLoading(true);
-    try {
-      const { error } = await supabase
-        .from('join_requests')
-        .insert({ user_id: user!.id, company_id: company.id });
-      if (error) {
-        if (error.message?.includes('duplicate')) {
-          toast.error('Έχετε ήδη στείλει αίτημα');
-        } else {
-          throw error;
-        }
-        return;
-      }
-      setPendingCompanyName(company.name);
-      setStep('pending');
-      toast.success('Το αίτημα στάλθηκε!');
-    } catch (error: any) {
-      toast.error(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const skipToReady = () => setStep('ready');
 
   const handleFinish = async () => {
     setLoading(true);
@@ -196,6 +136,16 @@ export default function Onboarding() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePending = (companyName: string) => {
+    setPendingCompanyName(companyName);
+    setStep('pending');
+  };
+
+  const handleDocsComplete = (sourceIds: string[]) => {
+    setUploadedSourceIds(sourceIds);
+    goNext();
   };
 
   return (
@@ -246,204 +196,91 @@ export default function Onboarding() {
         {!['loading', 'pending'].includes(step) && (
           <Card className="border-border/40">
             <CardContent className="py-10 px-8">
-
-              {/* Step: Welcome */}
               {step === 'welcome' && (
-                <div className="text-center space-y-6">
-                  <PartyPopper className="h-16 w-16 text-primary mx-auto" />
-                  <h1 className="text-2xl font-bold text-foreground">
-                    Καλωσήρθατε, {profile?.full_name || 'χρήστη'}!
-                  </h1>
-                  <p className="text-muted-foreground">
-                    Ας ρυθμίσουμε μαζί τον χώρο εργασίας σας σε λίγα βήματα.
-                  </p>
-                  <Button onClick={goNext} className="w-full">
-                    Ας ξεκινήσουμε <ChevronRight className="h-4 w-4 ml-2" />
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={signOut} className="text-muted-foreground">
-                    <ArrowLeft className="h-4 w-4 mr-2" />Αποσύνδεση
-                  </Button>
-                </div>
+                <OnboardingWelcome
+                  profile={profile}
+                  onNext={goNext}
+                  onSignOut={signOut}
+                />
               )}
 
-              {/* Step: Company Setup */}
               {step === 'company' && (
-                <div className="space-y-6">
-                  <div className="text-center mb-4">
-                    <Building2 className="h-10 w-10 text-primary mx-auto mb-2" />
-                    <h2 className="text-xl font-semibold text-foreground">Ο χώρος εργασίας σας</h2>
-                    <p className="text-sm text-muted-foreground">
-                      {isPersonalEmail
-                        ? 'Δημιουργήστε μια νέα εταιρεία'
-                        : domainCompanies.length > 0
-                          ? `Βρέθηκαν εταιρείες με domain @${emailDomain}`
-                          : `Δημιουργήστε εταιρεία για @${emailDomain}`
-                      }
-                    </p>
-                  </div>
-
-                  {/* Domain companies found — show join options */}
-                  {!isPersonalEmail && domainCompanies.length > 0 && companyMode !== 'create' && (
-                    <div className="space-y-3">
-                      <Label className="text-muted-foreground text-xs uppercase tracking-wider">Υπάρχουσες εταιρείες</Label>
-                      {domainCompanies.map((dc) => (
-                        <div key={dc.id} className="flex items-center justify-between p-4 rounded-xl border border-border/40">
-                          <div className="flex items-center gap-3">
-                            {dc.logo_url ? (
-                              <img src={dc.logo_url} alt={dc.name} className="h-8 w-8 rounded-lg" />
-                            ) : (
-                              <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
-                                <Building2 className="h-4 w-4 text-muted-foreground" />
-                              </div>
-                            )}
-                            <span className="font-medium text-foreground">{dc.name}</span>
-                          </div>
-                          <Button size="sm" onClick={() => handleRequestJoin(dc)} disabled={loading}>
-                            <Link2 className="h-3.5 w-3.5 mr-1.5" />Αίτημα
-                          </Button>
-                        </div>
-                      ))}
-                      <div className="text-center pt-2">
-                        <Button variant="ghost" size="sm" onClick={() => setCompanyMode('create')} className="text-muted-foreground">
-                          Ή δημιουργήστε νέα εταιρεία
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Create company form */}
-                  {(isPersonalEmail || domainCompanies.length === 0 || companyMode === 'create') && (
-                    <div className="space-y-4">
-                      {companyMode === 'create' && domainCompanies.length > 0 && (
-                        <Button variant="ghost" size="sm" className="-ml-2" onClick={() => setCompanyMode(null)}>
-                          <ArrowLeft className="h-4 w-4 mr-1" />Πίσω στις υπάρχουσες
-                        </Button>
-                      )}
-                      <div className="space-y-2">
-                        <Label>Όνομα εταιρείας *</Label>
-                        <Input
-                          placeholder="Η εταιρεία μου"
-                          value={companyName}
-                          onChange={(e) => setCompanyName(e.target.value)}
-                        />
-                      </div>
-                      <Button
-                        className="w-full"
-                        onClick={handleCreateCompany}
-                        disabled={loading || !companyName.trim()}
-                      >
-                        {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                        Δημιουργία & συνέχεια
-                      </Button>
-                    </div>
-                  )}
-
-                  <div className="flex gap-3 pt-2">
-                    <Button variant="outline" onClick={goBack} className="flex-1">
-                      <ChevronLeft className="h-4 w-4 mr-1" /> Πίσω
-                    </Button>
-                  </div>
-                </div>
+                <OnboardingCompany
+                  userId={user!.id}
+                  isPersonalEmail={isPersonalEmail}
+                  emailDomain={emailDomain}
+                  domainCompanies={domainCompanies}
+                  suggestedCompanyName={suggestedCompanyName}
+                  onNext={goNext}
+                  onBack={goBack}
+                  onSkip={goNext}
+                  onPending={handlePending}
+                  refreshUserData={refreshUserData}
+                />
               )}
 
-              {/* Step: Profile */}
               {step === 'profile' && (
-                <div className="space-y-6">
-                  <div className="text-center mb-4">
-                    <User className="h-10 w-10 text-primary mx-auto mb-2" />
-                    <h2 className="text-xl font-semibold text-foreground">Το προφίλ σας</h2>
-                    <p className="text-sm text-muted-foreground">Προαιρετικά στοιχεία</p>
-                    {invitationCompanyName && (
-                      <p className="text-xs text-primary mt-1">Εταιρεία: {invitationCompanyName}</p>
-                    )}
-                  </div>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Τηλέφωνο</Label>
-                      <Input placeholder="+30 210 1234567" value={phone} onChange={(e) => setPhone(e.target.value)} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Θέση εργασίας</Label>
-                      <Input placeholder="π.χ. Project Manager" value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} />
-                    </div>
-                  </div>
-                  <div className="flex gap-3">
-                    {!invitationCompanyName && (
-                      <Button variant="outline" onClick={goBack} className="flex-1">
-                        <ChevronLeft className="h-4 w-4 mr-1" /> Πίσω
-                      </Button>
-                    )}
-                    <Button onClick={goNext} className="flex-1">
-                      Συνέχεια <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
-                  </div>
-                </div>
+                <OnboardingProfile
+                  userId={user!.id}
+                  invitationCompanyName={invitationCompanyName || undefined}
+                  onNext={goNext}
+                  onBack={goBack}
+                  onSkip={goNext}
+                  phone={phone}
+                  setPhone={setPhone}
+                  jobTitle={jobTitle}
+                  setJobTitle={setJobTitle}
+                />
               )}
 
-              {/* Step: Preferences */}
-              {step === 'preferences' && (
-                <div className="space-y-6">
-                  <div className="text-center mb-4">
-                    <Settings className="h-10 w-10 text-primary mx-auto mb-2" />
-                    <h2 className="text-xl font-semibold text-foreground">Προτιμήσεις</h2>
-                    <p className="text-sm text-muted-foreground">Προσαρμόστε την εμπειρία σας</p>
-                  </div>
-                  <div className="space-y-4">
-                    <Label>Θέμα εμφάνισης</Label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        onClick={() => setTheme('light')}
-                        className={`flex items-center gap-3 p-4 rounded-xl border transition-colors ${
-                          theme === 'light' ? 'border-primary bg-primary/5' : 'border-border/40 hover:border-primary/40'
-                        }`}
-                      >
-                        <Sun className="h-5 w-5 text-foreground" />
-                        <span className="text-sm font-medium text-foreground">Φωτεινό</span>
-                      </button>
-                      <button
-                        onClick={() => setTheme('dark')}
-                        className={`flex items-center gap-3 p-4 rounded-xl border transition-colors ${
-                          theme === 'dark' ? 'border-primary bg-primary/5' : 'border-border/40 hover:border-primary/40'
-                        }`}
-                      >
-                        <Moon className="h-5 w-5 text-foreground" />
-                        <span className="text-sm font-medium text-foreground">Σκοτεινό</span>
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex gap-3">
-                    <Button variant="outline" onClick={goBack} className="flex-1">
-                      <ChevronLeft className="h-4 w-4 mr-1" /> Πίσω
-                    </Button>
-                    <Button onClick={goNext} className="flex-1">
-                      Συνέχεια <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
-                  </div>
-                </div>
+              {step === 'team' && (
+                <OnboardingTeamInvite
+                  userId={user!.id}
+                  companyId={company?.id}
+                  onNext={goNext}
+                  onBack={goBack}
+                  onSkip={goNext}
+                />
               )}
 
-              {/* Step: Ready */}
+              {step === 'client' && (
+                <OnboardingFirstClient
+                  companyId={company?.id}
+                  onNext={goNext}
+                  onBack={goBack}
+                  onSkip={goNext}
+                />
+              )}
+
+              {step === 'docs' && (
+                <OnboardingCompanyDocs
+                  userId={user!.id}
+                  companyId={company?.id}
+                  onNext={handleDocsComplete}
+                  onBack={goBack}
+                  onSkip={() => { setUploadedSourceIds([]); goNext(); }}
+                />
+              )}
+
+              {step === 'ai-setup' && (
+                <OnboardingAISetup
+                  companyId={company?.id}
+                  sourceIds={uploadedSourceIds}
+                  onNext={goNext}
+                  onSkip={goNext}
+                />
+              )}
+
               {step === 'ready' && (
-                <div className="text-center space-y-6">
-                  <Rocket className="h-16 w-16 text-primary mx-auto" />
-                  <h2 className="text-xl font-semibold text-foreground">Είστε έτοιμοι!</h2>
-                  <div className="text-left bg-muted/50 rounded-xl p-4 space-y-2 text-sm">
-                    <p className="text-muted-foreground"><strong className="text-foreground">Email:</strong> {profile?.email}</p>
-                    {jobTitle && <p className="text-muted-foreground"><strong className="text-foreground">Θέση:</strong> {jobTitle}</p>}
-                    {phone && <p className="text-muted-foreground"><strong className="text-foreground">Τηλέφωνο:</strong> {phone}</p>}
-                  </div>
-                  <div className="flex gap-3">
-                    <Button variant="outline" onClick={goBack} className="flex-1">
-                      <ChevronLeft className="h-4 w-4 mr-1" /> Πίσω
-                    </Button>
-                    <Button onClick={handleFinish} disabled={loading} className="flex-1">
-                      {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                      Μπείτε στον χώρο εργασίας
-                    </Button>
-                  </div>
-                </div>
+                <OnboardingReady
+                  profile={profile}
+                  jobTitle={jobTitle}
+                  phone={phone}
+                  loading={loading}
+                  onFinish={handleFinish}
+                  onBack={goBack}
+                />
               )}
-
             </CardContent>
           </Card>
         )}

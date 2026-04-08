@@ -7,6 +7,7 @@ export interface OnboardingStep {
   label: string;
   description: string;
   completed: boolean;
+  route: string;
 }
 
 export function useOnboardingProgress() {

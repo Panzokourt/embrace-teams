@@ -14,8 +14,13 @@ export default function SetupGuide() {
 
   if (isComplete || loading) return null;
 
-  const handleGoToOnboarding = () => {
-    navigate('/onboarding');
+  const handleGoToStep = (route: string) => {
+    navigate(route);
+  };
+
+  const handleContinueSetup = () => {
+    const nextStep = steps.find(s => !s.completed);
+    if (nextStep) navigate(nextStep.route);
   };
 
   const handleFinish = async () => {

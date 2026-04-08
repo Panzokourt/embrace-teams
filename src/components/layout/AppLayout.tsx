@@ -8,6 +8,7 @@ import VoiceCommandProvider, { useVoiceCommand } from '@/components/secretary/Vo
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Loader2 } from 'lucide-react';
 import ChatFloatingBubbles from '@/components/chat/ChatFloatingBubbles';
+import QuickChatBar from '@/components/quick-chat/QuickChatBar';
 import { FocusModeProvider } from '@/contexts/FocusContext';
 import FocusOverlay from '@/components/focus/FocusOverlay';
 import { LayoutProvider, useLayout } from '@/contexts/LayoutContext';
@@ -58,6 +59,8 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
   });
 
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [quickChatOpen, setQuickChatOpen] = useState(false);
+  const toggleQuickChat = useCallback(() => setQuickChatOpen(prev => !prev), []);
 
   // Persist to localStorage
   // Note: rightPanelOpen is intentionally NOT persisted — panel starts closed on every page load
@@ -286,6 +289,7 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
           rightPanelOpen={rightPanelOpen}
           onMobileMenuToggle={() => setMobileSidebarOpen(true)}
           showHamburger={sidebarMode === 'hidden'}
+          onQuickChatToggle={toggleQuickChat}
         />
         <main className="flex-1 overflow-auto">
           <Outlet />
@@ -331,6 +335,7 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
 
       <ChatFloatingBubbles />
       <FocusOverlay />
+      <QuickChatBar isOpen={quickChatOpen} onToggle={toggleQuickChat} />
     </div>
   );
 }

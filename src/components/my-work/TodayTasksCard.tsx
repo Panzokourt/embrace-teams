@@ -58,6 +58,7 @@ interface MyProject {
 }
 
 type SortMode = 'manual' | 'date' | 'priority' | 'project' | 'status';
+type SortDir = 'asc' | 'desc';
 
 const SORT_OPTIONS: { value: SortMode; label: string }[] = [
   { value: 'manual', label: 'Χειροκίνητα' },

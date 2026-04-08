@@ -335,6 +335,7 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
 
       <ChatFloatingBubbles />
       <FocusOverlay />
+      <QuickChatBar isOpen={quickChatOpen} onToggle={toggleQuickChat} />
     </div>
   );
 }

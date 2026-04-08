@@ -429,7 +429,6 @@ export function TaskGanttView({ tasks, onTaskUpdated }: TaskGanttViewProps) {
                                         )}
                                       </div>
                                     )}
-                                    )}
                                   </TooltipTrigger>
                                 </PopoverTrigger>
                                 <TooltipContent side="top" className="max-w-xs">

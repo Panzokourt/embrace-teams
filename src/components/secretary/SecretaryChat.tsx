@@ -81,9 +81,10 @@ function getGreeting() {
 interface SecretaryChatProps {
   mode: "full" | "panel";
   registerSendHandler?: (handler: (text: string) => void) => void;
+  onOpenMemory?: () => void;
 }
 
-export default function SecretaryChat({ mode, registerSendHandler }: SecretaryChatProps) {
+export default function SecretaryChat({ mode, registerSendHandler, onOpenMemory }: SecretaryChatProps) {
   const { profile, user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");

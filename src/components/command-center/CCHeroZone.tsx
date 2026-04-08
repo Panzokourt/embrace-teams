@@ -11,6 +11,9 @@ function XPRing({ progress, level }: { progress: number; level: number }) {
   const radius = 54;
   const stroke = 6;
   const normalizedProgress = Math.min(100, Math.max(0, progress));
+  const circumference = 2 * Math.PI * radius;
+  const progressOffset = circumference - (normalizedProgress / 100) * circumference;
+  const trackColor = 'hsl(var(--muted))';
 
   const glowColor = level >= 20 ? 'hsl(38 92% 50%)' :
     level >= 15 ? 'hsl(270 60% 55%)' :
@@ -21,15 +24,14 @@ function XPRing({ progress, level }: { progress: number; level: number }) {
     <div className="relative w-32 h-32">
       <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
         <circle cx="60" cy="60" r={radius} fill="none"
-          stroke="hsl(var(--muted))" strokeWidth={stroke} opacity={0.3} />
+          stroke={trackColor} strokeWidth={stroke} opacity={0.35} />
         <circle cx="60" cy="60" r={radius} fill="none"
           stroke={glowColor} strokeWidth={stroke}
           strokeLinecap="round"
-          pathLength={100}
-          strokeDasharray={`${normalizedProgress} ${100 - normalizedProgress}`}
-          strokeDashoffset="0"
+          strokeDasharray={circumference}
+          strokeDashoffset={progressOffset}
           className="transition-all duration-1000 ease-out"
-          style={{ filter: `drop-shadow(0 0 6px ${glowColor})` }} />
+          style={{ filter: normalizedProgress > 0 ? `drop-shadow(0 0 6px ${glowColor})` : 'none' }} />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-3xl font-bold text-foreground">{level}</span>

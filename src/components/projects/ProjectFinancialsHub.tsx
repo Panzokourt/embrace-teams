@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Separator } from '@/components/ui/separator';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ProjectFinancialsManager } from '@/components/projects/ProjectFinancialsManager';
 import { ProjectPLReport } from '@/components/projects/ProjectPLReport';
 import { ProjectFinancialStepper } from '@/components/projects/ProjectFinancialStepper';
-import { DollarSign, Receipt, BarChart3, TrendingUp, TrendingDown, Wallet, Target, Activity } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Wallet, Loader2, ChevronDown } from 'lucide-react';
 
 interface ProjectFinancialsHubProps {
   projectId: string;
@@ -54,15 +55,13 @@ function StatKPI({
   );
 }
 
-function BudgetOverview({
+export function ProjectFinancialsHub({
   projectId,
+  clientId,
   projectBudget,
   agencyFeePercentage,
-}: {
-  projectId: string;
-  projectBudget: number;
-  agencyFeePercentage: number;
-}) {
+  isInternal,
+}: ProjectFinancialsHubProps) {
   const [kpi, setKpi] = useState<KPIData>({
     totalInvoiced: 0,
     totalPaid: 0,
@@ -70,6 +69,7 @@ function BudgetOverview({
     totalExpenses: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [plOpen, setPlOpen] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -93,163 +93,109 @@ function BudgetOverview({
     load();
   }, [projectId]);
 
-  const agencyFee = (projectBudget * agencyFeePercentage) / 100;
-  const netBudget = projectBudget - agencyFee;
-  const budgetUsedPct = projectBudget > 0 ? Math.min(100, Math.round((kpi.totalInvoiced / projectBudget) * 100)) : 0;
-  const paidPct = kpi.totalInvoiced > 0 ? Math.min(100, Math.round((kpi.totalPaid / kpi.totalInvoiced) * 100)) : 0;
-  const profitMargin = kpi.totalPaid > 0 ? ((kpi.totalPaid - kpi.totalExpenses) / kpi.totalPaid) * 100 : 0;
-
   const fmt = (n: number) => `€${n.toLocaleString('el-GR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
-  if (loading) return null;
+  const profit = kpi.totalPaid - kpi.totalExpenses;
+  const profitMargin = kpi.totalPaid > 0 ? ((profit / kpi.totalPaid) * 100) : 0;
+  const budgetUsedPct = projectBudget > 0 ? Math.min(100, Math.round((kpi.totalInvoiced / projectBudget) * 100)) : 0;
+  const paidPct = kpi.totalInvoiced > 0 ? Math.min(100, Math.round((kpi.totalPaid / kpi.totalInvoiced) * 100)) : 0;
 
   return (
-    <div className="space-y-6 py-2">
-      {/* KPI grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatKPI
-          label="Συνολικό Budget"
-          value={fmt(projectBudget)}
-          sub={agencyFeePercentage > 0 ? `Fee: ${agencyFeePercentage}%` : undefined}
-          icon={DollarSign}
-          iconClass="bg-muted text-foreground"
-        />
-        <StatKPI
-          label="Agency Fee"
-          value={fmt(agencyFee)}
-          sub={agencyFeePercentage > 0 ? `${agencyFeePercentage}% επί budget` : '–'}
-          icon={Target}
-          iconClass="bg-muted text-muted-foreground"
-        />
-        <StatKPI
-          label="Net Budget"
-          value={fmt(netBudget)}
-          sub="Χωρίς fee"
-          icon={Wallet}
-          iconClass="bg-success/10 text-success"
-        />
-        <StatKPI
-          label="Εκκρεμή Τιμολόγια"
-          value={fmt(kpi.pendingInvoices)}
-          sub={`${fmt(kpi.totalInvoiced)} συνολικά`}
-          icon={Receipt}
-          iconClass="bg-warning/10 text-warning"
-        />
-      </div>
+    <div className="space-y-6">
+      {/* 1. Financial Lifecycle Stepper */}
+      <ProjectFinancialStepper projectId={projectId} isInternal={isInternal} />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatKPI
-          label="Εισπράχθηκε"
-          value={fmt(kpi.totalPaid)}
-          sub={`${paidPct}% εισπράχθηκε`}
-          icon={TrendingUp}
-          iconClass="bg-success/10 text-success"
-        />
-        <StatKPI
-          label="Συνολικά Έξοδα"
-          value={fmt(kpi.totalExpenses)}
-          icon={TrendingDown}
-          iconClass="bg-destructive/10 text-destructive"
-        />
-        <StatKPI
-          label="Καθαρό Κέρδος"
-          value={fmt(kpi.totalPaid - kpi.totalExpenses)}
-          sub={`Περιθώριο: ${profitMargin.toFixed(1)}%`}
-          icon={BarChart3}
-          iconClass="bg-muted text-foreground"
-        />
-        <StatKPI
-          label="Budget Αξιοποίηση"
-          value={`${budgetUsedPct}%`}
-          sub={`${fmt(kpi.totalInvoiced)} / ${fmt(projectBudget)}`}
-          icon={DollarSign}
-          iconClass="bg-muted text-muted-foreground"
-        />
-      </div>
+      {/* 2. KPI Cards */}
+      {!loading && (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <StatKPI
+              label="Budget"
+              value={fmt(projectBudget)}
+              sub={agencyFeePercentage > 0 ? `Fee: ${agencyFeePercentage}%` : undefined}
+              icon={DollarSign}
+              iconClass="bg-muted text-foreground"
+            />
+            <StatKPI
+              label="Έσοδα (Εισπραχθέντα)"
+              value={fmt(kpi.totalPaid)}
+              sub={kpi.pendingInvoices > 0 ? `Εκκρεμούν: ${fmt(kpi.pendingInvoices)}` : undefined}
+              icon={TrendingUp}
+              iconClass="bg-success/10 text-success"
+            />
+            <StatKPI
+              label="Έξοδα"
+              value={fmt(kpi.totalExpenses)}
+              icon={TrendingDown}
+              iconClass="bg-destructive/10 text-destructive"
+            />
+            <StatKPI
+              label="Κέρδος"
+              value={fmt(profit)}
+              sub={`Margin: ${profitMargin.toFixed(1)}%`}
+              icon={Wallet}
+              iconClass={profit >= 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}
+            />
+          </div>
 
-      {/* Progress bars */}
-      <div className="space-y-4">
-        <div className="space-y-1.5">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Budget αξιοποίηση</span>
-            <span className="font-medium">{budgetUsedPct}%</span>
+          {/* 3. Progress Bars */}
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Budget αξιοποίηση</span>
+                <span className="font-medium">{budgetUsedPct}%</span>
+              </div>
+              <Progress value={budgetUsedPct} className="h-2.5" />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Τιμολογήθηκε: {fmt(kpi.totalInvoiced)}</span>
+                <span>Διαθέσιμο: {fmt(Math.max(0, projectBudget - kpi.totalInvoiced))}</span>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Είσπραξη τιμολογίων</span>
+                <span className="font-medium">{paidPct}%</span>
+              </div>
+              <Progress value={paidPct} className="h-2.5" />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Εισπράχθηκε: {fmt(kpi.totalPaid)}</span>
+                <span>Εκκρεμεί: {fmt(kpi.pendingInvoices)}</span>
+              </div>
+            </div>
           </div>
-          <Progress value={budgetUsedPct} className="h-2.5" />
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Τιμολογήθηκε: {fmt(kpi.totalInvoiced)}</span>
-            <span>Διαθέσιμο: {fmt(Math.max(0, projectBudget - kpi.totalInvoiced))}</span>
-          </div>
+        </>
+      )}
+
+      {loading && (
+        <div className="flex justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
+      )}
 
-        <div className="space-y-1.5">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Είσπραξη τιμολογίων</span>
-            <span className="font-medium">{paidPct}%</span>
+      <Separator />
+
+      {/* 4. Invoices & Expenses CRUD */}
+      <ProjectFinancialsManager projectId={projectId} clientId={clientId} />
+
+      <Separator />
+
+      {/* 5. P&L Statement (Collapsible) */}
+      <Collapsible open={plOpen} onOpenChange={setPlOpen}>
+        <CollapsibleTrigger className="flex items-center gap-2 w-full text-left py-2 group">
+          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${plOpen ? '' : '-rotate-90'}`} />
+          <span className="font-semibold text-sm">Αναλυτικό P&L Statement</span>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="pt-3">
+            <ProjectPLReport
+              projectId={projectId}
+              projectBudget={projectBudget}
+              agencyFeePercentage={agencyFeePercentage}
+            />
           </div>
-          <Progress value={paidPct} className="h-2.5" />
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Εισπράχθηκε: {fmt(kpi.totalPaid)}</span>
-            <span>Εκκρεμεί: {fmt(kpi.pendingInvoices)}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export function ProjectFinancialsHub({
-  projectId,
-  clientId,
-  projectBudget,
-  agencyFeePercentage,
-  isInternal,
-}: ProjectFinancialsHubProps) {
-  return (
-    <div className="space-y-4">
-      <Tabs defaultValue="lifecycle" className="space-y-4">
-        <TabsList className="bg-muted/50">
-          <TabsTrigger value="lifecycle" className="gap-1.5">
-            <Activity className="h-3.5 w-3.5" />
-            Κύκλος Ζωής
-          </TabsTrigger>
-          <TabsTrigger value="overview" className="gap-1.5">
-            <BarChart3 className="h-3.5 w-3.5" />
-            Budget Overview
-          </TabsTrigger>
-          <TabsTrigger value="invoices" className="gap-1.5">
-            <Receipt className="h-3.5 w-3.5" />
-            Τιμολόγια & Έξοδα
-          </TabsTrigger>
-          <TabsTrigger value="pl" className="gap-1.5">
-            <TrendingUp className="h-3.5 w-3.5" />
-            P&L Report
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="lifecycle">
-          <ProjectFinancialStepper projectId={projectId} isInternal={isInternal} />
-        </TabsContent>
-
-        <TabsContent value="overview">
-          <BudgetOverview
-            projectId={projectId}
-            projectBudget={projectBudget}
-            agencyFeePercentage={agencyFeePercentage}
-          />
-        </TabsContent>
-
-        <TabsContent value="invoices">
-          <ProjectFinancialsManager projectId={projectId} clientId={clientId} />
-        </TabsContent>
-
-        <TabsContent value="pl">
-          <ProjectPLReport
-            projectId={projectId}
-            projectBudget={projectBudget}
-            agencyFeePercentage={agencyFeePercentage}
-          />
-        </TabsContent>
-      </Tabs>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }

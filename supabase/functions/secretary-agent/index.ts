@@ -570,7 +570,7 @@ const toolDefinitions = [
     type: "function",
     function: {
       name: "save_memory",
-      description: "Save an important fact, file analysis summary, decision, or user preference to persistent memory. Call this after analyzing files, making decisions, or learning user preferences. This helps you remember across conversations.",
+      description: "Save an important fact, file analysis summary, decision, or user preference to persistent memory. Call this after analyzing files, making decisions, or learning user preferences. This helps you remember across conversations. Always include project_id or client_id when the memory is related to a specific project or client.",
       parameters: {
         type: "object",
         properties: {
@@ -578,6 +578,8 @@ const toolDefinitions = [
           key: { type: "string", description: "Short identifier, e.g. 'creative_brief_govgr' or 'user_prefers_greek'" },
           content: { type: "string", description: "The memory content - summary, key findings, decisions made" },
           metadata: { type: "object", description: "Optional metadata (file names, entity IDs, etc.)" },
+          project_id: { type: "string", description: "Project UUID if this memory relates to a specific project" },
+          client_id: { type: "string", description: "Client UUID if this memory relates to a specific client" },
         },
         required: ["category", "key", "content"],
       },

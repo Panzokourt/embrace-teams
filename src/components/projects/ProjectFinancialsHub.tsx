@@ -5,7 +5,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { ProjectFinancialsManager } from '@/components/projects/ProjectFinancialsManager';
 import { ProjectPLReport } from '@/components/projects/ProjectPLReport';
-import { DollarSign, Receipt, BarChart3, TrendingUp, TrendingDown, Wallet, Target } from 'lucide-react';
+import { ProjectFinancialStepper } from '@/components/projects/ProjectFinancialStepper';
+import { DollarSign, Receipt, BarChart3, TrendingUp, TrendingDown, Wallet, Target, Activity } from 'lucide-react';
 
 interface ProjectFinancialsHubProps {
   projectId: string;

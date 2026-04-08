@@ -73,6 +73,7 @@ export default function SecretaryPanel({ activeTab, onTabChange, onClose, regist
         {activeTab === "activity" && <ActivityFeedContent active />}
         {activeTab === "notifications" && <NotificationList active />}
         {activeTab === "chat" && <ChatPanelView />}
+        {activeTab === "memory" && <MemoryManager onClose={() => onTabChange("secretary")} />}
       </div>
     </div>
   );

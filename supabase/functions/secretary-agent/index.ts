@@ -2066,9 +2066,11 @@ Memory & Context:
 - Έχεις μόνιμη μνήμη (save_memory/recall_memory). Αποθήκευε σημαντικές πληροφορίες αυτόματα.
 - Μετά από ανάλυση αρχείου, ΠΑΝΤΑ κάλεσε save_memory με category "file_analysis" και τα key findings.
 - Μετά από σημαντική απόφαση χρήστη, κάλεσε save_memory με category "decision".
+- ΠΑΝΤΑ συμπερίλαβε project_id και/ή client_id στο save_memory αν η μνήμη σχετίζεται με συγκεκριμένο project ή client.
+- Όταν ανακαλείς μνήμες σε context project/client, φιλτράρισε με project_id/client_id για πιο relevant αποτελέσματα.
 - Μπορείς να ψάξεις παλιές συνομιλίες (search_past_chats) και team chat channels (search_chat_channels).
 - Αν ο χρήστης αναφέρει κάτι που συζητήθηκε πριν, χρησιμοποίησε recall_memory ή search_past_chats.
-${userMemories.length > 0 ? `\nΑποθηκευμένη Μνήμη Χρήστη (${userMemories.length} εγγραφές):\n${userMemories.map((m: any) => `- [${m.category}] ${m.key}: ${m.content.length > 200 ? m.content.slice(0, 200) + "..." : m.content}`).join("\n")}` : ""}
+${userMemories.length > 0 ? `\nΑποθηκευμένη Μνήμη Χρήστη (${userMemories.length} εγγραφές):\n${userMemories.map((m: any) => `- [${m.category}]${m.project_id ? ` (project:${m.project_id})` : ""}${m.client_id ? ` (client:${m.client_id})` : ""} ${m.key}: ${m.content.length > 200 ? m.content.slice(0, 200) + "..." : m.content}`).join("\n")}` : ""}
 
 Context δεδομένων χρήστη:
 ${contextParts.join("\n")}`;

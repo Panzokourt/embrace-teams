@@ -1682,6 +1682,8 @@ Respond in Greek. Be thorough but concise.`;
               content: args.content,
               category: args.category || "general",
               metadata: args.metadata || {},
+              project_id: args.project_id || null,
+              client_id: args.client_id || null,
               updated_at: new Date().toISOString(),
             })
             .eq("id", existing.id);
@@ -1695,6 +1697,8 @@ Respond in Greek. Be thorough but concise.`;
             key: args.key,
             content: args.content,
             metadata: args.metadata || {},
+            project_id: args.project_id || null,
+            client_id: args.client_id || null,
           });
           if (error) throw error;
           return { success: true, action: "saved", key: args.key };

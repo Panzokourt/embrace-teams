@@ -518,13 +518,7 @@ export default function AppSidebar({
                   <SidebarProjectTree collapsed={false} />
                   <SidebarSubLink to="/work?tab=tasks" icon={<CheckSquare className="h-4 w-4" />} label="Tasks" active={location.pathname === '/work' && location.search.includes('tab=tasks')} onClick={() => {navigate('/work?tab=tasks');onItemClick?.();}} />
                 </SidebarNavGroup>
-                <SidebarLink to="/campaigns" icon={<FileText className="h-[18px] w-[18px]" />} label="Campaigns" active={location.pathname === '/campaigns'} collapsed={false} onClick={() => {onItemClick?.();}} />
                 <SidebarLink to="/calendar" icon={<CalendarDays className="h-[18px] w-[18px]" />} label="Calendar" active={location.pathname === '/calendar'} collapsed={false} onClick={() => {onItemClick?.();}} />
-                <SidebarLink to="/backlog" icon={<FileStack className="h-[18px] w-[18px]" />} label="Backlog" active={location.pathname === '/backlog'} collapsed={false} onClick={() => {onItemClick?.();}} />
-                
-                <SidebarLink to="/files" icon={<FileArchive className="h-[18px] w-[18px]" />} label="Files" active={location.pathname === '/files'} collapsed={false} onClick={() => {onItemClick?.();}} />
-                <SidebarLink to="/workflows" icon={<GitBranch className="h-[18px] w-[18px]" />} label="Workflows" active={location.pathname === '/workflows'} collapsed={false} onClick={() => {onItemClick?.();}} />
-                <SidebarLink to="/media-planning" icon={<MonitorPlay className="h-[18px] w-[18px]" />} label="Media Planning" active={location.pathname.startsWith('/media-planning')} collapsed={false} onClick={() => {onItemClick?.();}} />
               </> :
 
         (flyoutCategory || activeCategory) ? categoryNavItems[(flyoutCategory || activeCategory) as CategoryId]?.filter(canAccess).map((item) => {

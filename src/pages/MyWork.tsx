@@ -416,6 +416,7 @@ export default function MyWork() {
                   )}
                 </CardContent>
               </Card>
+              </div>
             </div>
           ) : (
             <MyWorkCalendar

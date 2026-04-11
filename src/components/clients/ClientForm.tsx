@@ -14,6 +14,7 @@ import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { Loader2, X, Plus, Trash2 } from 'lucide-react';
 import { useProjectCategories } from '@/hooks/useProjectCategories';
+import { AIFillButton } from '@/components/shared/AIFillButton';
 
 const defaultSectorOptions = [
   { value: 'public', label: 'Δημόσιος Τομέας' },
@@ -156,6 +157,22 @@ export function ClientForm({ open, onOpenChange, client, onSaved }: ClientFormPr
           <DialogDescription>{client ? 'Ενημερώστε τα στοιχεία του πελάτη' : 'Προσθέστε νέο πελάτη'}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-5">
+          {/* AI Fill */}
+          {!client && (
+            <AIFillButton
+              formType="client"
+              onFill={(data) => {
+                setFormData(prev => ({
+                  ...prev,
+                  name: data.name || prev.name,
+                  sector: data.sector || prev.sector,
+                  website: data.website || prev.website,
+                  contact_email: data.contact_email || prev.contact_email,
+                  notes: data.notes || prev.notes,
+                }));
+              }}
+            />
+          )}
           {/* Basic Info */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2 sm:col-span-2">

@@ -35,6 +35,8 @@ import { TodayTasksCard } from '@/components/my-work/TodayTasksCard';
 import { MyWorkCalendar } from '@/components/my-work/MyWorkCalendar';
 import CollapsibleSection, { ShowHiddenSections } from '@/components/my-work/CollapsibleSection';
 import { naturalCompare } from '@/lib/utils';
+import { TimeSuggestionBanner } from '@/components/time-tracking/TimeSuggestionBanner';
+import { WeeklyTimeSummary } from '@/components/time-tracking/WeeklyTimeSummary';
 
 // ── Types ──────────────────────────────────────────
 interface TaskItem {
@@ -353,7 +355,12 @@ export default function MyWork() {
           </div>
 
           {activeView === 'projects' ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <TimeSuggestionBanner />
+                <WeeklyTimeSummary />
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <TodayTasksCard
                 todayTasks={todayTasks}
                 onTaskComplete={toggleTaskComplete}

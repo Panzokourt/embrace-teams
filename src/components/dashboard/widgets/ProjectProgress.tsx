@@ -1,27 +1,14 @@
-import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
+import { projectQueries } from '@/queries';
 import { Progress } from '@/components/ui/progress';
 import { ListChecks } from 'lucide-react';
 import { WIDGET_CARD_CLASS, WIDGET_ICON_CLASS, WIDGET_TITLE_CLASS } from '../chartStyles';
 
-interface ProjectInfo { id: string; name: string; progress: number }
-
 export default function ProjectProgress() {
-  const [projects, setProjects] = useState<ProjectInfo[]>([]);
-
-  useEffect(() => {
-    supabase
-      .from('projects')
-      .select('id, name, progress')
-      .eq('status', 'active')
-      .order('name')
-      .limit(8)
-      .then(({ data }) => {
-        if (data) {
-          setProjects(data.map(p => ({ id: p.id, name: p.name, progress: p.progress ?? 0 })));
-        }
-      });
-  }, []);
+  const { data: projects = [] } = useQuery({
+    ...projectQueries.active(),
+    select: (data) => data.map(p => ({ id: p.id, name: p.name, progress: p.progress ?? 0 })),
+  });
 
   return (
     <div className={WIDGET_CARD_CLASS}>

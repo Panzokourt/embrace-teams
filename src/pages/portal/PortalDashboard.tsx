@@ -33,12 +33,12 @@ export default function PortalDashboard() {
     if (projectIds.length > 0) {
       const { data: invoices } = await supabase
         .from('invoices')
-        .select('id, total_amount, status')
+        .select('id, amount, status')
         .in('project_id', projectIds);
       invoiceCount = invoices?.length || 0;
       pendingAmount = (invoices || [])
         .filter(i => i.status !== 'paid')
-        .reduce((s, i) => s + (i.total_amount || 0), 0);
+        .reduce((s, i) => s + (i.amount || 0), 0);
 
       const { data: files } = await supabase
         .from('file_attachments')

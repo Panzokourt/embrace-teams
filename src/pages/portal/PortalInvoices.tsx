@@ -13,8 +13,8 @@ interface PortalInvoice {
   id: string;
   invoice_number: string | null;
   status: string;
-  total_amount: number;
-  issue_date: string | null;
+  amount: number;
+  issued_date: string | null;
   due_date: string | null;
   project: { name: string } | null;
 }
@@ -57,9 +57,9 @@ export default function PortalInvoices() {
 
     const { data } = await supabase
       .from('invoices')
-      .select('id, invoice_number, status, total_amount, issue_date, due_date, project:projects(name)')
+      .select('id, invoice_number, status, amount, issued_date, due_date, project:projects(name)')
       .in('project_id', projectIds)
-      .order('issue_date', { ascending: false });
+      .order('issued_date', { ascending: false });
 
     setInvoices((data as any[]) || []);
     setLoading(false);
@@ -69,7 +69,7 @@ export default function PortalInvoices() {
 
   const totalPending = invoices
     .filter(i => i.status !== 'paid' && i.status !== 'cancelled')
-    .reduce((s, i) => s + (i.total_amount || 0), 0);
+    .reduce((s, i) => s + (i.amount || 0), 0);
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">

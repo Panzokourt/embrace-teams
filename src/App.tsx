@@ -48,6 +48,11 @@ import ResetPassword from "@/pages/ResetPassword";
 import PlatformAdmin from "@/pages/PlatformAdmin";
 import MediaPlanning from "@/pages/MediaPlanning";
 import MediaPlanWorkspace from "@/pages/MediaPlanWorkspace";
+import ClientPortalLayout from "@/components/portal/ClientPortalLayout";
+import PortalDashboard from "@/pages/portal/PortalDashboard";
+import PortalProjects from "@/pages/portal/PortalProjects";
+import PortalInvoices from "@/pages/portal/PortalInvoices";
+import PortalFiles from "@/pages/portal/PortalFiles";
 
 function RedirectUserToEmployee() {
   const { id } = useParams();
@@ -82,6 +87,13 @@ const App = () => (
                 <Route path="/accept-invite" element={<AcceptInvite />} />
                 <Route path="/welcome" element={<WelcomeWizard />} />
                 <Route path="/platform-admin" element={<PlatformAdmin />} />
+                {/* Client Portal */}
+                <Route path="/portal" element={<ClientPortalLayout />}>
+                  <Route index element={<PortalDashboard />} />
+                  <Route path="projects" element={<PortalProjects />} />
+                  <Route path="invoices" element={<PortalInvoices />} />
+                  <Route path="files" element={<PortalFiles />} />
+                </Route>
                 <Route element={<AppLayout />}>
                 <Route path="/" element={<MyWork />} />
                 <Route path="/command-center" element={<Navigate to="/" replace />} />

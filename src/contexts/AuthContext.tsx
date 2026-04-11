@@ -34,6 +34,7 @@ export interface Company {
   name: string;
   domain: string;
   logo_url: string | null;
+  workspace_type: string | null;
 }
 
 export interface UserCompanyRole {
@@ -219,7 +220,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             id: c.id,
             name: c.name,
             domain: c.domain,
-            logo_url: c.logo_url
+            logo_url: c.logo_url,
+            workspace_type: c.workspace_type || null,
           });
         }
       });
@@ -316,6 +318,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const comp = companies.find(c => c.id === role.company_id);
     setCompany(comp || null);
     localStorage.setItem('activeCompanyId', role.company_id);
+    if (comp?.workspace_type) {
+      localStorage.setItem('workspace_type', comp.workspace_type);
+    }
 
     // Update last login
     supabase

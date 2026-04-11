@@ -13,6 +13,7 @@ import { TableToolbar } from '@/components/shared/TableToolbar';
 import { EditDeleteActions } from '@/components/dialogs/EditDeleteActions';
 import { ResizableTableHeader } from '@/components/shared/ResizableTableHeader';
 import { GroupedTableSection } from '@/components/shared/GroupedTableSection';
+import { ProjectFinancialBadge } from './ProjectFinancialBadge';
 import { ProjectBulkActions } from '@/components/projects/ProjectBulkActions';
 import { useTableViews, GroupByField } from '@/hooks/useTableViews';
 import { exportToCSV, exportToExcel, formatters } from '@/utils/exportUtils';
@@ -647,7 +648,10 @@ export function ProjectsTableView({
           {/* Budget */}
           {isColumnVisible('budget') && (
             <TableCell style={{ width: getColumnWidth('budget') }} onClick={(e) => e.stopPropagation()}>
-              <EnhancedInlineEditCell value={project.budget} onSave={(val) => onInlineUpdate(project.id, 'budget', val)} type="number" displayValue={`€${project.budget?.toLocaleString('el-GR') || 0}`} disabled={!canManage} />
+              <div className="flex items-center gap-1.5">
+                <EnhancedInlineEditCell value={project.budget} onSave={(val) => onInlineUpdate(project.id, 'budget', val)} type="number" displayValue={`€${project.budget?.toLocaleString('el-GR') || 0}`} disabled={!canManage} />
+                <ProjectFinancialBadge projectId={project.id} budget={project.budget} />
+              </div>
             </TableCell>
           )}
 

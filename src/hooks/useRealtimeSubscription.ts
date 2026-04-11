@@ -42,7 +42,7 @@ export function useRealtimeSubscription({
   useEffect(() => {
     if (!enabled || tables.length === 0) return;
 
-    const channelName = `realtime-${tables.join('-')}-${Date.now()}`;
+    const channelName = `realtime-${tables.join('-')}`;
     
     let channel = supabase.channel(channelName);
     

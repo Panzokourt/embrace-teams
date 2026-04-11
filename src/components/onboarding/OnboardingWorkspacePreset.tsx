@@ -17,6 +17,7 @@ export default function OnboardingWorkspacePreset({ companyId, onNext, onBack }:
 
   const handleContinue = async () => {
     if (!selectedPreset) return;
+    localStorage.setItem('workspace_type', selectedPreset.type);
     if (companyId) {
       try {
         await (supabase.from('companies') as any).update({ workspace_type: selectedPreset.type }).eq('id', companyId);

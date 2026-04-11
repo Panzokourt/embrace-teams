@@ -28,7 +28,8 @@ import {
   DollarSign, Settings, LogOut, Zap, ChevronLeft, ChevronRight, UserCog, Building2,
   Moon, Sun, CalendarDays, FileArchive, Timer, FileStack, BarChart3,
   Plus, Palette, Monitor, Globe, Calendar, MessageSquare, BookUser,
-  Briefcase, Mail, Trophy, ShieldCheck, BookOpen, GitBranch, MonitorPlay } from
+  Briefcase, Mail, Trophy, ShieldCheck, BookOpen, GitBranch, MonitorPlay,
+  Megaphone, Code2, Paintbrush, TrendingUp, Shield } from
 'lucide-react';
 import { briefDefinitions, getBriefDefinition } from '@/components/blueprints/briefDefinitions';
 import { BriefFormDialog } from '@/components/blueprints/BriefFormDialog';
@@ -47,7 +48,7 @@ interface NavItem {
   adminOnly?: boolean;
 }
 
-type CategoryId = 'work' | 'clients' | 'communication' | 'revenue' | 'operations' | 'intelligence' | 'settings';
+type CategoryId = 'work' | 'clients' | 'marketing' | 'creative' | 'development' | 'finance' | 'operations' | 'intelligence' | 'communication' | 'settings';
 type CategoryIdOrNull = CategoryId | null;
 
 interface Category {
@@ -57,63 +58,100 @@ interface Category {
   routePrefixes: string[];
 }
 
-const categories: Category[] = [
-{ id: 'work', icon: Briefcase, label: 'Work', routePrefixes: ['/work', '/projects', '/tasks', '/calendar', '/files', '/workflows', '/media-planning'] },
-{ id: 'clients', icon: Building2, label: 'Clients', routePrefixes: ['/clients', '/contacts'] },
-{ id: 'communication', icon: MessageSquare, label: 'Communication', routePrefixes: ['/chat', '/inbox'] },
-{ id: 'revenue', icon: DollarSign, label: 'Revenue', routePrefixes: ['/financials', '/pricing'] },
-{ id: 'operations', icon: Users, label: 'Operations', routePrefixes: ['/hr', '/timesheets', '/knowledge', '/operations'] },
-{ id: 'intelligence', icon: BarChart3, label: 'Intelligence', routePrefixes: ['/reports', '/brain'] },
+// Workspace types that hide specific categories
+const WORKSPACE_CATEGORY_VISIBILITY: Record<string, CategoryId[]> = {
+  freelancer: ['work', 'clients', 'finance', 'communication', 'intelligence', 'settings'],
+  startup: ['work', 'clients', 'marketing', 'development', 'finance', 'operations', 'intelligence', 'communication', 'settings'],
+  agency: ['work', 'clients', 'marketing', 'creative', 'finance', 'operations', 'intelligence', 'communication', 'settings'],
+  software: ['work', 'clients', 'development', 'finance', 'operations', 'intelligence', 'communication', 'settings'],
+  consulting: ['work', 'clients', 'finance', 'operations', 'intelligence', 'communication', 'settings'],
+  ecommerce: ['work', 'clients', 'marketing', 'finance', 'operations', 'intelligence', 'communication', 'settings'],
+};
 
-{ id: 'settings', icon: Settings, label: 'Settings', routePrefixes: ['/settings'] }];
+const allCategories: Category[] = [
+  { id: 'work', icon: Briefcase, label: 'Work', routePrefixes: ['/work', '/projects', '/tasks', '/calendar', '/files'] },
+  { id: 'clients', icon: Building2, label: 'Clients', routePrefixes: ['/clients', '/contacts', '/tenders'] },
+  { id: 'marketing', icon: Megaphone, label: 'Marketing', routePrefixes: ['/campaigns', '/media-planning', '/blueprints'] },
+  { id: 'creative', icon: Paintbrush, label: 'Creative', routePrefixes: ['/briefs', '/creative'] },
+  { id: 'development', icon: Code2, label: 'Development', routePrefixes: ['/backlog', '/workflows'] },
+  { id: 'finance', icon: DollarSign, label: 'Finance', routePrefixes: ['/financials', '/pricing'] },
+  { id: 'operations', icon: Users, label: 'Operations', routePrefixes: ['/hr', '/timesheets', '/knowledge', '/operations'] },
+  { id: 'intelligence', icon: BarChart3, label: 'Intelligence', routePrefixes: ['/reports', '/brain'] },
+  { id: 'communication', icon: MessageSquare, label: 'Communication', routePrefixes: ['/chat', '/inbox'] },
+  { id: 'settings', icon: Settings, label: 'Settings', routePrefixes: ['/settings'] },
+];
 
 
 const categoryNavItems: Record<CategoryId, NavItem[]> = {
-
-
   work: [],
   clients: [
-  { title: 'All Clients', href: '/clients', icon: Building2, permission: 'clients.view' },
-  { title: 'Contacts', href: '/contacts', icon: BookUser }],
-
-  communication: [
-  { title: 'Chat', href: '/chat', icon: MessageSquare },
-  { title: 'Inbox', href: '/inbox', icon: Mail }],
-
-  revenue: [
-  { title: 'Dashboard', href: '/financials?tab=dashboard', icon: LayoutDashboard, permission: 'financials.view' },
-  { title: 'Υπηρεσίες & Τιμολόγηση', href: '/pricing', icon: FileText, permission: 'financials.view' },
-  { title: 'Contracts', href: '/financials?tab=contracts', icon: FileText, permission: 'financials.view' },
-  { title: 'Invoices', href: '/financials?tab=invoices', icon: FileText, permission: 'financials.view' },
-  { title: 'Expenses', href: '/financials?tab=expenses', icon: DollarSign, permission: 'financials.view' },
-  { title: 'Profitability', href: '/financials?tab=reports', icon: BarChart3, permission: 'financials.view' }],
-
+    { title: 'All Clients', href: '/clients', icon: Building2, permission: 'clients.view' },
+    { title: 'Contacts', href: '/contacts', icon: BookUser },
+    { title: 'Tenders', href: '/tenders', icon: FileText, permission: 'tenders.view' },
+  ],
+  marketing: [
+    { title: 'Campaigns', href: '/campaigns', icon: Megaphone },
+    { title: 'Media Planning', href: '/media-planning', icon: MonitorPlay },
+    { title: 'Blueprints', href: '/blueprints', icon: FileText },
+    { title: 'Reports', href: '/reports', icon: BarChart3, permission: 'reports.view' },
+  ],
+  creative: [
+    { title: 'Briefs', href: '/blueprints', icon: Palette },
+    { title: 'Campaigns', href: '/campaigns', icon: Megaphone },
+    { title: 'Files & Assets', href: '/files', icon: FileArchive },
+  ],
+  development: [
+    { title: 'Projects', href: '/work?tab=projects', icon: FolderKanban },
+    { title: 'Backlog', href: '/backlog', icon: FileStack },
+    { title: 'Workflows', href: '/workflows', icon: GitBranch },
+    { title: 'Tenders', href: '/tenders', icon: FileText, permission: 'tenders.view' },
+  ],
+  finance: [
+    { title: 'Dashboard', href: '/financials?tab=dashboard', icon: LayoutDashboard, permission: 'financials.view' },
+    { title: 'Υπηρεσίες & Τιμολόγηση', href: '/pricing', icon: FileText, permission: 'financials.view' },
+    { title: 'Contracts', href: '/financials?tab=contracts', icon: FileText, permission: 'financials.view' },
+    { title: 'Invoices', href: '/financials?tab=invoices', icon: FileText, permission: 'financials.view' },
+    { title: 'Expenses', href: '/financials?tab=expenses', icon: DollarSign, permission: 'financials.view' },
+    { title: 'Profitability', href: '/financials?tab=reports', icon: BarChart3, permission: 'financials.view' },
+  ],
   operations: [
-  { title: 'Team & HR', href: '/hr', icon: UserCog },
-  { title: 'Timesheets', href: '/timesheets', icon: Timer },
-  { title: 'Knowledge Base', href: '/knowledge', icon: BookOpen }],
-
+    { title: 'Team & HR', href: '/hr', icon: UserCog },
+    { title: 'Timesheets', href: '/timesheets', icon: Timer },
+    { title: 'Knowledge Base', href: '/knowledge', icon: BookOpen },
+    { title: 'Capacity', href: '/operations?tab=capacity', icon: TrendingUp },
+    { title: 'Leaderboard', href: '/operations?tab=leaderboard', icon: Trophy },
+  ],
   intelligence: [
-  { title: 'Reports Hub', href: '/reports', icon: BarChart3, permission: 'financials.view' },
-  { title: 'Brain', href: '/brain', icon: Zap }],
-
-
+    { title: 'Reports Hub', href: '/reports', icon: BarChart3, permission: 'reports.view' },
+    { title: 'Brain', href: '/brain', icon: Zap },
+  ],
+  communication: [
+    { title: 'Chat', href: '/chat', icon: MessageSquare },
+    { title: 'Inbox', href: '/inbox', icon: Mail },
+  ],
   settings: [
-  { title: 'General', href: '/settings', icon: Settings, permission: 'settings.company' },
-  { title: 'Organization', href: '/settings/organization', icon: Building2, permission: 'settings.company' }]
-
+    { title: 'General', href: '/settings', icon: Settings, permission: 'settings.company' },
+    { title: 'Organization', href: '/settings/organization', icon: Building2, permission: 'settings.company' },
+    { title: 'Integrations', href: '/settings/integrations', icon: Globe, permission: 'settings.integrations' },
+    { title: 'Billing', href: '/settings/billing', icon: DollarSign, permission: 'settings.billing' },
+    { title: 'Security', href: '/settings/security', icon: Shield, permission: 'settings.security' },
+  ],
 };
 
 function detectCategory(pathname: string): CategoryIdOrNull {
   if (pathname === '/' || pathname === '/my-work') return null;
-  if (pathname.startsWith('/work') || pathname.startsWith('/projects') || pathname.startsWith('/tasks') || pathname.startsWith('/calendar') || pathname.startsWith('/files') || pathname.startsWith('/workflows') || pathname.startsWith('/media-planning')) return 'work';
+  if (pathname.startsWith('/work') || pathname.startsWith('/projects') || pathname.startsWith('/tasks') || pathname.startsWith('/calendar')) return 'work';
   if (pathname.startsWith('/clients') || pathname.startsWith('/contacts')) return 'clients';
-  if (pathname.startsWith('/chat') || pathname.startsWith('/inbox')) return 'communication';
-  if (pathname.startsWith('/financials') || pathname.startsWith('/pricing')) return 'revenue';
+  if (pathname.startsWith('/campaigns') || pathname.startsWith('/media-planning') || pathname.startsWith('/blueprints')) return 'marketing';
+  if (pathname.startsWith('/briefs') || pathname.startsWith('/creative')) return 'creative';
+  if (pathname.startsWith('/backlog') || pathname.startsWith('/workflows')) return 'development';
+  if (pathname.startsWith('/financials') || pathname.startsWith('/pricing')) return 'finance';
   if (pathname.startsWith('/hr') || pathname.startsWith('/timesheets') || pathname.startsWith('/knowledge') || pathname.startsWith('/operations')) return 'operations';
   if (pathname.startsWith('/reports') || pathname.startsWith('/brain')) return 'intelligence';
-  
+  if (pathname.startsWith('/chat') || pathname.startsWith('/inbox')) return 'communication';
   if (pathname.startsWith('/settings')) return 'settings';
+  if (pathname.startsWith('/tenders')) return 'clients';
+  if (pathname.startsWith('/files')) return 'creative';
   if (pathname.startsWith('/dashboards')) return 'work';
   return null;
 }
@@ -135,7 +173,15 @@ export default function AppSidebar({
 }: {collapsed: boolean;onToggleCollapse: () => void;forceCollapsed?: boolean;isMobileSheet?: boolean;}) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { profile, roles, signOut, isAdmin, isManager, isClient, hasPermission, isSuperAdmin, isCompanyAdmin } = useAuth();
+  const { profile, roles, signOut, isAdmin, isManager, isClient, hasPermission, isSuperAdmin, isCompanyAdmin, company } = useAuth();
+
+  // Filter categories based on workspace type
+  const categories = useMemo(() => {
+    const wsType = company?.workspace_type || localStorage.getItem('workspace_type') || '';
+    const allowedIds = WORKSPACE_CATEGORY_VISIBILITY[wsType];
+    if (!allowedIds) return allCategories;
+    return allCategories.filter(c => allowedIds.includes(c.id));
+  }, [company?.workspace_type]);
   const { resolvedTheme, setTheme } = useTheme();
   const [quickOpen, setQuickOpen] = useState(false);
   const [selectedBriefType, setSelectedBriefType] = useState<string | null>(null);
@@ -472,13 +518,7 @@ export default function AppSidebar({
                   <SidebarProjectTree collapsed={false} />
                   <SidebarSubLink to="/work?tab=tasks" icon={<CheckSquare className="h-4 w-4" />} label="Tasks" active={location.pathname === '/work' && location.search.includes('tab=tasks')} onClick={() => {navigate('/work?tab=tasks');onItemClick?.();}} />
                 </SidebarNavGroup>
-                <SidebarLink to="/campaigns" icon={<FileText className="h-[18px] w-[18px]" />} label="Campaigns" active={location.pathname === '/campaigns'} collapsed={false} onClick={() => {onItemClick?.();}} />
                 <SidebarLink to="/calendar" icon={<CalendarDays className="h-[18px] w-[18px]" />} label="Calendar" active={location.pathname === '/calendar'} collapsed={false} onClick={() => {onItemClick?.();}} />
-                <SidebarLink to="/backlog" icon={<FileStack className="h-[18px] w-[18px]" />} label="Backlog" active={location.pathname === '/backlog'} collapsed={false} onClick={() => {onItemClick?.();}} />
-                
-                <SidebarLink to="/files" icon={<FileArchive className="h-[18px] w-[18px]" />} label="Files" active={location.pathname === '/files'} collapsed={false} onClick={() => {onItemClick?.();}} />
-                <SidebarLink to="/workflows" icon={<GitBranch className="h-[18px] w-[18px]" />} label="Workflows" active={location.pathname === '/workflows'} collapsed={false} onClick={() => {onItemClick?.();}} />
-                <SidebarLink to="/media-planning" icon={<MonitorPlay className="h-[18px] w-[18px]" />} label="Media Planning" active={location.pathname.startsWith('/media-planning')} collapsed={false} onClick={() => {onItemClick?.();}} />
               </> :
 
         (flyoutCategory || activeCategory) ? categoryNavItems[(flyoutCategory || activeCategory) as CategoryId]?.filter(canAccess).map((item) => {

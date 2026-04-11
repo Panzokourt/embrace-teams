@@ -103,6 +103,11 @@ Invalidation: `queryClient.invalidateQueries({ queryKey: ['projects'] })` σβή
 ## Τι δεν αλλάζει
 
 - Supabase client (`client.ts`) — ως έχει
-- Existing hooks (`useTimeTracking`, `useChatMessages` κλπ) — θα refactored σε Φάση 2-3
-- Mutation logic σε components — Φάση 3
+
+## Status
+
+- ✅ **Φάση 1** — Foundation + Core Entities (projects, clients, invoices, expenses, tasks, profiles)
+- ✅ **Φάση 2** — Secondary Entities (timesheets, contacts, contracts, media-plans)
+- ✅ **Φάση 3** — Centralized mutations (`src/queries/mutations.ts`) με automatic cache invalidation
+- 🔄 **Ongoing** — Σταδιακή μετάβαση components από inline queries σε centralized query layer
 

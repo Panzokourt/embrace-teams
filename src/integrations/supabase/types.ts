@@ -775,6 +775,54 @@ export type Database = {
           },
         ]
       }
+      client_portal_users: {
+        Row: {
+          client_id: string
+          company_id: string
+          created_at: string
+          id: string
+          invited_by: string | null
+          is_active: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          company_id: string
+          created_at?: string
+          id?: string
+          invited_by?: string | null
+          is_active?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          invited_by?: string | null
+          is_active?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_portal_users_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_portal_users_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_user_access: {
         Row: {
           client_id: string
@@ -7368,6 +7416,7 @@ export type Database = {
         }[]
       }
       get_department_users: { Args: { dept_id: string }; Returns: string[] }
+      get_portal_client_ids: { Args: { _user_id: string }; Returns: string[] }
       get_subordinate_users: { Args: { manager_id: string }; Returns: string[] }
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
       get_user_company_role: {
@@ -7425,6 +7474,10 @@ export type Database = {
         Returns: boolean
       }
       is_platform_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_portal_user: {
+        Args: { _client_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_super_admin:
         | { Args: { _user_id: string }; Returns: boolean }
         | { Args: { _company_id: string; _user_id: string }; Returns: boolean }

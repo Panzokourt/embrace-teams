@@ -23,6 +23,7 @@ import TasksByStatus from '@/components/dashboard/widgets/TasksByStatus';
 import AlertWidget from '@/components/dashboard/widgets/AlertWidget';
 import PlaceholderWidget from '@/components/dashboard/widgets/PlaceholderWidget';
 import { PageHeader } from '@/components/shared/PageHeader';
+import DashboardFinancials from '@/components/dashboard/DashboardFinancials';
 import {
   DollarSign, Percent, TrendingUp, FileWarning,
   Trophy, FolderKanban, AlertTriangle, Activity,
@@ -304,6 +305,9 @@ export default function Dashboard() {
           </div>
         }
       />
+
+      {/* Financial Overview */}
+      <DashboardFinancials />
 
       {/* Zone-based layout */}
       <div className="space-y-8">

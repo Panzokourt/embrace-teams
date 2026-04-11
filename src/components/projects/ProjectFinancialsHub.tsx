@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
@@ -7,7 +7,9 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ProjectFinancialsManager } from '@/components/projects/ProjectFinancialsManager';
 import { ProjectPLReport } from '@/components/projects/ProjectPLReport';
 import { ProjectFinancialStepper } from '@/components/projects/ProjectFinancialStepper';
+import { invoiceQueries, expenseQueries } from '@/queries';
 import { DollarSign, TrendingUp, TrendingDown, Wallet, Loader2, ChevronDown } from 'lucide-react';
+import { useState } from 'react';
 
 interface ProjectFinancialsHubProps {
   projectId: string;
@@ -62,36 +64,19 @@ export function ProjectFinancialsHub({
   agencyFeePercentage,
   isInternal,
 }: ProjectFinancialsHubProps) {
-  const [kpi, setKpi] = useState<KPIData>({
-    totalInvoiced: 0,
-    totalPaid: 0,
-    pendingInvoices: 0,
-    totalExpenses: 0,
-  });
-  const [loading, setLoading] = useState(true);
   const [plOpen, setPlOpen] = useState(false);
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      const [invoicesRes, expensesRes] = await Promise.all([
-        supabase.from('invoices').select('amount, paid').eq('project_id', projectId),
-        supabase.from('expenses').select('amount').eq('project_id', projectId),
-      ]);
+  const { data: invoices = [], isLoading: invLoading } = useQuery(invoiceQueries.byProject(projectId));
+  const { data: expenses = [], isLoading: expLoading } = useQuery(expenseQueries.byProject(projectId));
 
-      const invoices = invoicesRes.data || [];
-      const expenses = expensesRes.data || [];
+  const loading = invLoading || expLoading;
 
-      setKpi({
-        totalInvoiced: invoices.reduce((s, i) => s + i.amount, 0),
-        totalPaid: invoices.filter(i => i.paid).reduce((s, i) => s + i.amount, 0),
-        pendingInvoices: invoices.filter(i => !i.paid).reduce((s, i) => s + i.amount, 0),
-        totalExpenses: expenses.reduce((s, e) => s + e.amount, 0),
-      });
-      setLoading(false);
-    }
-    load();
-  }, [projectId]);
+  const kpi = useMemo(() => ({
+    totalInvoiced: invoices.reduce((s, i) => s + i.amount, 0),
+    totalPaid: invoices.filter(i => i.paid).reduce((s, i) => s + i.amount, 0),
+    pendingInvoices: invoices.filter(i => !i.paid).reduce((s, i) => s + i.amount, 0),
+    totalExpenses: expenses.reduce((s, e) => s + e.amount, 0),
+  }), [invoices, expenses]);
 
   const fmt = (n: number) => `€${n.toLocaleString('el-GR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 

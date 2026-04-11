@@ -37,6 +37,7 @@ import {
   Paperclip, Sparkles, Upload, Building2, Users2,
   Circle, Clock, AlertCircle, CheckCircle2, XCircle, Handshake,
 } from 'lucide-react';
+import { AIFillButton } from '@/components/shared/AIFillButton';
 import { format } from 'date-fns';
 import {
   DndContext, DragOverlay, closestCorners, KeyboardSensor, PointerSensor,
@@ -710,6 +711,23 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
                 )}
 
                 <div className="grid gap-4 md:grid-cols-2">
+                  {/* AI Fill */}
+                  {!editingProject && (
+                    <div className="md:col-span-2">
+                      <AIFillButton
+                        formType="project"
+                        onFill={(data) => {
+                          setFormData(prev => ({
+                            ...prev,
+                            name: data.name || prev.name,
+                            description: data.description || prev.description,
+                            budget: data.budget?.toString() || prev.budget,
+                            status: data.status || prev.status,
+                          }));
+                        }}
+                      />
+                    </div>
+                  )}
                   <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="name">Όνομα Έργου *</Label>
                     <Input id="name" value={formData.name} onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))} placeholder="π.χ. Website Redesign" required />

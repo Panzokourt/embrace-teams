@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTimeTracking, TimeEntry } from '@/hooks/useTimeTracking';
+import { timesheetKeys, timesheetQueries, profileQueries } from '@/queries';
 import { TimeEntryForm } from '@/components/time-tracking/TimeEntryForm';
 import { TimesheetFilters, DatePreset, GroupBy, AggregationLevel } from '@/components/time-tracking/TimesheetFilters';
 import { TimesheetGridView } from '@/components/time-tracking/TimesheetGridView';

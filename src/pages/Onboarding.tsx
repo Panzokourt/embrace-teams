@@ -16,8 +16,12 @@ import OnboardingFirstClient from '@/components/onboarding/OnboardingFirstClient
 import OnboardingCompanyDocs from '@/components/onboarding/OnboardingCompanyDocs';
 import OnboardingAISetup from '@/components/onboarding/OnboardingAISetup';
 import OnboardingReady from '@/components/onboarding/OnboardingReady';
+import OnboardingWorkspacePreset from '@/components/onboarding/OnboardingWorkspacePreset';
+import OnboardingServices from '@/components/onboarding/OnboardingServices';
+import OnboardingTemplates from '@/components/onboarding/OnboardingTemplates';
+import type { WorkspacePreset } from '@/components/onboarding/workspacePresets';
 
-type WizardStep = 'loading' | 'welcome' | 'company' | 'profile' | 'team' | 'client' | 'docs' | 'ai-setup' | 'ready' | 'pending';
+type WizardStep = 'loading' | 'welcome' | 'company' | 'workspace' | 'profile' | 'services' | 'templates' | 'team' | 'client' | 'docs' | 'ai-setup' | 'ready' | 'pending';
 
 interface DomainCompany {
   id: string;
@@ -49,6 +53,9 @@ export default function Onboarding() {
 
   // Docs upload state
   const [uploadedSourceIds, setUploadedSourceIds] = useState<string[]>([]);
+
+  // Workspace preset
+  const [activePreset, setActivePreset] = useState<WorkspacePreset | null>(null);
 
   // If user already has an active company role, redirect
   useEffect(() => {
@@ -113,7 +120,7 @@ export default function Onboarding() {
   }, [user]);
 
   // Wizard steps (excluding loading and pending)
-  const wizardSteps: WizardStep[] = ['welcome', 'company', 'profile', 'team', 'client', 'docs', 'ai-setup', 'ready'];
+  const wizardSteps: WizardStep[] = ['welcome', 'company', 'workspace', 'profile', 'services', 'templates', 'team', 'client', 'docs', 'ai-setup', 'ready'];
   const currentIndex = wizardSteps.indexOf(step);
   const progressPercent = step === 'loading' ? 0 : step === 'pending' ? 25
     : ((currentIndex + 1) / wizardSteps.length) * 100;
@@ -155,6 +162,11 @@ export default function Onboarding() {
 
   const handleDocsComplete = (sourceIds: string[]) => {
     setUploadedSourceIds(sourceIds);
+    goNext();
+  };
+
+  const handlePresetSelected = (preset: WorkspacePreset) => {
+    setActivePreset(preset);
     goNext();
   };
 
@@ -229,6 +241,14 @@ export default function Onboarding() {
                 />
               )}
 
+              {step === 'workspace' && (
+                <OnboardingWorkspacePreset
+                  companyId={company?.id}
+                  onNext={handlePresetSelected}
+                  onBack={goBack}
+                />
+              )}
+
               {step === 'profile' && (
                 <OnboardingProfile
                   userId={user!.id}
@@ -240,6 +260,26 @@ export default function Onboarding() {
                   setPhone={setPhone}
                   jobTitle={jobTitle}
                   setJobTitle={setJobTitle}
+                />
+              )}
+
+              {step === 'services' && (
+                <OnboardingServices
+                  companyId={company?.id}
+                  preset={activePreset}
+                  onNext={goNext}
+                  onBack={goBack}
+                  onSkip={goNext}
+                />
+              )}
+
+              {step === 'templates' && (
+                <OnboardingTemplates
+                  companyId={company?.id}
+                  preset={activePreset}
+                  onNext={goNext}
+                  onBack={goBack}
+                  onSkip={goNext}
                 />
               )}
 

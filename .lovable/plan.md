@@ -1,132 +1,107 @@
 
 
-# Olseny — Πλάνο Υλοποίησης Ελλειπόντων Features
+# Φάση 4 — Ανάλυση ComingSoon Pages: Τι χρειάζεται πραγματικά
 
-Βάσει του product context file, αυτά είναι τα features που **δεν υπάρχουν** στην εφαρμογή. Οργανωμένα σε 6 φάσεις κατά προτεραιότητα.
+## Τρέχουσα κατάσταση
 
----
+Υπάρχουν **18 αρχεία** ComingSoon, αλλά **κανένα δεν εμφανίζεται** — όλα τα routes κάνουν redirect σε υπάρχουσες σελίδες. Οι σελίδες είναι νεκρός κώδικας.
 
-## Φάση 0 — Technical Debt (Προαπαιτούμενα)
+## Κατηγοριοποίηση
 
-| Εργασία | Λεπτομέρεια |
-|---------|------------|
-| QueryClient config | `staleTime: 5 * 60 * 1000`, `retry: 1` στο `new QueryClient()` — σήμερα δεν έχει config |
-| Realtime channel cleanup | Αντικατάσταση `Date.now()` suffix με σταθερά keys + proper cleanup σε useEffect returns |
-| Legacy user_roles cleanup | Αφαίρεση deprecated table references αν δεν χρησιμοποιείται πλέον |
+### ✅ ΗΔΗ ΚΑΛΥΠΤΟΝΤΑΙ — Δεν χρειάζεται τίποτα (μόνο cleanup)
 
----
+| Σελίδα | Redirect → | Γιατί δεν χρειάζεται |
+|--------|-----------|---------------------|
+| **AI Insights** | `/brain` | Το Brain page καλύπτει πλήρως |
+| **Pricing** | `/pricing` | Υπάρχει ήδη `PricingPage.tsx` |
+| **MediaPlanningPage** | `/media-planning` | Υπάρχει ήδη `MediaPlanning.tsx` |
 
-## Φάση 1 — Financial Visibility Παντού
-
-Το context λέει: *"Financial data εμφανίζεται παντού, όχι μόνο στο Finance section"*. Σήμερα τα financials είναι μόνο στο ProjectDetail.
-
-| Εργασία | Αρχεία |
-|---------|--------|
-| **Mini P&L badge σε Project cards** — δείχνει budget, invoiced, profit margin | `ProjectsTableView.tsx`, νέο `ProjectFinancialBadge.tsx` |
-| **Dashboard Financial widget** — top-level P&L (revenue, expenses, profit) | Νέο `DashboardFinancials.tsx` |
-| **Client detail — P&L per client** — aggregate invoices/expenses | `ClientDetail.tsx`, νέο `ClientPLSummary.tsx` |
+**Ενέργεια**: Διαγραφή των 3 αρχείων (dead code).
 
 ---
 
-## Φάση 2 — AI-Fill σε Forms
+### 🔶 ΧΡΕΙΑΖΟΝΤΑΙ ΩΣ REAL FEATURES — Υψηλή προτεραιότητα
 
-Το context λέει: *"Κάθε form πρέπει να έχει AI alternative"*. Σήμερα κανένα form δεν έχει AI fill (εκτός email-to-project).
+| Σελίδα | Τι λείπει | Πρόταση |
+|--------|-----------|---------|
+| **Campaigns** | Δεν υπάρχει campaign management — redirect σε `/work` δεν βοηθάει | Νέα σελίδα: campaigns linked to clients/projects, timeline, status tracking |
+| **Capacity** | Δεν υπάρχει workload visibility — redirect σε `/hr` δεν δείχνει φόρτο | Νέα σελίδα: heatmap ωρών ανά άτομο/εβδομάδα vs διαθεσιμότητα |
+| **Backlog** | Δεν υπάρχει cross-project backlog — redirect σε `/calendar` δεν βοηθάει | Νέα σελίδα: unassigned/unscheduled tasks, filterable, drag-to-assign |
 
-| Εργασία | Αρχεία |
-|---------|--------|
-| **AI fill button component** — reusable, καλεί secretary-agent με context | Νέο `AIFillButton.tsx` |
-| **Project creation** — "Περίγραψε το project" → AI γεμίζει name, description, budget, tasks | `ProjectCreation` forms |
-| **Task creation** — "Describe what needs to be done" → AI γεμίζει title, description, priority | Task forms |
-| **Invoice creation** — AI προτείνει amount βάσει project budget/hours | Invoice forms |
-| **Client creation** — Paste website URL → AI γεμίζει name, industry, contact info | Client forms |
+**Εκτίμηση**: 3 σελίδες × ~200 γραμμές + queries = μεσαίος όγκος
 
 ---
 
-## Φάση 3 — Smart Time Tracking
+### 🔷 ΧΡΗΣΙΜΑ ΩΣ TABS/SECTIONS — Μεσαία προτεραιότητα
 
-Το context λέει: *"AI παρακολουθεί active tasks → προτείνει time entry"*. Σήμερα δεν υπάρχει.
+Αυτά δεν χρειάζονται standalone σελίδα, αλλά θα ήταν χρήσιμα ως tabs μέσα σε υπάρχουσες:
 
-| Εργασία | Αρχεία |
-|---------|--------|
-| **Edge function: `smart-time-suggest`** — αναλύει assigned tasks, recent activity, patterns → προτείνει entries | Νέα edge function |
-| **Daily suggestion banner** — εμφανίζεται στο MyWork/Dashboard στο τέλος ημέρας | Νέο `TimeSuggestionBanner.tsx` |
-| **Weekly time summary** — AI summary εβδομαδιαίων ωρών per project | Νέο `WeeklyTimeSummary.tsx` |
+| Σελίδα | Πού ανήκει | Τι χτίζεται |
+|--------|-----------|-------------|
+| **Performance** | Tab στο `/reports` | Metrics ανά άτομο: tasks completed, hours, utilization |
+| **Benchmarks** | Tab στο `/reports` | KPIs vs targets: margin, delivery time, utilization |
+| **Forecasting** | Tab στο `/reports` | Revenue projection βάσει pipeline |
+| **Cross-client Insights** | Tab στο `/reports` | Comparative: revenue, hours, profitability per client |
+| **Resource Planning** | Tab στο `/hr` | Gantt allocation ανά άτομο/project/εβδομάδα |
 
----
-
-## Φάση 4 — ComingSoon Pages → Real Features
-
-17 σελίδες είναι placeholder. Κατά προτεραιότητα:
-
-### Υψηλή (core business value)
-| Σελίδα | Τι χτίζεται |
-|--------|-------------|
-| **Campaigns** | Campaign management — linked to clients/projects, timeline, deliverables tracker |
-| **Capacity** | Team workload heatmap — hours assigned vs available per person/week |
-| **Backlog** | Cross-project task backlog — unassigned/unscheduled tasks, drag to project |
-| **Resource Planning** | Gantt-style view — team allocation across projects per week |
-
-### Μεσαία (intelligence layer)
-| Σελίδα | Τι χτίζεται |
-|--------|-------------|
-| **Cross-client Insights** | Comparative dashboard — revenue, profitability, hours per client |
-| **Benchmarks** | KPI tracking vs targets — utilization rate, avg project margin, delivery time |
-| **Forecasting** | Revenue/expense projection — based on pipeline + recurring projects |
-| **Performance** | Team/individual metrics — tasks completed, hours logged, utilization |
-| **AI Insights** | Redirect to Brain page (δεν χρειάζεται standalone) |
-
-### Χαμηλή (settings/admin)
-| Σελίδα | Τι χτίζεται |
-|--------|-------------|
-| **Roles & Permissions** | Custom role editor — granular permissions per module |
-| **Billing** | Subscription management UI |
-| **Branding** | Logo, colors, email template customization |
-| **API Keys** | API key generation/management |
-| **Webhooks** | Webhook configuration UI |
-| **Feature Flags** | Toggle features per company |
-| **Pricing** | Redirect to Services page |
-| **MediaPlanningPage** | Redirect to existing MediaPlanning |
+**Εκτίμηση**: 5 tab components × ~150 γραμμές
 
 ---
 
-## Φάση 5 — Client Portal
+### ⬜ ΔΕΝ ΧΡΕΙΑΖΟΝΤΑΙ ΤΩΡΑ — Χαμηλή προτεραιότητα
 
-Δεν υπάρχει καθόλου. Απαιτεί:
+Αυτά είναι admin/settings features που τα redirect στο `/settings` είναι εντάξει προσωρινά:
 
-| Εργασία | Λεπτομέρεια |
-|---------|------------|
-| **Auth flow για clients** — magic link ή password, separate role | Migration + auth config |
-| **Portal layout** — minimal, read-only | Νέο `ClientPortalLayout.tsx` |
-| **Project status view** — progress, milestones, deliverables | Νέο `PortalProjectView.tsx` |
-| **Invoice view** — outstanding/paid invoices | Νέο `PortalInvoices.tsx` |
-| **File sharing** — client-visible files only | Νέο `PortalFiles.tsx` |
-| **RLS policies** — clients βλέπουν μόνο τα δικά τους data | Migration |
+| Σελίδα | Γιατί μπορεί να περιμένει |
+|--------|--------------------------|
+| **Roles & Permissions** | Υπάρχει ήδη RBAC σε code level — UI editor είναι nice-to-have |
+| **Billing** | Δεν υπάρχει Stripe integration ακόμα |
+| **Branding** | Logo/colors — cosmetic |
+| **API Keys** | Δεν υπάρχει public API |
+| **Webhooks** | Δεν υπάρχουν outbound events |
+| **Feature Flags** | Δεν υπάρχει feature flag system |
 
----
-
-## Φάση 6 — Integrations
-
-Αναφέρονται στο context αλλά δεν υπάρχουν:
-
-| Integration | Λεπτομέρεια |
-|-------------|------------|
-| **Google Calendar sync** | 2-way sync events ↔ project milestones/deadlines |
-| **Slack → Tasks** | Incoming webhook, AI parses message → task |
-| **Stripe/Xero reconciliation** | Invoice status auto-update from payment provider |
+**Ενέργεια**: Παραμένουν ως redirects, καθαρισμός dead files.
 
 ---
 
-## Σύνοψη εκτίμησης
+## Προτεινόμενο πλάνο εκτέλεσης
 
-| Φάση | Εκτιμώμενος όγκος | Προτεραιότητα |
-|------|-------------------|---------------|
-| 0 — Tech Debt | 3 αρχεία | Κρίσιμη |
-| 1 — Financial Visibility | ~5 components | Υψηλή |
-| 2 — AI-Fill Forms | ~6 components + 1 reusable | Υψηλή |
-| 3 — Smart Time | 1 edge function + 2 components | Μεσαία |
-| 4 — ComingSoon → Real | ~17 pages (4 high priority) | Μεσαία-Υψηλή |
-| 5 — Client Portal | Layout + 4 views + auth + RLS | Μεσαία |
-| 6 — Integrations | 3 external APIs | Χαμηλή |
+### Βήμα 1: Cleanup dead code
+- Διαγραφή 18 ComingSoon page files που δεν χρησιμοποιούνται
+- Διαγραφή `ComingSoonPage.tsx` component
 
-Πες μου αν θέλεις να ξεκινήσουμε από κάποια συγκεκριμένη φάση ή αν θέλεις αλλαγές στο πλάνο.
+### Βήμα 2: Campaigns page (νέα σελίδα)
+- DB migration: `campaigns` table (name, client_id, project_id, status, start_date, end_date, budget, company_id)
+- Σελίδα με Kanban view (by status) + table view
+- CRUD dialog, linked to clients/projects
+- Route: `/campaigns` (αντικατάσταση redirect)
+
+### Βήμα 3: Capacity page (νέα σελίδα)
+- Query: aggregate `time_entries` + `tasks` per user per week
+- Heatmap grid: rows = team members, columns = weeks, cells = hours (color-coded)
+- Available hours config (default 40h/week)
+- Route: `/operations/capacity` → real page
+
+### Βήμα 4: Backlog page (νέα σελίδα)
+- Query: tasks where `status = 'todo'` AND (`assigned_to IS NULL` OR `due_date IS NULL`)
+- Filterable list with project/client grouping
+- Quick-assign dropdown, bulk actions
+- Route: `/backlog` → real page
+
+### Βήμα 5: Reports tabs (ενσωμάτωση)
+- 4 νέα tab components στο Reports page:
+  - Performance tab
+  - Benchmarks tab  
+  - Forecasting tab
+  - Cross-client Insights tab
+- Κάθε tab χρησιμοποιεί υπάρχοντα data (tasks, time_entries, invoices, expenses)
+
+## Τεχνικά
+
+- **Migration**: Μόνο για campaigns table — τα υπόλοιπα χρησιμοποιούν υπάρχοντα tables
+- **Νέα αρχεία**: ~8 components + 1 migration
+- **Τροποποιήσεις**: `App.tsx` (routes), `AppSidebar.tsx` (nav links), `Reports.tsx` (tabs)
+
+Πες μου αν συμφωνείς με αυτή την κατηγοριοποίηση ή αν θέλεις αλλαγές πριν ξεκινήσουμε.
 

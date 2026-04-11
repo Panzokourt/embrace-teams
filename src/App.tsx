@@ -48,6 +48,11 @@ import ResetPassword from "@/pages/ResetPassword";
 import PlatformAdmin from "@/pages/PlatformAdmin";
 import MediaPlanning from "@/pages/MediaPlanning";
 import MediaPlanWorkspace from "@/pages/MediaPlanWorkspace";
+import ClientPortalLayout from "@/components/portal/ClientPortalLayout";
+import PortalDashboard from "@/pages/portal/PortalDashboard";
+import PortalProjects from "@/pages/portal/PortalProjects";
+import PortalInvoices from "@/pages/portal/PortalInvoices";
+import PortalFiles from "@/pages/portal/PortalFiles";
 
 function RedirectUserToEmployee() {
   const { id } = useParams();

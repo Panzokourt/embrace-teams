@@ -20,6 +20,7 @@ import { ClientTeamCard } from '@/components/clients/detail/ClientTeamCard';
 import { ClientContactsCard } from '@/components/clients/detail/ClientContactsCard';
 import { ClientFilesCard } from '@/components/clients/detail/ClientFilesCard';
 import { ClientMediaPlansCard } from '@/components/clients/detail/ClientMediaPlansCard';
+import { ClientPLSummary } from '@/components/clients/detail/ClientPLSummary';
 
 export default function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -189,6 +190,7 @@ export default function ClientDetailPage() {
 
         {/* Right Column — Execution & People */}
           <div className="col-span-12 lg:col-span-5 space-y-6">
+            <ClientPLSummary invoices={invoices} totalBudget={totalBudget} />
             <ClientProjectsCard projects={projects} clientId={client.id} />
             <ClientMediaPlansCard clientId={client.id} />
             <ClientTasksSnapshot overdue={overdueTasks} dueThisWeek={dueThisWeek} open={openTasks} />

@@ -1497,12 +1497,14 @@ export type Database = {
           account_id: string
           body_html: string | null
           body_text: string | null
+          brief_parsed_at: string | null
           cc_addresses: Json | null
           created_at: string
           folder: string
           from_address: string | null
           from_name: string | null
           id: string
+          is_brief_candidate: boolean | null
           is_read: boolean
           is_starred: boolean
           message_id_header: string | null
@@ -1517,12 +1519,14 @@ export type Database = {
           account_id: string
           body_html?: string | null
           body_text?: string | null
+          brief_parsed_at?: string | null
           cc_addresses?: Json | null
           created_at?: string
           folder?: string
           from_address?: string | null
           from_name?: string | null
           id?: string
+          is_brief_candidate?: boolean | null
           is_read?: boolean
           is_starred?: boolean
           message_id_header?: string | null
@@ -1537,12 +1541,14 @@ export type Database = {
           account_id?: string
           body_html?: string | null
           body_text?: string | null
+          brief_parsed_at?: string | null
           cc_addresses?: Json | null
           created_at?: string
           folder?: string
           from_address?: string | null
           from_name?: string | null
           id?: string
+          is_brief_candidate?: boolean | null
           is_read?: boolean
           is_starred?: boolean
           message_id_header?: string | null

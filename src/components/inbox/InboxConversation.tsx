@@ -6,11 +6,13 @@ import { InboxEntityLinker } from './InboxEntityLinker';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Star, ArrowLeft, Link2, Reply, ReplyAll, Forward } from 'lucide-react';
+import { Star, ArrowLeft, Link2, Reply, ReplyAll, Forward, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
+import { EmailToProjectBanner } from './EmailToProjectBanner';
+import { useEmailToProject } from '@/hooks/useEmailToProject';
 
 type ReplyMode = 'reply' | 'reply-all' | 'forward';
 
@@ -29,6 +31,7 @@ export function InboxConversation({ thread, userEmail, onSend, onToggleStar, onB
   const [showLinker, setShowLinker] = useState(false);
   const [entityLinks, setEntityLinks] = useState<any[]>([]);
   const [attachmentsMap, setAttachmentsMap] = useState<Record<string, any[]>>({});
+  const emailToProject = useEmailToProject();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -135,6 +138,16 @@ export function InboxConversation({ thread, userEmail, onSend, onToggleStar, onB
         <Button
           variant="ghost"
           size="icon"
+          className="h-8 w-8 text-amber-500 hover:text-amber-600"
+          onClick={() => emailToProject.parseBrief(lastMessage.id)}
+          title="Ανάλυση ως Project Brief"
+          disabled={emailToProject.state === 'parsing'}
+        >
+          <Sparkles className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
           className="h-8 w-8"
           onClick={() => setShowLinker(true)}
           title="Σύνδεση με Πελάτη/Έργο/Task"
@@ -150,6 +163,17 @@ export function InboxConversation({ thread, userEmail, onSend, onToggleStar, onB
           <Star className={cn('h-4 w-4', thread.is_starred && 'text-warning fill-warning')} />
         </Button>
       </div>
+
+      {/* Email-to-Project Banner */}
+      <EmailToProjectBanner
+        state={emailToProject.state}
+        draft={emailToProject.draft}
+        error={emailToProject.error}
+        onParse={() => emailToProject.parseBrief(lastMessage.id)}
+        onUpdateDraft={emailToProject.updateDraft}
+        onCreateProject={emailToProject.createProject}
+        onReset={emailToProject.reset}
+      />
 
       {/* Messages */}
       <ScrollArea className="flex-1 p-4">

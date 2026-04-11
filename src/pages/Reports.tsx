@@ -9,6 +9,10 @@ import { ReportsProjects } from '@/components/reports/ReportsProjects';
 import { ReportsTasks } from '@/components/reports/ReportsTasks';
 import { ReportsClients } from '@/components/reports/ReportsClients';
 import { ReportsTeam } from '@/components/reports/ReportsTeam';
+import { ReportsPerformance } from '@/components/reports/ReportsPerformance';
+import { ReportsBenchmarks } from '@/components/reports/ReportsBenchmarks';
+import { ReportsForecasting } from '@/components/reports/ReportsForecasting';
+import { ReportsCrossClient } from '@/components/reports/ReportsCrossClient';
 import { exportToCSV, exportToExcel, formatters } from '@/utils/exportUtils';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Loader2, BarChart3 } from 'lucide-react';
@@ -20,6 +24,10 @@ const TABS = [
   { value: 'tasks', label: 'Εργασίες' },
   { value: 'clients', label: 'Πελάτες' },
   { value: 'team', label: 'Ομάδα' },
+  { value: 'performance', label: 'Απόδοση' },
+  { value: 'benchmarks', label: 'KPIs' },
+  { value: 'forecasting', label: 'Προβλέψεις' },
+  { value: 'cross-client', label: 'Cross-client' },
 ];
 
 export default function Reports() {
@@ -159,6 +167,10 @@ export default function Reports() {
         <TabsContent value="tasks"><ReportsTasks data={data} /></TabsContent>
         <TabsContent value="clients"><ReportsClients data={data} /></TabsContent>
         <TabsContent value="team"><ReportsTeam data={data} /></TabsContent>
+        <TabsContent value="performance"><ReportsPerformance data={data} /></TabsContent>
+        <TabsContent value="benchmarks"><ReportsBenchmarks data={data} /></TabsContent>
+        <TabsContent value="forecasting"><ReportsForecasting data={data} /></TabsContent>
+        <TabsContent value="cross-client"><ReportsCrossClient data={data} /></TabsContent>
       </Tabs>
     </div>
   );

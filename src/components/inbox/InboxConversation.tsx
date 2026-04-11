@@ -138,6 +138,16 @@ export function InboxConversation({ thread, userEmail, onSend, onToggleStar, onB
         <Button
           variant="ghost"
           size="icon"
+          className="h-8 w-8 text-amber-500 hover:text-amber-600"
+          onClick={() => emailToProject.parseBrief(lastMessage.id)}
+          title="Ανάλυση ως Project Brief"
+          disabled={emailToProject.state === 'parsing'}
+        >
+          <Sparkles className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
           className="h-8 w-8"
           onClick={() => setShowLinker(true)}
           title="Σύνδεση με Πελάτη/Έργο/Task"
@@ -153,6 +163,17 @@ export function InboxConversation({ thread, userEmail, onSend, onToggleStar, onB
           <Star className={cn('h-4 w-4', thread.is_starred && 'text-warning fill-warning')} />
         </Button>
       </div>
+
+      {/* Email-to-Project Banner */}
+      <EmailToProjectBanner
+        state={emailToProject.state}
+        draft={emailToProject.draft}
+        error={emailToProject.error}
+        onParse={() => emailToProject.parseBrief(lastMessage.id)}
+        onUpdateDraft={emailToProject.updateDraft}
+        onCreateProject={emailToProject.createProject}
+        onReset={emailToProject.reset}
+      />
 
       {/* Messages */}
       <ScrollArea className="flex-1 p-4">

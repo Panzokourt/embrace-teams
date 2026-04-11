@@ -42,7 +42,8 @@ const emptyForm: CampaignForm = {
 };
 
 export default function Campaigns() {
-  const { user, companyId } = useAuth();
+  const { user, company } = useAuth();
+  const companyId = company?.id;
   const qc = useQueryClient();
   const [view, setView] = useState<'kanban' | 'table'>('kanban');
   const [dialogOpen, setDialogOpen] = useState(false);

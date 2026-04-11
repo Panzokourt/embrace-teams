@@ -18,7 +18,8 @@ const PRIORITY_COLORS: Record<string, string> = {
 };
 
 export default function Backlog() {
-  const { companyId } = useAuth();
+  const { company } = useAuth();
+  const companyId = company?.id;
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [filterProject, setFilterProject] = useState<string>('all');

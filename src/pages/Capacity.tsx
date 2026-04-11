@@ -14,7 +14,8 @@ const WEEKS_TO_SHOW = 8;
 const HOURS_PER_WEEK = 40;
 
 export default function Capacity() {
-  const { companyId } = useAuth();
+  const { company } = useAuth();
+  const companyId = company?.id;
 
   const { data: profiles = [], isLoading: loadingProfiles } = useQuery({
     queryKey: ['capacity-profiles', companyId],

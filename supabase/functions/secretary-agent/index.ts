@@ -299,7 +299,6 @@ const toolDefinitions = [
       },
     },
   },
-  // ── NEW TOOLS ──
   {
     type: "function",
     function: {
@@ -684,6 +683,36 @@ const toolDefinitions = [
   },
 ];
 
+// ── Helper: call Lovable AI Gateway (non-streaming) ──
+async function callGateway(messages: any[], tools?: any[], toolChoice?: any) {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
+  const body: any = {
+    model: "google/gemini-2.5-pro",
+    messages,
+  };
+  if (tools) body.tools = tools;
+  if (toolChoice) body.tool_choice = toolChoice;
+
+  const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    console.error("Gateway error:", resp.status, errText);
+    throw new Error(`Gateway error ${resp.status}`);
+  }
+
+  return await resp.json();
+}
+
 // ── Tool execution ────────────────────────────────────────────────
 async function executeTool(
   supabase: any,
@@ -782,7 +811,6 @@ async function executeTool(
       }
 
       case "create_client": {
-        // Check for existing client with same name first
         const { data: existingClients } = await supabase
           .from("clients")
           .select("id, name")
@@ -1010,10 +1038,7 @@ async function executeTool(
         };
       }
 
-      // ── NEW TOOL EXECUTORS ──
-
       case "create_project": {
-        // Check for existing client first if name is provided
         if (args.client_id) {
           const { data: existingClient } = await supabase.from("clients").select("id, name").eq("id", args.client_id).single();
           if (!existingClient) {
@@ -1032,7 +1057,6 @@ async function executeTool(
           created_by: userId,
         }).select("id, name, status, budget").single();
         if (error) throw error;
-        // Also add the creator to the project team
         await supabase.from("project_user_access").insert({
           project_id: data.id,
           user_id: userId,
@@ -1079,7 +1103,6 @@ async function executeTool(
           created_by: userId,
         }).select("id, title, start_time, end_time, event_type").single();
         if (error) throw error;
-        // Add attendees if provided
         if (args.attendee_ids && args.attendee_ids.length > 0) {
           const attendeeRows = args.attendee_ids.map((uid: string) => ({
             event_id: data.id,
@@ -1108,7 +1131,6 @@ async function executeTool(
           is_running: false,
         }).select("id, duration_minutes, description").single();
         if (error) throw error;
-        // Update task actual_hours if task_id provided
         if (args.task_id) {
           const { data: entries } = await supabase
             .from("time_entries")
@@ -1130,7 +1152,6 @@ async function executeTool(
           message_type: "text",
         }).select("id, content, created_at").single();
         if (error) throw error;
-        // Update channel last_message_at
         await supabase.from("chat_channels").update({ last_message_at: new Date().toISOString() }).eq("id", args.channel_id);
         return { success: true, message: data };
       }
@@ -1141,14 +1162,12 @@ async function executeTool(
         const todayEnd = `${today}T23:59:59.999Z`;
 
         const [myTasksRes, overdueRes, eventsRes, projectsRes, chatChannelsRes] = await Promise.all([
-          // Today's tasks (due today)
           supabase.from("tasks")
             .select("id, title, status, priority, due_date, project_id, projects(name)")
             .eq("assigned_to", userId)
             .eq("due_date", today)
             .neq("status", "done")
             .neq("status", "cancelled"),
-          // Overdue tasks
           supabase.from("tasks")
             .select("id, title, status, priority, due_date, project_id, projects(name)")
             .eq("assigned_to", userId)
@@ -1156,20 +1175,17 @@ async function executeTool(
             .neq("status", "done")
             .neq("status", "cancelled")
             .order("due_date", { ascending: true }),
-          // Today's calendar events
           supabase.from("calendar_events")
             .select("id, title, start_time, end_time, event_type, location, video_link, project_id")
             .eq("company_id", companyId)
             .gte("start_time", todayStart)
             .lte("start_time", todayEnd)
             .order("start_time", { ascending: true }),
-          // Projects behind schedule (active with end_date passed)
           supabase.from("projects")
             .select("id, name, status, end_date")
             .eq("company_id", companyId)
             .eq("status", "active")
             .lt("end_date", today),
-          // Chat channels with recent activity
           supabase.from("chat_channels")
             .select("id, name, type")
             .eq("company_id", companyId)
@@ -1177,7 +1193,6 @@ async function executeTool(
             .limit(10),
         ]);
 
-        // Get all open tasks count
         const { count: openTasksCount } = await supabase
           .from("tasks")
           .select("id", { count: "exact", head: true })
@@ -1209,7 +1224,6 @@ async function executeTool(
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
-            ...(args.focus ? {} : {}),
           },
           body: JSON.stringify({ focus: args.focus || null }),
         });
@@ -1218,7 +1232,6 @@ async function executeTool(
           return { error: `Brain analysis failed: ${errText}` };
         }
         const brainResult = await resp.json();
-        // Fetch the latest insights generated
         const { data: newInsights } = await supabase
           .from("brain_insights")
           .select("id, title, body, category, priority, neuro_tactic")
@@ -1253,21 +1266,18 @@ async function executeTool(
         if (args.priority) q = q.eq("priority", args.priority);
         const { data, error } = await q;
         if (error) throw error;
-        // If entity_id filter, do client-side filtering on evidence JSONB
         let insights = data || [];
         if (args.entity_id) {
           insights = insights.filter((i: any) => {
             const ev = i.evidence;
             if (!ev) return false;
-            const evStr = JSON.stringify(ev);
-            return evStr.includes(args.entity_id);
+            return JSON.stringify(ev).includes(args.entity_id);
           });
         }
         return { insights, count: insights.length };
       }
 
       case "action_brain_insight": {
-        // Fetch the insight first
         const { data: insight, error: insError } = await supabase
           .from("brain_insights")
           .select("id, title, body, category, evidence")
@@ -1286,7 +1296,7 @@ async function executeTool(
         }
 
         if (args.action_type === "create_project") {
-        const { data: proj, error: projErr } = await supabase.from("projects").insert({
+          const { data: proj, error: projErr } = await supabase.from("projects").insert({
             name: insight.title,
             description: insight.body,
             status: "lead",
@@ -1322,9 +1332,6 @@ async function executeTool(
       // ── SMART INTAKE & PLANNING EXECUTORS ──
 
       case "smart_project_plan": {
-        const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-        if (!ANTHROPIC_API_KEY) return { error: "AI not configured" };
-
         const planPrompt = `Είσαι expert project planner για agency επικοινωνίας/marketing.
 Δημιούργησε ένα πλήρες project plan βασισμένο στην περιγραφή.
 
@@ -1332,8 +1339,6 @@ async function executeTool(
 ${args.budget ? `Budget: €${args.budget}` : ""}
 ${args.duration_months ? `Διάρκεια: ${args.duration_months} μήνες` : ""}
 ${args.template_hint ? `Τύπος: ${args.template_hint}` : ""}
-
-Επέστρεψε ένα JSON object μέσω του tool output_plan.
 
 Κανόνες:
 - 3-6 deliverables ανάλογα πολυπλοκότητα
@@ -1343,72 +1348,63 @@ ${args.template_hint ? `Τύπος: ${args.template_hint}` : ""}
 - Ρεαλιστικά estimated_hours
 - role_hint πρέπει να αντιστοιχεί σε ρόλους agency (project_lead, designer, copywriter, seo_specialist, social_media_manager, developer, account_manager, media_planner)`;
 
-        const planResp = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: {
-            "x-api-key": ANTHROPIC_API_KEY,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "claude-sonnet-4-20250514",
-            max_tokens: 8192,
-            messages: [{ role: "user", content: planPrompt }],
-            tools: [{
-              name: "output_plan",
-              description: "Output the structured project plan",
-              input_schema: {
-                type: "object",
-                properties: {
-                  name: { type: "string" },
-                  description: { type: "string" },
-                  deliverables: { type: "array", items: { type: "object", properties: { name: { type: "string" }, budget_pct: { type: "number" }, tasks: { type: "array", items: { type: "object", properties: { title: { type: "string" }, priority: { type: "string" }, days_offset_start: { type: "number" }, days_offset_due: { type: "number" }, estimated_hours: { type: "number" }, role_hint: { type: "string" } } } } } } },
-                  suggested_roles: { type: "array", items: { type: "string" } },
+        try {
+          const planResult = await callGateway(
+            [{ role: "user", content: planPrompt }],
+            [{
+              type: "function",
+              function: {
+                name: "output_plan",
+                description: "Output the structured project plan",
+                parameters: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    description: { type: "string" },
+                    deliverables: { type: "array", items: { type: "object", properties: { name: { type: "string" }, budget_pct: { type: "number" }, tasks: { type: "array", items: { type: "object", properties: { title: { type: "string" }, priority: { type: "string" }, days_offset_start: { type: "number" }, days_offset_due: { type: "number" }, estimated_hours: { type: "number" }, role_hint: { type: "string" } } } } } } },
+                    suggested_roles: { type: "array", items: { type: "string" } },
+                  },
+                  required: ["name", "description", "deliverables", "suggested_roles"],
                 },
-                required: ["name", "description", "deliverables", "suggested_roles"],
               },
             }],
-            tool_choice: { type: "tool", name: "output_plan" },
-          }),
-        });
+            { type: "function", function: { name: "output_plan" } }
+          );
 
-        if (!planResp.ok) {
-          const errText = await planResp.text();
-          console.error("Plan AI error:", errText);
+          const toolCall = planResult.choices?.[0]?.message?.tool_calls?.[0];
+          if (!toolCall) return { error: "AI did not return a plan" };
+
+          const plan = typeof toolCall.function.arguments === "string"
+            ? JSON.parse(toolCall.function.arguments)
+            : toolCall.function.arguments;
+
+          if (args.budget && plan.deliverables) {
+            for (const d of plan.deliverables) {
+              d.budget_amount = Math.round((d.budget_pct / 100) * args.budget);
+            }
+          }
+
+          const totalTasks = (plan.deliverables || []).reduce((s: number, d: any) => s + (d.tasks?.length || 0), 0);
+          const totalHours = (plan.deliverables || []).reduce((s: number, d: any) =>
+            s + (d.tasks || []).reduce((ts: number, t: any) => ts + (t.estimated_hours || 0), 0), 0);
+
+          return {
+            success: true,
+            plan,
+            summary: {
+              deliverables_count: plan.deliverables?.length || 0,
+              total_tasks: totalTasks,
+              total_estimated_hours: totalHours,
+              suggested_roles: plan.suggested_roles || [],
+              budget: args.budget || null,
+              duration_months: args.duration_months || null,
+            },
+            message: "Plan generated. Present it to the user and ask for confirmation before executing with execute_project_plan.",
+          };
+        } catch (e) {
+          console.error("Plan AI error:", e);
           return { error: "Failed to generate plan" };
         }
-
-        const planResult = await planResp.json();
-        // Find tool_use block in Anthropic response
-        const toolUseBlock = planResult.content?.find((b: any) => b.type === "tool_use" && b.name === "output_plan");
-        if (!toolUseBlock) return { error: "AI did not return a plan" };
-
-        const plan = toolUseBlock.input;
-
-        // Enrich with budget amounts
-        if (args.budget && plan.deliverables) {
-          for (const d of plan.deliverables) {
-            d.budget_amount = Math.round((d.budget_pct / 100) * args.budget);
-          }
-        }
-
-        const totalTasks = (plan.deliverables || []).reduce((s: number, d: any) => s + (d.tasks?.length || 0), 0);
-        const totalHours = (plan.deliverables || []).reduce((s: number, d: any) =>
-          s + (d.tasks || []).reduce((ts: number, t: any) => ts + (t.estimated_hours || 0), 0), 0);
-
-        return {
-          success: true,
-          plan,
-          summary: {
-            deliverables_count: plan.deliverables?.length || 0,
-            total_tasks: totalTasks,
-            total_estimated_hours: totalHours,
-            suggested_roles: plan.suggested_roles || [],
-            budget: args.budget || null,
-            duration_months: args.duration_months || null,
-          },
-          message: "Plan generated. Present it to the user and ask for confirmation before executing with execute_project_plan.",
-        };
       }
 
       case "execute_project_plan": {
@@ -1418,7 +1414,6 @@ ${args.template_hint ? `Τύπος: ${args.template_hint}` : ""}
         const startDate = args.start_date || new Date().toISOString().split("T")[0];
         const startMs = new Date(startDate).getTime();
 
-        // Calculate end date from max days_offset_due
         let maxDayOffset = 30;
         for (const d of plan.deliverables || []) {
           for (const t of d.tasks || []) {
@@ -1427,7 +1422,6 @@ ${args.template_hint ? `Τύπος: ${args.template_hint}` : ""}
         }
         const endDate = new Date(startMs + maxDayOffset * 86400000).toISOString().split("T")[0];
 
-        // 1. Create project
         const { data: project, error: projErr } = await supabase.from("projects").insert({
           name: plan.name,
           description: plan.description || null,
@@ -1441,12 +1435,10 @@ ${args.template_hint ? `Τύπος: ${args.template_hint}` : ""}
         }).select("id, name, status, budget").single();
         if (projErr) throw projErr;
 
-        // 2. Add creator to team
         await supabase.from("project_user_access").insert({
           project_id: project.id, user_id: userId, role: "project_lead",
         }).select().maybeSingle();
 
-        // 3. Add team members
         if (args.team_members && args.team_members.length > 0) {
           const teamRows = args.team_members.map((m: any) => ({
             project_id: project.id,
@@ -1456,7 +1448,6 @@ ${args.template_hint ? `Τύπος: ${args.template_hint}` : ""}
           await supabase.from("project_user_access").upsert(teamRows, { onConflict: "project_id,user_id" });
         }
 
-        // 4. Create deliverables and tasks
         let totalTasksCreated = 0;
         let totalDeliverablesCreated = 0;
 
@@ -1503,14 +1494,10 @@ ${args.template_hint ? `Τύπος: ${args.template_hint}` : ""}
       }
 
       case "analyze_uploaded_file": {
-        const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-        if (!ANTHROPIC_API_KEY) return { error: "AI not configured" };
-
         const content = args.file_content || "";
         const fileName = args.file_name || "unknown";
         const analysisType = args.analysis_type || "summarize";
 
-        // Truncate if too long for AI context
         const maxChars = 30000;
         const truncatedContent = content.length > maxChars 
           ? content.slice(0, maxChars) + `\n\n[Truncated: showing first ${maxChars} of ${content.length} characters]`
@@ -1531,35 +1518,21 @@ ${truncatedContent}
 
 Respond in Greek. Be thorough but concise.`;
 
-        const analysisResp = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: {
-            "x-api-key": ANTHROPIC_API_KEY,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "claude-sonnet-4-20250514",
-            max_tokens: 4096,
-            messages: [{ role: "user", content: analysisPrompt }],
-          }),
-        });
+        try {
+          const analysisResult = await callGateway([{ role: "user", content: analysisPrompt }]);
+          const analysis = analysisResult.choices?.[0]?.message?.content || "No analysis generated";
 
-        if (!analysisResp.ok) {
+          return {
+            success: true,
+            file_name: fileName,
+            analysis_type: analysisType,
+            analysis,
+            content_length: content.length,
+            truncated: content.length > maxChars,
+          };
+        } catch (e) {
           return { error: "Failed to analyze file" };
         }
-
-        const analysisResult = await analysisResp.json();
-        const analysis = analysisResult.content?.[0]?.text || "No analysis generated";
-
-        return {
-          success: true,
-          file_name: fileName,
-          analysis_type: analysisType,
-          analysis,
-          content_length: content.length,
-          truncated: content.length > maxChars,
-        };
       }
 
       case "get_risk_radar": {
@@ -1568,7 +1541,6 @@ Respond in Greek. Be thorough but concise.`;
         const twoWeeksAgo = new Date(Date.now() - 14 * 86400000).toISOString();
 
         const [overdueRes, upcomingUnassignedRes, projectBudgetsRes, staleProjectsRes, capacityRes] = await Promise.all([
-          // Overdue tasks grouped info
           supabase.from("tasks")
             .select("id, title, due_date, priority, project_id, projects(name), assigned_to, profiles!tasks_assigned_to_fkey(full_name)")
             .lt("due_date", today)
@@ -1576,7 +1548,6 @@ Respond in Greek. Be thorough but concise.`;
             .neq("status", "cancelled")
             .order("due_date", { ascending: true })
             .limit(20),
-          // Tasks due in 3 days without assignee
           supabase.from("tasks")
             .select("id, title, due_date, priority, project_id, projects(name)")
             .gte("due_date", today)
@@ -1585,20 +1556,17 @@ Respond in Greek. Be thorough but concise.`;
             .neq("status", "done")
             .neq("status", "cancelled")
             .limit(20),
-          // Active projects with budgets and expenses
           supabase.from("projects")
             .select("id, name, budget, status")
             .eq("company_id", companyId)
             .eq("status", "active")
             .not("budget", "is", null),
-          // Projects with no task updates in 14+ days
           supabase.from("projects")
             .select("id, name, status, updated_at")
             .eq("company_id", companyId)
             .eq("status", "active")
             .lt("updated_at", twoWeeksAgo)
             .limit(10),
-          // Users with many open tasks
           supabase.rpc("get_user_company_id", { _user_id: userId }).then(async () => {
             const { data } = await supabase
               .from("tasks")
@@ -1606,7 +1574,6 @@ Respond in Greek. Be thorough but concise.`;
               .neq("status", "done")
               .neq("status", "cancelled")
               .not("assigned_to", "is", null);
-            // Count tasks per user
             const counts: Record<string, { name: string; count: number }> = {};
             for (const t of data || []) {
               const uid = t.assigned_to;
@@ -1620,7 +1587,6 @@ Respond in Greek. Be thorough but concise.`;
           }),
         ]);
 
-        // Check budget overruns
         const budgetOverruns: any[] = [];
         for (const proj of projectBudgetsRes.data || []) {
           if (!proj.budget) continue;
@@ -1642,7 +1608,6 @@ Respond in Greek. Be thorough but concise.`;
 
         const risks: any[] = [];
 
-        // Overdue tasks
         const overdueTasks = overdueRes.data || [];
         if (overdueTasks.length > 0) {
           risks.push({
@@ -1658,7 +1623,6 @@ Respond in Greek. Be thorough but concise.`;
           });
         }
 
-        // Budget overruns
         if (budgetOverruns.length > 0) {
           risks.push({
             type: "budget_overrun",
@@ -1668,7 +1632,6 @@ Respond in Greek. Be thorough but concise.`;
           });
         }
 
-        // Upcoming unassigned
         const unassigned = upcomingUnassignedRes.data || [];
         if (unassigned.length > 0) {
           risks.push({
@@ -1683,7 +1646,6 @@ Respond in Greek. Be thorough but concise.`;
           });
         }
 
-        // Stale projects
         const stale = staleProjectsRes.data || [];
         if (stale.length > 0) {
           risks.push({
@@ -1694,7 +1656,6 @@ Respond in Greek. Be thorough but concise.`;
           });
         }
 
-        // Capacity issues
         const overloaded = await capacityRes;
         if (overloaded.length > 0) {
           risks.push({
@@ -1716,7 +1677,6 @@ Respond in Greek. Be thorough but concise.`;
       // ── MEMORY TOOL EXECUTORS ──
 
       case "save_memory": {
-        // Upsert memory by key to avoid duplicates
         const { data: existing } = await supabase
           .from("secretary_memory")
           .select("id")
@@ -1757,142 +1717,106 @@ Respond in Greek. Be thorough but concise.`;
       }
 
       case "recall_memory": {
-        const limit = args.limit || 10;
-        const selectCols = "id, category, key, content, metadata, project_id, client_id, created_at, updated_at";
-
-        const applyFilters = (q: any) => {
-          if (args.category) q = q.eq("category", args.category);
-          if (args.project_id) q = q.eq("project_id", args.project_id);
-          if (args.client_id) q = q.eq("client_id", args.client_id);
-          return q;
-        };
-
-        // Try full-text search first
-        if (args.query) {
-          let ftsQ = supabase
-            .from("secretary_memory")
-            .select(selectCols)
-            .eq("user_id", userId)
-            .eq("company_id", companyId)
-            .textSearch("content", args.query, { type: "plain" })
-            .order("updated_at", { ascending: false })
-            .limit(limit);
-          ftsQ = applyFilters(ftsQ);
-          const { data: ftsData } = await ftsQ;
-
-          if (ftsData && ftsData.length > 0) {
-            return { memories: ftsData, count: ftsData.length, search_type: "full_text" };
-          }
-
-          // Fallback: ilike search
-          let ilikeQ = supabase
-            .from("secretary_memory")
-            .select(selectCols)
-            .eq("user_id", userId)
-            .eq("company_id", companyId)
-            .or(`content.ilike.%${args.query}%,key.ilike.%${args.query}%`)
-            .order("updated_at", { ascending: false })
-            .limit(limit);
-          ilikeQ = applyFilters(ilikeQ);
-          const { data: ilikeData } = await ilikeQ;
-
-          return { memories: ilikeData || [], count: (ilikeData || []).length, search_type: "fuzzy" };
-        }
-
         let q = supabase
           .from("secretary_memory")
-          .select(selectCols)
+          .select("id, category, key, content, metadata, project_id, client_id, updated_at")
           .eq("user_id", userId)
           .eq("company_id", companyId)
           .order("updated_at", { ascending: false })
-          .limit(limit);
-        q = applyFilters(q);
-
+          .limit(args.limit || 10);
+        if (args.category) q = q.eq("category", args.category);
+        if (args.project_id) q = q.eq("project_id", args.project_id);
+        if (args.client_id) q = q.eq("client_id", args.client_id);
         const { data, error } = await q;
         if (error) throw error;
-        return { memories: data || [], count: (data || []).length };
+        let memories = data || [];
+        if (args.query) {
+          const queryLower = args.query.toLowerCase();
+          memories = memories.filter((m: any) =>
+            m.key.toLowerCase().includes(queryLower) ||
+            m.content.toLowerCase().includes(queryLower)
+          );
+        }
+        return { memories, count: memories.length };
       }
 
       case "search_past_chats": {
-        const limit = args.limit || 20;
-        // Search in secretary_messages using ilike
         const { data, error } = await supabase
-          .from("secretary_messages")
-          .select("id, conversation_id, role, content, created_at")
-          .eq("role", "assistant")
-          .ilike("content", `%${args.query}%`)
-          .order("created_at", { ascending: false })
-          .limit(limit);
-
-        if (error) throw error;
-
-        // Filter to only conversations belonging to this user
-        const convIds = [...new Set((data || []).map((m: any) => m.conversation_id))];
-        const { data: userConvs } = await supabase
           .from("secretary_conversations")
-          .select("id, title")
+          .select("id, title, messages, updated_at")
           .eq("user_id", userId)
-          .in("id", convIds);
-
-        const validConvIds = new Set((userConvs || []).map((c: any) => c.id));
-        const convTitles: Record<string, string> = {};
-        for (const c of userConvs || []) convTitles[c.id] = c.title;
-
-        const filtered = (data || [])
-          .filter((m: any) => validConvIds.has(m.conversation_id))
-          .map((m: any) => ({
-            ...m,
-            conversation_title: convTitles[m.conversation_id] || "Untitled",
-            content_preview: m.content.length > 300 ? m.content.slice(0, 300) + "..." : m.content,
-          }));
-
-        return { messages: filtered, count: filtered.length };
+          .order("updated_at", { ascending: false })
+          .limit(args.limit || 20);
+        if (error) throw error;
+        const conversations = data || [];
+        const queryLower = args.query.toLowerCase();
+        const results: any[] = [];
+        for (const conv of conversations) {
+          const msgs = conv.messages || [];
+          const matches = msgs.filter((m: any) =>
+            m.content && typeof m.content === "string" && m.content.toLowerCase().includes(queryLower)
+          );
+          if (matches.length > 0) {
+            results.push({
+              conversation_id: conv.id,
+              title: conv.title,
+              date: conv.updated_at,
+              matching_messages: matches.slice(0, 3).map((m: any) => ({
+                role: m.role,
+                excerpt: m.content.substring(0, 200),
+              })),
+            });
+          }
+        }
+        return { results, count: results.length };
       }
 
       case "search_chat_channels": {
-        const limit = args.limit || 20;
-        // Use the existing search_chat_messages DB function
         const { data, error } = await supabase.rpc("search_chat_messages", {
           _query: args.query,
           _company_id: companyId,
-          _limit: limit,
+          _limit: args.limit || 20,
         });
         if (error) throw error;
         return { messages: data || [], count: (data || []).length };
       }
 
+      // ── WIKI & FILES EXECUTORS ──
+
       case "search_wiki": {
-        const limit = args.limit || 10;
         let q = supabase
           .from("kb_articles")
-          .select("id, title, body, tags, article_type, status, created_at")
+          .select("id, title, body, tags, article_type, status, updated_at")
           .eq("company_id", companyId)
-          .neq("status", "deprecated")
-          .order("created_at", { ascending: false })
-          .limit(limit);
-
-        if (args.tags && args.tags.length > 0) {
-          q = q.overlaps("tags", args.tags);
-        }
-
-        // Search by title and body using ilike
-        if (args.query) {
-          q = q.or(`title.ilike.%${args.query}%,body.ilike.%${args.query}%`);
-        }
-
+          .order("updated_at", { ascending: false })
+          .limit(args.limit || 10);
         const { data, error } = await q;
         if (error) throw error;
-
-        const articles = (data || []).map((a: any) => ({
-          id: a.id,
-          title: a.title,
-          snippet: a.body?.substring(0, 300) + (a.body?.length > 300 ? "..." : ""),
-          tags: a.tags || [],
-          type: a.article_type,
-          status: a.status,
-        }));
-
-        return { articles, count: articles.length };
+        let articles = data || [];
+        if (args.query) {
+          const queryLower = args.query.toLowerCase();
+          articles = articles.filter((a: any) =>
+            a.title.toLowerCase().includes(queryLower) ||
+            (a.body && a.body.toLowerCase().includes(queryLower)) ||
+            (a.tags && a.tags.some((t: string) => t.toLowerCase().includes(queryLower)))
+          );
+        }
+        if (args.tags && args.tags.length > 0) {
+          articles = articles.filter((a: any) =>
+            a.tags && args.tags.some((t: string) => a.tags.includes(t))
+          );
+        }
+        return {
+          articles: articles.map((a: any) => ({
+            id: a.id,
+            title: a.title,
+            excerpt: a.body?.substring(0, 300),
+            tags: a.tags,
+            type: a.article_type,
+            status: a.status,
+          })),
+          count: articles.length,
+        };
       }
 
       case "save_to_wiki": {
@@ -1933,7 +1857,6 @@ Respond in Greek. Be thorough but concise.`;
         const results: any = {};
 
         if (args.folder_id) {
-          // List contents of a specific folder
           const [filesRes, subfoldersRes] = await Promise.all([
             supabase
               .from("file_attachments")
@@ -1950,7 +1873,6 @@ Respond in Greek. Be thorough but concise.`;
           results.files = filesRes.data || [];
           results.subfolders = subfoldersRes.data || [];
         } else if (args.project_id) {
-          // List top-level folders and files for a project
           const [foldersRes, filesRes] = await Promise.all([
             supabase
               .from("file_folders")
@@ -2030,11 +1952,8 @@ serve(async (req) => {
       supabase.from("tasks").select("id, title, status, priority, project_id, due_date").eq("assigned_to", userId).neq("status", "done").order("created_at", { ascending: false }).limit(30),
       supabase.from("clients").select("id, name").order("name").limit(30),
       supabase.from("leave_types").select("id, name, code").limit(20),
-      // Proactive: overdue tasks
       supabase.from("tasks").select("id", { count: "exact", head: true }).eq("assigned_to", userId).lt("due_date", today).neq("status", "done").neq("status", "cancelled"),
-      // Proactive: projects behind schedule
       supabase.from("projects").select("id, name", { count: "exact" }).eq("status", "active").lt("end_date", today).limit(10),
-      // Today's events count
       supabase.from("calendar_events").select("id, title, start_time", { count: "exact" }).gte("start_time", todayStart).lte("start_time", todayEnd).limit(10),
     ]);
 
@@ -2042,7 +1961,6 @@ serve(async (req) => {
     const companyRole = companyRoleRes.data;
     const companyId = companyRole?.company_id || "";
 
-    // Fetch Brain alerts and user memories in parallel
     const twoDaysAgo2 = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
 
     const [brainAlertsRes, memoriesRes] = await Promise.all([
@@ -2067,7 +1985,6 @@ serve(async (req) => {
 
     const brainAlerts = brainAlertsRes.data;
     const userMemories = memoriesRes.data || [];
-    // (brain alerts already fetched above in parallel)
 
     const overdueCount = overdueRes.count || 0;
     const behindScheduleCount = (behindScheduleRes.data || []).length;
@@ -2301,26 +2218,21 @@ ${userMemories.length > 0 ? `\nΑποθηκευμένη Μνήμη Χρήστη 
 Context δεδομένων χρήστη:
 ${contextParts.join("\n")}`;
 
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!ANTHROPIC_API_KEY) {
-      throw new Error("ANTHROPIC_API_KEY is not configured");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
+      throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    // Convert OpenAI-style tool definitions to Anthropic format
-    const anthropicTools = toolDefinitions.map((t: any) => ({
-      name: t.function.name,
-      description: t.function.description,
-      input_schema: t.function.parameters,
-    }));
+    // Build OpenAI-compatible messages
+    const openaiMessages = [
+      { role: "system", content: systemPrompt },
+      ...messages.filter((m: any) => m.role !== "system").map((m: any) => ({
+        role: m.role === "assistant" ? "assistant" : "user",
+        content: m.content,
+      })),
+    ];
 
-    // Build Anthropic messages (separate system, convert roles)
-    // Filter out system messages from the conversation
-    const anthropicMessages = messages.map((m: any) => ({
-      role: m.role === "system" ? "user" : m.role,
-      content: m.content,
-    }));
-
-    // SSE streaming response
+    // SSE streaming response with OpenAI-compatible Gateway
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
@@ -2329,26 +2241,20 @@ ${contextParts.join("\n")}`;
         };
 
         try {
-          let conversationMessages = [...anthropicMessages];
+          let conversationMessages = [...openaiMessages];
 
           // Tool calling loop (max 8 iterations)
           for (let i = 0; i < 8; i++) {
-            const isToolLoop = i > 0;
-
-            // Check if this might be the final call — use streaming
-            const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+            const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
               method: "POST",
               headers: {
-                "x-api-key": ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
+                Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                model: "claude-sonnet-4-20250514",
-                max_tokens: 8192,
-                system: systemPrompt,
+                model: "google/gemini-2.5-pro",
                 messages: conversationMessages,
-                tools: anthropicTools,
+                tools: toolDefinitions,
                 stream: true,
               }),
             });
@@ -2356,27 +2262,23 @@ ${contextParts.join("\n")}`;
             if (!aiResponse.ok) {
               if (aiResponse.status === 429) {
                 send({ type: "error", text: "Πολλά αιτήματα. Δοκίμασε ξανά σε λίγο." });
+              } else if (aiResponse.status === 402) {
+                send({ type: "error", text: "Απαιτείται πληρωμή για AI λειτουργίες." });
               } else {
                 const errText = await aiResponse.text();
-                console.error("Anthropic API error:", aiResponse.status, errText);
+                console.error("AI Gateway error:", aiResponse.status, errText);
                 send({ type: "error", text: "Σφάλμα AI API" });
               }
               break;
             }
 
-            // Parse SSE stream from Anthropic
+            // Parse OpenAI-compatible SSE stream
             const reader = aiResponse.body!.getReader();
             const decoder = new TextDecoder();
             let buffer = "";
-            let contentBlocks: any[] = [];
-            let currentBlockIndex = -1;
-            let currentBlockType = "";
-            let currentToolName = "";
-            let currentToolId = "";
             let textAccumulator = "";
-            let inputJsonAccumulator = "";
-            let stopReason = "";
-            let hasToolUse = false;
+            let toolCalls: Record<number, { id: string; name: string; arguments: string }> = {};
+            let finishReason = "";
             let streamedText = false;
 
             while (true) {
@@ -2384,101 +2286,88 @@ ${contextParts.join("\n")}`;
               if (done) break;
               buffer += decoder.decode(value, { stream: true });
 
-              const lines = buffer.split("\n");
-              buffer = lines.pop() || "";
+              let newlineIndex: number;
+              while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+                let line = buffer.slice(0, newlineIndex);
+                buffer = buffer.slice(newlineIndex + 1);
 
-              for (const line of lines) {
+                if (line.endsWith("\r")) line = line.slice(0, -1);
+                if (line.trim() === "") continue;
                 if (!line.startsWith("data: ")) continue;
-                const data = line.slice(6).trim();
-                if (data === "[DONE]") continue;
 
-                let event: any;
-                try { event = JSON.parse(data); } catch { continue; }
+                const jsonStr = line.slice(6).trim();
+                if (jsonStr === "[DONE]") {
+                  finishReason = finishReason || "stop";
+                  continue;
+                }
 
-                switch (event.type) {
-                  case "content_block_start":
-                    currentBlockIndex = event.index;
-                    if (event.content_block?.type === "tool_use") {
-                      currentBlockType = "tool_use";
-                      currentToolName = event.content_block.name;
-                      currentToolId = event.content_block.id;
-                      inputJsonAccumulator = "";
-                      hasToolUse = true;
-                    } else if (event.content_block?.type === "text") {
-                      currentBlockType = "text";
-                      textAccumulator = "";
+                let parsed: any;
+                try { parsed = JSON.parse(jsonStr); } catch { continue; }
+
+                const choice = parsed.choices?.[0];
+                if (!choice) continue;
+
+                if (choice.finish_reason) {
+                  finishReason = choice.finish_reason;
+                }
+
+                const delta = choice.delta;
+                if (!delta) continue;
+
+                // Text content
+                if (delta.content) {
+                  textAccumulator += delta.content;
+                  // Only stream text if no tool calls detected yet
+                  if (Object.keys(toolCalls).length === 0) {
+                    send({ type: "delta", content: delta.content });
+                    streamedText = true;
+                  }
+                }
+
+                // Tool calls (accumulated across chunks)
+                if (delta.tool_calls) {
+                  for (const tc of delta.tool_calls) {
+                    const idx = tc.index ?? 0;
+                    if (!toolCalls[idx]) {
+                      toolCalls[idx] = { id: tc.id || "", name: tc.function?.name || "", arguments: "" };
                     }
-                    break;
-
-                  case "content_block_delta":
-                    if (event.delta?.type === "text_delta" && currentBlockType === "text") {
-                      const text = event.delta.text;
-                      textAccumulator += text;
-                      // Stream text to client immediately
-                      if (!hasToolUse || stopReason === "end_turn") {
-                        send({ type: "delta", content: text });
-                        streamedText = true;
-                      }
-                    } else if (event.delta?.type === "input_json_delta" && currentBlockType === "tool_use") {
-                      inputJsonAccumulator += event.delta.partial_json || "";
-                    }
-                    break;
-
-                  case "content_block_stop":
-                    if (currentBlockType === "text") {
-                      contentBlocks.push({ type: "text", text: textAccumulator });
-                    } else if (currentBlockType === "tool_use") {
-                      let parsedInput = {};
-                      try { parsedInput = JSON.parse(inputJsonAccumulator); } catch { }
-                      contentBlocks.push({
-                        type: "tool_use",
-                        id: currentToolId,
-                        name: currentToolName,
-                        input: parsedInput,
-                      });
-                    }
-                    currentBlockType = "";
-                    break;
-
-                  case "message_delta":
-                    if (event.delta?.stop_reason) {
-                      stopReason = event.delta.stop_reason;
-                    }
-                    break;
+                    if (tc.id) toolCalls[idx].id = tc.id;
+                    if (tc.function?.name) toolCalls[idx].name = tc.function.name;
+                    if (tc.function?.arguments) toolCalls[idx].arguments += tc.function.arguments;
+                  }
                 }
               }
             }
 
-            // Check for tool use blocks
-            const toolUseBlocks = contentBlocks.filter((b: any) => b.type === "tool_use");
+            const toolCallsList = Object.values(toolCalls);
 
-            // If no tool calls or end_turn, we're done
-            if (toolUseBlocks.length === 0 || stopReason === "end_turn") {
-              // If we didn't stream text yet (e.g. text came before tool detection), send it now
-              if (!streamedText) {
-                const fullText = contentBlocks.filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
-                if (fullText) {
-                  send({ type: "delta", content: fullText });
-                }
+            // If no tool calls, we're done
+            if (toolCallsList.length === 0 || finishReason === "stop") {
+              if (!streamedText && textAccumulator) {
+                send({ type: "delta", content: textAccumulator });
               }
-              const fullReply = contentBlocks.filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
-              send({ type: "done", reply: fullReply });
+              send({ type: "done", reply: textAccumulator });
               break;
             }
 
-            // We have tool calls — send status and execute them
-            // First, if any text was streamed, we need to handle that
-            // Add assistant message with all content blocks
-            conversationMessages.push({
-              role: "assistant",
-              content: contentBlocks,
-            });
+            // We have tool calls — execute them
+            // Build assistant message with tool_calls
+            const assistantMsg: any = { role: "assistant", content: textAccumulator || null };
+            assistantMsg.tool_calls = toolCallsList.map((tc) => ({
+              id: tc.id,
+              type: "function",
+              function: { name: tc.name, arguments: tc.arguments },
+            }));
+            conversationMessages.push(assistantMsg);
+
+            // If text was streamed before tool calls were detected, that's ok
+            // but we should not re-stream it
 
             // Execute each tool call
-            const toolResults: any[] = [];
-            for (const toolBlock of toolUseBlocks) {
-              const fnName = toolBlock.name;
-              const fnArgs = toolBlock.input || {};
+            for (const tc of toolCallsList) {
+              const fnName = tc.name;
+              let fnArgs: any = {};
+              try { fnArgs = JSON.parse(tc.arguments); } catch { }
 
               // Send status to client
               const toolLabel = fnName.replace(/_/g, " ");
@@ -2487,22 +2376,17 @@ ${contextParts.join("\n")}`;
               console.log(`Executing tool: ${fnName}`, fnArgs);
               const toolResult = await executeTool(supabase, userId, companyId, fnName, fnArgs);
 
-              toolResults.push({
-                type: "tool_result",
-                tool_use_id: toolBlock.id,
+              // Add tool result as a message
+              conversationMessages.push({
+                role: "tool",
+                tool_call_id: tc.id,
                 content: JSON.stringify(toolResult),
               });
             }
 
-            conversationMessages.push({
-              role: "user",
-              content: toolResults,
-            });
-
             // Reset for next iteration
-            contentBlocks = [];
             textAccumulator = "";
-            hasToolUse = false;
+            toolCalls = {};
             streamedText = false;
           }
         } catch (e) {

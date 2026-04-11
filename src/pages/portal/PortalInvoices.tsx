@@ -101,11 +101,11 @@ export default function PortalInvoices() {
                   </div>
                   <div className="flex items-center gap-3 mt-1 text-[10px] text-muted-foreground">
                     {inv.project && <span>{inv.project.name}</span>}
-                    {inv.issue_date && <span>Ημ/νία: {new Date(inv.issue_date).toLocaleDateString('el-GR')}</span>}
+                    {inv.issued_date && <span>Ημ/νία: {new Date(inv.issued_date).toLocaleDateString('el-GR')}</span>}
                     {inv.due_date && <span>Λήξη: {new Date(inv.due_date).toLocaleDateString('el-GR')}</span>}
                   </div>
                 </div>
-                <span className="text-sm font-bold">€{(inv.total_amount || 0).toLocaleString()}</span>
+                <span className="text-sm font-bold">€{(inv.amount || 0).toLocaleString()}</span>
               </CardContent>
             </Card>
           ))}

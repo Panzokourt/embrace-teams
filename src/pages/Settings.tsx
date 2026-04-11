@@ -505,6 +505,9 @@ export default function SettingsPage() {
       {/* Data Management (Admin only) */}
       {isAdmin && <DataManagementCard />}
 
+      {/* Client Portal (Admin only) */}
+      {isAdmin && <PortalUserManager />}
+
       {/* Password Change Dialog */}
       <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
         <DialogContent>

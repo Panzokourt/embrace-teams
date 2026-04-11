@@ -12,6 +12,9 @@ import MyWork from "@/pages/MyWork";
 
 
 import Work from "@/pages/Work";
+import Campaigns from "@/pages/Campaigns";
+import Backlog from "@/pages/Backlog";
+import Capacity from "@/pages/Capacity";
 import ProjectDetail from "@/pages/ProjectDetail";
 import TaskDetail from "@/pages/TaskDetail";
 import Financials from "@/pages/Financials";
@@ -141,9 +144,9 @@ const App = () => (
                   <Route path="/workflows" element={<Workflows />} />
                   <Route path="/media-planning" element={<MediaPlanning />} />
                   <Route path="/media-planning/:id" element={<MediaPlanWorkspace />} />
-                  <Route path="/campaigns" element={<Navigate to="/work" replace />} />
-                  <Route path="/backlog" element={<Navigate to="/calendar" replace />} />
-                  <Route path="/operations/capacity" element={<Navigate to="/hr" replace />} />
+                  <Route path="/campaigns" element={<Campaigns />} />
+                  <Route path="/backlog" element={<Backlog />} />
+                  <Route path="/operations/capacity" element={<Capacity />} />
                   <Route path="/operations/resource-planning" element={<Navigate to="/hr" replace />} />
                   <Route path="/intelligence/performance" element={<Navigate to="/reports" replace />} />
                   <Route path="/intelligence/insights" element={<Navigate to="/reports" replace />} />

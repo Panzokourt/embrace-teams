@@ -12,6 +12,9 @@ import MyWork from "@/pages/MyWork";
 
 
 import Work from "@/pages/Work";
+import Campaigns from "@/pages/Campaigns";
+import Backlog from "@/pages/Backlog";
+import Capacity from "@/pages/Capacity";
 import ProjectDetail from "@/pages/ProjectDetail";
 import TaskDetail from "@/pages/TaskDetail";
 import Financials from "@/pages/Financials";

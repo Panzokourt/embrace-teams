@@ -28,47 +28,42 @@ interface ParseResult {
 }
 
 // OCR/Document parsing using Claude Vision via Anthropic API
-async function parseDocumentWithClaude(
+async function parseDocumentWithVision(
   base64Data: string, 
   mimeType: string, 
   fileName: string,
   pageInfo?: string
 ): Promise<string> {
-  const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
   
-  if (!anthropicApiKey) {
-    console.warn("ANTHROPIC_API_KEY not found, cannot use AI parsing");
+  if (!LOVABLE_API_KEY) {
+    console.warn("LOVABLE_API_KEY not found, cannot use AI parsing");
     return "";
   }
   
   try {
     const pageNote = pageInfo ? ` (${pageInfo})` : '';
-    console.log(`Parsing ${fileName}${pageNote} with Claude Vision...`);
+    console.log(`Parsing ${fileName}${pageNote} with AI Vision...`);
     
-    // Map mime types for Claude's supported image formats
     const supportedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     const mediaType = supportedImageTypes.includes(mimeType) ? mimeType : 'image/png';
     
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        "x-api-key": anthropicApiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 32768,
+        model: "google/gemini-2.5-flash",
         messages: [
           {
             role: "user",
             content: [
               {
-                type: "image",
-                source: {
-                  type: "base64",
-                  media_type: mediaType,
-                  data: base64Data,
+                type: "image_url",
+                image_url: {
+                  url: `data:${mediaType};base64,${base64Data}`,
                 }
               },
               {
@@ -106,26 +101,26 @@ async function parseDocumentWithClaude(
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Claude API error:", response.status, errorText);
+      console.error("AI Vision API error:", response.status, errorText);
       
       if (response.status === 429) {
         throw new Error("Rate limit exceeded. Παρακαλώ δοκιμάστε ξανά σε λίγο.");
       }
       if (response.status === 402 || response.status === 400) {
-        throw new Error("API error. Ελέγξτε το API key.");
+        throw new Error("API error. Ελέγξτε τη ρύθμιση.");
       }
       
       return "";
     }
     
     const data = await response.json();
-    const extractedText = data.content?.[0]?.text || "";
+    const extractedText = data.choices?.[0]?.message?.content || "";
     
-    console.log(`Claude extracted ${extractedText.length} characters from ${fileName}${pageNote}`);
+    console.log(`AI Vision extracted ${extractedText.length} characters from ${fileName}${pageNote}`);
     return extractedText.trim();
     
   } catch (error) {
-    console.error("Claude parsing error:", error);
+    console.error("AI Vision parsing error:", error);
     throw error;
   }
 }

@@ -988,9 +988,11 @@ export type Database = {
           industry: string | null
           logo_url: string | null
           name: string
+          onboarding_preset: Json | null
           settings: Json | null
           sso_enforced: boolean
           updated_at: string
+          workspace_type: string | null
         }
         Insert: {
           allow_domain_requests?: boolean
@@ -1002,9 +1004,11 @@ export type Database = {
           industry?: string | null
           logo_url?: string | null
           name: string
+          onboarding_preset?: Json | null
           settings?: Json | null
           sso_enforced?: boolean
           updated_at?: string
+          workspace_type?: string | null
         }
         Update: {
           allow_domain_requests?: boolean
@@ -1016,9 +1020,11 @@ export type Database = {
           industry?: string | null
           logo_url?: string | null
           name?: string
+          onboarding_preset?: Json | null
           settings?: Json | null
           sso_enforced?: boolean
           updated_at?: string
+          workspace_type?: string | null
         }
         Relationships: []
       }

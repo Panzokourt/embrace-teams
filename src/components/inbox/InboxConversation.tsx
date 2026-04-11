@@ -31,6 +31,8 @@ export function InboxConversation({ thread, userEmail, onSend, onToggleStar, onB
   const [showLinker, setShowLinker] = useState(false);
   const [entityLinks, setEntityLinks] = useState<any[]>([]);
   const [attachmentsMap, setAttachmentsMap] = useState<Record<string, any[]>>({});
+  const emailToProject = useEmailToProject();
+  const [attachmentsMap, setAttachmentsMap] = useState<Record<string, any[]>>({});
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });

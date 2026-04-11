@@ -6,11 +6,13 @@ import { InboxEntityLinker } from './InboxEntityLinker';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Star, ArrowLeft, Link2, Reply, ReplyAll, Forward } from 'lucide-react';
+import { Star, ArrowLeft, Link2, Reply, ReplyAll, Forward, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
+import { EmailToProjectBanner } from './EmailToProjectBanner';
+import { useEmailToProject } from '@/hooks/useEmailToProject';
 
 type ReplyMode = 'reply' | 'reply-all' | 'forward';
 

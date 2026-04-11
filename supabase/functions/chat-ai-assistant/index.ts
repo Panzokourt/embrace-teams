@@ -30,8 +30,8 @@ serve(async (req) => {
     }
 
     const { action, channelId, messages: inputMessages } = await req.json();
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not configured");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     let systemPrompt = "";
     let userContent = "";
@@ -51,18 +51,16 @@ serve(async (req) => {
       });
     }
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 4096,
-        system: systemPrompt,
+        model: "google/gemini-3-flash-preview",
         messages: [
+          { role: "system", content: systemPrompt },
           { role: "user", content: userContent },
         ],
       }),
@@ -80,14 +78,14 @@ serve(async (req) => {
         });
       }
       const t = await response.text();
-      console.error("Anthropic API error:", response.status, t);
+      console.error("AI Gateway error:", response.status, t);
       return new Response(JSON.stringify({ error: "AI API error" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const result = await response.json();
-    const content = result.content?.[0]?.text || "No response";
+    const content = result.choices?.[0]?.message?.content || "No response";
 
     return new Response(JSON.stringify({ result: content }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

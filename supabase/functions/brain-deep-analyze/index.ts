@@ -7,42 +7,26 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
-    }
+    if (!authHeader?.startsWith("Bearer ")) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const perplexityApiKey = Deno.env.get("PERPLEXITY_API_KEY");
 
-    if (!ANTHROPIC_API_KEY) {
-      return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (!LOVABLE_API_KEY) return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { Authorization: authHeader } } });
     const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(authHeader.replace("Bearer ", ""));
-    if (claimsError || !claimsData?.claims) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
-    }
+    if (claimsError || !claimsData?.claims) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
 
     const { insight } = await req.json();
-    if (!insight) {
-      return new Response(JSON.stringify({ error: "Missing insight" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (!insight) return new Response(JSON.stringify({ error: "Missing insight" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const serviceClient = createClient(supabaseUrl, serviceRoleKey);
 
@@ -78,20 +62,13 @@ serve(async (req) => {
           const citations = pData.citations || [];
           if (citations.length > 0) marketResearch += "\n\nΠηγές: " + citations.join(", ");
         }
-      } catch (e) {
-        console.error("Perplexity deep dive error:", e);
-      }
+      } catch (e) { console.error("Perplexity deep dive error:", e); }
     }
 
     const entityContext = JSON.stringify({
       clients: clientsRes.data || [],
-      projects: (projectsRes.data || []).map((p: any) => ({
-        id: p.id, name: p.name, status: p.status, budget: p.budget,
-        net_budget: p.net_budget, progress: p.progress, start_date: p.start_date, end_date: p.end_date,
-      })),
-      tasks: (tasksRes.data || []).map((t: any) => ({
-        id: t.id, title: t.title, status: t.status, priority: t.priority, due_date: t.due_date,
-      })),
+      projects: (projectsRes.data || []).map((p: any) => ({ id: p.id, name: p.name, status: p.status, budget: p.budget, net_budget: p.net_budget, progress: p.progress, start_date: p.start_date, end_date: p.end_date })),
+      tasks: (tasksRes.data || []).map((t: any) => ({ id: t.id, title: t.title, status: t.status, priority: t.priority, due_date: t.due_date })),
     });
 
     const systemPrompt = `You are "Brain Deep Dive", an expert AI analyst for a marketing agency. You are given an existing insight and must provide a comprehensive deep analysis.
@@ -119,99 +96,92 @@ ${marketResearch ? `## Market Research (Perplexity)\n${marketResearch}` : ""}
 
 Provide a deep dive analysis.`;
 
-    const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 4096,
-        system: systemPrompt,
+        model: "google/gemini-2.5-pro",
         messages: [
+          { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
         tools: [{
-          name: "deep_dive_result",
-          description: "Return deep dive analysis results",
-          input_schema: {
-            type: "object",
-            properties: {
-              extended_analysis: { type: "string", description: "Extended markdown analysis in Greek (500-1000 words)" },
-              action_plan: {
-                type: "array",
-                items: {
+          type: "function",
+          function: {
+            name: "deep_dive_result",
+            description: "Return deep dive analysis results",
+            parameters: {
+              type: "object",
+              properties: {
+                extended_analysis: { type: "string", description: "Extended markdown analysis in Greek (500-1000 words)" },
+                action_plan: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      step: { type: "string" },
+                      timeline: { type: "string" },
+                      effort: { type: "string", enum: ["low", "medium", "high"] },
+                    },
+                    required: ["step", "timeline", "effort"],
+                  },
+                },
+                suggested_project: {
                   type: "object",
                   properties: {
-                    step: { type: "string" },
-                    timeline: { type: "string" },
-                    effort: { type: "string", enum: ["low", "medium", "high"] },
+                    name: { type: "string" },
+                    description: { type: "string" },
+                    client_id: { type: "string" },
+                    budget: { type: "number" },
+                    estimated_duration_days: { type: "number" },
                   },
-                  required: ["step", "timeline", "effort"],
+                  required: ["name", "description"],
+                },
+                suggested_task: {
+                  type: "object",
+                  properties: {
+                    title: { type: "string" },
+                    description: { type: "string" },
+                    priority: { type: "string", enum: ["low", "medium", "high", "urgent"] },
+                    estimated_hours: { type: "number" },
+                  },
+                  required: ["title", "description", "priority"],
                 },
               },
-              suggested_project: {
-                type: "object",
-                properties: {
-                  name: { type: "string" },
-                  description: { type: "string" },
-                  client_id: { type: "string" },
-                  budget: { type: "number" },
-                  estimated_duration_days: { type: "number" },
-                },
-                required: ["name", "description"],
-              },
-              suggested_task: {
-                type: "object",
-                properties: {
-                  title: { type: "string" },
-                  description: { type: "string" },
-                  priority: { type: "string", enum: ["low", "medium", "high", "urgent"] },
-                  estimated_hours: { type: "number" },
-                },
-                required: ["title", "description", "priority"],
-              },
+              required: ["extended_analysis", "action_plan"],
             },
-            required: ["extended_analysis", "action_plan"],
           },
         }],
-        tool_choice: { type: "tool", name: "deep_dive_result" },
+        tool_choice: { type: "function", function: { name: "deep_dive_result" } },
       }),
     });
 
     if (!aiResponse.ok) {
-      if (aiResponse.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded" }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-      if (aiResponse.status === 402) {
-        return new Response(JSON.stringify({ error: "Payment required" }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
+      if (aiResponse.status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded" }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (aiResponse.status === 402) return new Response(JSON.stringify({ error: "Payment required" }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       const errText = await aiResponse.text();
-      console.error("Anthropic API error:", aiResponse.status, errText);
+      console.error("AI Gateway error:", aiResponse.status, errText);
       return new Response(JSON.stringify({ error: "AI analysis failed" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const aiData = await aiResponse.json();
-    const toolUse = aiData.content?.find((c: any) => c.type === "tool_use");
-    if (!toolUse) {
-      return new Response(JSON.stringify({ error: "No analysis generated" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+    if (!toolCall) return new Response(JSON.stringify({ error: "No analysis generated" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    const result = toolUse.input;
+    const result = typeof toolCall.function.arguments === "string"
+      ? JSON.parse(toolCall.function.arguments)
+      : toolCall.function.arguments;
 
     if (result.suggested_project && !result.suggested_project.client_id && clientIds.length > 0) {
       result.suggested_project.client_id = clientIds[0];
     }
 
-    return new Response(JSON.stringify(result), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     console.error("Brain deep analyze error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });

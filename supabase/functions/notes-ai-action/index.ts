@@ -13,9 +13,9 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -41,7 +41,7 @@ serve(async (req) => {
         toolDef = {
           name: "create_task",
           description: "Create a task from note content",
-          input_schema: {
+          parameters: {
             type: "object",
             properties: {
               title: { type: "string", description: "Task title" },
@@ -59,7 +59,7 @@ serve(async (req) => {
         toolDef = {
           name: "create_deliverable",
           description: "Create a deliverable from note content",
-          input_schema: {
+          parameters: {
             type: "object",
             properties: {
               name: { type: "string", description: "Deliverable name" },
@@ -76,7 +76,7 @@ serve(async (req) => {
         toolDef = {
           name: "create_meeting",
           description: "Create a calendar event/meeting from note",
-          input_schema: {
+          parameters: {
             type: "object",
             properties: {
               title: { type: "string" },
@@ -101,7 +101,7 @@ serve(async (req) => {
         toolDef = {
           name: "link_project",
           description: "Link note to a project",
-          input_schema: {
+          parameters: {
             type: "object",
             properties: {
               project_id: { type: "string", description: "UUID of matching project" },
@@ -116,22 +116,23 @@ serve(async (req) => {
         throw new Error(`Unknown action: ${action}`);
     }
 
-    const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 2048,
-        system: systemPrompt,
+        model: "google/gemini-3-flash-preview",
         messages: [
+          { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        tools: [toolDef],
-        tool_choice: { type: "tool", name: toolDef.name },
+        tools: [{
+          type: "function",
+          function: toolDef,
+        }],
+        tool_choice: { type: "function", function: { name: toolDef.name } },
       }),
     });
 
@@ -143,10 +144,12 @@ serve(async (req) => {
     }
 
     const aiData = await aiResponse.json();
-    const toolUse = aiData.content?.find((c: any) => c.type === "tool_use");
-    if (!toolUse) throw new Error("AI did not return structured data");
+    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+    if (!toolCall) throw new Error("AI did not return structured data");
 
-    const parsed = toolUse.input;
+    const parsed = typeof toolCall.function.arguments === "string"
+      ? JSON.parse(toolCall.function.arguments)
+      : toolCall.function.arguments;
 
     // Execute the action
     let entityId: string | null = null;

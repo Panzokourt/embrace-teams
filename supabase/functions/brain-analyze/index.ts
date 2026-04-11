@@ -16,11 +16,11 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const perplexityApiKey = Deno.env.get("PERPLEXITY_API_KEY");
     const firecrawlApiKey = Deno.env.get("FIRECRAWL_API_KEY");
 
-    if (!ANTHROPIC_API_KEY) return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (!LOVABLE_API_KEY) return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const userClient = createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { Authorization: authHeader } } });
     const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(authHeader.replace("Bearer ", ""));
@@ -120,44 +120,51 @@ Generate 6-12 insights in GREEK. Each must have evidence linking to specific ent
 
     const userPrompt = `Analyze this company data:\n\n${dataContext}\n${marketIntel ? `\nMarket Intelligence:\n${marketIntel}` : ""}\n${firecrawlContext ? `\nClient Websites:\n${firecrawlContext}` : ""}`;
 
-    const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
-      headers: { "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 8192,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
+        model: "google/gemini-2.5-pro",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
         tools: [{
-          name: "generate_brain_insights",
-          description: "Generate structured business intelligence insights",
-          input_schema: {
-            type: "object",
-            properties: {
-              insights: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    category: { type: "string", enum: ["strategic", "sales", "productivity", "market", "alert", "neuro"] },
-                    subcategory: { type: "string" },
-                    priority: { type: "string", enum: ["high", "medium", "low"] },
-                    title: { type: "string" },
-                    body: { type: "string" },
-                    evidence: { type: "array", items: { type: "object", properties: { type: { type: "string" }, id: { type: "string" }, name: { type: "string" } }, required: ["type", "id", "name"] } },
-                    nlp_metadata: { type: "object", properties: { sentiment: { type: "string" }, sentiment_score: { type: "number" }, keywords: { type: "array", items: { type: "string" } }, detected_intent: { type: "string" } } },
-                    neuro_tactic: { type: "string", enum: ["loss_aversion", "anchoring", "social_proof", "scarcity", "reciprocity", "peak_end_rule", "decoy_effect"] },
-                    neuro_rationale: { type: "string" },
-                    market_context: { type: "string" },
+          type: "function",
+          function: {
+            name: "generate_brain_insights",
+            description: "Generate structured business intelligence insights",
+            parameters: {
+              type: "object",
+              properties: {
+                insights: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      category: { type: "string", enum: ["strategic", "sales", "productivity", "market", "alert", "neuro"] },
+                      subcategory: { type: "string" },
+                      priority: { type: "string", enum: ["high", "medium", "low"] },
+                      title: { type: "string" },
+                      body: { type: "string" },
+                      evidence: { type: "array", items: { type: "object", properties: { type: { type: "string" }, id: { type: "string" }, name: { type: "string" } }, required: ["type", "id", "name"] } },
+                      nlp_metadata: { type: "object", properties: { sentiment: { type: "string" }, sentiment_score: { type: "number" }, keywords: { type: "array", items: { type: "string" } }, detected_intent: { type: "string" } } },
+                      neuro_tactic: { type: "string", enum: ["loss_aversion", "anchoring", "social_proof", "scarcity", "reciprocity", "peak_end_rule", "decoy_effect"] },
+                      neuro_rationale: { type: "string" },
+                      market_context: { type: "string" },
+                    },
+                    required: ["category", "priority", "title", "body", "evidence", "neuro_tactic", "neuro_rationale"],
                   },
-                  required: ["category", "priority", "title", "body", "evidence", "neuro_tactic", "neuro_rationale"],
                 },
               },
+              required: ["insights"],
             },
-            required: ["insights"],
           },
         }],
-        tool_choice: { type: "tool", name: "generate_brain_insights" },
+        tool_choice: { type: "function", function: { name: "generate_brain_insights" } },
       }),
     });
 
@@ -165,15 +172,17 @@ Generate 6-12 insights in GREEK. Each must have evidence linking to specific ent
       if (aiResponse.status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       if (aiResponse.status === 402) return new Response(JSON.stringify({ error: "Payment required." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       const errText = await aiResponse.text();
-      console.error("Anthropic error:", aiResponse.status, errText);
+      console.error("AI Gateway error:", aiResponse.status, errText);
       return new Response(JSON.stringify({ error: "AI analysis failed" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const aiData = await aiResponse.json();
-    const toolUse = aiData.content?.find((c: any) => c.type === "tool_use");
-    if (!toolUse) return new Response(JSON.stringify({ error: "No insights generated" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+    if (!toolCall) return new Response(JSON.stringify({ error: "No insights generated" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    const insightsPayload = toolUse.input;
+    const insightsPayload = typeof toolCall.function.arguments === "string"
+      ? JSON.parse(toolCall.function.arguments)
+      : toolCall.function.arguments;
     const insights = insightsPayload.insights || [];
 
     const enrichedInsights = insights.map((insight: any) => ({

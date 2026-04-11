@@ -20,7 +20,7 @@ serve(async (req) => {
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
-      return new Response(JSON.stringify({ error: 'Authentication required' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+      return new Response(JSON.stringify({ error: 'Authentication required' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -30,19 +30,19 @@ serve(async (req) => {
     const token = authHeader.replace('Bearer ', '');
     const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
     if (claimsError || !claimsData?.claims) {
-      return new Response(JSON.stringify({ error: 'Invalid authentication token' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+      return new Response(JSON.stringify({ error: 'Invalid authentication token' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
     const userId = claimsData.claims.sub;
 
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not configured");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const { fileContents, projectName, projectBudget, projectId, additionalContext, focusArea, focusInstructions, isReanalysis, requestQuestions } = await req.json();
 
     if (projectId) {
       const { data: hasAccess, error: accessError } = await supabase.rpc('has_new_project_access', { _user_id: userId, _project_id: projectId });
       if (accessError || !hasAccess) {
-        return new Response(JSON.stringify({ error: 'Unauthorized access to project' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+        return new Response(JSON.stringify({ error: 'Unauthorized access to project' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
     }
 
@@ -95,24 +95,27 @@ ${processedFiles.map((f: any, i: number) => `=== Αρχείο ${i + 1}: ${f.file
       required: ["deliverables", "tasks", "invoices", "projectSummary"],
     };
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 8192,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
+        model: "google/gemini-2.5-pro",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
         tools: [{
-          name: "suggest_project_structure",
-          description: "Επιστρέφει δομημένες προτάσεις για παραδοτέα, tasks, τιμολόγια και στοιχεία έργου.",
-          input_schema: jsonSchema,
+          type: "function",
+          function: {
+            name: "suggest_project_structure",
+            description: "Επιστρέφει δομημένες προτάσεις για παραδοτέα, tasks, τιμολόγια και στοιχεία έργου.",
+            parameters: jsonSchema,
+          },
         }],
-        tool_choice: { type: "tool", name: "suggest_project_structure" },
+        tool_choice: { type: "function", function: { name: "suggest_project_structure" } },
       }),
     });
 
@@ -120,20 +123,22 @@ ${processedFiles.map((f: any, i: number) => `=== Αρχείο ${i + 1}: ${f.file
       if (response.status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded." }), { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       if (response.status === 402) return new Response(JSON.stringify({ error: "Payment required." }), { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       const errorText = await response.text();
-      console.error("Anthropic API error:", response.status, errorText);
+      console.error("AI Gateway error:", response.status, errorText);
       throw new Error(`AI error: ${response.status}`);
     }
 
     const aiResponse = await response.json();
-    const toolUse = aiResponse.content?.find((c: any) => c.type === "tool_use");
+    const toolCall = aiResponse.choices?.[0]?.message?.tool_calls?.[0];
     
     let suggestions: ProjectSuggestion;
-    if (toolUse?.input) {
-      suggestions = toolUse.input;
+    if (toolCall?.function?.arguments) {
+      suggestions = typeof toolCall.function.arguments === "string"
+        ? JSON.parse(toolCall.function.arguments)
+        : toolCall.function.arguments;
     } else {
-      const textBlock = aiResponse.content?.find((c: any) => c.type === "text");
-      if (textBlock?.text) {
-        const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
+      const textContent = aiResponse.choices?.[0]?.message?.content;
+      if (textContent) {
+        const jsonMatch = textContent.match(/\{[\s\S]*\}/);
         if (jsonMatch) suggestions = JSON.parse(jsonMatch[0]);
         else throw new Error("No structured data in AI response");
       } else {

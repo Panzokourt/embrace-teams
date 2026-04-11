@@ -29,8 +29,8 @@ serve(async (req) => {
       });
     }
 
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not configured");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const { services, prompt } = await req.json();
 
@@ -59,7 +59,7 @@ ${servicesSummary}`;
       ? `Ο χρήστης ζητάει: "${prompt}". Πρότεινε ένα πακέτο βάσει αυτής της περιγραφής.`
       : "Πρότεινε ένα βέλτιστο πακέτο υπηρεσιών βάσει των διαθέσιμων υπηρεσιών.";
 
-    const toolInputSchema = {
+    const toolSchema = {
       type: "object" as const,
       properties: {
         package_name: { type: "string" as const, description: "Όνομα πακέτου" },
@@ -85,28 +85,27 @@ ${servicesSummary}`;
       required: ["package_name", "description", "list_price", "discount_percent", "duration_type", "duration_value", "items"],
     };
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 4096,
-        system: systemPrompt,
+        model: "google/gemini-3-flash-preview",
         messages: [
+          { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        tools: [
-          {
+        tools: [{
+          type: "function",
+          function: {
             name: "suggest_package",
             description: "Return a structured package suggestion with selected services, pricing and discount.",
-            input_schema: toolInputSchema,
+            parameters: toolSchema,
           },
-        ],
-        tool_choice: { type: "tool", name: "suggest_package" },
+        }],
+        tool_choice: { type: "function", function: { name: "suggest_package" } },
       }),
     });
 
@@ -122,18 +121,20 @@ ${servicesSummary}`;
         });
       }
       const t = await response.text();
-      console.error("Anthropic API error:", response.status, t);
+      console.error("AI Gateway error:", response.status, t);
       throw new Error("AI API error");
     }
 
     const data = await response.json();
-    const toolUse = data.content?.find((c: any) => c.type === "tool_use");
+    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     
-    if (!toolUse?.input) {
+    if (!toolCall?.function?.arguments) {
       throw new Error("No structured response from AI");
     }
 
-    const suggestion = toolUse.input;
+    const suggestion = typeof toolCall.function.arguments === "string"
+      ? JSON.parse(toolCall.function.arguments)
+      : toolCall.function.arguments;
 
     // Validate service_ids exist in provided services
     const serviceIds = new Set(services.map((s: any) => s.id));

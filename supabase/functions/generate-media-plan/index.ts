@@ -28,90 +28,54 @@ interface GenerateRequest {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
-      return new Response(
-        JSON.stringify({ error: 'Authentication required' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: 'Authentication required' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } }
-    });
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { Authorization: authHeader } } });
 
     const token = authHeader.replace('Bearer ', '');
     const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
     if (claimsError || !claimsData?.claims) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid authentication token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: 'Invalid authentication token' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
     const userId = claimsData.claims.sub;
 
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
     const body = await req.json() as GenerateRequest;
-    const {
-      projectId, projectName, projectBudget, agencyFeePercentage = 0,
-      deliverables, campaignObjective, campaignObjectives,
-      targetAudience, campaignDuration, phases,
-      selectedChannels, budgetAllocation
-    } = body;
+    const { projectId, projectName, projectBudget, agencyFeePercentage = 0, deliverables, campaignObjective, campaignObjectives, targetAudience, campaignDuration, phases, selectedChannels, budgetAllocation } = body;
 
     if (!projectId) {
-      return new Response(
-        JSON.stringify({ error: "Project ID is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Project ID is required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const { data: hasAccess, error: accessError } = await supabase.rpc(
-      'has_new_project_access',
-      { _user_id: userId, _project_id: projectId }
-    );
+    const { data: hasAccess, error: accessError } = await supabase.rpc('has_new_project_access', { _user_id: userId, _project_id: projectId });
     if (accessError || !hasAccess) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized access to project' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: 'Unauthorized access to project' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     if (!deliverables || deliverables.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "No deliverables provided" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "No deliverables provided" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const resolvedObjectives: string[] = campaignObjectives && campaignObjectives.length > 0
-      ? campaignObjectives
-      : (campaignObjective ? [campaignObjective] : ['awareness']);
-
+    const resolvedObjectives: string[] = campaignObjectives && campaignObjectives.length > 0 ? campaignObjectives : (campaignObjective ? [campaignObjective] : ['awareness']);
     const netBudget = projectBudget * (1 - agencyFeePercentage / 100);
-
-    const channelList = selectedChannels?.length
-      ? selectedChannels.join(', ')
-      : 'TV, Radio, Digital (Social & Search), OOH, Print, Influencers';
-
+    const channelList = selectedChannels?.length ? selectedChannels.join(', ') : 'TV, Radio, Digital (Social & Search), OOH, Print, Influencers';
     const allocationText = budgetAllocation && Object.keys(budgetAllocation).length > 0
       ? Object.entries(budgetAllocation).filter(([, v]) => v > 0).map(([k, v]) => `${k}: ${v}%`).join(', ')
       : 'Distribute intelligently based on campaign objectives';
 
     let phasesText = '';
     if (phases && phases.length > 0) {
-      phasesText = phases.map(p =>
-        `- ${p.name}${p.start ? ` (${p.start}` : ''}${p.end ? ` → ${p.end})` : (p.start ? ')' : '')}`
-      ).join('\n');
+      phasesText = phases.map(p => `- ${p.name}${p.start ? ` (${p.start}` : ''}${p.end ? ` → ${p.end})` : (p.start ? ')' : '')}`).join('\n');
     } else if (campaignDuration?.start || campaignDuration?.end) {
       phasesText = `- Main Campaign: ${campaignDuration?.start || 'TBD'} → ${campaignDuration?.end || 'TBD'}`;
     } else {
@@ -166,18 +130,16 @@ ${phasesText}
 Project Deliverables:
 ${deliverables.map(d => `- ${d.name} (ID: ${d.id})`).join('\n')}`;
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 4096,
-        system: systemPrompt,
+        model: "google/gemini-3-flash-preview",
         messages: [
+          { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
       }),
@@ -185,18 +147,18 @@ ${deliverables.map(d => `- ${d.name} (ID: ${d.id})`).join('\n')}`;
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Anthropic API error:", response.status, errorText);
+      console.error("AI Gateway error:", response.status, errorText);
       if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again later." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-      throw new Error(`Anthropic API error: ${response.status}`);
+      if (response.status === 402) {
+        return new Response(JSON.stringify({ error: "Payment required." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      throw new Error(`AI error: ${response.status}`);
     }
 
     const aiResponse = await response.json();
-    const content = aiResponse.content?.[0]?.text;
+    const content = aiResponse.choices?.[0]?.message?.content;
     if (!content) throw new Error("No content in AI response");
 
     let result;
@@ -222,17 +184,10 @@ ${deliverables.map(d => `- ${d.name} (ID: ${d.id})`).join('\n')}`;
 
     console.log("Successfully generated media plan with", result.mediaPlanItems?.length || 0, "items");
 
-    return new Response(
-      JSON.stringify(result),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-
+    return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error: unknown) {
     console.error("Error in generate-media-plan:", error);
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: errorMessage }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });

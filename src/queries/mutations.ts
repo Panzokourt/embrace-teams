@@ -149,7 +149,7 @@ export const useCreateInvoice = createMutation<{
   [key: string]: any;
 }>({
   mutationFn: async (input) => {
-    const { error } = await supabase.from('invoices').insert(input);
+    const { error } = await supabase.from('invoices').insert(input as any);
     if (error) throw error;
   },
   invalidateKeys: [invoiceKeys.all],
@@ -313,7 +313,7 @@ export const useCreateMediaPlan = createMutation<{
   [key: string]: any;
 }>({
   mutationFn: async (input) => {
-    const { error } = await supabase.from('media_plans').insert(input);
+    const { error } = await supabase.from('media_plans').insert(input as any);
     if (error) throw error;
   },
   invalidateKeys: [mediaPlanKeys.all],

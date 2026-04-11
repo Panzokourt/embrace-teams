@@ -1,38 +1,60 @@
 
 
-# Onboarding Redesign — Workspace Presets, Services & Templates
+# Email-to-Project — AI Brief Parsing Feature
 
 ## Σύνοψη
 
-Προσθήκη 3 νέων βημάτων στο onboarding wizard: επιλογή τύπου workspace, ρύθμιση υπηρεσιών, και project templates με AI SOP generation. Απαιτεί 1 migration + 3 νέα components + ενημέρωση Onboarding.tsx.
+Προσθήκη δυνατότητας δημιουργίας project απευθείας από email brief μέσω AI ανάλυσης. Ο χρήστης πατάει ένα κουμπί στο InboxConversation, ο AI αναλύει το email και προτείνει δομημένο draft project με tasks.
 
-## Βήματα υλοποίησης
+## Βήματα
 
 ### 1. Database Migration
-Προσθήκη `workspace_type TEXT` και `onboarding_preset JSONB` στον πίνακα `companies`.
+Προσθήκη 2 columns στο `email_messages`:
+- `is_brief_candidate BOOLEAN DEFAULT false`
+- `brief_parsed_at TIMESTAMPTZ`
 
-### 2. `src/components/onboarding/workspacePresets.ts`
-Νέο αρχείο με τα 5 presets (Digital Agency, Comms/PR, Dev Team, Creative Agency, Freelancer). Κάθε preset περιέχει departments, services, projectTemplates, KPIs.
+### 2. Edge Function: `email-to-project`
+Νέο endpoint που:
+- Φέρνει το email, τους clients και τα templates της εταιρείας
+- Καλεί Anthropic API (ANTHROPIC_API_KEY υπάρχει ήδη στα secrets) για JSON extraction
+- Κάνει client matching (name ή email domain)
+- Επιστρέφει structured draft
+- Ενημερώνει `brief_parsed_at` στο email
 
-### 3. `src/components/onboarding/OnboardingWorkspacePreset.tsx`
-Νέο component — ο χρήστης επιλέγει τύπο εταιρείας. Clickable cards με expanded preview (departments/services/templates pills). Αποθηκεύει `workspace_type` στον πίνακα companies.
+### 3. Hook: `src/hooks/useEmailToProject.ts`
+State management για parsing → draft editing → project creation:
+- `parseBrief()` — καλεί edge function
+- `updateDraft()` — inline editing
+- `createProject()` — insert σε `projects` + `tasks` + `email_entity_links`
+- **Σημείωση**: Το `projects` table δεν έχει `priority` column — θα αποθηκεύεται στο `metadata` JSONB. Επίσης tasks δεν έχουν `sort_order`, θα χρησιμοποιηθεί `created_at` ordering.
 
-### 4. `src/components/onboarding/OnboardingServices.tsx`
-Νέο component — λίστα υπηρεσιών βάσει preset με checkboxes, inline τιμές, δυνατότητα custom service. Insert στον πίνακα `services` (mapping: `default_price` → `list_price`, `unit` → `pricing_unit`, `category` defaults to preset type).
+### 4. Component: `src/components/inbox/EmailToProjectBanner.tsx`
+Expandable banner με 4 states:
+1. Trigger — amber banner "Αυτό το email μοιάζει με brief"
+2. Parsing — spinner
+3. Draft ready — editable form (client, name, description, budget, deadline, priority, tasks as chips)
+4. Success — auto-navigate
 
-### 5. `src/components/onboarding/OnboardingTemplates.tsx`
-Νέο component — επιλογή project templates + toggle AI SOP generation. Insert σε `project_templates` (requires `project_type` = preset type) και `project_template_tasks`. SOP generation μέσω `secretary-agent` edge function.
+### 5. Wire into `InboxConversation.tsx`
+- Νέο Sparkles button στο header (amber χρώμα)
+- Render `EmailToProjectBanner` μεταξύ header και ScrollArea
+- Χωρίς αλλαγές στην υπόλοιπη λογική
 
-### 6. `src/pages/Onboarding.tsx`
-- Προσθήκη `'workspace' | 'services' | 'templates'` στο WizardStep type
-- Νέα σειρά: welcome → company → workspace → profile → services → templates → team → client → docs → ai-setup → ready
-- State: `activePreset: WorkspacePreset | null`
-- Render τα 3 νέα components στα αντίστοιχα steps
+## Τεχνικές προσαρμογές vs. αρχείο prompt
+| Θέμα | Prompt λέει | Πραγματικό schema | Λύση |
+|------|-------------|-------------------|------|
+| Project priority | Insert `priority` | Δεν υπάρχει column | Αποθήκευση σε `metadata` JSONB |
+| Task sort_order | Insert `sort_order` | Δεν υπάρχει column | Παράλειψη, χρήση `created_at` |
+| Company_id σε tasks | `company_id` | Δεν υπάρχει column σε tasks | Παράλειψη |
+| AI call | Anthropic direct | ANTHROPIC_API_KEY exists | Direct fetch to Anthropic API |
 
-## Προσαρμογές σε σχέση με το αρχείο
+## Αρχεία
 
-Το DB schema έχει ήδη πλούσια δομή στα `services` και `project_templates`. Θα γίνει mapping:
-- Services: `name`, `list_price`, `pricing_unit`, `company_id`, `is_active`, `category` (= preset type)
-- Templates: `name`, `description`, `project_type` (= preset type), `company_id`
-- Template tasks: `template_id`, `title`, `sort_order`
+| Αρχείο | Ενέργεια |
+|--------|----------|
+| Migration | `ALTER TABLE email_messages ADD COLUMN ...` |
+| `supabase/functions/email-to-project/index.ts` | Νέο |
+| `src/hooks/useEmailToProject.ts` | Νέο |
+| `src/components/inbox/EmailToProjectBanner.tsx` | Νέο |
+| `src/components/inbox/InboxConversation.tsx` | Μικρή αλλαγή (button + banner) |
 

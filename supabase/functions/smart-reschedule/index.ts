@@ -135,10 +135,22 @@ Schedule all unscheduled/overdue tasks into available working hour slots.`;
         : toolCall.function.arguments;
       
       // Server-side validation: filter out assignments on non-working days
+      // Default to Mon-Fri if no work schedule provided
+      const effectiveWorkingDays = workingDays.length > 0 ? workingDays : [1, 2, 3, 4, 5];
       const validAssignments = (args.assignments || []).filter((a: any) => {
-        const d = new Date(a.due_date);
+        // Parse the date and extract day-of-week from the date portion (not UTC-shifted)
+        const dateStr = a.due_date;
+        const parts = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (parts) {
+          // Build date from date-only parts to avoid timezone shifts
+          const localDate = new Date(parseInt(parts[1]), parseInt(parts[2]) - 1, parseInt(parts[3]));
+          const dow = localDate.getDay();
+          return effectiveWorkingDays.includes(dow);
+        }
+        // Fallback: use Date parsing
+        const d = new Date(dateStr);
         const dow = d.getDay();
-        return workingDays.includes(dow);
+        return effectiveWorkingDays.includes(dow);
       });
       
       if (validAssignments.length < (args.assignments || []).length) {

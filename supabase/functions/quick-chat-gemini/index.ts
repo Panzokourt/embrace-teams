@@ -150,7 +150,7 @@ serve(async (req) => {
       );
     }
 
-    const response_ref = response;
+    // Remove the unused response_ref alias
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -173,7 +173,7 @@ serve(async (req) => {
       );
     }
 
-    // Transform OpenAI SSE stream to our custom SSE format
+    // Transform SSE stream to our custom format
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     const encoder = new TextEncoder();
@@ -182,6 +182,33 @@ serve(async (req) => {
       async start(controller) {
         let buffer = "";
         let fullReply = "";
+
+        const emitDelta = (content: string) => {
+          fullReply += content;
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "delta", content })}\n\n`));
+        };
+
+        const emitDone = async () => {
+          // Auto-save memory
+          if (fullReply.length > 100 && companyId) {
+            try {
+              const summaryMatch = fullReply.match(/📝 Σύνοψη για μνήμη:([\s\S]*?)(?:$|:::)/);
+              if (summaryMatch) {
+                await supabase.from("secretary_memory").insert({
+                  user_id: userId,
+                  company_id: companyId,
+                  category: "file_analysis",
+                  key: `ai_analysis_${Date.now()}`,
+                  content: summaryMatch[1].trim().slice(0, 2000),
+                  metadata: { source: "quick-chat-gemini", page: current_page },
+                });
+              }
+            } catch (memErr) {
+              console.error("Memory save error:", memErr);
+            }
+          }
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done", reply: fullReply })}\n\n`));
+        };
 
         try {
           while (true) {
@@ -196,40 +223,24 @@ serve(async (req) => {
               if (!line.startsWith("data: ")) continue;
               const jsonStr = line.slice(6).trim();
               if (jsonStr === "[DONE]") {
-                // Auto-save memory from Gemini response if it contains file analysis
-                if (fullReply.length > 100 && companyId) {
-                  try {
-                    // Extract a summary key from the reply
-                    const summaryMatch = fullReply.match(/📝 Σύνοψη για μνήμη:([\s\S]*?)(?:$|:::)/);
-                    if (summaryMatch) {
-                      await supabase.from("secretary_memory").insert({
-                        user_id: userId,
-                        company_id: companyId,
-                        category: "file_analysis",
-                        key: `gemini_analysis_${Date.now()}`,
-                        content: summaryMatch[1].trim().slice(0, 2000),
-                        metadata: { source: "quick-chat-gemini", page: current_page },
-                      });
-                    }
-                  } catch (memErr) {
-                    console.error("Memory save error:", memErr);
-                  }
-                }
-
-                controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify({ type: "done", reply: fullReply })}\n\n`)
-                );
+                await emitDone();
                 continue;
               }
 
               try {
                 const parsed = JSON.parse(jsonStr);
-                const content = parsed.choices?.[0]?.delta?.content;
-                if (content) {
-                  fullReply += content;
-                  controller.enqueue(
-                    encoder.encode(`data: ${JSON.stringify({ type: "delta", content })}\n\n`)
-                  );
+
+                if (isClaude) {
+                  // Anthropic SSE format
+                  if (parsed.type === "content_block_delta" && parsed.delta?.type === "text_delta" && parsed.delta.text) {
+                    emitDelta(parsed.delta.text);
+                  } else if (parsed.type === "message_stop") {
+                    await emitDone();
+                  }
+                } else {
+                  // OpenAI SSE format
+                  const content = parsed.choices?.[0]?.delta?.content;
+                  if (content) emitDelta(content);
                 }
               } catch {
                 // skip malformed JSON
@@ -243,19 +254,20 @@ serve(async (req) => {
               if (!line.startsWith("data: ")) continue;
               const jsonStr = line.slice(6).trim();
               if (jsonStr === "[DONE]") {
-                controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify({ type: "done", reply: fullReply })}\n\n`)
-                );
+                await emitDone();
                 continue;
               }
               try {
                 const parsed = JSON.parse(jsonStr);
-                const content = parsed.choices?.[0]?.delta?.content;
-                if (content) {
-                  fullReply += content;
-                  controller.enqueue(
-                    encoder.encode(`data: ${JSON.stringify({ type: "delta", content })}\n\n`)
-                  );
+                if (isClaude) {
+                  if (parsed.type === "content_block_delta" && parsed.delta?.type === "text_delta" && parsed.delta.text) {
+                    emitDelta(parsed.delta.text);
+                  } else if (parsed.type === "message_stop") {
+                    await emitDone();
+                  }
+                } else {
+                  const content = parsed.choices?.[0]?.delta?.content;
+                  if (content) emitDelta(content);
                 }
               } catch {}
             }

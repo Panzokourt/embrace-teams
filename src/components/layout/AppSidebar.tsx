@@ -317,25 +317,6 @@ export default function AppSidebar({
         <TooltipContent side="right" sideOffset={8}>Files & Assets</TooltipContent>
       </Tooltip>
 
-      {/* Standalone: Workflows */}
-      <Tooltip delayDuration={300}>
-        <TooltipTrigger asChild>
-          <button
-            onClick={() => { navigate('/workflows'); handleNavClick(); setFlyoutCategory(null); setActiveCategory(null); }}
-            className={cn(
-              "relative flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200",
-              isMobile
-                ? location.pathname === '/workflows' ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                : location.pathname === '/workflows' ? "bg-white/15 text-white" : "text-white/50 hover:text-white hover:bg-white/10"
-            )}>
-            {location.pathname === '/workflows' && !isMobile && (
-              <span className="absolute left-0.5 top-1/2 -translate-y-1/2 w-[3px] h-3 rounded-full bg-primary" />
-            )}
-            <GitBranch className="h-[18px] w-[18px]" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="right" sideOffset={8}>Workflows</TooltipContent>
-      </Tooltip>
 
       <div className="w-6 h-px bg-white/10 mb-1" />
 

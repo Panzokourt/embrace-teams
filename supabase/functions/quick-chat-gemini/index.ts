@@ -45,7 +45,8 @@ serve(async (req) => {
     }
     const userId = claimsData.claims.sub;
 
-    const { messages, current_page } = await req.json();
+    const { messages, current_page, model: requestedModel } = await req.json();
+    const isClaude = typeof requestedModel === "string" && requestedModel.startsWith("claude-");
 
     // Fetch user company and memories in parallel
     const [companyRoleRes, memoriesRes] = await Promise.all([
@@ -62,8 +63,12 @@ serve(async (req) => {
     const userMemories = memoriesRes.data || [];
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!isClaude && !LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
+    }
+    if (isClaude && !ANTHROPIC_API_KEY) {
+      throw new Error("ANTHROPIC_API_KEY is not configured");
     }
 
     // Convert messages to OpenAI-compatible format
@@ -99,24 +104,53 @@ serve(async (req) => {
       systemContent += `\n\nΑποθηκευμένη Μνήμη (${userMemories.length} εγγραφές):\n${userMemories.map((m: any) => `- [${m.category}] ${m.key}: ${m.content.length > 200 ? m.content.slice(0, 200) + "..." : m.content}`).join("\n")}`;
     }
 
-    const response = await fetch(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
-      {
+    let response: Response;
+
+    if (isClaude) {
+      // ── Claude via Anthropic API ──
+      const anthropicMessages = convertedMessages
+        .filter((m: any) => m.role !== "system")
+        .map((m: any) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }));
+
+      response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
+          "x-api-key": ANTHROPIC_API_KEY!,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-pro",
-          messages: [
-            { role: "system", content: systemContent },
-            ...convertedMessages,
-          ],
+          model: requestedModel,
+          max_tokens: 8192,
+          system: systemContent,
+          messages: anthropicMessages,
           stream: true,
         }),
-      }
-    );
+      });
+    } else {
+      // ── Lovable AI Gateway ──
+      const gatewayModel = requestedModel || "google/gemini-2.5-pro";
+      response = await fetch(
+        "https://ai.gateway.lovable.dev/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: gatewayModel,
+            messages: [
+              { role: "system", content: systemContent },
+              ...convertedMessages,
+            ],
+            stream: true,
+          }),
+        }
+      );
+    }
+
+    const response_ref = response;
 
     if (!response.ok) {
       if (response.status === 429) {

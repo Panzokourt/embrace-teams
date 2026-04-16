@@ -150,7 +150,7 @@ serve(async (req) => {
       );
     }
 
-    // Remove the unused response_ref alias
+    
 
     if (!response.ok) {
       if (response.status === 429) {

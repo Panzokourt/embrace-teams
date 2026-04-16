@@ -2248,151 +2248,295 @@ ${contextParts.join("\n")}`;
         try {
           let conversationMessages = [...openaiMessages];
 
-          // Tool calling loop (max 8 iterations)
-          for (let i = 0; i < 8; i++) {
-            const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${LOVABLE_API_KEY}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                model: "google/gemini-2.5-pro",
-                messages: conversationMessages,
-                tools: toolDefinitions,
-                stream: true,
-              }),
-            });
+          if (isClaude) {
+            // ── Claude via Anthropic API ──
+            // Convert OpenAI messages to Anthropic format
+            const anthropicMessages = conversationMessages
+              .filter((m: any) => m.role !== "system")
+              .map((m: any) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }));
 
-            if (!aiResponse.ok) {
-              if (aiResponse.status === 429) {
-                send({ type: "error", text: "Πολλά αιτήματα. Δοκίμασε ξανά σε λίγο." });
-              } else if (aiResponse.status === 402) {
-                send({ type: "error", text: "Απαιτείται πληρωμή για AI λειτουργίες." });
-              } else {
-                const errText = await aiResponse.text();
-                console.error("AI Gateway error:", aiResponse.status, errText);
-                send({ type: "error", text: "Σφάλμα AI API" });
-              }
-              break;
-            }
-
-            // Parse OpenAI-compatible SSE stream
-            const reader = aiResponse.body!.getReader();
-            const decoder = new TextDecoder();
-            let buffer = "";
-            let textAccumulator = "";
-            let toolCalls: Record<number, { id: string; name: string; arguments: string }> = {};
-            let finishReason = "";
-            let streamedText = false;
-
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              buffer += decoder.decode(value, { stream: true });
-
-              let newlineIndex: number;
-              while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
-                let line = buffer.slice(0, newlineIndex);
-                buffer = buffer.slice(newlineIndex + 1);
-
-                if (line.endsWith("\r")) line = line.slice(0, -1);
-                if (line.trim() === "") continue;
-                if (!line.startsWith("data: ")) continue;
-
-                const jsonStr = line.slice(6).trim();
-                if (jsonStr === "[DONE]") {
-                  finishReason = finishReason || "stop";
-                  continue;
-                }
-
-                let parsed: any;
-                try { parsed = JSON.parse(jsonStr); } catch { continue; }
-
-                const choice = parsed.choices?.[0];
-                if (!choice) continue;
-
-                if (choice.finish_reason) {
-                  finishReason = choice.finish_reason;
-                }
-
-                const delta = choice.delta;
-                if (!delta) continue;
-
-                // Text content
-                if (delta.content) {
-                  textAccumulator += delta.content;
-                  // Only stream text if no tool calls detected yet
-                  if (Object.keys(toolCalls).length === 0) {
-                    send({ type: "delta", content: delta.content });
-                    streamedText = true;
-                  }
-                }
-
-                // Tool calls (accumulated across chunks)
-                if (delta.tool_calls) {
-                  for (const tc of delta.tool_calls) {
-                    const idx = tc.index ?? 0;
-                    if (!toolCalls[idx]) {
-                      toolCalls[idx] = { id: tc.id || "", name: tc.function?.name || "", arguments: "" };
-                    }
-                    if (tc.id) toolCalls[idx].id = tc.id;
-                    if (tc.function?.name) toolCalls[idx].name = tc.function.name;
-                    if (tc.function?.arguments) toolCalls[idx].arguments += tc.function.arguments;
-                  }
-                }
-              }
-            }
-
-            const toolCallsList = Object.values(toolCalls);
-
-            // If no tool calls, we're done
-            if (toolCallsList.length === 0 || finishReason === "stop") {
-              if (!streamedText && textAccumulator) {
-                send({ type: "delta", content: textAccumulator });
-              }
-              send({ type: "done", reply: textAccumulator });
-              break;
-            }
-
-            // We have tool calls — execute them
-            // Build assistant message with tool_calls
-            const assistantMsg: any = { role: "assistant", content: textAccumulator || null };
-            assistantMsg.tool_calls = toolCallsList.map((tc) => ({
-              id: tc.id,
-              type: "function",
-              function: { name: tc.name, arguments: tc.arguments },
+            // Convert tool definitions to Anthropic format
+            const anthropicTools = toolDefinitions.map((t: any) => ({
+              name: t.function.name,
+              description: t.function.description,
+              input_schema: t.function.parameters,
             }));
-            conversationMessages.push(assistantMsg);
 
-            // If text was streamed before tool calls were detected, that's ok
-            // but we should not re-stream it
-
-            // Execute each tool call
-            for (const tc of toolCallsList) {
-              const fnName = tc.name;
-              let fnArgs: any = {};
-              try { fnArgs = JSON.parse(tc.arguments); } catch { }
-
-              // Send status to client
-              const toolLabel = fnName.replace(/_/g, " ");
-              send({ type: "status", text: `Εκτέλεση: ${toolLabel}...` });
-
-              console.log(`Executing tool: ${fnName}`, fnArgs);
-              const toolResult = await executeTool(supabase, userId, companyId, fnName, fnArgs);
-
-              // Add tool result as a message
-              conversationMessages.push({
-                role: "tool",
-                tool_call_id: tc.id,
-                content: JSON.stringify(toolResult),
+            // Tool calling loop for Claude
+            for (let i = 0; i < 8; i++) {
+              const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+                method: "POST",
+                headers: {
+                  "x-api-key": ANTHROPIC_API_KEY!,
+                  "anthropic-version": "2023-06-01",
+                  "content-type": "application/json",
+                },
+                body: JSON.stringify({
+                  model: requestedModel,
+                  max_tokens: 8192,
+                  system: systemPrompt,
+                  messages: anthropicMessages,
+                  tools: anthropicTools,
+                  stream: true,
+                }),
               });
-            }
 
-            // Reset for next iteration
-            textAccumulator = "";
-            toolCalls = {};
-            streamedText = false;
+              if (!aiResponse.ok) {
+                if (aiResponse.status === 429) {
+                  send({ type: "error", text: "Πολλά αιτήματα. Δοκίμασε ξανά σε λίγο." });
+                } else if (aiResponse.status === 402) {
+                  send({ type: "error", text: "Απαιτείται πληρωμή." });
+                } else {
+                  const errText = await aiResponse.text();
+                  console.error("Anthropic API error:", aiResponse.status, errText);
+                  send({ type: "error", text: "Σφάλμα Anthropic API" });
+                }
+                break;
+              }
+
+              // Parse Anthropic SSE stream
+              const reader = aiResponse.body!.getReader();
+              const decoder = new TextDecoder();
+              let buffer = "";
+              let textAccumulator = "";
+              let toolUseBlocks: { id: string; name: string; input: string }[] = [];
+              let currentToolId = "";
+              let currentToolName = "";
+              let currentToolInput = "";
+              let stopReason = "";
+              let streamedText = false;
+
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+
+                let newlineIndex: number;
+                while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+                  let line = buffer.slice(0, newlineIndex);
+                  buffer = buffer.slice(newlineIndex + 1);
+                  if (line.endsWith("\r")) line = line.slice(0, -1);
+                  if (line.trim() === "" || !line.startsWith("data: ")) continue;
+
+                  const jsonStr = line.slice(6).trim();
+                  let parsed: any;
+                  try { parsed = JSON.parse(jsonStr); } catch { continue; }
+
+                  const eventType = parsed.type;
+
+                  if (eventType === "content_block_start") {
+                    if (parsed.content_block?.type === "tool_use") {
+                      currentToolId = parsed.content_block.id || "";
+                      currentToolName = parsed.content_block.name || "";
+                      currentToolInput = "";
+                    }
+                  } else if (eventType === "content_block_delta") {
+                    const delta = parsed.delta;
+                    if (delta?.type === "text_delta" && delta.text) {
+                      textAccumulator += delta.text;
+                      if (toolUseBlocks.length === 0) {
+                        send({ type: "delta", content: delta.text });
+                        streamedText = true;
+                      }
+                    } else if (delta?.type === "input_json_delta" && delta.partial_json) {
+                      currentToolInput += delta.partial_json;
+                    }
+                  } else if (eventType === "content_block_stop") {
+                    if (currentToolName) {
+                      toolUseBlocks.push({ id: currentToolId, name: currentToolName, input: currentToolInput });
+                      currentToolId = "";
+                      currentToolName = "";
+                      currentToolInput = "";
+                    }
+                  } else if (eventType === "message_delta") {
+                    if (parsed.delta?.stop_reason) {
+                      stopReason = parsed.delta.stop_reason;
+                    }
+                  }
+                }
+              }
+
+              // If no tool calls, we're done
+              if (toolUseBlocks.length === 0 || stopReason === "end_turn") {
+                if (!streamedText && textAccumulator) {
+                  send({ type: "delta", content: textAccumulator });
+                }
+                send({ type: "done", reply: textAccumulator });
+                break;
+              }
+
+              // Build assistant message with tool_use content blocks
+              const assistantContent: any[] = [];
+              if (textAccumulator) {
+                assistantContent.push({ type: "text", text: textAccumulator });
+              }
+              for (const tb of toolUseBlocks) {
+                let parsedInput: any = {};
+                try { parsedInput = JSON.parse(tb.input); } catch { }
+                assistantContent.push({ type: "tool_use", id: tb.id, name: tb.name, input: parsedInput });
+              }
+              anthropicMessages.push({ role: "assistant", content: assistantContent });
+
+              // Execute tool calls and build tool_result messages
+              const toolResults: any[] = [];
+              for (const tb of toolUseBlocks) {
+                let fnArgs: any = {};
+                try { fnArgs = JSON.parse(tb.input); } catch { }
+                const toolLabel = tb.name.replace(/_/g, " ");
+                send({ type: "status", text: `Εκτέλεση: ${toolLabel}...` });
+                console.log(`Executing tool (Claude): ${tb.name}`, fnArgs);
+                const toolResult = await executeTool(supabase, userId, companyId, tb.name, fnArgs);
+                toolResults.push({ type: "tool_result", tool_use_id: tb.id, content: JSON.stringify(toolResult) });
+              }
+              anthropicMessages.push({ role: "user", content: toolResults });
+
+              // Reset for next iteration
+              textAccumulator = "";
+              toolUseBlocks = [];
+              streamedText = false;
+            }
+          } else {
+            // ── Lovable AI Gateway (Gemini/GPT) ──
+            const gatewayModel = requestedModel || "google/gemini-2.5-pro";
+
+            // Tool calling loop (max 8 iterations)
+            for (let i = 0; i < 8; i++) {
+              const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  model: gatewayModel,
+                  messages: conversationMessages,
+                  tools: toolDefinitions,
+                  stream: true,
+                }),
+              });
+
+              if (!aiResponse.ok) {
+                if (aiResponse.status === 429) {
+                  send({ type: "error", text: "Πολλά αιτήματα. Δοκίμασε ξανά σε λίγο." });
+                } else if (aiResponse.status === 402) {
+                  send({ type: "error", text: "Απαιτείται πληρωμή για AI λειτουργίες." });
+                } else {
+                  const errText = await aiResponse.text();
+                  console.error("AI Gateway error:", aiResponse.status, errText);
+                  send({ type: "error", text: "Σφάλμα AI API" });
+                }
+                break;
+              }
+
+              // Parse OpenAI-compatible SSE stream
+              const reader = aiResponse.body!.getReader();
+              const decoder = new TextDecoder();
+              let buffer = "";
+              let textAccumulator = "";
+              let toolCalls: Record<number, { id: string; name: string; arguments: string }> = {};
+              let finishReason = "";
+              let streamedText = false;
+
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+
+                let newlineIndex: number;
+                while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+                  let line = buffer.slice(0, newlineIndex);
+                  buffer = buffer.slice(newlineIndex + 1);
+
+                  if (line.endsWith("\r")) line = line.slice(0, -1);
+                  if (line.trim() === "") continue;
+                  if (!line.startsWith("data: ")) continue;
+
+                  const jsonStr = line.slice(6).trim();
+                  if (jsonStr === "[DONE]") {
+                    finishReason = finishReason || "stop";
+                    continue;
+                  }
+
+                  let parsed: any;
+                  try { parsed = JSON.parse(jsonStr); } catch { continue; }
+
+                  const choice = parsed.choices?.[0];
+                  if (!choice) continue;
+
+                  if (choice.finish_reason) {
+                    finishReason = choice.finish_reason;
+                  }
+
+                  const delta = choice.delta;
+                  if (!delta) continue;
+
+                  // Text content
+                  if (delta.content) {
+                    textAccumulator += delta.content;
+                    if (Object.keys(toolCalls).length === 0) {
+                      send({ type: "delta", content: delta.content });
+                      streamedText = true;
+                    }
+                  }
+
+                  // Tool calls
+                  if (delta.tool_calls) {
+                    for (const tc of delta.tool_calls) {
+                      const idx = tc.index ?? 0;
+                      if (!toolCalls[idx]) {
+                        toolCalls[idx] = { id: tc.id || "", name: tc.function?.name || "", arguments: "" };
+                      }
+                      if (tc.id) toolCalls[idx].id = tc.id;
+                      if (tc.function?.name) toolCalls[idx].name = tc.function.name;
+                      if (tc.function?.arguments) toolCalls[idx].arguments += tc.function.arguments;
+                    }
+                  }
+                }
+              }
+
+              const toolCallsList = Object.values(toolCalls);
+
+              // If no tool calls, we're done
+              if (toolCallsList.length === 0 || finishReason === "stop") {
+                if (!streamedText && textAccumulator) {
+                  send({ type: "delta", content: textAccumulator });
+                }
+                send({ type: "done", reply: textAccumulator });
+                break;
+              }
+
+              // We have tool calls — execute them
+              const assistantMsg: any = { role: "assistant", content: textAccumulator || null };
+              assistantMsg.tool_calls = toolCallsList.map((tc) => ({
+                id: tc.id,
+                type: "function",
+                function: { name: tc.name, arguments: tc.arguments },
+              }));
+              conversationMessages.push(assistantMsg);
+
+              for (const tc of toolCallsList) {
+                const fnName = tc.name;
+                let fnArgs: any = {};
+                try { fnArgs = JSON.parse(tc.arguments); } catch { }
+
+                const toolLabel = fnName.replace(/_/g, " ");
+                send({ type: "status", text: `Εκτέλεση: ${toolLabel}...` });
+
+                console.log(`Executing tool: ${fnName}`, fnArgs);
+                const toolResult = await executeTool(supabase, userId, companyId, fnName, fnArgs);
+
+                conversationMessages.push({
+                  role: "tool",
+                  tool_call_id: tc.id,
+                  content: JSON.stringify(toolResult),
+                });
+              }
+
+              // Reset for next iteration
+              textAccumulator = "";
+              toolCalls = {};
+              streamedText = false;
+            }
           }
         } catch (e) {
           console.error("secretary-agent stream error:", e);

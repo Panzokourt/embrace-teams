@@ -1938,7 +1938,8 @@ serve(async (req) => {
     }
     const userId = claimsData.claims.sub;
 
-    const { messages, current_page, page_context } = await req.json();
+    const { messages, current_page, page_context, model: requestedModel } = await req.json();
+    const isClaude = typeof requestedModel === "string" && requestedModel.startsWith("claude-");
 
     // Fetch user context in parallel
     const today = new Date().toISOString().split("T")[0];
@@ -2219,8 +2220,12 @@ Context δεδομένων χρήστη:
 ${contextParts.join("\n")}`;
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!isClaude && !LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
+    }
+    if (isClaude && !ANTHROPIC_API_KEY) {
+      throw new Error("ANTHROPIC_API_KEY is not configured");
     }
 
     // Build OpenAI-compatible messages

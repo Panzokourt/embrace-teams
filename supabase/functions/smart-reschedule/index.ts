@@ -137,7 +137,15 @@ Schedule all unscheduled/overdue tasks into available working hour slots.`;
       // Server-side validation: filter out assignments on non-working days
       const validAssignments = (args.assignments || []).filter((a: any) => {
         const d = new Date(a.due_date);
-        const dow = d.getDay();
+        const dow = d.getUTCDay();
+        // Also check local day in case of timezone edge
+        const localDow = d.getDay();
+        const isValid = workingDays.includes(dow) || workingDays.includes(localDow);
+        // If workingDays is empty (no schedule data), default to Mon-Fri
+        if (workingDays.length === 0) {
+          return dow >= 1 && dow <= 5;
+        }
+        // Both UTC and local day must be working days to be safe
         return workingDays.includes(dow);
       });
       

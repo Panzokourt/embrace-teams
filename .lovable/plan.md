@@ -1,59 +1,50 @@
 
 
-# Navigation Restructure — Πλάνο Υλοποίησης
+# Sidebar Refinements — Πλάνο
 
-Αναδιάρθρωση του sidebar navigation από 7 flat κατηγορίες σε 10 domain-based, με workspace-aware visibility.
+## Αλλαγές
 
----
+### AppSidebar.tsx
 
-## Τι αλλάζει
+**1. Clients** — Αφαίρεση `Tenders` entry + αφαίρεση `/tenders` από routePrefixes
 
-### 1. AppSidebar.tsx — Κύριες αλλαγές
+**2. Marketing** — Αφαίρεση `Blueprints` & `Reports` entries, αφαίρεση `/blueprints` από routePrefixes. Μένουν: Campaigns, Media Planning
 
-**CategoryId type**: Από 7 → 10 κατηγορίες
-```
-work | clients | marketing | creative | development | finance | operations | intelligence | communication | settings
-```
+**3. Creative** — Άδειασμα items (αφαίρεση Briefs, Campaigns, Files & Assets). Η κατηγορία **παραμένει** visible στο rail. Files & Assets γίνεται standalone icon στο rail (`/files`)
 
-**Categories array**: Νέες κατηγορίες `marketing`, `creative`, `development`, `finance` (αντί `revenue`).
+**4. Development** — Άδειασμα items (αφαίρεση Projects, Backlog, Tenders). Η κατηγορία **παραμένει** visible στο rail. Workflows γίνεται standalone icon στο rail (`/workflows`)
 
-**categoryNavItems**: Πλήρες restructure:
-- `marketing`: Campaigns, Media Planning, Briefs, Blueprints, Reports
-- `creative`: Briefs, Campaigns, Files & Assets
-- `development`: Projects, Backlog, Workflows, Tenders
-- `finance`: Dashboard, Pricing, Contracts, Invoices, Expenses, Profitability (αντικαθιστά `revenue`)
-- `clients`: Προσθήκη Tenders + Client Portal
-- `operations`: Προσθήκη Capacity + Leaderboard
-- `settings`: Προσθήκη Integrations + Billing
+**5. Operations** — Fix links:
+- Capacity: `/operations/capacity` (αντί `/operations?tab=capacity`)
+- Leaderboard: `/leaderboard` (αντί `/operations?tab=leaderboard`)
 
-**detectCategory**: Update για νέα route mappings.
+**6. Settings** — Δημιουργία νέων σελίδων:
+- `src/pages/BillingSettings.tsx` — Subscription plan, usage, payment placeholder
+- `src/pages/SecuritySettings.tsx` — Password, 2FA, sessions placeholder
+- Routes στο `App.tsx`: `/settings/billing`, `/settings/security`
 
-**Work category panel**: Αφαίρεση Campaigns, Backlog, Workflows, Media Planning (μετακινούνται σε marketing/development).
+**7. Rail standalone icons** — Προσθήκη Files & Assets (`FileArchive`, `/files`) και Workflows (`GitBranch`, `/workflows`) στο icon rail, δίπλα στο My Work
 
-**Workspace visibility**: Κρύβει κατηγορίες ανά workspace type (π.χ. freelancer δεν βλέπει marketing/creative/development/operations).
+**8. detectCategory** — Update:
+- `/files` → `null` (standalone)
+- `/workflows` → `null` (standalone)
+- Αφαίρεση `/tenders` line
 
-### 2. AuthContext.tsx — Μικρή αλλαγή
+**9. routePrefixes cleanup**:
+- `work`: αφαίρεση `/files`
+- `clients`: αφαίρεση `/tenders`
+- `marketing`: αφαίρεση `/blueprints`
+- `development`: αφαίρεση `/backlog`, `/workflows`
+- `creative`: αφαίρεση `/briefs`
 
-- Προσθήκη `workspace_type` στο `Company` interface
-- Κατά το `selectCompany`, αποθήκευση `workspace_type` στο localStorage
+## Αρχεία
 
-### 3. OnboardingWorkspacePreset.tsx — Μικρή αλλαγή
+| Αρχείο | Ενέργεια |
+|--------|----------|
+| `src/components/layout/AppSidebar.tsx` | Κύριες αλλαγές (nav items, rail icons, detect, routePrefixes) |
+| `src/pages/BillingSettings.tsx` | Νέα σελίδα |
+| `src/pages/SecuritySettings.tsx` | Νέα σελίδα |
+| `src/App.tsx` | Routes billing/security, αφαίρεση tenders redirect |
 
-- Προσθήκη `localStorage.setItem('workspace_type', ...)` μετά το save
-
-### 4. Νέα imports
-
-Προσθήκη `Megaphone`, `Code2` στα lucide-react imports.
-
----
-
-## Αρχεία που τροποποιούνται
-
-| Αρχείο | Αλλαγή |
-|--------|--------|
-| `src/components/layout/AppSidebar.tsx` | Κύρια αναδιάρθρωση |
-| `src/contexts/AuthContext.tsx` | Company interface + localStorage sync |
-| `src/components/onboarding/OnboardingWorkspacePreset.tsx` | localStorage save |
-
-Δεν αλλάζει κανένα route στο App.tsx — μόνο sidebar navigation.
+Creative & Development παραμένουν ως κατηγορίες — απλά χωρίς sub-items προς το παρόν.
 

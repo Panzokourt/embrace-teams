@@ -101,6 +101,15 @@ function parseTaskDate(dateStr: string): Date {
   return new Date(dateStr);
 }
 
+function isoWorkScheduleDayToJsDay(dayOfWeek: number): number {
+  return (dayOfWeek + 1) % 7;
+}
+
+function isWorkingDayForDate(day: Date, workScheduleMap: Record<number, WorkSchedule>): boolean {
+  const ws = workScheduleMap[day.getDay()];
+  return ws?.is_working_day ?? (day.getDay() !== 0 && day.getDay() !== 6);
+}
+
 function isAllDay(dateStr: string | null): boolean {
   if (!dateStr) return true;
   if (isDateOnlyString(dateStr)) return true;
@@ -137,7 +146,7 @@ function splitTaskIntoBlocks(
   while (hoursLeft > 0 && maxDays-- > 0) {
     const dow = currentDay.getDay();
     const ws = workScheduleMap[dow];
-    const isWorking = ws?.is_working_day ?? (dow !== 0 && dow !== 6);
+    const isWorking = isWorkingDayForDate(currentDay, workScheduleMap);
 
     if (!isWorking) {
       currentDay = addDays(currentDay, 1);
@@ -321,7 +330,7 @@ export function MyWorkCalendar({
   // Work schedule helpers
   const workScheduleMap = useMemo(() => {
     const map: Record<number, WorkSchedule> = {};
-    workSchedules.forEach(ws => { map[ws.day_of_week] = ws; });
+    workSchedules.forEach(ws => { map[isoWorkScheduleDayToJsDay(ws.day_of_week)] = ws; });
     return map;
   }, [workSchedules]);
 
@@ -335,8 +344,7 @@ export function MyWorkCalendar({
   }
 
   function isWorkingDay(day: Date): boolean {
-    const ws = workScheduleMap[day.getDay()];
-    return ws?.is_working_day ?? (day.getDay() !== 0 && day.getDay() !== 6);
+    return isWorkingDayForDate(day, workScheduleMap);
   }
 
   function isPastHour(day: Date, hour: number): boolean {
@@ -352,6 +360,12 @@ export function MyWorkCalendar({
   const scheduledTasks = useMemo(() => tasks.filter(t => getTaskDate(t) !== null), [tasks]);
   const allDayTasks = useMemo(() => scheduledTasks.filter(t => isAllDay(getTaskDate(t))), [scheduledTasks]);
   const timedTasks = useMemo(() => scheduledTasks.filter(t => !isAllDay(getTaskDate(t))), [scheduledTasks]);
+  const invalidScheduledTasks = useMemo(() =>
+    timedTasks.filter(t => {
+      const dateStr = getTaskDate(t);
+      return !!dateStr && t.status !== 'completed' && !isWorkingDayForDate(parseTaskDate(dateStr), workScheduleMap);
+    }),
+  [timedTasks, workScheduleMap]);
 
   const unscheduledTasks = useMemo(() =>
     tasks.filter(t => !t.due_date && !t.start_date && t.status !== 'completed'), [tasks]);
@@ -361,7 +375,7 @@ export function MyWorkCalendar({
       if (!d) return false;
       return isBefore(startOfDay(parseTaskDate(d)), startOfDay(new Date())) && t.status !== 'completed';
     }), [tasks]);
-  const backlogCount = unscheduledTasks.length + overdueTasks.length;
+  const backlogCount = unscheduledTasks.length + overdueTasks.length + invalidScheduledTasks.length;
 
   const milestonesByDay = useMemo(() => {
     const map: Record<string, Milestone[]> = {};
@@ -466,7 +480,10 @@ export function MyWorkCalendar({
     if (rescheduling) return;
     setRescheduling(true);
     try {
-      const tasksToSchedule = [...unscheduledTasks, ...overdueTasks].map(t => ({
+      const tasksToReschedule = [...unscheduledTasks, ...overdueTasks, ...invalidScheduledTasks]
+        .filter((task, index, allTasks) => allTasks.findIndex(item => item.id === task.id) === index);
+
+      const tasksToSchedule = tasksToReschedule.map(t => ({
         id: t.id,
         title: t.title,
         priority: t.priority,
@@ -481,7 +498,8 @@ export function MyWorkCalendar({
         return;
       }
 
-      const existingSlots = timedTasks.map(t => {
+      const tasksToRescheduleIds = new Set(tasksToReschedule.map(task => task.id));
+      const existingSlots = timedTasks.filter(t => !tasksToRescheduleIds.has(t.id)).map(t => {
         const d = getTaskDate(t);
         return { id: t.id, due_date: d, estimated_hours: (t as any).estimated_hours || 1 };
       });

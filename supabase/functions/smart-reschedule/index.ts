@@ -5,6 +5,37 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const ISO_DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+function jsDayToIsoDay(day: number): number {
+  return day === 0 ? 6 : day - 1;
+}
+
+function parseTimeToMinutes(time: string | undefined, fallback: string): number {
+  const [fallbackHours, fallbackMinutes] = fallback.split(":").map((value) => Number.parseInt(value, 10));
+  const [hours, minutes] = (time || fallback).split(":").map((value) => Number.parseInt(value, 10));
+
+  return (Number.isFinite(hours) ? hours : fallbackHours) * 60 + (Number.isFinite(minutes) ? minutes : fallbackMinutes);
+}
+
+function parseLocalDateTime(dateStr: string): Date | null {
+  const parts = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+  if (parts) {
+    const [, year, month, day, hours = "0", minutes = "0", seconds = "0"] = parts;
+    return new Date(
+      Number.parseInt(year, 10),
+      Number.parseInt(month, 10) - 1,
+      Number.parseInt(day, 10),
+      Number.parseInt(hours, 10),
+      Number.parseInt(minutes, 10),
+      Number.parseInt(seconds, 10),
+    );
+  }
+
+  const parsed = new Date(dateStr);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -20,15 +51,28 @@ serve(async (req) => {
     }
 
     const today = new Date().toISOString().split("T")[0];
+    const effectiveWorkSchedule = Array.isArray(workSchedule) && workSchedule.length > 0
+      ? workSchedule
+      : [0, 1, 2, 3, 4].map((day_of_week) => ({
+          day_of_week,
+          start_time: "09:00",
+          end_time: "17:00",
+          is_working_day: true,
+        }));
 
-    // Pre-compute working days list for the prompt
-    const workingDays = (workSchedule || [])
+    // work_schedules uses ISO indexing: 0=Mon ... 6=Sun
+    const workingDays = effectiveWorkSchedule
       .filter((ws: any) => ws.is_working_day)
       .map((ws: any) => ws.day_of_week);
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const workingDayNames = workingDays.map((d: number) => `${dayNames[d]} (${d})`).join(', ');
+    const workingDayNames = workingDays.map((d: number) => `${ISO_DAY_NAMES[d]} (${d})`).join(', ');
     const nonWorkingDays = [0,1,2,3,4,5,6].filter((d: number) => !workingDays.includes(d));
-    const nonWorkingDayNames = nonWorkingDays.map((d: number) => dayNames[d]).join(', ');
+    const nonWorkingDayNames = nonWorkingDays.map((d: number) => ISO_DAY_NAMES[d]).join(', ');
+
+    if (workingDays.length === 0) {
+      return new Response(JSON.stringify({ assignments: [] }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const systemPrompt = `You are a task scheduling assistant. Given a list of tasks (with priority and estimated_hours), work schedule (working days and hours), and already-scheduled slots, assign each task to an optimal time slot.
 
@@ -50,8 +94,8 @@ Use the schedule_tasks tool to return your assignments.`;
     const userPrompt = `Tasks to schedule:
 ${JSON.stringify(tasks, null, 2)}
 
-Work schedule (day_of_week: 0=Sun, 1=Mon, ...):
-${JSON.stringify(workSchedule, null, 2)}
+Work schedule (day_of_week: 0=Mon, 1=Tue, ... 6=Sun):
+${JSON.stringify(effectiveWorkSchedule, null, 2)}
 
 Already scheduled slots:
 ${JSON.stringify(existingSlots, null, 2)}
@@ -134,27 +178,31 @@ Schedule all unscheduled/overdue tasks into available working hour slots.`;
         ? JSON.parse(toolCall.function.arguments) 
         : toolCall.function.arguments;
       
-      // Server-side validation: filter out assignments on non-working days
-      // Default to Mon-Fri if no work schedule provided
-      const effectiveWorkingDays = workingDays.length > 0 ? workingDays : [1, 2, 3, 4, 5];
+      const effectiveScheduleMap = new Map(
+        effectiveWorkSchedule.map((ws: any) => [
+          ws.day_of_week,
+          {
+            isWorkingDay: ws.is_working_day !== false,
+            startMinutes: parseTimeToMinutes(ws.start_time, "09:00"),
+            endMinutes: parseTimeToMinutes(ws.end_time, "17:00"),
+          },
+        ])
+      );
+
       const validAssignments = (args.assignments || []).filter((a: any) => {
-        // Parse the date and extract day-of-week from the date portion (not UTC-shifted)
-        const dateStr = a.due_date;
-        const parts = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
-        if (parts) {
-          // Build date from date-only parts to avoid timezone shifts
-          const localDate = new Date(parseInt(parts[1]), parseInt(parts[2]) - 1, parseInt(parts[3]));
-          const dow = localDate.getDay();
-          return effectiveWorkingDays.includes(dow);
-        }
-        // Fallback: use Date parsing
-        const d = new Date(dateStr);
-        const dow = d.getDay();
-        return effectiveWorkingDays.includes(dow);
+        const localDate = parseLocalDateTime(a.due_date);
+        if (!localDate) return false;
+
+        const isoDow = jsDayToIsoDay(localDate.getDay());
+        const schedule = effectiveScheduleMap.get(isoDow);
+        if (!schedule?.isWorkingDay) return false;
+
+        const assignmentMinutes = localDate.getHours() * 60 + localDate.getMinutes();
+        return assignmentMinutes >= schedule.startMinutes && assignmentMinutes < schedule.endMinutes;
       });
       
       if (validAssignments.length < (args.assignments || []).length) {
-        console.warn(`Filtered out ${(args.assignments || []).length - validAssignments.length} assignments on non-working days`);
+        console.warn(`Filtered out ${(args.assignments || []).length - validAssignments.length} assignments outside the user's working schedule`);
       }
 
       return new Response(JSON.stringify({ assignments: validAssignments }), {

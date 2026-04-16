@@ -613,7 +613,7 @@ export default function SecretaryChat({ mode, registerSendHandler, onOpenMemory 
                 </div>
               )}
 
-              <div className="flex items-end gap-2 p-3">
+              <div className="gap-2 p-3 flex items-center justify-center">
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 mb-0.5"

@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Bot, Loader2, Paperclip, Send, X, FileText, Image as ImageIcon, File as FileIcon, FileSpreadsheet } from "lucide-react";
+import ModelSelector from "@/components/chat/ModelSelector";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import ConversationSidebar from "./ConversationSidebar";

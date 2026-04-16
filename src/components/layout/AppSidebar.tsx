@@ -69,13 +69,13 @@ const WORKSPACE_CATEGORY_VISIBILITY: Record<string, CategoryId[]> = {
 };
 
 const allCategories: Category[] = [
-  { id: 'work', icon: Briefcase, label: 'Work', routePrefixes: ['/work', '/projects', '/tasks', '/calendar', '/files'] },
-  { id: 'clients', icon: Building2, label: 'Clients', routePrefixes: ['/clients', '/contacts', '/tenders'] },
-  { id: 'marketing', icon: Megaphone, label: 'Marketing', routePrefixes: ['/campaigns', '/media-planning', '/blueprints'] },
-  { id: 'creative', icon: Paintbrush, label: 'Creative', routePrefixes: ['/briefs', '/creative'] },
-  { id: 'development', icon: Code2, label: 'Development', routePrefixes: ['/backlog', '/workflows'] },
+  { id: 'work', icon: Briefcase, label: 'Work', routePrefixes: ['/work', '/projects', '/tasks', '/calendar'] },
+  { id: 'clients', icon: Building2, label: 'Clients', routePrefixes: ['/clients', '/contacts'] },
+  { id: 'marketing', icon: Megaphone, label: 'Marketing', routePrefixes: ['/campaigns', '/media-planning'] },
+  { id: 'creative', icon: Paintbrush, label: 'Creative', routePrefixes: ['/creative'] },
+  { id: 'development', icon: Code2, label: 'Development', routePrefixes: ['/development'] },
   { id: 'finance', icon: DollarSign, label: 'Finance', routePrefixes: ['/financials', '/pricing'] },
-  { id: 'operations', icon: Users, label: 'Operations', routePrefixes: ['/hr', '/timesheets', '/knowledge', '/operations'] },
+  { id: 'operations', icon: Users, label: 'Operations', routePrefixes: ['/hr', '/timesheets', '/knowledge', '/operations', '/leaderboard'] },
   { id: 'intelligence', icon: BarChart3, label: 'Intelligence', routePrefixes: ['/reports', '/brain'] },
   { id: 'communication', icon: MessageSquare, label: 'Communication', routePrefixes: ['/chat', '/inbox'] },
   { id: 'settings', icon: Settings, label: 'Settings', routePrefixes: ['/settings'] },
@@ -87,25 +87,13 @@ const categoryNavItems: Record<CategoryId, NavItem[]> = {
   clients: [
     { title: 'All Clients', href: '/clients', icon: Building2, permission: 'clients.view' },
     { title: 'Contacts', href: '/contacts', icon: BookUser },
-    { title: 'Tenders', href: '/tenders', icon: FileText, permission: 'tenders.view' },
   ],
   marketing: [
     { title: 'Campaigns', href: '/campaigns', icon: Megaphone },
     { title: 'Media Planning', href: '/media-planning', icon: MonitorPlay },
-    { title: 'Blueprints', href: '/blueprints', icon: FileText },
-    { title: 'Reports', href: '/reports', icon: BarChart3, permission: 'reports.view' },
   ],
-  creative: [
-    { title: 'Briefs', href: '/blueprints', icon: Palette },
-    { title: 'Campaigns', href: '/campaigns', icon: Megaphone },
-    { title: 'Files & Assets', href: '/files', icon: FileArchive },
-  ],
-  development: [
-    { title: 'Projects', href: '/work?tab=projects', icon: FolderKanban },
-    { title: 'Backlog', href: '/backlog', icon: FileStack },
-    { title: 'Workflows', href: '/workflows', icon: GitBranch },
-    { title: 'Tenders', href: '/tenders', icon: FileText, permission: 'tenders.view' },
-  ],
+  creative: [],
+  development: [],
   finance: [
     { title: 'Dashboard', href: '/financials?tab=dashboard', icon: LayoutDashboard, permission: 'financials.view' },
     { title: 'Υπηρεσίες & Τιμολόγηση', href: '/pricing', icon: FileText, permission: 'financials.view' },
@@ -118,8 +106,8 @@ const categoryNavItems: Record<CategoryId, NavItem[]> = {
     { title: 'Team & HR', href: '/hr', icon: UserCog },
     { title: 'Timesheets', href: '/timesheets', icon: Timer },
     { title: 'Knowledge Base', href: '/knowledge', icon: BookOpen },
-    { title: 'Capacity', href: '/operations?tab=capacity', icon: TrendingUp },
-    { title: 'Leaderboard', href: '/operations?tab=leaderboard', icon: Trophy },
+    { title: 'Capacity', href: '/operations/capacity', icon: TrendingUp },
+    { title: 'Leaderboard', href: '/leaderboard', icon: Trophy },
   ],
   intelligence: [
     { title: 'Reports Hub', href: '/reports', icon: BarChart3, permission: 'reports.view' },
@@ -140,18 +128,17 @@ const categoryNavItems: Record<CategoryId, NavItem[]> = {
 
 function detectCategory(pathname: string): CategoryIdOrNull {
   if (pathname === '/' || pathname === '/my-work') return null;
+  if (pathname === '/files' || pathname === '/workflows') return null; // standalone rail items
   if (pathname.startsWith('/work') || pathname.startsWith('/projects') || pathname.startsWith('/tasks') || pathname.startsWith('/calendar')) return 'work';
   if (pathname.startsWith('/clients') || pathname.startsWith('/contacts')) return 'clients';
-  if (pathname.startsWith('/campaigns') || pathname.startsWith('/media-planning') || pathname.startsWith('/blueprints')) return 'marketing';
-  if (pathname.startsWith('/briefs') || pathname.startsWith('/creative')) return 'creative';
-  if (pathname.startsWith('/backlog') || pathname.startsWith('/workflows')) return 'development';
+  if (pathname.startsWith('/campaigns') || pathname.startsWith('/media-planning')) return 'marketing';
+  if (pathname.startsWith('/creative')) return 'creative';
+  if (pathname.startsWith('/development')) return 'development';
   if (pathname.startsWith('/financials') || pathname.startsWith('/pricing')) return 'finance';
-  if (pathname.startsWith('/hr') || pathname.startsWith('/timesheets') || pathname.startsWith('/knowledge') || pathname.startsWith('/operations')) return 'operations';
+  if (pathname.startsWith('/hr') || pathname.startsWith('/timesheets') || pathname.startsWith('/knowledge') || pathname.startsWith('/operations') || pathname.startsWith('/leaderboard')) return 'operations';
   if (pathname.startsWith('/reports') || pathname.startsWith('/brain')) return 'intelligence';
   if (pathname.startsWith('/chat') || pathname.startsWith('/inbox')) return 'communication';
   if (pathname.startsWith('/settings')) return 'settings';
-  if (pathname.startsWith('/tenders')) return 'clients';
-  if (pathname.startsWith('/files')) return 'creative';
   if (pathname.startsWith('/dashboards')) return 'work';
   return null;
 }
@@ -306,6 +293,46 @@ export default function AppSidebar({
           </button>
         </TooltipTrigger>
         <TooltipContent side="right" sideOffset={8}>My Work</TooltipContent>
+      </Tooltip>
+
+      {/* Standalone: Files & Assets */}
+      <Tooltip delayDuration={300}>
+        <TooltipTrigger asChild>
+          <button
+            onClick={() => { navigate('/files'); handleNavClick(); setFlyoutCategory(null); setActiveCategory(null); }}
+            className={cn(
+              "relative flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200",
+              isMobile
+                ? location.pathname === '/files' ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                : location.pathname === '/files' ? "bg-white/15 text-white" : "text-white/50 hover:text-white hover:bg-white/10"
+            )}>
+            {location.pathname === '/files' && !isMobile && (
+              <span className="absolute left-0.5 top-1/2 -translate-y-1/2 w-[3px] h-3 rounded-full bg-primary" />
+            )}
+            <FileArchive className="h-[18px] w-[18px]" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="right" sideOffset={8}>Files & Assets</TooltipContent>
+      </Tooltip>
+
+      {/* Standalone: Workflows */}
+      <Tooltip delayDuration={300}>
+        <TooltipTrigger asChild>
+          <button
+            onClick={() => { navigate('/workflows'); handleNavClick(); setFlyoutCategory(null); setActiveCategory(null); }}
+            className={cn(
+              "relative flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200",
+              isMobile
+                ? location.pathname === '/workflows' ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                : location.pathname === '/workflows' ? "bg-white/15 text-white" : "text-white/50 hover:text-white hover:bg-white/10"
+            )}>
+            {location.pathname === '/workflows' && !isMobile && (
+              <span className="absolute left-0.5 top-1/2 -translate-y-1/2 w-[3px] h-3 rounded-full bg-primary" />
+            )}
+            <GitBranch className="h-[18px] w-[18px]" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="right" sideOffset={8}>Workflows</TooltipContent>
       </Tooltip>
 
       <div className="w-6 h-px bg-white/10 mb-1" />

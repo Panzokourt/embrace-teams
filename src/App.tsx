@@ -22,6 +22,8 @@ import Reports from "@/pages/Reports";
 import Clients from "@/pages/Clients";
 import ClientDetail from "@/pages/ClientDetail";
 import Settings from "@/pages/Settings";
+import BillingSettings from "@/pages/BillingSettings";
+import SecuritySettings from "@/pages/SecuritySettings";
 import CalendarHub from "@/pages/CalendarHub";
 import Files from "@/pages/Files";
 import Blueprints from "@/pages/Blueprints";
@@ -109,7 +111,6 @@ const App = () => (
                   <Route path="/projects/:id" element={<ProjectDetail />} />
                   <Route path="/tasks/:id" element={<TaskDetail />} />
                   <Route path="/tasks" element={<Navigate to="/work?tab=tasks" replace />} />
-                  <Route path="/tenders" element={<Navigate to="/work?tab=projects" replace />} />
                   <Route path="/tenders/:id" element={<Navigate to="/work?tab=projects" replace />} />
                   <Route path="/financials" element={<Financials />} />
                   <Route path="/reports" element={<Reports />} />
@@ -119,6 +120,8 @@ const App = () => (
                   <Route path="/hr/employee/:id" element={<EmployeeProfile />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/settings/organization" element={<OrganizationSettings />} />
+                  <Route path="/settings/billing" element={<BillingSettings />} />
+                  <Route path="/settings/security" element={<SecuritySettings />} />
                   <Route path="/calendar" element={<CalendarHub />} />
                   <Route path="/files" element={<Files />} />
                   <Route path="/blueprints" element={<Navigate to="/knowledge?tab=blueprints" replace />} />

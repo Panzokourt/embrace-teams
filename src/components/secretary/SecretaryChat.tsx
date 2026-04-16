@@ -95,6 +95,7 @@ export default function SecretaryChat({ mode, registerSendHandler, onOpenMemory 
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [sidebarKey, setSidebarKey] = useState(0);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [selectedModel, setSelectedModel] = useState("auto");
   const [dragging, setDragging] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -334,6 +335,7 @@ export default function SecretaryChat({ mode, registerSendHandler, onOpenMemory 
             messages: payloadMessages,
             current_page: location.pathname,
             page_context: mode === "panel" ? pageContext : undefined,
+            model: selectedModel !== "auto" ? selectedModel : undefined,
           }),
         }
       );
@@ -619,6 +621,7 @@ export default function SecretaryChat({ mode, registerSendHandler, onOpenMemory 
                 >
                   <Paperclip className="h-5 w-5" />
                 </button>
+                <ModelSelector value={selectedModel} onChange={setSelectedModel} disabled={loading} />
 
                 <textarea
                   ref={inputRef}

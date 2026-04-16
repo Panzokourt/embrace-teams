@@ -135,18 +135,22 @@ Schedule all unscheduled/overdue tasks into available working hour slots.`;
         : toolCall.function.arguments;
       
       // Server-side validation: filter out assignments on non-working days
+      // Default to Mon-Fri if no work schedule provided
+      const effectiveWorkingDays = workingDays.length > 0 ? workingDays : [1, 2, 3, 4, 5];
       const validAssignments = (args.assignments || []).filter((a: any) => {
-        const d = new Date(a.due_date);
-        const dow = d.getUTCDay();
-        // Also check local day in case of timezone edge
-        const localDow = d.getDay();
-        const isValid = workingDays.includes(dow) || workingDays.includes(localDow);
-        // If workingDays is empty (no schedule data), default to Mon-Fri
-        if (workingDays.length === 0) {
-          return dow >= 1 && dow <= 5;
+        // Parse the date and extract day-of-week from the date portion (not UTC-shifted)
+        const dateStr = a.due_date;
+        const parts = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (parts) {
+          // Build date from date-only parts to avoid timezone shifts
+          const localDate = new Date(parseInt(parts[1]), parseInt(parts[2]) - 1, parseInt(parts[3]));
+          const dow = localDate.getDay();
+          return effectiveWorkingDays.includes(dow);
         }
-        // Both UTC and local day must be working days to be safe
-        return workingDays.includes(dow);
+        // Fallback: use Date parsing
+        const d = new Date(dateStr);
+        const dow = d.getDay();
+        return effectiveWorkingDays.includes(dow);
       });
       
       if (validAssignments.length < (args.assignments || []).length) {

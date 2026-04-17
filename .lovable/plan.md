@@ -1,113 +1,176 @@
 
 
-# Secretary Multi-Model Support — Πλάνο
+# Universal Mention & Slash Command System
 
-## Τι γίνεται
+## Πρόβλημα
 
-Προσθήκη **Model Selector** στο Secretary Chat με υποστήριξη τριών providers: Claude (Anthropic API), Gemini (Lovable Gateway), GPT (Lovable Gateway). Dual routing: Claude → direct Anthropic API, Gemini/GPT → Lovable AI Gateway. Κανένα υπάρχον feature δεν αλλάζει.
+Σήμερα υπάρχουν **3 ασύμβατες υλοποιήσεις mention**, καθεμία περιορισμένη:
 
-## Αρχιτεκτονική Routing
+| Σημείο | Τι υποστηρίζει | Σύνταξη |
+|--------|----------------|---------|
+| `src/components/chat/MentionInput.tsx` (Chat panel) | users, projects, tasks, email threads | `@Όνομα ` (plain) |
+| `src/components/secretary/MentionInput.tsx` | profiles, projects, tasks, files | `@[name](type:id)` |
+| `CommentsSection > MentionTextarea` | μόνο users του project | `@name ` |
+| `QuickChatBar` (κάτω-κέντρο) | **τίποτα** — απλό `<input>` | — |
+| `InboxComposeInput` | τίποτα | — |
+| `/` slash commands | **πουθενά** δεν υπάρχει | — |
+
+Ο χρήστης ζητά: σε **όλα τα input** όπου γράφει, με `@` ή `/` να βρίσκει **πάντα** τα ίδια entities (people, projects, tasks, contracts, deliverables, invoices, campaigns, tenders, clients, files, emails, wiki articles).
+
+## Λύση: Ένα Universal Component
+
+Φτιάχνουμε **`<MentionTextarea>`** ως ενιαίο component που αντικαθιστά και τις 3+ υπάρχουσες υλοποιήσεις. Τοποθετείται σε **όλα** τα input points.
 
 ```text
-SecretaryChat (selectedModel state)
-    │
-    │  body: { messages, model, current_page, page_context }
-    ▼
-secretary-agent Edge Function
-    │
-    ├─ model starts with "claude" → Anthropic API (ANTHROPIC_API_KEY ✅ exists)
-    │   - Anthropic SSE format → normalize to our {type:"delta"} format
-    │   - Tool calling: Anthropic native tool format
-    │
-    └─ else → Lovable AI Gateway (existing behavior)
-        - google/gemini-2.5-pro, google/gemini-2.5-flash, openai/gpt-5 etc.
-        - Tool calling: OpenAI format (existing)
-
-quick-chat-gemini Edge Function
-    │
-    └─ Same: accept model, route Claude → Anthropic, else → Gateway
+src/components/mentions/
+├── useMentionSearch.ts        ← React Query hook με debounce + 6h cache
+├── mentionRegistry.ts         ← Type definitions + colors + icons + table mapping
+├── MentionTextarea.tsx        ← Universal textarea wrapper (auto-grow)
+├── MentionPopover.tsx         ← Dropdown UI (grouped by type, keyboard nav)
+├── MentionChip.tsx            ← Render για display (read-only με click-to-navigate)
+└── parseMentions.ts           ← Server-friendly parser για το serialized format
 ```
 
-## Αλλαγές ανά αρχείο
+### Σύνταξη (single source of truth)
 
-### 1. `src/components/chat/ModelSelector.tsx` (Νέο)
-
-Dropdown component με grouped models:
-- **Best** (auto) — `auto` → defaults to `google/gemini-2.5-pro`
-- **Claude** — Sonnet 4, Opus 4, Haiku 4.5
-- **Gemini** — 2.5 Pro, 2.5 Flash, 3 Flash Preview
-- **GPT** — GPT-5, GPT-5 Mini
-
-Compact button style (όπως στο screenshot), εμφανίζεται κάτω-δεξιά στο input area.
-
-### 2. `src/components/secretary/SecretaryChat.tsx`
-
-- `selectedModel` state (default: `auto`)
-- `ModelSelector` component στο input area, δίπλα στο Send button
-- Το `selectedModel` περνά στο fetch payload: `body.model`
-- Αν `model === 'auto'` ή λείπει → backend χρησιμοποιεί default (Gemini 2.5 Pro)
-- Streaming parsing: ήδη χειρίζεται `{type: "delta"}` format — δεν αλλάζει
-
-### 3. `supabase/functions/secretary-agent/index.ts`
-
-- Parse `model` από request body (γραμμή ~1941)
-- Αν `model` starts with `claude-`:
-  - Call `https://api.anthropic.com/v1/messages` με `ANTHROPIC_API_KEY`
-  - Anthropic SSE stream: parse `content_block_delta` events → normalize σε `{type:"delta", content}` format
-  - Tool calling: convert `toolDefinitions` σε Anthropic format + handle `tool_use`/`tool_result` blocks
-- Αν όχι Claude → existing Gateway logic, αλλά χρησιμοποιεί `model` parameter αντί hardcoded
-- `callGateway` helper: δέχεται `model` parameter
-
-### 4. `supabase/functions/quick-chat-gemini/index.ts`
-
-- Parse `model` από request body
-- Αν Claude → route σε Anthropic API (χωρίς tool calling, simple streaming)
-- Αν άλλο → existing Gateway logic με dynamic model
-
-## Tool Calling ανά Provider
-
-| Feature | Lovable Gateway (Gemini/GPT) | Anthropic (Claude) |
-|---------|-----|---------|
-| Tool format | OpenAI `tools[]` | Anthropic `tools[]` (same schema, different wrapper) |
-| Tool call detection | `finish_reason: "tool_calls"` | `stop_reason: "tool_use"` |
-| Tool result format | `role: "tool"` message | `role: "user"` with `tool_result` block |
-
-Η μετατροπή γίνεται στο Edge Function — ο client δεν αλλάζει καθόλου.
-
-## Models List
-
-```typescript
-const AI_MODELS = [
-  { id: 'auto', name: 'Best', provider: 'auto', description: 'Επιλέγει αυτόματα το καλύτερο' },
-  // Claude
-  { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'anthropic' },
-  { id: 'claude-opus-4-20250514', name: 'Claude Opus 4', provider: 'anthropic' },
-  { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5', provider: 'anthropic' },
-  // Gemini
-  { id: 'google/gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'google' },
-  { id: 'google/gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'google' },
-  { id: 'google/gemini-3-flash-preview', name: 'Gemini 3 Flash', provider: 'google' },
-  // OpenAI
-  { id: 'openai/gpt-5', name: 'GPT-5', provider: 'openai' },
-  { id: 'openai/gpt-5-mini', name: 'GPT-5 Mini', provider: 'openai' },
-];
+```text
+@[Όνομα](type:id)        ← mention ενός entity
+/[command](payload)      ← slash command (action)
 ```
 
-## Secrets
+Παράδειγμα μηνύματος μετά από input:
+```
+Συζητώντας με @[Γιάννη](user:abc-123) για το @[Project Apollo](project:def-456),
+έκλεισα το @[Contract #2024-08](contract:ghi-789). Δες /summary(today).
+```
 
-`ANTHROPIC_API_KEY` — ήδη υπάρχει στο project. Δεν χρειάζεται setup.
+## Entities που υποστηρίζονται
+
+Όλα query-able από τη βάση με ενιαίο interface:
+
+| Type | Πίνακας | Πεδία αναζήτησης | Icon |
+|------|---------|------------------|------|
+| `user` | `profiles` | `full_name, email` | User |
+| `project` | `projects` | `name` | FolderKanban |
+| `task` | `tasks` | `title` | CheckSquare |
+| `client` | `clients` | `name, contact_email` | Building2 |
+| `contract` | `contracts` + `project_contracts` | `title, contract_type` | FileSignature |
+| `deliverable` | `deliverables` | `name` | Package |
+| `invoice` | `invoices` | `invoice_number, notes` | Receipt |
+| `campaign` | `campaigns` | `name` | Megaphone |
+| `tender` | `tenders` | `name` | Gavel |
+| `file` | `file_attachments` | `file_name` | File |
+| `email` | `email_messages` (group by thread) | `subject, from_*` | Mail |
+| `wiki` | `kb_articles` | `title` | BookOpen |
+
+Όλα φιλτράρονται με **company_id** (multi-tenant), respect σε RLS.
+
+## Slash Commands (`/`)
+
+Μόνο σε **AI chats** (Secretary, Quick, Sidebar Chat) — όχι σε comments/inbox.
+
+| Command | Action |
+|---------|--------|
+| `/summary` | Δημιουργεί σύνοψη ημέρας/εβδομάδας |
+| `/task` | Άνοιγμα task creation flow |
+| `/find` | Καθαρή αναζήτηση χωρίς AI |
+| `/calendar` | Εμφανίζει σημερινό schedule |
+| `/help` | Λίστα όλων |
+
+Το set έρχεται από registry, εύκολα επεκτάσιμο.
+
+## Hook: `useMentionSearch(query, opts)`
+
+```text
+- Debounce 200ms
+- Παράλληλα queries σε όλους τους πίνακες (Promise.all)
+- React Query cache (staleTime 5min)
+- opts.types?: filter by allowed types (π.χ. comments → μόνο 'user')
+- opts.companyId: scoping
+- Returns: { results: GroupedResults, loading: boolean }
+```
+
+## Integration plan ανά σημείο
+
+| Σημείο | Πριν | Μετά |
+|--------|------|------|
+| `src/components/chat/ChatMessageInput.tsx` | custom textarea + παλιό MentionInput | `<MentionTextarea>` με όλα τα types |
+| `src/components/secretary/MentionInput.tsx` | local impl | proxy → `<MentionTextarea>` με `enableSlash` |
+| `src/components/secretary/SecretaryChat.tsx` | inline textarea (γρ. 630) | `<MentionTextarea enableSlash>` |
+| `src/components/quick-chat/QuickChatBar.tsx` | plain `<input>` (γρ. 543) | `<MentionTextarea enableSlash compact>` |
+| `src/components/comments/CommentsSection.tsx` | local MentionTextarea (γρ. 99-213) | `<MentionTextarea types={['user']}>` (διατηρεί behavior) |
+| `src/components/inbox/InboxComposeInput.tsx` | plain Textarea (γρ. 156) | `<MentionTextarea>` στο body |
+| `ChatThread.tsx` (αν στέλνει μηνύματα) | check & migrate | `<MentionTextarea>` |
+
+## Display των mentions
+
+Φτιάχνουμε **`<MentionRenderer text={...}>`** που:
+- Parse-άρει `@[name](type:id)` και `/[cmd](payload)`
+- Render-άρει inline chips (color-coded ανά type)
+- Click → navigate στο σωστό route (π.χ. `project:xxx` → `/projects/xxx`)
+- Tooltip με preview (όνομα + type + status)
+
+Χρησιμοποιείται σε:
+- ChatMessageItem (μηνύματα chat)
+- CommentsSection (renderCommentContent)
+- SecretaryChat message rendering
+- Inbox message body
+- Όπου αλλού δείχνουμε user-generated content
+
+## Backend awareness
+
+Τα Edge Functions ήδη γνωρίζουν το format `@[name](type:id)` (γρ. 2207 στο `secretary-agent`). Επεκτείνουμε:
+
+- `parseMentions(text)` helper στο shared `_shared/mentions.ts` (Deno)
+- Όταν το AI λάβει mentions → auto-fetch το αντίστοιχο entity context πριν την απάντηση (π.χ. mention contract → φέρνει contract details, parties, dates)
+- Notifications: αν user mention σε comment/chat → δημιουργείται `notifications` row για τον αναφερόμενο
+
+## UX leverages
+
+- **Keyboard**: `↑↓` navigation, `Enter`/`Tab` insert, `Esc` close, `@` ή `/` ξανά για re-trigger
+- **Grouped popover**: Όλα τα results γκρουπαρισμένα ανά type με headers (όπως Linear/Slack)
+- **Recents**: Top 3 πιο πρόσφατα mentions του χρήστη φαίνονται όταν `@` πατηθεί χωρίς query
+- **Empty state**: αν query > 1 char και 0 results → "Πρόσθεσε νέο…" CTA (όπου έχει νόημα)
+- **Loading skeleton**: shimmer rows όσο ψάχνει
+- **Mobile**: popover γίνεται bottom sheet σε <640px
+
+## Edge cases
+
+- Text μέσα σε email (`user@example.com`) → δεν ενεργοποιείται popover (regex απαιτεί whitespace πριν)
+- Stripping σε email subjects/SMS exports → `parseMentions(text, { format: 'plain' })` βγάζει μόνο τα labels
+- RLS: queries επιστρέφουν μόνο entities που ο user βλέπει — δεν διαρρέει info
 
 ## Αρχεία
 
-| Αρχείο | Ενέργεια |
-|--------|----------|
-| `src/components/chat/ModelSelector.tsx` | Νέο component |
-| `src/components/secretary/SecretaryChat.tsx` | Προσθήκη model state + selector UI |
-| `supabase/functions/secretary-agent/index.ts` | Dual routing (Claude/Gateway) + dynamic model |
-| `supabase/functions/quick-chat-gemini/index.ts` | Dual routing + dynamic model |
+| Ενέργεια | Αρχείο |
+|----------|--------|
+| **Νέο** | `src/components/mentions/mentionRegistry.ts` |
+| **Νέο** | `src/components/mentions/useMentionSearch.ts` |
+| **Νέο** | `src/components/mentions/MentionTextarea.tsx` |
+| **Νέο** | `src/components/mentions/MentionPopover.tsx` |
+| **Νέο** | `src/components/mentions/MentionRenderer.tsx` |
+| **Νέο** | `src/components/mentions/parseMentions.ts` |
+| **Νέο** | `supabase/functions/_shared/mentions.ts` |
+| **Refactor** | `src/components/chat/ChatMessageInput.tsx` (αντικατάσταση) |
+| **Refactor** | `src/components/chat/ChatMessageItem.tsx` (renderer) |
+| **Refactor** | `src/components/secretary/SecretaryChat.tsx` (textarea) |
+| **Refactor** | `src/components/secretary/MentionInput.tsx` (γίνεται wrapper) |
+| **Refactor** | `src/components/quick-chat/QuickChatBar.tsx` (input → textarea) |
+| **Refactor** | `src/components/comments/CommentsSection.tsx` (local → universal) |
+| **Refactor** | `src/components/inbox/InboxComposeInput.tsx` (body field) |
+| **Διαγραφή** | `src/components/chat/MentionInput.tsx` (αντικατάσταση από νέο) |
+| **Update** | `supabase/functions/secretary-agent/index.ts` (use shared parser, auto-fetch context) |
+| **Update** | `supabase/functions/quick-chat-gemini/index.ts` (ίδιο) |
 
 ## Τι ΔΕΝ αλλάζει
-- Conversation DB, memory, file processing, drag & drop, ConversationSidebar
-- Quick actions, page context, voice commands
-- Existing streaming format στον client
+
+- DB schemas (όλα τα entities ήδη υπάρχουν)
+- AI model selector (Claude/Gemini/GPT routing)
+- Voice commands, file processing, conversation history
+- Comments business logic (μόνο το input UI αλλάζει)
+
+## Migration ασφάλεια
+
+- Backwards-compatible: παλιά messages με `@Όνομα` (plain) εξακολουθούν να φαίνονται κανονικά (ο renderer fallback-άρει σε plain text αν δεν matchάρει `@[]()`)
+- Συνταξη `@[name](type:id)` ήδη γνωστή στο secretary-agent → δεν σπάει nothing
 

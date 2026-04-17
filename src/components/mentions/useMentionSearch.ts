@@ -142,11 +142,11 @@ export function useMentionSearch(
 
       if (include('tender')) tasks.push((async () => {
         const { data } = await supabase.from('tenders')
-          .select('id, name, status' as any)
+          .select('id, name')
           .ilike('name', term)
           .limit(limitPerType);
         groupsMap.set('tender', (data || []).map((t: any) => ({
-          id: t.id, type: 'tender', label: t.name, sub: t.status || undefined,
+          id: t.id, type: 'tender', label: t.name,
         })));
       })());
 

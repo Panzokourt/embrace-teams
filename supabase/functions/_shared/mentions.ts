@@ -82,7 +82,7 @@ export async function fetchMentionContext(
   const out: Array<{ type: string; id: string; label: string; summary: string }> = [];
 
   const tableMap: Partial<Record<MentionType, { table: string; cols: string; labelCol: string }>> = {
-    user:        { table: 'profiles',         cols: 'id, full_name, email, role, department_id', labelCol: 'full_name' },
+    user:        { table: 'profiles',         cols: 'id, full_name, email, department_id',       labelCol: 'full_name' },
     project:     { table: 'projects',         cols: 'id, name, status, client_id, end_date',     labelCol: 'name' },
     task:        { table: 'tasks',            cols: 'id, title, status, due_date, assigned_to',  labelCol: 'title' },
     client:      { table: 'clients',          cols: 'id, name, contact_email, status, sector',   labelCol: 'name' },
@@ -90,8 +90,9 @@ export async function fetchMentionContext(
     deliverable: { table: 'deliverables',     cols: 'id, name, project_id, due_date, completed', labelCol: 'name' },
     invoice:     { table: 'invoices',         cols: 'id, invoice_number, amount, status, due_date', labelCol: 'invoice_number' },
     campaign:    { table: 'campaigns',        cols: 'id, name, status, budget, start_date, end_date', labelCol: 'name' },
-    tender:      { table: 'tenders',          cols: 'id, name, status, deadline',                labelCol: 'name' },
+    tender:      { table: 'tenders',          cols: 'id, name',                                  labelCol: 'name' },
     file:        { table: 'file_attachments', cols: 'id, file_name, content_type, file_size',    labelCol: 'file_name' },
+    wiki:        { table: 'kb_articles',      cols: 'id, title, status',                         labelCol: 'title' },
   };
 
   for (const [type, ids] of Object.entries(grouped)) {

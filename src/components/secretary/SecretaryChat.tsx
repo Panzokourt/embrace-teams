@@ -11,6 +11,8 @@ import { parseAndRenderContent } from "./ActionRenderer";
 import { useLocation } from "react-router-dom";
 import { useDocumentParser } from "@/hooks/useDocumentParser";
 import { usePageContext } from "@/hooks/usePageContext";
+import MentionTextarea from "@/components/mentions/MentionTextarea";
+import { MentionRenderer } from "@/components/mentions/MentionRenderer";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -546,7 +548,9 @@ export default function SecretaryChat({ mode, registerSendHandler, onOpenMemory 
                     {msg.role === "assistant" ? (
                       renderMessageContent(msg.content)
                     ) : (
-                      <p className="whitespace-pre-wrap">{msg.displayContent || (typeof msg.content === 'string' ? msg.content : '')}</p>
+                      <MentionRenderer
+                        text={msg.displayContent || (typeof msg.content === 'string' ? msg.content : '')}
+                      />
                     )}
                   </div>
                 </div>
@@ -623,16 +627,15 @@ export default function SecretaryChat({ mode, registerSendHandler, onOpenMemory 
                 </button>
                 <ModelSelector value={selectedModel} onChange={setSelectedModel} disabled={loading} />
 
-                <textarea
-                  ref={inputRef}
+                <MentionTextarea
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  onInput={handleTextareaInput}
-                  placeholder="Γράψε ένα μήνυμα ή σύρε αρχεία..."
+                  onChange={setInput}
+                  onSubmit={() => sendMessage(input)}
+                  enableSlash
+                  placeholder="Γράψε ένα μήνυμα ή σύρε αρχεία... (@ για mention, / για εντολή)"
                   disabled={loading}
-                  rows={1}
-                  className="flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 max-h-[200px]"
+                  className="flex-1 px-1 py-1 text-sm"
+                  maxHeight={200}
                 />
 
                 <button

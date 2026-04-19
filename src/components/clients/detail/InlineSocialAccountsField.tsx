@@ -37,12 +37,28 @@ const platformLabel = (p: string) => PLATFORMS.find(pl => pl.value === p.toLower
 const normalizeUrl = (raw: string): string => {
   const trimmed = raw.trim();
   if (!trimmed) return '';
-  // Already has a protocol
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  // Protocol-relative
   if (trimmed.startsWith('//')) return `https:${trimmed}`;
-  // Strip any leading slashes that would make it look relative
   return `https://${trimmed.replace(/^\/+/, '')}`;
+};
+
+const openExternalUrl = (raw: string) => {
+  const normalized = normalizeUrl(raw);
+  if (!normalized) return;
+
+  const popup = window.open(normalized, '_blank', 'noopener,noreferrer');
+  if (popup) {
+    popup.opener = null;
+    return;
+  }
+
+  const tempLink = document.createElement('a');
+  tempLink.href = normalized;
+  tempLink.target = '_blank';
+  tempLink.rel = 'noopener noreferrer';
+  document.body.appendChild(tempLink);
+  tempLink.click();
+  tempLink.remove();
 };
 
 interface RowFormProps {
@@ -162,10 +178,14 @@ export function InlineSocialAccountsField({ clientId, accounts, canEdit = true, 
             </div>
             <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
               {acc.url && (
-                <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
-                  <a href={normalizeUrl(acc.url)} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => openExternalUrl(acc.url)}
+                  type="button"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
                 </Button>
               )}
               {canEdit && (

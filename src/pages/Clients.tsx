@@ -302,7 +302,16 @@ export default function ClientsPage() {
 
         if (error) throw error;
 
-        setClients(prev => [...prev, { ...data, projectCount: 0 }].sort((a, b) => a.name.localeCompare(b.name, 'el', { numeric: true, sensitivity: 'base' })));
+        let finalLogoUrl: string | null = null;
+        if (data?.id && pendingLogoUrl) {
+          finalLogoUrl = await uploadPendingLogo(data.id);
+          if (finalLogoUrl) {
+            await supabase.from('clients').update({ logo_url: finalLogoUrl }).eq('id', data.id);
+          }
+        }
+
+        const newRow = { ...data, logo_url: finalLogoUrl ?? data.logo_url, projectCount: 0 };
+        setClients(prev => [...prev, newRow].sort((a, b) => a.name.localeCompare(b.name, 'el', { numeric: true, sensitivity: 'base' })));
         toast.success('Ο πελάτης δημιουργήθηκε!');
         logCreate('client', data.id, formData.name);
       }

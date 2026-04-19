@@ -290,9 +290,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 2. Perplexity lookup if ΑΦΜ or only name available
-    const targetTax = taxId || client.tax_id;
-    // 2. Perplexity lookup if ΑΦΜ ή/και αν δεν πήραμε context από website
+    // 2. Perplexity lookup αν υπάρχει ΑΦΜ ή/και αν δεν πήραμε context από website
     const targetTax = taxId || client.tax_id;
     const targetName = clientName || client.name;
     const needsPerplexityFallback = !context.trim() && !!targetName;

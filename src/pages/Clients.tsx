@@ -75,6 +75,8 @@ export default function ClientsPage() {
   const [saving, setSaving] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [tagInput, setTagInput] = useState('');
+  const [enriching, setEnriching] = useState(false);
+  const [pendingLogoUrl, setPendingLogoUrl] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',

@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ExternalLink, Plus, Trash2, Pencil, Check, X, Loader2 } from 'lucide-react';
 import { useClientUpdate } from '@/hooks/useClientUpdate';
 import { toast } from 'sonner';
-import { openExternalUrl } from '@/lib/utils';
+import { normalizeExternalUrl } from '@/lib/utils';
 
 export interface SocialAccount {
   platform: string;
@@ -35,12 +35,7 @@ const PLATFORMS = [
 const platformIcon = (p: string) => PLATFORMS.find(pl => pl.value === p.toLowerCase())?.icon || '🌐';
 const platformLabel = (p: string) => PLATFORMS.find(pl => pl.value === p.toLowerCase())?.label || p;
 
-const handleOpenSocialUrl = (raw: string) => {
-  const opened = openExternalUrl(raw);
-  if (!opened) {
-    toast.error('Δεν ήταν δυνατό το άνοιγμα του συνδέσμου. Επίτρεψε pop-ups για αυτή τη σελίδα.');
-  }
-};
+const getExternalHref = (raw: string) => normalizeExternalUrl(raw) ?? '#';
 
 interface RowFormProps {
   initial?: SocialAccount;
@@ -159,15 +154,20 @@ export function InlineSocialAccountsField({ clientId, accounts, canEdit = true, 
             </div>
             <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
               {acc.url && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={() => handleOpenSocialUrl(acc.url)}
-                  type="button"
+                <a
+                  href={getExternalHref(acc.url)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                  onClick={(e) => {
+                    if (!normalizeExternalUrl(acc.url)) {
+                      e.preventDefault();
+                      toast.error('Ο σύνδεσμος δεν είναι έγκυρος.');
+                    }
+                  }}
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
-                </Button>
+                </a>
               )}
               {canEdit && (
                 <>

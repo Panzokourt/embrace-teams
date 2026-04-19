@@ -426,6 +426,54 @@ export default function ClientsPage() {
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
+                  {!editingClient && (
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 space-y-3">
+                      <div className="flex items-start justify-between gap-3 flex-wrap">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                            <Sparkles className="h-4 w-4 text-amber-500" />
+                            AI Συμπλήρωση
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Συμπλήρωσε το website / επωνυμία / ΑΦΜ και άσε το AI να βρει τα υπόλοιπα.
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleEnrich}
+                          disabled={enriching}
+                          className="bg-amber-500 hover:bg-amber-600 text-white gap-1.5 shrink-0"
+                        >
+                          {enriching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                          AI Enrich
+                        </Button>
+                      </div>
+                      {pendingLogoUrl && (
+                        <div className="flex items-center gap-3 p-2 rounded-lg bg-card border border-border">
+                          <img
+                            src={pendingLogoUrl}
+                            alt="logo preview"
+                            className="h-12 w-12 object-contain rounded-md bg-secondary shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium">Λογότυπο εντοπίστηκε</p>
+                            <p className="text-xs text-muted-foreground truncate">{pendingLogoUrl}</p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 shrink-0"
+                            onClick={() => setPendingLogoUrl(null)}
+                            title="Αφαίρεση"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2 sm:col-span-2">
                       <Label htmlFor="name" className="text-sm font-medium">Επωνυμία *</Label>

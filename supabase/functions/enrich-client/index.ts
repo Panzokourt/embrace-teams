@@ -34,26 +34,34 @@ const FIELD_LABELS: Record<string, string> = {
   notes: 'Περιγραφή',
 };
 
+async function firecrawlCall(target: string, formats: any[]) {
+  const r = await fetch('https://api.firecrawl.dev/v2/scrape', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ url: target, formats, onlyMainContent: true }),
+  });
+  return r;
+}
+
 async function firecrawlScrape(url: string) {
   if (!FIRECRAWL_API_KEY) return null;
   const target = url.startsWith('http') ? url : `https://${url}`;
   try {
-    const r = await fetch('https://api.firecrawl.dev/v2/scrape', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        url: target,
-        formats: ['markdown', 'branding', 'links'],
-        onlyMainContent: true,
-      }),
-    });
+    // Try with branding first; fall back if plan/feature not available
+    let r = await firecrawlCall(target, ['markdown', 'branding', 'links']);
     if (!r.ok) {
       const t = await r.text();
-      console.error('Firecrawl error', r.status, t);
-      return null;
+      console.error('Firecrawl error (with branding)', r.status, t);
+      // Retry without branding/links — most common failure cause
+      r = await firecrawlCall(target, ['markdown']);
+      if (!r.ok) {
+        const t2 = await r.text();
+        console.error('Firecrawl error (markdown only)', r.status, t2);
+        return null;
+      }
     }
     return await r.json();
   } catch (e) {

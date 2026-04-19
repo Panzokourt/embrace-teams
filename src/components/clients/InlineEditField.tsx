@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, KeyboardEvent } from 'react';
+import { useState, useEffect, useRef, useLayoutEffect, KeyboardEvent } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Pencil, Check, X, Loader2 } from 'lucide-react';
+import { Pencil, Check, X, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -27,6 +27,8 @@ interface Props {
   prefix?: React.ReactNode;
   /** Render a custom display (read-mode) view */
   renderDisplay?: (value: string | null | undefined) => React.ReactNode;
+  /** Number of lines before clamping with "Show more" toggle. Default: 2. Use 0 to disable. */
+  clamp?: number;
 }
 
 export function InlineEditField({
@@ -42,6 +44,7 @@ export function InlineEditField({
   displayClassName,
   prefix,
   renderDisplay,
+  clamp = 2,
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value ?? '');
@@ -164,26 +167,110 @@ export function InlineEditField({
   }
 
   // Display mode
+  return <DisplayMode
+    value={value}
+    canEdit={canEdit}
+    className={className}
+    displayClassName={displayClassName}
+    prefix={prefix}
+    renderDisplay={renderDisplay}
+    placeholder={placeholder}
+    emptyLabel={emptyLabel}
+    clamp={clamp}
+    onStartEdit={() => setEditing(true)}
+  />;
+}
+
+interface DisplayModeProps {
+  value: string | null | undefined;
+  canEdit: boolean;
+  className?: string;
+  displayClassName?: string;
+  prefix?: React.ReactNode;
+  renderDisplay?: (value: string | null | undefined) => React.ReactNode;
+  placeholder: string;
+  emptyLabel?: string;
+  clamp: number;
+  onStartEdit: () => void;
+}
+
+function DisplayMode({
+  value, canEdit, className, displayClassName, prefix, renderDisplay,
+  placeholder, emptyLabel, clamp, onStartEdit,
+}: DisplayModeProps) {
   const isEmpty = !value || (typeof value === 'string' && value.trim() === '');
+  const [expanded, setExpanded] = useState(false);
+  const [overflowing, setOverflowing] = useState(false);
+  const textRef = useRef<HTMLSpanElement | null>(null);
+
+  // Detect when text actually overflows the clamped height
+  useLayoutEffect(() => {
+    if (clamp === 0 || !textRef.current || isEmpty) {
+      setOverflowing(false);
+      return;
+    }
+    const el = textRef.current;
+    // Compare scroll vs client height (with 1px tolerance)
+    setOverflowing(el.scrollHeight - el.clientHeight > 1);
+  }, [value, clamp, isEmpty, expanded]);
+
+  const clampClass = clamp > 0 && !expanded
+    ? clamp === 1 ? 'line-clamp-1'
+    : clamp === 2 ? 'line-clamp-2'
+    : clamp === 3 ? 'line-clamp-3'
+    : 'line-clamp-4'
+    : '';
+
   return (
-    <button
-      type="button"
-      onClick={() => canEdit && setEditing(true)}
-      disabled={!canEdit}
-      className={cn(
-        'group inline-flex items-center gap-1.5 text-left rounded-md transition-colors min-w-0',
-        canEdit && 'hover:bg-secondary/60 cursor-text px-1.5 -mx-1.5 py-0.5',
-        !canEdit && 'cursor-default',
-        className,
+    <div className={cn('group min-w-0', className)}>
+      <div
+        role={canEdit ? 'button' : undefined}
+        tabIndex={canEdit ? 0 : undefined}
+        onClick={() => canEdit && onStartEdit()}
+        onKeyDown={(e) => {
+          if (canEdit && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            onStartEdit();
+          }
+        }}
+        className={cn(
+          'flex items-start gap-1.5 text-left rounded-md transition-colors min-w-0',
+          canEdit && 'hover:bg-secondary/60 cursor-text px-1.5 -mx-1.5 py-0.5',
+          !canEdit && 'cursor-default',
+        )}
+      >
+        {prefix && <span className="shrink-0 mt-0.5">{prefix}</span>}
+        <span
+          ref={textRef}
+          className={cn(
+            'min-w-0 flex-1 break-words whitespace-pre-wrap',
+            clampClass,
+            isEmpty && 'text-muted-foreground italic',
+            displayClassName,
+          )}
+        >
+          {renderDisplay ? renderDisplay(value) : (isEmpty ? (emptyLabel || placeholder) : value)}
+        </span>
+        {canEdit && (
+          <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-1" />
+        )}
+      </div>
+      {clamp > 0 && (overflowing || expanded) && !isEmpty && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setExpanded(v => !v);
+          }}
+          className="text-xs text-primary hover:underline inline-flex items-center gap-0.5 mt-0.5 px-1.5"
+        >
+          {expanded ? (
+            <>Λιγότερα <ChevronUp className="h-3 w-3" /></>
+          ) : (
+            <>Περισσότερα <ChevronDown className="h-3 w-3" /></>
+          )}
+        </button>
       )}
-    >
-      {prefix}
-      <span className={cn('truncate', isEmpty && 'text-muted-foreground italic', displayClassName)}>
-        {renderDisplay ? renderDisplay(value) : (isEmpty ? (emptyLabel || placeholder) : value)}
-      </span>
-      {canEdit && (
-        <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-      )}
-    </button>
+    </div>
   );
 }

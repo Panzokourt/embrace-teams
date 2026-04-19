@@ -37,21 +37,68 @@ const confidenceColor: Record<string, string> = {
 
 function renderValue(v: any) {
   if (v === null || v === undefined || v === '') return <span className="text-muted-foreground italic">—</span>;
-  if (typeof v === 'string') return <span className="break-words">{v}</span>;
-  if (Array.isArray(v)) return <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{JSON.stringify(v)}</code>;
-  return <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{JSON.stringify(v)}</code>;
+  if (typeof v === 'string') {
+    return <span className="break-words whitespace-pre-wrap block">{v}</span>;
+  }
+  if (Array.isArray(v)) {
+    // Render arrays of strings as chips
+    if (v.every(x => typeof x === 'string')) {
+      return (
+        <div className="flex flex-wrap gap-1">
+          {v.map((s, i) => (
+            <span key={i} className="text-xs bg-muted px-1.5 py-0.5 rounded-md">{s}</span>
+          ))}
+        </div>
+      );
+    }
+    // Render arrays of objects (e.g. social_accounts) as a compact list
+    return (
+      <div className="space-y-1 max-h-40 overflow-auto pr-1">
+        {v.map((item, i) => (
+          <div key={i} className="text-xs bg-muted/60 rounded-md px-2 py-1">
+            {typeof item === 'object' && item !== null ? (
+              <div className="space-y-0.5">
+                {Object.entries(item).map(([k, val]) => (
+                  <div key={k} className="flex gap-1.5">
+                    <span className="text-muted-foreground shrink-0">{k}:</span>
+                    <span className="break-all">{String(val)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <span className="break-all">{String(item)}</span>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <code className="text-xs bg-muted px-1.5 py-0.5 rounded block max-h-40 overflow-auto whitespace-pre-wrap break-words">
+      {JSON.stringify(v, null, 2)}
+    </code>
+  );
 }
 
 export function AIEnrichDialog({ open, onOpenChange, clientId, suggestions, logoUrl, onApplied }: Props) {
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [applyLogo, setApplyLogo] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Per-field merge mode for arrays (tags, social_accounts) — default merge
+  const [mergeMode, setMergeMode] = useState<Record<string, 'merge' | 'replace'>>({});
 
   useEffect(() => {
     if (open) {
       const init: Record<string, boolean> = {};
-      suggestions.forEach(s => { init[s.field] = (s.confidence || 'medium') !== 'low'; });
+      const initMerge: Record<string, 'merge' | 'replace'> = {};
+      suggestions.forEach(s => {
+        init[s.field] = (s.confidence || 'medium') !== 'low';
+        if (Array.isArray(s.value) && Array.isArray(s.currentValue) && s.currentValue.length > 0) {
+          initMerge[s.field] = 'merge';
+        }
+      });
       setSelected(init);
+      setMergeMode(initMerge);
       setApplyLogo(!!logoUrl);
     }
   }, [open, suggestions, logoUrl]);

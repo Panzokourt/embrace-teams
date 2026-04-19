@@ -237,11 +237,36 @@ ALWAYS try to extract these high-value fields when any signal exists:
 
 async function uploadLogo(supabase: any, logoUrl: string, clientId: string): Promise<string | null> {
   try {
-    const r = await fetch(logoUrl);
-    if (!r.ok) return null;
-    const ct = r.headers.get('content-type') || 'image/png';
-    const ext = ct.includes('svg') ? 'svg' : ct.includes('jpeg') ? 'jpg' : ct.includes('webp') ? 'webp' : 'png';
+    const r = await fetch(logoUrl, {
+      headers: {
+        // Some CDNs (incl. Google favicons) require a UA
+        'User-Agent': 'Mozilla/5.0 (compatible; LovableEnrichBot/1.0)',
+        'Accept': 'image/*,*/*;q=0.8',
+      },
+    });
+    if (!r.ok) {
+      console.error('Logo fetch failed', r.status, logoUrl);
+      return null;
+    }
+    const ct = (r.headers.get('content-type') || 'image/png').toLowerCase();
+    // Validate it's actually an image
+    if (!ct.startsWith('image/') && !ct.includes('svg')) {
+      console.error('Logo is not an image, content-type:', ct, logoUrl);
+      return null;
+    }
     const buf = await r.arrayBuffer();
+    if (!buf || buf.byteLength < 100) {
+      console.error('Logo too small/empty', buf?.byteLength, logoUrl);
+      return null;
+    }
+    const ext = ct.includes('svg') ? 'svg'
+              : ct.includes('jpeg') || ct.includes('jpg') ? 'jpg'
+              : ct.includes('webp') ? 'webp'
+              : ct.includes('gif') ? 'gif'
+              : ct.includes('x-icon') || ct.includes('vnd.microsoft.icon') ? 'ico'
+              : 'png';
+    // Service role bypasses RLS, so the bucket policy first-segment rule does not apply here.
+    // We keep a stable, namespaced path under the client id.
     const path = `client-logos/${clientId}.${ext}`;
     const { error } = await supabase.storage.from('project-files').upload(path, buf, {
       contentType: ct,
@@ -251,10 +276,13 @@ async function uploadLogo(supabase: any, logoUrl: string, clientId: string): Pro
       console.error('Logo upload error', error);
       return null;
     }
-    // Create signed URL valid for 10 years (effectively permanent for display)
-    const { data: signed } = await supabase.storage
+    const { data: signed, error: signErr } = await supabase.storage
       .from('project-files')
       .createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
+    if (signErr) {
+      console.error('Logo signed URL error', signErr);
+      return null;
+    }
     return signed?.signedUrl || null;
   } catch (e) {
     console.error('uploadLogo exception', e);
@@ -318,30 +346,39 @@ Deno.serve(async (req) => {
     let logoUrl: string | undefined;
     let primarySource = '';
     let primarySourceUrl = '';
+    const logoAttempts: string[] = [];
+
+    // Helper: try a list of candidate logo URLs in order, stop at first successful upload.
+    const tryLogos = async (candidates: Array<{ src: string; url: string | null | undefined }>) => {
+      for (const c of candidates) {
+        if (!c.url) continue;
+        logoAttempts.push(`${c.src}:${c.url}`);
+        const uploaded = await uploadLogo(supabase, c.url, clientId);
+        if (uploaded) {
+          console.log('Logo resolved via', c.src, '->', c.url);
+          return uploaded;
+        }
+      }
+      return undefined;
+    };
 
     // 1. Firecrawl scrape if website provided
     const targetWebsite = website || client.website;
     if (targetWebsite) {
+      const baseUrl = targetWebsite.startsWith('http') ? targetWebsite : `https://${targetWebsite}`;
       const fc = await firecrawlScrape(targetWebsite);
       if (fc) {
         const md = fc.markdown || fc.data?.markdown || '';
         const branding = fc.branding || fc.data?.branding;
         const rawHtml = fc.rawHtml || fc.data?.rawHtml || fc.html || fc.data?.html || '';
-        const baseUrl = targetWebsite.startsWith('http') ? targetWebsite : `https://${targetWebsite}`;
 
-        // Logo detection: branding → og:image → favicon link → Google favicon
-        let detectedLogo: string | null =
-          branding?.logo || branding?.images?.logo || null;
-        if (!detectedLogo && rawHtml) {
-          detectedLogo = extractLogoFromHtml(rawHtml, baseUrl);
-        }
-        if (!detectedLogo) {
-          detectedLogo = googleFaviconUrl(targetWebsite);
-        }
-        if (detectedLogo) {
-          const uploaded = await uploadLogo(supabase, detectedLogo, clientId);
-          if (uploaded) logoUrl = uploaded;
-        }
+        const candidates: Array<{ src: string; url: string | null | undefined }> = [
+          { src: 'branding.logo', url: branding?.logo },
+          { src: 'branding.images.logo', url: branding?.images?.logo },
+          { src: 'html-meta', url: rawHtml ? extractLogoFromHtml(rawHtml, baseUrl) : null },
+          { src: 'google-favicon', url: googleFaviconUrl(targetWebsite) },
+        ];
+        logoUrl = await tryLogos(candidates);
 
         context += `=== Website (${targetWebsite}) ===\n${md.slice(0, 8000)}\n\n`;
         if (branding) context += `=== Branding ===\n${JSON.stringify(branding).slice(0, 1500)}\n\n`;
@@ -349,13 +386,14 @@ Deno.serve(async (req) => {
         primarySourceUrl = baseUrl;
       } else {
         // Even without Firecrawl content, we can still set a default favicon
-        const fav = googleFaviconUrl(targetWebsite);
-        if (fav) {
-          const uploaded = await uploadLogo(supabase, fav, clientId);
-          if (uploaded) logoUrl = uploaded;
-        }
+        logoUrl = await tryLogos([{ src: 'google-favicon-only', url: googleFaviconUrl(targetWebsite) }]);
       }
     }
+
+    if (logoAttempts.length && !logoUrl) {
+      console.warn('Logo lookup failed. Attempts:', JSON.stringify(logoAttempts));
+    }
+
 
     // 2. Perplexity lookup αν υπάρχει ΑΦΜ ή/και αν δεν πήραμε context από website
     const targetTax = taxId || client.tax_id;

@@ -41,6 +41,11 @@ export default function ClientDetailPage() {
     if (id) fetchAll();
   }, [id]);
 
+  const handleClientPatched = (updated: any) => {
+    if (!updated) return;
+    setClient((prev: any) => ({ ...(prev || {}), ...updated }));
+  };
+
   const fetchAll = async () => {
     if (!id) return;
     setLoading(true);

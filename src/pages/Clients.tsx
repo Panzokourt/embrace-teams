@@ -27,7 +27,8 @@ import {
   Plus, 
   Search,
   Loader2,
-  X
+  X,
+  Sparkles
 } from 'lucide-react';
 
 import { useProjectCategories } from '@/hooks/useProjectCategories';

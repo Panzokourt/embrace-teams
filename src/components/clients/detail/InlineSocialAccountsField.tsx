@@ -163,7 +163,7 @@ export function InlineSocialAccountsField({ clientId, accounts, canEdit = true, 
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7"
-                  onClick={() => openExternalUrl(acc.url)}
+                  onClick={() => handleOpenSocialUrl(acc.url)}
                   type="button"
                 >
                   <ExternalLink className="h-3.5 w-3.5" />

@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ExternalLink, Plus, Trash2, Pencil, Check, X, Loader2 } from 'lucide-react';
 import { useClientUpdate } from '@/hooks/useClientUpdate';
 import { toast } from 'sonner';
+import { openExternalUrl } from '@/lib/utils';
 
 export interface SocialAccount {
   platform: string;
@@ -34,31 +35,11 @@ const PLATFORMS = [
 const platformIcon = (p: string) => PLATFORMS.find(pl => pl.value === p.toLowerCase())?.icon || '🌐';
 const platformLabel = (p: string) => PLATFORMS.find(pl => pl.value === p.toLowerCase())?.label || p;
 
-const normalizeUrl = (raw: string): string => {
-  const trimmed = raw.trim();
-  if (!trimmed) return '';
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  if (trimmed.startsWith('//')) return `https:${trimmed}`;
-  return `https://${trimmed.replace(/^\/+/, '')}`;
-};
-
-const openExternalUrl = (raw: string) => {
-  const normalized = normalizeUrl(raw);
-  if (!normalized) return;
-
-  const popup = window.open(normalized, '_blank', 'noopener,noreferrer');
-  if (popup) {
-    popup.opener = null;
-    return;
+const handleOpenSocialUrl = (raw: string) => {
+  const opened = openExternalUrl(raw);
+  if (!opened) {
+    toast.error('Δεν ήταν δυνατό το άνοιγμα του συνδέσμου. Επίτρεψε pop-ups για αυτή τη σελίδα.');
   }
-
-  const tempLink = document.createElement('a');
-  tempLink.href = normalized;
-  tempLink.target = '_blank';
-  tempLink.rel = 'noopener noreferrer';
-  document.body.appendChild(tempLink);
-  tempLink.click();
-  tempLink.remove();
 };
 
 interface RowFormProps {
@@ -182,7 +163,7 @@ export function InlineSocialAccountsField({ clientId, accounts, canEdit = true, 
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7"
-                  onClick={() => openExternalUrl(acc.url)}
+                  onClick={() => handleOpenSocialUrl(acc.url)}
                   type="button"
                 >
                   <ExternalLink className="h-3.5 w-3.5" />

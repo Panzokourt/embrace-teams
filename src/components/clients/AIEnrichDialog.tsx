@@ -111,7 +111,42 @@ export function AIEnrichDialog({ open, onOpenChange, clientId, suggestions, logo
     try {
       const updates: Record<string, any> = {};
       suggestions.forEach(s => {
-        if (selected[s.field]) updates[s.field] = s.value;
+        if (!selected[s.field]) return;
+        let value = s.value;
+        // Merge arrays (tags, social_accounts) when current already has values & user picked merge
+        if (
+          mergeMode[s.field] === 'merge' &&
+          Array.isArray(value) &&
+          Array.isArray(s.currentValue) &&
+          s.currentValue.length > 0
+        ) {
+          if (s.field === 'tags' || (value.every((x: any) => typeof x === 'string'))) {
+            // Union for string arrays — case-insensitive dedupe
+            const seen = new Set<string>();
+            const merged: string[] = [];
+            [...s.currentValue, ...value].forEach((t: any) => {
+              const k = String(t).trim().toLowerCase();
+              if (k && !seen.has(k)) {
+                seen.add(k);
+                merged.push(String(t).trim());
+              }
+            });
+            value = merged;
+          } else if (s.field === 'social_accounts') {
+            // Dedupe by platform+url
+            const seen = new Set<string>();
+            const merged: any[] = [];
+            [...s.currentValue, ...value].forEach((a: any) => {
+              const k = `${(a?.platform || '').toLowerCase()}::${(a?.url || a?.account_name || '').toLowerCase()}`;
+              if (!seen.has(k)) {
+                seen.add(k);
+                merged.push(a);
+              }
+            });
+            value = merged;
+          }
+        }
+        updates[s.field] = value;
       });
       if (applyLogo && logoUrl) updates.logo_url = logoUrl;
 
@@ -193,15 +228,45 @@ export function AIEnrichDialog({ open, onOpenChange, clientId, suggestions, logo
                   <div className="space-y-1 text-sm">
                     {s.currentValue !== undefined && s.currentValue !== null && s.currentValue !== '' && (
                       <div className="flex gap-2">
-                        <span className="text-xs text-muted-foreground w-12 shrink-0">Τώρα:</span>
-                        <span className="text-muted-foreground line-through">{renderValue(s.currentValue)}</span>
+                        <span className="text-xs text-muted-foreground w-12 shrink-0 mt-0.5">Τώρα:</span>
+                        <div className="text-muted-foreground min-w-0 flex-1">{renderValue(s.currentValue)}</div>
                       </div>
                     )}
                     <div className="flex gap-2">
-                      <span className="text-xs text-muted-foreground w-12 shrink-0">Νέο:</span>
-                      <div className="text-foreground min-w-0">{renderValue(s.value)}</div>
+                      <span className="text-xs text-muted-foreground w-12 shrink-0 mt-0.5">Νέο:</span>
+                      <div className="text-foreground min-w-0 flex-1">{renderValue(s.value)}</div>
                     </div>
                   </div>
+                  {Array.isArray(s.value) && Array.isArray(s.currentValue) && s.currentValue.length > 0 && (
+                    <div
+                      className="flex items-center gap-2 mt-2 text-xs"
+                      onClick={(e) => e.preventDefault()}
+                    >
+                      <span className="text-muted-foreground">Εφαρμογή:</span>
+                      <button
+                        type="button"
+                        onClick={() => setMergeMode(p => ({ ...p, [s.field]: 'merge' }))}
+                        className={`px-2 py-0.5 rounded-md border ${
+                          (mergeMode[s.field] || 'merge') === 'merge'
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-card border-border hover:bg-secondary'
+                        }`}
+                      >
+                        Συγχώνευση
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMergeMode(p => ({ ...p, [s.field]: 'replace' }))}
+                        className={`px-2 py-0.5 rounded-md border ${
+                          mergeMode[s.field] === 'replace'
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-card border-border hover:bg-secondary'
+                        }`}
+                      >
+                        Αντικατάσταση
+                      </button>
+                    </div>
+                  )}
                   {s.sourceUrl && (
                     <a
                       href={s.sourceUrl}

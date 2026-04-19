@@ -34,6 +34,17 @@ const PLATFORMS = [
 const platformIcon = (p: string) => PLATFORMS.find(pl => pl.value === p.toLowerCase())?.icon || '🌐';
 const platformLabel = (p: string) => PLATFORMS.find(pl => pl.value === p.toLowerCase())?.label || p;
 
+const normalizeUrl = (raw: string): string => {
+  const trimmed = raw.trim();
+  if (!trimmed) return '';
+  // Already has a protocol
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  // Protocol-relative
+  if (trimmed.startsWith('//')) return `https:${trimmed}`;
+  // Strip any leading slashes that would make it look relative
+  return `https://${trimmed.replace(/^\/+/, '')}`;
+};
+
 interface RowFormProps {
   initial?: SocialAccount;
   onSubmit: (acc: SocialAccount) => void;

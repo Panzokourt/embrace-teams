@@ -368,10 +368,28 @@ Deno.serve(async (req) => {
     const logoAttempts: string[] = [];
 
     // Helper: try a list of candidate logo URLs in order, stop at first successful upload.
+    // In draft mode (no clientId) we don't have a stable storage key, so just return the
+    // first remote URL that points to an image.
     const tryLogos = async (candidates: Array<{ src: string; url: string | null | undefined }>) => {
       for (const c of candidates) {
         if (!c.url) continue;
         logoAttempts.push(`${c.src}:${c.url}`);
+        if (isDraft) {
+          try {
+            const probe = await fetch(c.url, {
+              method: 'GET',
+              headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LovableEnrichBot/1.0)' },
+            });
+            if (probe.ok) {
+              const ct = (probe.headers.get('content-type') || '').toLowerCase();
+              if (ct.startsWith('image/') || ct.includes('svg')) {
+                console.log('Draft logo resolved via', c.src, '->', c.url);
+                return c.url;
+              }
+            }
+          } catch (_) { /* ignore */ }
+          continue;
+        }
         const uploaded = await uploadLogo(supabase, c.url, clientId);
         if (uploaded) {
           console.log('Logo resolved via', c.src, '->', c.url);
@@ -382,7 +400,7 @@ Deno.serve(async (req) => {
     };
 
     // 1. Firecrawl scrape if website provided
-    const targetWebsite = website || client.website;
+    const targetWebsite = website || client?.website;
     if (targetWebsite) {
       const baseUrl = targetWebsite.startsWith('http') ? targetWebsite : `https://${targetWebsite}`;
       const fc = await firecrawlScrape(targetWebsite);
@@ -404,7 +422,6 @@ Deno.serve(async (req) => {
         primarySource = 'firecrawl';
         primarySourceUrl = baseUrl;
       } else {
-        // Even without Firecrawl content, we can still set a default favicon
         logoUrl = await tryLogos([{ src: 'google-favicon-only', url: googleFaviconUrl(targetWebsite) }]);
       }
     }
@@ -414,16 +431,22 @@ Deno.serve(async (req) => {
     }
 
 
-    // 2. Perplexity lookup αν υπάρχει ΑΦΜ ή/και αν δεν πήραμε context από website
-    const targetTax = taxId || client.tax_id;
-    const targetName = clientName || client.name;
+    // 2. Perplexity lookup
+    const targetTax = taxId || client?.tax_id;
+    const targetName = clientName || client?.name;
     const needsPerplexityFallback = !context.trim() && !!targetName;
-    // Always run Perplexity if we have a name — to enrich social accounts, tags, ΑΦΜ που λείπουν
-    const wantsPerplexity = !!targetName && (targetTax || needsPerplexityFallback || !client.tax_id || !Array.isArray(client.social_accounts) || (client.social_accounts as any[]).length < 3);
+    const existingSocials = Array.isArray(client?.social_accounts) ? (client!.social_accounts as any[]) : [];
+    const wantsPerplexity = !!targetName && (
+      isDraft ||
+      !!targetTax ||
+      needsPerplexityFallback ||
+      !client?.tax_id ||
+      existingSocials.length < 3
+    );
     if (wantsPerplexity) {
       const socialAsk = 'ΟΛΟΥΣ τους επίσημους λογαριασμούς social media (Facebook URL, Instagram URL, LinkedIn URL, YouTube URL, TikTok URL, X/Twitter URL, Threads URL) με τα handles τους';
       const tagsAsk = 'τομέα δραστηριότητας και 3-6 σύντομα tags (industry, business model π.χ. b2b/b2c, τύπος εταιρείας π.χ. startup/agency/saas/fintech)';
-      const taxAsk = client.tax_id ? '' : 'ΑΦΜ της εταιρείας από δημόσια μητρώα (ΓΕΜΗ, taxisnet, opengov) — μόνο αν είσαι σίγουρος, 9 ψηφία';
+      const taxAsk = client?.tax_id ? '' : 'ΑΦΜ της εταιρείας από δημόσια μητρώα (ΓΕΜΗ, taxisnet, opengov) — μόνο αν είσαι σίγουρος, 9 ψηφία';
       const baseInfo = `επωνυμία, διεύθυνση, website, στοιχεία επικοινωνίας`;
       const q = targetTax
         ? `Πληροφορίες για την ελληνική εταιρεία "${targetName}" με ΑΦΜ ${targetTax}: ${baseInfo}, ${tagsAsk}, ${socialAsk}.`
@@ -446,9 +469,13 @@ Deno.serve(async (req) => {
 
     // 3. AI extraction
     const extracted = await aiExtract(context, {
-      name: client.name, tax_id: client.tax_id, website: client.website,
-      sector: client.sector, address: client.address,
-      contact_email: client.contact_email, contact_phone: client.contact_phone,
+      name: client?.name || clientName || '',
+      tax_id: client?.tax_id || taxId || '',
+      website: client?.website || website || '',
+      sector: client?.sector || '',
+      address: client?.address || '',
+      contact_email: client?.contact_email || '',
+      contact_phone: client?.contact_phone || '',
     });
 
     const confidence: Record<string, string> = extracted.confidence || {};
@@ -458,9 +485,8 @@ Deno.serve(async (req) => {
     const suggestions: Suggestion[] = [];
     for (const [field, value] of Object.entries(extracted)) {
       if (value === null || value === undefined || value === '') continue;
-      const current = (client as any)[field];
-      // Skip identical
-      if (JSON.stringify(current) === JSON.stringify(value)) continue;
+      const current = client ? (client as any)[field] : undefined;
+      if (current !== undefined && JSON.stringify(current) === JSON.stringify(value)) continue;
       suggestions.push({
         field,
         label: FIELD_LABELS[field] || field,
@@ -472,14 +498,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Log enrichment
-    await supabase.from('client_enrichment_log').insert({
-      client_id: clientId,
-      company_id: client.company_id,
-      user_id: user.id,
-      suggestion_count: suggestions.length,
-      sources: { firecrawl: !!targetWebsite, perplexity: !!targetTax || !targetWebsite },
-    });
+    // Log enrichment (skip in draft mode — no client/company yet)
+    if (!isDraft && client) {
+      await supabase.from('client_enrichment_log').insert({
+        client_id: clientId,
+        company_id: client.company_id,
+        user_id: user.id,
+        suggestion_count: suggestions.length,
+        sources: { firecrawl: !!targetWebsite, perplexity: !!targetTax || !targetWebsite },
+      });
+    }
 
     return new Response(JSON.stringify({ suggestions, logoUrl }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

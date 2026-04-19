@@ -326,15 +326,34 @@ Deno.serve(async (req) => {
       if (fc) {
         const md = fc.markdown || fc.data?.markdown || '';
         const branding = fc.branding || fc.data?.branding;
-        const detectedLogo = branding?.logo || branding?.images?.logo;
+        const rawHtml = fc.rawHtml || fc.data?.rawHtml || fc.html || fc.data?.html || '';
+        const baseUrl = targetWebsite.startsWith('http') ? targetWebsite : `https://${targetWebsite}`;
+
+        // Logo detection: branding → og:image → favicon link → Google favicon
+        let detectedLogo: string | null =
+          branding?.logo || branding?.images?.logo || null;
+        if (!detectedLogo && rawHtml) {
+          detectedLogo = extractLogoFromHtml(rawHtml, baseUrl);
+        }
+        if (!detectedLogo) {
+          detectedLogo = googleFaviconUrl(targetWebsite);
+        }
         if (detectedLogo) {
           const uploaded = await uploadLogo(supabase, detectedLogo, clientId);
           if (uploaded) logoUrl = uploaded;
         }
+
         context += `=== Website (${targetWebsite}) ===\n${md.slice(0, 8000)}\n\n`;
         if (branding) context += `=== Branding ===\n${JSON.stringify(branding).slice(0, 1500)}\n\n`;
         primarySource = 'firecrawl';
-        primarySourceUrl = targetWebsite.startsWith('http') ? targetWebsite : `https://${targetWebsite}`;
+        primarySourceUrl = baseUrl;
+      } else {
+        // Even without Firecrawl content, we can still set a default favicon
+        const fav = googleFaviconUrl(targetWebsite);
+        if (fav) {
+          const uploaded = await uploadLogo(supabase, fav, clientId);
+          if (uploaded) logoUrl = uploaded;
+        }
       }
     }
 

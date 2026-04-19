@@ -51,22 +51,58 @@ async function firecrawlScrape(url: string) {
   if (!FIRECRAWL_API_KEY) return null;
   const target = url.startsWith('http') ? url : `https://${url}`;
   try {
-    // Try with branding first; fall back if plan/feature not available
-    let r = await firecrawlCall(target, ['markdown', 'branding', 'links']);
+    // Request rawHtml too so we can extract favicon/og:image as logo fallback
+    let r = await firecrawlCall(target, ['markdown', 'branding', 'links', 'rawHtml']);
     if (!r.ok) {
       const t = await r.text();
       console.error('Firecrawl error (with branding)', r.status, t);
-      // Retry without branding/links — most common failure cause
-      r = await firecrawlCall(target, ['markdown']);
+      r = await firecrawlCall(target, ['markdown', 'rawHtml']);
       if (!r.ok) {
         const t2 = await r.text();
-        console.error('Firecrawl error (markdown only)', r.status, t2);
-        return null;
+        console.error('Firecrawl error (markdown+raw)', r.status, t2);
+        // Last resort: markdown only
+        r = await firecrawlCall(target, ['markdown']);
+        if (!r.ok) return null;
       }
     }
     return await r.json();
   } catch (e) {
     console.error('Firecrawl exception', e);
+    return null;
+  }
+}
+
+function extractLogoFromHtml(html: string, baseUrl: string): string | null {
+  if (!html) return null;
+  const absolutize = (href: string): string => {
+    try {
+      return new URL(href, baseUrl).toString();
+    } catch {
+      return href;
+    }
+  };
+  // 1) og:image / twitter:image
+  const og = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+        || html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
+  if (og?.[1]) return absolutize(og[1]);
+
+  // 2) <link rel="apple-touch-icon"> (usually high-res)
+  const apple = html.match(/<link[^>]+rel=["'](?:apple-touch-icon[^"']*)["'][^>]+href=["']([^"']+)["']/i);
+  if (apple?.[1]) return absolutize(apple[1]);
+
+  // 3) Standard <link rel="icon">
+  const icon = html.match(/<link[^>]+rel=["'](?:shortcut )?icon["'][^>]+href=["']([^"']+)["']/i)
+            || html.match(/<link[^>]+href=["']([^"']+)["'][^>]+rel=["'](?:shortcut )?icon["']/i);
+  if (icon?.[1]) return absolutize(icon[1]);
+
+  return null;
+}
+
+function googleFaviconUrl(siteUrl: string): string | null {
+  try {
+    const u = new URL(siteUrl.startsWith('http') ? siteUrl : `https://${siteUrl}`);
+    return `https://www.google.com/s2/favicons?domain=${u.hostname}&sz=256`;
+  } catch {
     return null;
   }
 }
@@ -290,15 +326,34 @@ Deno.serve(async (req) => {
       if (fc) {
         const md = fc.markdown || fc.data?.markdown || '';
         const branding = fc.branding || fc.data?.branding;
-        const detectedLogo = branding?.logo || branding?.images?.logo;
+        const rawHtml = fc.rawHtml || fc.data?.rawHtml || fc.html || fc.data?.html || '';
+        const baseUrl = targetWebsite.startsWith('http') ? targetWebsite : `https://${targetWebsite}`;
+
+        // Logo detection: branding → og:image → favicon link → Google favicon
+        let detectedLogo: string | null =
+          branding?.logo || branding?.images?.logo || null;
+        if (!detectedLogo && rawHtml) {
+          detectedLogo = extractLogoFromHtml(rawHtml, baseUrl);
+        }
+        if (!detectedLogo) {
+          detectedLogo = googleFaviconUrl(targetWebsite);
+        }
         if (detectedLogo) {
           const uploaded = await uploadLogo(supabase, detectedLogo, clientId);
           if (uploaded) logoUrl = uploaded;
         }
+
         context += `=== Website (${targetWebsite}) ===\n${md.slice(0, 8000)}\n\n`;
         if (branding) context += `=== Branding ===\n${JSON.stringify(branding).slice(0, 1500)}\n\n`;
         primarySource = 'firecrawl';
-        primarySourceUrl = targetWebsite.startsWith('http') ? targetWebsite : `https://${targetWebsite}`;
+        primarySourceUrl = baseUrl;
+      } else {
+        // Even without Firecrawl content, we can still set a default favicon
+        const fav = googleFaviconUrl(targetWebsite);
+        if (fav) {
+          const uploaded = await uploadLogo(supabase, fav, clientId);
+          if (uploaded) logoUrl = uploaded;
+        }
       }
     }
 

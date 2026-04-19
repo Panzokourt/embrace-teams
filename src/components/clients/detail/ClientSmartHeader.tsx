@@ -72,19 +72,26 @@ export function ClientSmartHeader({
     if (!file) return;
     setUploading(true);
     try {
-      const ext = file.name.split('.').pop() || 'png';
-      const path = `client-logos/${client.id}.${ext}`;
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      if (userErr || !userData.user) throw new Error('Δεν είσαι συνδεδεμένος');
+      const userId = userData.user.id;
+
+      const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
+      // Storage policy requires the first path segment to equal auth.uid().
+      const path = `${userId}/client-logos/${client.id}-${Date.now()}.${ext}`;
+
       const { error: upErr } = await supabase.storage
         .from('project-files')
         .upload(path, file, { upsert: true, contentType: file.type });
       if (upErr) throw upErr;
-      const { data: signed } = await supabase.storage
+
+      const { data: signed, error: signErr } = await supabase.storage
         .from('project-files')
         .createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
-      if (signed?.signedUrl) {
-        await update.mutateAsync({ logo_url: signed.signedUrl });
-        toast.success('Λογότυπο ενημερώθηκε');
-      }
+      if (signErr || !signed?.signedUrl) throw signErr || new Error('Σφάλμα δημιουργίας URL');
+
+      await update.mutateAsync({ logo_url: signed.signedUrl });
+      toast.success('Λογότυπο ενημερώθηκε');
     } catch (err: any) {
       toast.error(err?.message || 'Σφάλμα ανεβάσματος');
     } finally {

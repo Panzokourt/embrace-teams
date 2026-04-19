@@ -32,12 +32,14 @@ export function AIEnrichButton({ clientId, website, taxId, clientName, size = 'i
         body: { clientId, website, taxId, clientName },
       });
       if (error) throw error;
-      if (!data?.suggestions?.length) {
+      const incomingSuggestions: EnrichSuggestion[] = data?.suggestions || [];
+      const incomingLogo: string | undefined = data?.logoUrl;
+      if (!incomingSuggestions.length && !incomingLogo) {
         toast.info('Δεν βρέθηκαν προτάσεις');
         return;
       }
-      setSuggestions(data.suggestions);
-      setLogoUrl(data.logoUrl);
+      setSuggestions(incomingSuggestions);
+      setLogoUrl(incomingLogo);
       setOpen(true);
     } catch (e: any) {
       const msg = e?.message || 'AI enrichment απέτυχε';

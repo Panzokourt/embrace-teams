@@ -237,11 +237,36 @@ ALWAYS try to extract these high-value fields when any signal exists:
 
 async function uploadLogo(supabase: any, logoUrl: string, clientId: string): Promise<string | null> {
   try {
-    const r = await fetch(logoUrl);
-    if (!r.ok) return null;
-    const ct = r.headers.get('content-type') || 'image/png';
-    const ext = ct.includes('svg') ? 'svg' : ct.includes('jpeg') ? 'jpg' : ct.includes('webp') ? 'webp' : 'png';
+    const r = await fetch(logoUrl, {
+      headers: {
+        // Some CDNs (incl. Google favicons) require a UA
+        'User-Agent': 'Mozilla/5.0 (compatible; LovableEnrichBot/1.0)',
+        'Accept': 'image/*,*/*;q=0.8',
+      },
+    });
+    if (!r.ok) {
+      console.error('Logo fetch failed', r.status, logoUrl);
+      return null;
+    }
+    const ct = (r.headers.get('content-type') || 'image/png').toLowerCase();
+    // Validate it's actually an image
+    if (!ct.startsWith('image/') && !ct.includes('svg')) {
+      console.error('Logo is not an image, content-type:', ct, logoUrl);
+      return null;
+    }
     const buf = await r.arrayBuffer();
+    if (!buf || buf.byteLength < 100) {
+      console.error('Logo too small/empty', buf?.byteLength, logoUrl);
+      return null;
+    }
+    const ext = ct.includes('svg') ? 'svg'
+              : ct.includes('jpeg') || ct.includes('jpg') ? 'jpg'
+              : ct.includes('webp') ? 'webp'
+              : ct.includes('gif') ? 'gif'
+              : ct.includes('x-icon') || ct.includes('vnd.microsoft.icon') ? 'ico'
+              : 'png';
+    // Service role bypasses RLS, so the bucket policy first-segment rule does not apply here.
+    // We keep a stable, namespaced path under the client id.
     const path = `client-logos/${clientId}.${ext}`;
     const { error } = await supabase.storage.from('project-files').upload(path, buf, {
       contentType: ct,
@@ -251,10 +276,13 @@ async function uploadLogo(supabase: any, logoUrl: string, clientId: string): Pro
       console.error('Logo upload error', error);
       return null;
     }
-    // Create signed URL valid for 10 years (effectively permanent for display)
-    const { data: signed } = await supabase.storage
+    const { data: signed, error: signErr } = await supabase.storage
       .from('project-files')
       .createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
+    if (signErr) {
+      console.error('Logo signed URL error', signErr);
+      return null;
+    }
     return signed?.signedUrl || null;
   } catch (e) {
     console.error('uploadLogo exception', e);

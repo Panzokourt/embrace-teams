@@ -41,6 +41,8 @@ export function ClientForm({ open, onOpenChange, client, onSaved }: ClientFormPr
   const { data: categories = [] } = useProjectCategories();
   const [saving, setSaving] = useState(false);
   const [tagInput, setTagInput] = useState('');
+  const [enriching, setEnriching] = useState(false);
+  const [pendingLogoUrl, setPendingLogoUrl] = useState<string | null>(null);
 
   const sectorOptions = categories.length > 0
     ? categories.map(c => ({ value: c.name, label: c.name }))

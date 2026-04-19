@@ -313,33 +313,52 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { clientId, website, taxId, clientName } = await req.json();
-    if (!clientId) {
-      return new Response(JSON.stringify({ error: 'clientId required' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    const { clientId, website, taxId, clientName, draft } = await req.json();
+    const isDraft = !!draft || !clientId;
 
-    // Get current client
-    const { data: client, error: cErr } = await supabase
-      .from('clients').select('*').eq('id', clientId).single();
-    if (cErr || !client) {
-      return new Response(JSON.stringify({ error: 'Client not found' }), {
-        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    // For non-draft requests we need a real client to write logos and update suggestions against.
+    let client: any = null;
+    if (!isDraft) {
+      const { data, error: cErr } = await supabase
+        .from('clients').select('*').eq('id', clientId).single();
+      if (cErr || !data) {
+        return new Response(JSON.stringify({ error: 'Client not found' }), {
+          status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      client = data;
 
-    // Rate limit: 10 enrichments / day / company
-    const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-    const { count } = await supabase
-      .from('client_enrichment_log')
-      .select('id', { count: 'exact', head: true })
-      .eq('company_id', client.company_id)
-      .gte('created_at', since);
-    if ((count || 0) >= 10) {
-      return new Response(JSON.stringify({ error: 'Όριο AI enrichment (10/μέρα) εξαντλήθηκε.' }), {
-        status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      // Rate limit: 10 enrichments / day / company
+      const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+      const { count } = await supabase
+        .from('client_enrichment_log')
+        .select('id', { count: 'exact', head: true })
+        .eq('company_id', client.company_id)
+        .gte('created_at', since);
+      if ((count || 0) >= 10) {
+        return new Response(JSON.stringify({ error: 'Όριο AI enrichment (10/μέρα) εξαντλήθηκε.' }), {
+          status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    } else {
+      // Draft mode requires at least a website / tax id / name to do anything useful
+      if (!website && !taxId && !clientName) {
+        return new Response(JSON.stringify({ error: 'website, taxId ή clientName απαιτείται' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      // Lightweight per-user draft rate-limit (20 / day) using same log table with a synthetic client id
+      const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+      const { count } = await supabase
+        .from('client_enrichment_log')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('created_at', since);
+      if ((count || 0) >= 20) {
+        return new Response(JSON.stringify({ error: 'Όριο AI enrichment (20/μέρα) εξαντλήθηκε.' }), {
+          status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     let context = '';

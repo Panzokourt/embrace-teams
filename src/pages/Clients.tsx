@@ -367,6 +367,8 @@ export default function ClientsPage() {
   const resetForm = () => {
     setEditingClient(null);
     setTagInput('');
+    setPendingLogoUrl(null);
+    setEnriching(false);
     setFormData({
       name: '',
       contact_email: '',

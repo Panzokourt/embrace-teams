@@ -346,30 +346,39 @@ Deno.serve(async (req) => {
     let logoUrl: string | undefined;
     let primarySource = '';
     let primarySourceUrl = '';
+    const logoAttempts: string[] = [];
+
+    // Helper: try a list of candidate logo URLs in order, stop at first successful upload.
+    const tryLogos = async (candidates: Array<{ src: string; url: string | null | undefined }>) => {
+      for (const c of candidates) {
+        if (!c.url) continue;
+        logoAttempts.push(`${c.src}:${c.url}`);
+        const uploaded = await uploadLogo(supabase, c.url, clientId);
+        if (uploaded) {
+          console.log('Logo resolved via', c.src, '->', c.url);
+          return uploaded;
+        }
+      }
+      return undefined;
+    };
 
     // 1. Firecrawl scrape if website provided
     const targetWebsite = website || client.website;
     if (targetWebsite) {
+      const baseUrl = targetWebsite.startsWith('http') ? targetWebsite : `https://${targetWebsite}`;
       const fc = await firecrawlScrape(targetWebsite);
       if (fc) {
         const md = fc.markdown || fc.data?.markdown || '';
         const branding = fc.branding || fc.data?.branding;
         const rawHtml = fc.rawHtml || fc.data?.rawHtml || fc.html || fc.data?.html || '';
-        const baseUrl = targetWebsite.startsWith('http') ? targetWebsite : `https://${targetWebsite}`;
 
-        // Logo detection: branding → og:image → favicon link → Google favicon
-        let detectedLogo: string | null =
-          branding?.logo || branding?.images?.logo || null;
-        if (!detectedLogo && rawHtml) {
-          detectedLogo = extractLogoFromHtml(rawHtml, baseUrl);
-        }
-        if (!detectedLogo) {
-          detectedLogo = googleFaviconUrl(targetWebsite);
-        }
-        if (detectedLogo) {
-          const uploaded = await uploadLogo(supabase, detectedLogo, clientId);
-          if (uploaded) logoUrl = uploaded;
-        }
+        const candidates: Array<{ src: string; url: string | null | undefined }> = [
+          { src: 'branding.logo', url: branding?.logo },
+          { src: 'branding.images.logo', url: branding?.images?.logo },
+          { src: 'html-meta', url: rawHtml ? extractLogoFromHtml(rawHtml, baseUrl) : null },
+          { src: 'google-favicon', url: googleFaviconUrl(targetWebsite) },
+        ];
+        logoUrl = await tryLogos(candidates);
 
         context += `=== Website (${targetWebsite}) ===\n${md.slice(0, 8000)}\n\n`;
         if (branding) context += `=== Branding ===\n${JSON.stringify(branding).slice(0, 1500)}\n\n`;
@@ -377,13 +386,14 @@ Deno.serve(async (req) => {
         primarySourceUrl = baseUrl;
       } else {
         // Even without Firecrawl content, we can still set a default favicon
-        const fav = googleFaviconUrl(targetWebsite);
-        if (fav) {
-          const uploaded = await uploadLogo(supabase, fav, clientId);
-          if (uploaded) logoUrl = uploaded;
-        }
+        logoUrl = await tryLogos([{ src: 'google-favicon-only', url: googleFaviconUrl(targetWebsite) }]);
       }
     }
+
+    if (logoAttempts.length && !logoUrl) {
+      console.warn('Logo lookup failed. Attempts:', JSON.stringify(logoAttempts));
+    }
+
 
     // 2. Perplexity lookup αν υπάρχει ΑΦΜ ή/και αν δεν πήραμε context από website
     const targetTax = taxId || client.tax_id;

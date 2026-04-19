@@ -34,6 +34,17 @@ const PLATFORMS = [
 const platformIcon = (p: string) => PLATFORMS.find(pl => pl.value === p.toLowerCase())?.icon || '🌐';
 const platformLabel = (p: string) => PLATFORMS.find(pl => pl.value === p.toLowerCase())?.label || p;
 
+const normalizeUrl = (raw: string): string => {
+  const trimmed = raw.trim();
+  if (!trimmed) return '';
+  // Already has a protocol
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  // Protocol-relative
+  if (trimmed.startsWith('//')) return `https:${trimmed}`;
+  // Strip any leading slashes that would make it look relative
+  return `https://${trimmed.replace(/^\/+/, '')}`;
+};
+
 interface RowFormProps {
   initial?: SocialAccount;
   onSubmit: (acc: SocialAccount) => void;
@@ -152,7 +163,7 @@ export function InlineSocialAccountsField({ clientId, accounts, canEdit = true, 
             <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
               {acc.url && (
                 <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
-                  <a href={acc.url.startsWith('http') ? acc.url : `https://${acc.url}`} target="_blank" rel="noreferrer">
+                  <a href={normalizeUrl(acc.url)} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="h-3.5 w-3.5" />
                   </a>
                 </Button>

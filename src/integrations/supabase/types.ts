@@ -845,6 +845,51 @@ export type Database = {
           },
         ]
       }
+      client_enrichment_log: {
+        Row: {
+          client_id: string
+          company_id: string
+          created_at: string
+          id: string
+          sources: Json | null
+          suggestion_count: number
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          company_id: string
+          created_at?: string
+          id?: string
+          sources?: Json | null
+          suggestion_count?: number
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          sources?: Json | null
+          suggestion_count?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_enrichment_log_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_enrichment_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_portal_users: {
         Row: {
           client_id: string

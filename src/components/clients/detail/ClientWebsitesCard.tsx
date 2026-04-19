@@ -21,12 +21,13 @@ interface Props {
   additionalWebsites: WebsiteItem[];
   canEdit: boolean;
   onRefresh?: () => void;
+  onClientUpdated?: (updated: any) => void;
 }
 
 export function ClientWebsitesCard({
-  clientId, clientName, taxId, primaryWebsite, additionalWebsites, canEdit, onRefresh,
+  clientId, clientName, taxId, primaryWebsite, additionalWebsites, canEdit, onRefresh, onClientUpdated,
 }: Props) {
-  const update = useClientUpdate(clientId);
+  const update = useClientUpdate(clientId, { onPatched: onClientUpdated });
   const [adding, setAdding] = useState(false);
   const [newUrl, setNewUrl] = useState('');
   const [newLabel, setNewLabel] = useState('');

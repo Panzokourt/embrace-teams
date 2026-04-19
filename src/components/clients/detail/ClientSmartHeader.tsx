@@ -32,6 +32,7 @@ interface Props {
   canEdit: boolean;
   onEdit: () => void;
   onRefresh?: () => void;
+  onClientUpdated?: (updated: any) => void;
 }
 
 const statusOptions = [
@@ -55,10 +56,10 @@ const statusBadgeClass: Record<string, string> = {
 };
 
 export function ClientSmartHeader({
-  client, revenueThisYear, monthlyRevenue, marginPercent, canEdit, onEdit, onRefresh,
+  client, revenueThisYear, monthlyRevenue, marginPercent, canEdit, onEdit, onRefresh, onClientUpdated,
 }: Props) {
   const navigate = useNavigate();
-  const update = useClientUpdate(client.id);
+  const update = useClientUpdate(client.id, { onPatched: onClientUpdated });
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 

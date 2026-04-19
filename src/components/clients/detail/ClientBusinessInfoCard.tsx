@@ -19,10 +19,11 @@ interface Props {
   };
   canEdit: boolean;
   onRefresh?: () => void;
+  onClientUpdated?: (updated: any) => void;
 }
 
-export function ClientBusinessInfoCard({ client, canEdit, onRefresh }: Props) {
-  const update = useClientUpdate(client.id);
+export function ClientBusinessInfoCard({ client, canEdit, onRefresh, onClientUpdated }: Props) {
+  const update = useClientUpdate(client.id, { onPatched: onClientUpdated });
   const save = (field: string) => async (value: string | null) => {
     await update.mutateAsync({ [field]: value });
   };

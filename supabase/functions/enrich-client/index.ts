@@ -34,26 +34,34 @@ const FIELD_LABELS: Record<string, string> = {
   notes: 'Περιγραφή',
 };
 
+async function firecrawlCall(target: string, formats: any[]) {
+  const r = await fetch('https://api.firecrawl.dev/v2/scrape', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ url: target, formats, onlyMainContent: true }),
+  });
+  return r;
+}
+
 async function firecrawlScrape(url: string) {
   if (!FIRECRAWL_API_KEY) return null;
   const target = url.startsWith('http') ? url : `https://${url}`;
   try {
-    const r = await fetch('https://api.firecrawl.dev/v2/scrape', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        url: target,
-        formats: ['markdown', 'branding', 'links'],
-        onlyMainContent: true,
-      }),
-    });
+    // Try with branding first; fall back if plan/feature not available
+    let r = await firecrawlCall(target, ['markdown', 'branding', 'links']);
     if (!r.ok) {
       const t = await r.text();
-      console.error('Firecrawl error', r.status, t);
-      return null;
+      console.error('Firecrawl error (with branding)', r.status, t);
+      // Retry without branding/links — most common failure cause
+      r = await firecrawlCall(target, ['markdown']);
+      if (!r.ok) {
+        const t2 = await r.text();
+        console.error('Firecrawl error (markdown only)', r.status, t2);
+        return null;
+      }
     }
     return await r.json();
   } catch (e) {
@@ -284,10 +292,14 @@ Deno.serve(async (req) => {
 
     // 2. Perplexity lookup if ΑΦΜ or only name available
     const targetTax = taxId || client.tax_id;
-    if (targetTax || (!targetWebsite && (clientName || client.name))) {
+    // 2. Perplexity lookup if ΑΦΜ ή/και αν δεν πήραμε context από website
+    const targetTax = taxId || client.tax_id;
+    const targetName = clientName || client.name;
+    const needsPerplexityFallback = !context.trim() && !!targetName;
+    if (targetTax || needsPerplexityFallback) {
       const q = targetTax
-        ? `Πληροφορίες για την ελληνική εταιρεία με ΑΦΜ ${targetTax}: επωνυμία, διεύθυνση, τομέας δραστηριότητας, website, στοιχεία επικοινωνίας.`
-        : `Πληροφορίες για την εταιρεία "${clientName || client.name}": ΑΦΜ, διεύθυνση, website, τομέας, στοιχεία επικοινωνίας.`;
+        ? `Πληροφορίες για την ελληνική εταιρεία "${targetName}" με ΑΦΜ ${targetTax}: επωνυμία, διεύθυνση, τομέας δραστηριότητας, website, στοιχεία επικοινωνίας, social media.`
+        : `Πληροφορίες για την εταιρεία "${targetName}"${targetWebsite ? ` (website: ${targetWebsite})` : ''}: ΑΦΜ, διεύθυνση, website, τομέας, στοιχεία επικοινωνίας, social media.`;
       const px = await perplexityLookup(q);
       if (px) {
         context += `=== Web Search ===\n${px.content}\n\nSources:\n${(px.citations || []).join('\n')}\n`;

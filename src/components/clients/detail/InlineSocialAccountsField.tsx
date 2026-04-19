@@ -163,7 +163,7 @@ export function InlineSocialAccountsField({ clientId, accounts, canEdit = true, 
             <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
               {acc.url && (
                 <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
-                  <a href={acc.url.startsWith('http') ? acc.url : `https://${acc.url}`} target="_blank" rel="noreferrer">
+                  <a href={normalizeUrl(acc.url)} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="h-3.5 w-3.5" />
                   </a>
                 </Button>

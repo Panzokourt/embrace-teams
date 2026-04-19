@@ -179,6 +179,7 @@ export default function ClientDetailPage() {
         canEdit={isAdmin || isManager}
         onEdit={() => setEditOpen(true)}
         onRefresh={fetchAll}
+        onClientUpdated={handleClientPatched}
       />
 
       {/* SECTION 2 — Main Grid */}
@@ -189,6 +190,7 @@ export default function ClientDetailPage() {
             client={client}
             canEdit={isAdmin || isManager}
             onRefresh={fetchAll}
+            onClientUpdated={handleClientPatched}
           />
           <ClientWebsitesCard
             clientId={client.id}
@@ -198,6 +200,7 @@ export default function ClientDetailPage() {
             additionalWebsites={additionalWebsites}
             canEdit={isAdmin || isManager}
             onRefresh={fetchAll}
+            onClientUpdated={handleClientPatched}
           />
           <ClientSocialCard accounts={socialAccounts} onEdit={() => setEditOpen(true)} />
           <ClientAdAccountsCard accounts={adAccounts} onEdit={() => setEditOpen(true)} />

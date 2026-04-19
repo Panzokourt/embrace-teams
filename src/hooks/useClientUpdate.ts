@@ -4,7 +4,11 @@ import { toast } from 'sonner';
 
 type ClientUpdate = Record<string, any>;
 
-export function useClientUpdate(clientId: string | undefined) {
+interface Options {
+  onPatched?: (updatedClient: any) => void;
+}
+
+export function useClientUpdate(clientId: string | undefined, options?: Options) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -19,7 +23,8 @@ export function useClientUpdate(clientId: string | undefined) {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      options?.onPatched?.(data);
       queryClient.invalidateQueries({ queryKey: ['client', clientId] });
       queryClient.invalidateQueries({ queryKey: ['clients'] });
     },

@@ -41,6 +41,11 @@ export default function ClientDetailPage() {
     if (id) fetchAll();
   }, [id]);
 
+  const handleClientPatched = (updated: any) => {
+    if (!updated) return;
+    setClient((prev: any) => ({ ...(prev || {}), ...updated }));
+  };
+
   const fetchAll = async () => {
     if (!id) return;
     setLoading(true);
@@ -174,6 +179,7 @@ export default function ClientDetailPage() {
         canEdit={isAdmin || isManager}
         onEdit={() => setEditOpen(true)}
         onRefresh={fetchAll}
+        onClientUpdated={handleClientPatched}
       />
 
       {/* SECTION 2 — Main Grid */}
@@ -184,6 +190,7 @@ export default function ClientDetailPage() {
             client={client}
             canEdit={isAdmin || isManager}
             onRefresh={fetchAll}
+            onClientUpdated={handleClientPatched}
           />
           <ClientWebsitesCard
             clientId={client.id}
@@ -193,6 +200,7 @@ export default function ClientDetailPage() {
             additionalWebsites={additionalWebsites}
             canEdit={isAdmin || isManager}
             onRefresh={fetchAll}
+            onClientUpdated={handleClientPatched}
           />
           <ClientSocialCard accounts={socialAccounts} onEdit={() => setEditOpen(true)} />
           <ClientAdAccountsCard accounts={adAccounts} onEdit={() => setEditOpen(true)} />

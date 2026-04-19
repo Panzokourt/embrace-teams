@@ -89,7 +89,150 @@ export function ClientForm({ open, onOpenChange, client, onSaved }: ClientFormPr
       });
     }
     setTagInput(''); setGoalInput(''); setPillarInput('');
+    setPendingLogoUrl(null);
   }, [client, open]);
+
+  const mergeStringArray = (current: string[], incoming: string[]) => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    [...(current || []), ...(incoming || [])].forEach(t => {
+      const k = String(t).trim().toLowerCase();
+      if (k && !seen.has(k)) { seen.add(k); out.push(String(t).trim()); }
+    });
+    return out;
+  };
+
+  const mergeSocialAccounts = (
+    current: { platform: string; account_name: string; url: string }[],
+    incoming: any[],
+  ) => {
+    const seen = new Set<string>();
+    const out: any[] = [];
+    [...(current || []), ...(incoming || [])].forEach(a => {
+      if (!a) return;
+      const k = `${(a.platform || '').toLowerCase()}::${(a.url || a.account_name || '').toLowerCase()}`;
+      if (!seen.has(k)) { seen.add(k); out.push(a); }
+    });
+    return out;
+  };
+
+  const handleEnrich = async () => {
+    const site = formData.website.trim();
+    const tax = formData.tax_id.trim();
+    const name = formData.name.trim();
+    if (!site && !tax && !name) {
+      toast.error('Συμπλήρωσε website, ΑΦΜ ή επωνυμία πρώτα.');
+      return;
+    }
+    setEnriching(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('enrich-client', {
+        body: { draft: true, website: site || undefined, taxId: tax || undefined, clientName: name || undefined },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const suggestions: any[] = data?.suggestions || [];
+      const logoUrl: string | undefined = data?.logoUrl;
+
+      let appliedCount = 0;
+      setFormData(prev => {
+        const next = { ...prev };
+        for (const s of suggestions) {
+          const v = s.value;
+          if (v === null || v === undefined || v === '') continue;
+          switch (s.field) {
+            case 'name':
+              if (!next.name) { next.name = String(v); appliedCount++; }
+              break;
+            case 'tax_id':
+              if (!next.tax_id) { next.tax_id = String(v); appliedCount++; }
+              break;
+            case 'contact_email':
+              if (!next.contact_email) { next.contact_email = String(v); appliedCount++; }
+              break;
+            case 'contact_phone':
+              if (!next.contact_phone) { next.contact_phone = String(v); appliedCount++; }
+              break;
+            case 'secondary_phone':
+              if (!next.secondary_phone) { next.secondary_phone = String(v); appliedCount++; }
+              break;
+            case 'address':
+              if (!next.address) { next.address = String(v); appliedCount++; }
+              break;
+            case 'website':
+              if (!next.website) { next.website = String(v); appliedCount++; }
+              break;
+            case 'sector':
+              if (!next.sector) { next.sector = String(v); appliedCount++; }
+              break;
+            case 'notes':
+              if (!next.notes) { next.notes = String(v); appliedCount++; }
+              break;
+            case 'tags':
+              if (Array.isArray(v)) {
+                const merged = mergeStringArray(next.tags, v);
+                if (merged.length !== next.tags.length) { next.tags = merged; appliedCount++; }
+              }
+              break;
+            case 'social_accounts':
+              if (Array.isArray(v)) {
+                const merged = mergeSocialAccounts(next.social_accounts, v);
+                if (merged.length !== next.social_accounts.length) { next.social_accounts = merged; appliedCount++; }
+              }
+              break;
+          }
+        }
+        return next;
+      });
+
+      if (logoUrl) {
+        setPendingLogoUrl(logoUrl);
+        appliedCount++;
+      }
+
+      if (appliedCount > 0) {
+        toast.success(`Εφαρμόστηκαν ${appliedCount} προτάσεις από AI`);
+      } else {
+        toast.info('Δεν βρέθηκαν νέες προτάσεις.');
+      }
+    } catch (e: any) {
+      toast.error(e?.message || 'AI enrichment απέτυχε');
+    } finally {
+      setEnriching(false);
+    }
+  };
+
+  const uploadPendingLogo = async (clientId: string): Promise<string | null> => {
+    if (!pendingLogoUrl) return null;
+    try {
+      const { data: userData, error: uErr } = await supabase.auth.getUser();
+      if (uErr || !userData?.user) return null;
+      const userId = userData.user.id;
+      const r = await fetch(pendingLogoUrl);
+      if (!r.ok) return null;
+      const ct = (r.headers.get('content-type') || 'image/png').toLowerCase();
+      if (!ct.startsWith('image/') && !ct.includes('svg')) return null;
+      const blob = await r.blob();
+      const ext = ct.includes('svg') ? 'svg'
+                : ct.includes('jpeg') || ct.includes('jpg') ? 'jpg'
+                : ct.includes('webp') ? 'webp'
+                : ct.includes('gif') ? 'gif'
+                : 'png';
+      const path = `${userId}/client-logos/${clientId}-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from('project-files')
+        .upload(path, blob, { contentType: ct, upsert: true });
+      if (upErr) { console.error('Logo upload', upErr); return null; }
+      const { data: signed } = await supabase.storage
+        .from('project-files')
+        .createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
+      return signed?.signedUrl || null;
+    } catch (e) {
+      console.error('uploadPendingLogo', e);
+      return null;
+    }
+  };
 
   const addTag = () => {
     const t = tagInput.trim();

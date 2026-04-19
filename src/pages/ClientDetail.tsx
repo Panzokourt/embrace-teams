@@ -202,7 +202,12 @@ export default function ClientDetailPage() {
             onRefresh={fetchAll}
             onClientUpdated={handleClientPatched}
           />
-          <ClientSocialCard accounts={socialAccounts} onEdit={() => setEditOpen(true)} />
+          <ClientSocialCard
+            clientId={client.id}
+            accounts={socialAccounts}
+            canEdit={isAdmin || isManager}
+            onClientUpdated={handleClientPatched}
+          />
           <ClientAdAccountsCard accounts={adAccounts} onEdit={() => setEditOpen(true)} />
           <ClientStrategyCard strategy={strategy} onEdit={() => setEditOpen(true)} />
         </div>

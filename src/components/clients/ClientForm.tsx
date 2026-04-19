@@ -263,12 +263,23 @@ export function ClientForm({ open, onOpenChange, client, onSaved }: ClientFormPr
       };
 
       if (client?.id) {
+        if (pendingLogoUrl) {
+          const uploaded = await uploadPendingLogo(client.id);
+          if (uploaded) payload.logo_url = uploaded;
+        }
         const { error } = await supabase.from('clients').update(payload).eq('id', client.id);
         if (error) throw error;
         toast.success('Ο πελάτης ενημερώθηκε!');
       } else {
-        const { error } = await supabase.from('clients').insert(payload);
+        const { data: inserted, error } = await supabase
+          .from('clients').insert(payload).select('id').single();
         if (error) throw error;
+        if (inserted?.id && pendingLogoUrl) {
+          const uploaded = await uploadPendingLogo(inserted.id);
+          if (uploaded) {
+            await supabase.from('clients').update({ logo_url: uploaded }).eq('id', inserted.id);
+          }
+        }
         toast.success('Ο πελάτης δημιουργήθηκε!');
       }
       onOpenChange(false);

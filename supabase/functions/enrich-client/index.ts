@@ -125,16 +125,22 @@ async function aiExtract(context: string, currentClient: Record<string, any>) {
             enum: ['public', 'private', 'non_profit', 'government', 'mixed'],
           },
           notes: { type: 'string', description: 'Brief description of the company (1-2 sentences)' },
+          tags: {
+            type: 'array',
+            description: '3-6 σύντομα tags (lowercase, ENGLISH preferred) που χαρακτηρίζουν την εταιρεία: industry/τομέας, business model (b2b/b2c/d2c), τύπος (startup, enterprise, agency, sme, public-sector, non-profit), κάθετη αγορά (fintech, saas, ecommerce, restaurant, healthcare, education κ.λπ.). Παράδειγμα: ["fintech","b2b","saas","startup"].',
+            items: { type: 'string' },
+          },
           social_accounts: {
             type: 'array',
+            description: 'ΟΛΟΙ οι λογαριασμοί κοινωνικής δικτύωσης που μπορείς να επιβεβαιώσεις (Facebook, Instagram, LinkedIn, YouTube, TikTok, X/Twitter, Threads). Μην παραλείπεις πλατφόρμες που υπάρχουν. Το account_name πρέπει να είναι το handle/όνομα σελίδας (π.χ. "@nike", "Nike Greece") — αν δεν αναφέρεται ρητά, εξήγαγέ το από το URL.',
             items: {
               type: 'object',
               properties: {
-                platform: { type: 'string', enum: ['facebook', 'instagram', 'twitter', 'linkedin', 'youtube', 'tiktok'] },
+                platform: { type: 'string', enum: ['facebook', 'instagram', 'twitter', 'x', 'linkedin', 'youtube', 'tiktok', 'threads'] },
                 url: { type: 'string' },
-                handle: { type: 'string' },
+                account_name: { type: 'string', description: 'Handle ή εμφανιζόμενο όνομα του λογαριασμού' },
               },
-              required: ['platform', 'url'],
+              required: ['platform', 'url', 'account_name'],
             },
           },
           confidence: {
@@ -158,7 +164,12 @@ async function aiExtract(context: string, currentClient: Record<string, any>) {
       messages: [
         {
           role: 'system',
-          content: 'Extract verifiable business information from the provided context. Only include fields you can find evidence for. Output via the function tool. Confidence: high = directly stated; medium = inferred; low = uncertain. Greek company → Greek values where natural.',
+          content: `Extract verifiable business information from the provided context. Only include fields you can find evidence for. Output via the function tool. Confidence: high = directly stated; medium = inferred; low = uncertain. Greek company → Greek values where natural.
+
+ALWAYS try to extract these high-value fields when any signal exists:
+- tax_id (ΑΦΜ): Αν είναι ελληνική εταιρεία και βρεις 9ψήφιο ΑΦΜ, επέστρεψέ το (digits only).
+- tags: 3-6 περιγραφικά keywords (industry, business model, vertical) — π.χ. ["fintech","b2b","saas"].
+- social_accounts: ΟΛΕΣ τις πλατφόρμες (Facebook, Instagram, LinkedIn, YouTube, TikTok, X/Twitter, Threads) — όχι μόνο μία. Πάντα συμπλήρωσε account_name (handle ή όνομα σελίδας).`,
         },
         {
           role: 'user',
@@ -294,10 +305,16 @@ Deno.serve(async (req) => {
     const targetTax = taxId || client.tax_id;
     const targetName = clientName || client.name;
     const needsPerplexityFallback = !context.trim() && !!targetName;
-    if (targetTax || needsPerplexityFallback) {
+    // Always run Perplexity if we have a name — to enrich social accounts, tags, ΑΦΜ που λείπουν
+    const wantsPerplexity = !!targetName && (targetTax || needsPerplexityFallback || !client.tax_id || !Array.isArray(client.social_accounts) || (client.social_accounts as any[]).length < 3);
+    if (wantsPerplexity) {
+      const socialAsk = 'ΟΛΟΥΣ τους επίσημους λογαριασμούς social media (Facebook URL, Instagram URL, LinkedIn URL, YouTube URL, TikTok URL, X/Twitter URL, Threads URL) με τα handles τους';
+      const tagsAsk = 'τομέα δραστηριότητας και 3-6 σύντομα tags (industry, business model π.χ. b2b/b2c, τύπος εταιρείας π.χ. startup/agency/saas/fintech)';
+      const taxAsk = client.tax_id ? '' : 'ΑΦΜ της εταιρείας από δημόσια μητρώα (ΓΕΜΗ, taxisnet, opengov) — μόνο αν είσαι σίγουρος, 9 ψηφία';
+      const baseInfo = `επωνυμία, διεύθυνση, website, στοιχεία επικοινωνίας`;
       const q = targetTax
-        ? `Πληροφορίες για την ελληνική εταιρεία "${targetName}" με ΑΦΜ ${targetTax}: επωνυμία, διεύθυνση, τομέας δραστηριότητας, website, στοιχεία επικοινωνίας, social media.`
-        : `Πληροφορίες για την εταιρεία "${targetName}"${targetWebsite ? ` (website: ${targetWebsite})` : ''}: ΑΦΜ, διεύθυνση, website, τομέας, στοιχεία επικοινωνίας, social media.`;
+        ? `Πληροφορίες για την ελληνική εταιρεία "${targetName}" με ΑΦΜ ${targetTax}: ${baseInfo}, ${tagsAsk}, ${socialAsk}.`
+        : `Πληροφορίες για την εταιρεία "${targetName}"${targetWebsite ? ` (website: ${targetWebsite})` : ''}: ${baseInfo}, ${tagsAsk}, ${socialAsk}${taxAsk ? `, ${taxAsk}` : ''}.`;
       const px = await perplexityLookup(q);
       if (px) {
         context += `=== Web Search ===\n${px.content}\n\nSources:\n${(px.citations || []).join('\n')}\n`;

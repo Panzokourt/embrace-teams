@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { Loader2, X, Plus, Trash2 } from 'lucide-react';
+import { Loader2, X, Plus, Trash2, Sparkles } from 'lucide-react';
 import { useProjectCategories } from '@/hooks/useProjectCategories';
 import { AIFillButton } from '@/components/shared/AIFillButton';
 

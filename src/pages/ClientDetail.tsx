@@ -10,6 +10,7 @@ import { startOfYear, startOfWeek, endOfWeek, isBefore } from 'date-fns';
 import { ClientForm } from '@/components/clients/ClientForm';
 import { ClientSmartHeader } from '@/components/clients/detail/ClientSmartHeader';
 import { ClientWebsitesCard } from '@/components/clients/detail/ClientWebsitesCard';
+import { ClientBusinessInfoCard } from '@/components/clients/detail/ClientBusinessInfoCard';
 import { ClientSocialCard } from '@/components/clients/detail/ClientSocialCard';
 import { ClientAdAccountsCard } from '@/components/clients/detail/ClientAdAccountsCard';
 import { ClientStrategyCard } from '@/components/clients/detail/ClientStrategyCard';
@@ -172,16 +173,26 @@ export default function ClientDetailPage() {
         marginPercent={marginPercent}
         canEdit={isAdmin || isManager}
         onEdit={() => setEditOpen(true)}
+        onRefresh={fetchAll}
       />
 
       {/* SECTION 2 — Main Grid */}
       <div className="grid grid-cols-12 gap-6">
         {/* Left Column — Business & Strategy */}
         <div className="col-span-12 lg:col-span-7 space-y-6">
+          <ClientBusinessInfoCard
+            client={client}
+            canEdit={isAdmin || isManager}
+            onRefresh={fetchAll}
+          />
           <ClientWebsitesCard
+            clientId={client.id}
+            clientName={client.name}
+            taxId={client.tax_id}
             primaryWebsite={client.website}
             additionalWebsites={additionalWebsites}
-            onEdit={() => setEditOpen(true)}
+            canEdit={isAdmin || isManager}
+            onRefresh={fetchAll}
           />
           <ClientSocialCard accounts={socialAccounts} onEdit={() => setEditOpen(true)} />
           <ClientAdAccountsCard accounts={adAccounts} onEdit={() => setEditOpen(true)} />

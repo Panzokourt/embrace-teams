@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -5,9 +6,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
   Building2, Pencil, Plus, FolderKanban, FileText, UserPlus, BookOpen,
-  ArrowLeft, TrendingUp, DollarSign, Percent,
+  ArrowLeft, TrendingUp, DollarSign, Percent, Camera, Loader2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { InlineEditField } from '../InlineEditField';
+import { AIEnrichButton } from '../AIEnrichButton';
+import { useClientUpdate } from '@/hooks/useClientUpdate';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface Props {
   client: {
@@ -16,58 +22,153 @@ interface Props {
     logo_url: string | null;
     sector: string | null;
     status: string | null;
+    website: string | null;
+    tax_id: string | null;
+    company_id: string;
   };
   revenueThisYear: number;
   monthlyRevenue: number;
   marginPercent: number;
   canEdit: boolean;
   onEdit: () => void;
+  onRefresh?: () => void;
 }
 
-const statusConfig: Record<string, { label: string; className: string }> = {
-  active: { label: 'Active', className: 'bg-success/10 text-success border-success/20' },
-  proposal: { label: 'Proposal', className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200' },
-  risk: { label: 'Risk', className: 'bg-destructive/10 text-destructive border-destructive/20' },
+const statusOptions = [
+  { value: 'active', label: 'Active' },
+  { value: 'proposal', label: 'Proposal' },
+  { value: 'risk', label: 'Risk' },
+];
+
+const sectorOptions = [
+  { value: 'public', label: 'Δημόσιος Τομέας' },
+  { value: 'private', label: 'Ιδιωτικός Τομέας' },
+  { value: 'non_profit', label: 'Μη Κερδοσκοπικός' },
+  { value: 'government', label: 'Κυβερνητικός' },
+  { value: 'mixed', label: 'Μικτός' },
+];
+
+const statusBadgeClass: Record<string, string> = {
+  active: 'bg-success/10 text-success border-success/20',
+  proposal: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200',
+  risk: 'bg-destructive/10 text-destructive border-destructive/20',
 };
 
-const sectorLabels: Record<string, string> = {
-  public: 'Δημόσιος Τομέας',
-  private: 'Ιδιωτικός Τομέας',
-  non_profit: 'Μη Κερδοσκοπικός',
-  government: 'Κυβερνητικός',
-  mixed: 'Μικτός',
-};
-
-export function ClientSmartHeader({ client, revenueThisYear, monthlyRevenue, marginPercent, canEdit, onEdit }: Props) {
+export function ClientSmartHeader({
+  client, revenueThisYear, monthlyRevenue, marginPercent, canEdit, onEdit, onRefresh,
+}: Props) {
   const navigate = useNavigate();
-  const st = statusConfig[client.status || 'active'] || statusConfig.active;
+  const update = useClientUpdate(client.id);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const save = (field: string) => async (v: string | null) => {
+    await update.mutateAsync({ [field]: v });
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const ext = file.name.split('.').pop() || 'png';
+      const path = `client-logos/${client.id}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from('project-files')
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (upErr) throw upErr;
+      const { data: signed } = await supabase.storage
+        .from('project-files')
+        .createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
+      if (signed?.signedUrl) {
+        await update.mutateAsync({ logo_url: signed.signedUrl });
+        toast.success('Λογότυπο ενημερώθηκε');
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Σφάλμα ανεβάσματος');
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  const sectorLabel = sectorOptions.find(o => o.value === client.sector)?.label;
+  const statusKey = client.status || 'active';
+  const statusLabel = statusOptions.find(o => o.value === statusKey)?.label || 'Active';
 
   return (
     <div className="rounded-2xl border border-border/50 bg-card shadow-soft p-6">
       <div className="flex items-center gap-5">
-        {/* Back + Logo */}
         <Button variant="ghost" size="icon" onClick={() => navigate('/clients')} className="shrink-0">
           <ArrowLeft className="h-5 w-5" />
         </Button>
 
-        <div className="h-14 w-14 rounded-2xl bg-secondary flex items-center justify-center overflow-hidden shrink-0">
-          {client.logo_url ? (
-            <img src={client.logo_url} alt={client.name} className="h-full w-full object-cover" />
-          ) : (
-            <Building2 className="h-7 w-7 text-muted-foreground" />
-          )}
+        {/* Logo with upload */}
+        <div className="relative group shrink-0">
+          <button
+            type="button"
+            onClick={() => canEdit && fileRef.current?.click()}
+            disabled={!canEdit || uploading}
+            className="h-14 w-14 rounded-2xl bg-secondary flex items-center justify-center overflow-hidden relative"
+          >
+            {client.logo_url ? (
+              <img src={client.logo_url} alt={client.name} className="h-full w-full object-cover" />
+            ) : (
+              <Building2 className="h-7 w-7 text-muted-foreground" />
+            )}
+            {canEdit && (
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                {uploading ? (
+                  <Loader2 className="h-5 w-5 text-white animate-spin" />
+                ) : (
+                  <Camera className="h-5 w-5 text-white" />
+                )}
+              </div>
+            )}
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleLogoUpload}
+          />
         </div>
 
         {/* Name + Badges */}
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold truncate">{client.name}</h1>
+          <InlineEditField
+            value={client.name}
+            onSave={save('name')}
+            canEdit={canEdit}
+            placeholder="Όνομα πελάτη"
+            displayClassName="text-2xl font-bold"
+            inputClassName="text-2xl font-bold h-10"
+          />
           <div className="flex items-center gap-2 mt-1 flex-wrap">
-            {client.sector && (
-              <Badge variant="secondary" className="text-xs">
-                {sectorLabels[client.sector] || client.sector}
-              </Badge>
-            )}
-            <Badge className={`text-xs border ${st.className}`}>{st.label}</Badge>
+            <InlineEditField
+              value={client.sector}
+              onSave={save('sector')}
+              type="select"
+              options={sectorOptions}
+              canEdit={canEdit}
+              emptyLabel="+ τομέας"
+              renderDisplay={() => (
+                <Badge variant="secondary" className="text-xs">
+                  {sectorLabel || '+ τομέας'}
+                </Badge>
+              )}
+            />
+            <InlineEditField
+              value={statusKey}
+              onSave={save('status')}
+              type="select"
+              options={statusOptions}
+              canEdit={canEdit}
+              renderDisplay={() => (
+                <Badge className={`text-xs border ${statusBadgeClass[statusKey]}`}>{statusLabel}</Badge>
+              )}
+            />
           </div>
         </div>
 
@@ -96,8 +197,19 @@ export function ClientSmartHeader({ client, revenueThisYear, monthlyRevenue, mar
         {/* Actions */}
         <div className="flex items-center gap-2">
           {canEdit && (
+            <AIEnrichButton
+              clientId={client.id}
+              website={client.website}
+              taxId={client.tax_id}
+              clientName={client.name}
+              size="sm"
+              label="AI Enrich"
+              onApplied={onRefresh}
+            />
+          )}
+          {canEdit && (
             <Button size="sm" variant="outline" onClick={onEdit}>
-              <Pencil className="h-4 w-4 mr-1" /> Επεξεργασία
+              <Pencil className="h-4 w-4 mr-1" /> Πλήρης
             </Button>
           )}
           <DropdownMenu>

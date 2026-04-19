@@ -1,176 +1,112 @@
 
 
-# Universal Mention & Slash Command System
+# Inline Editing + Πλήρη Στοιχεία + AI Enrichment στη Σελίδα Πελάτη
 
-## Πρόβλημα
+## Τι λείπει σήμερα
 
-Σήμερα υπάρχουν **3 ασύμβατες υλοποιήσεις mention**, καθεμία περιορισμένη:
+Από τα DB πεδία (`tax_id`, `contact_phone`, `secondary_phone`, `address`, `contact_email`, `tags`, `notes`) **καμία** δεν εμφανίζεται στη σελίδα του πελάτη. Όλα κρύβονται πίσω από το dialog "Επεξεργασία". Δεν υπάρχει inline editing — κάθε αλλαγή (όνομα, website, sector, status) απαιτεί άνοιγμα ολόκληρης της φόρμας.
 
-| Σημείο | Τι υποστηρίζει | Σύνταξη |
-|--------|----------------|---------|
-| `src/components/chat/MentionInput.tsx` (Chat panel) | users, projects, tasks, email threads | `@Όνομα ` (plain) |
-| `src/components/secretary/MentionInput.tsx` | profiles, projects, tasks, files | `@[name](type:id)` |
-| `CommentsSection > MentionTextarea` | μόνο users του project | `@name ` |
-| `QuickChatBar` (κάτω-κέντρο) | **τίποτα** — απλό `<input>` | — |
-| `InboxComposeInput` | τίποτα | — |
-| `/` slash commands | **πουθενά** δεν υπάρχει | — |
+## Λύση — Τρία τμήματα
 
-Ο χρήστης ζητά: σε **όλα τα input** όπου γράφει, με `@` ή `/` να βρίσκει **πάντα** τα ίδια entities (people, projects, tasks, contracts, deliverables, invoices, campaigns, tenders, clients, files, emails, wiki articles).
+### 1. Inline editing παντού
 
-## Λύση: Ένα Universal Component
+Φτιάχνω **`<InlineEditField>`** ως universal component (text/email/phone/url/textarea/select), και το χρησιμοποιώ:
 
-Φτιάχνουμε **`<MentionTextarea>`** ως ενιαίο component που αντικαθιστά και τις 3+ υπάρχουσες υλοποιήσεις. Τοποθετείται σε **όλα** τα input points.
+| Σημείο | Πεδία που γίνονται inline-editable |
+|--------|-------------------------------------|
+| `ClientSmartHeader` | `name` (click-to-edit στον τίτλο), `sector`, `status` (badges → dropdown on click), `logo_url` (click στο avatar → upload) |
+| **Νέο** `ClientBusinessInfoCard` | `tax_id`, `contact_email`, `contact_phone`, `secondary_phone`, `address`, `tags` |
+| `ClientWebsitesCard` | `website` (primary) + `additional_websites[]` editable inline (add/remove rows) |
+| `ClientStrategyCard` | strategy fields ήδη υπάρχουν → γίνονται inline |
 
-```text
-src/components/mentions/
-├── useMentionSearch.ts        ← React Query hook με debounce + 6h cache
-├── mentionRegistry.ts         ← Type definitions + colors + icons + table mapping
-├── MentionTextarea.tsx        ← Universal textarea wrapper (auto-grow)
-├── MentionPopover.tsx         ← Dropdown UI (grouped by type, keyboard nav)
-├── MentionChip.tsx            ← Render για display (read-only με click-to-navigate)
-└── parseMentions.ts           ← Server-friendly parser για το serialized format
-```
+UX: hover δείχνει pencil icon, click ανοίγει field, `Enter` save / `Esc` cancel, `blur` save. Optimistic update + Supabase patch + toast. Permission check: μόνο `isAdmin || isManager`.
 
-### Σύνταξη (single source of truth)
+Το παλιό `ClientForm` dialog **μένει** ως "Πλήρης επεξεργασία" fallback (κουμπί στο header), γιατί καλύπτει αρχικό setup και bulk JSONB πεδία.
+
+### 2. Νέα κάρτα "Στοιχεία Επιχείρησης"
+
+Πάνω αριστερά στο grid (πάνω από Websites). Δείχνει:
 
 ```text
-@[Όνομα](type:id)        ← mention ενός entity
-/[command](payload)      ← slash command (action)
+ΑΦΜ          [123456789]    🔮 AI Enrich
+Email        [info@…]
+Τηλέφωνο     [+30 …]
+Δευτ. Τηλ    [—]
+Διεύθυνση    [—]
+Tags         [marketing] [b2b] [+]
 ```
 
-Παράδειγμα μηνύματος μετά από input:
+Όλα inline-editable. Όπου κενό → placeholder "Προσθήκη…".
+
+### 3. AI Client Enrichment
+
+Νέο edge function **`enrich-client`** (Lovable AI Gateway, default `google/gemini-3-flash-preview`).
+
+**Trigger points** (Sparkles button δίπλα στο πεδίο):
+- δίπλα στο **Website** στο `ClientWebsitesCard`
+- δίπλα στο **ΑΦΜ** στο νέο `ClientBusinessInfoCard`
+- "Enrich with AI" button στο SmartHeader (έξυπνη πρόταση που κάνει και τα δύο)
+
+**Flow**:
+```text
+Click "Enrich"
+  ↓
+enrich-client edge function:
+  1. Αν υπάρχει website → Firecrawl scrape (markdown + branding format)
+     → AI extract: company description, sector, address, phone, emails, social, logo URL
+  2. Αν υπάρχει ΑΦΜ (ΕΛ) → AI lookup μέσω web search (Perplexity sonar)
+     → company name, address, sector, website (cross-validate)
+  3. Επιστρέφει structured JSON με προτεινόμενα πεδία + confidence + sources
+  ↓
+Modal "AI Suggestions" — checkbox-list με τις προτάσεις
+  ↓
+User επιλέγει τι θέλει να εφαρμοστεί → bulk update
+  ↓
+Logo: αν Firecrawl branding έδωσε logo URL → fetch + upload σε `project-files` storage
+  → set `clients.logo_url`
 ```
-Συζητώντας με @[Γιάννη](user:abc-123) για το @[Project Apollo](project:def-456),
-έκλεισα το @[Contract #2024-08](contract:ghi-789). Δες /summary(today).
-```
 
-## Entities που υποστηρίζονται
+**Ασφάλεια & κόστος**:
+- Rate-limit: max 10 enrichments/μέρα/εταιρεία
+- `FIRECRAWL_API_KEY`, `PERPLEXITY_API_KEY`, `LOVABLE_API_KEY` ήδη στα secrets ✓
+- Όλα τα suggestions περνούν από user approval — **καμία αυτόματη εγγραφή**
 
-Όλα query-able από τη βάση με ενιαίο interface:
-
-| Type | Πίνακας | Πεδία αναζήτησης | Icon |
-|------|---------|------------------|------|
-| `user` | `profiles` | `full_name, email` | User |
-| `project` | `projects` | `name` | FolderKanban |
-| `task` | `tasks` | `title` | CheckSquare |
-| `client` | `clients` | `name, contact_email` | Building2 |
-| `contract` | `contracts` + `project_contracts` | `title, contract_type` | FileSignature |
-| `deliverable` | `deliverables` | `name` | Package |
-| `invoice` | `invoices` | `invoice_number, notes` | Receipt |
-| `campaign` | `campaigns` | `name` | Megaphone |
-| `tender` | `tenders` | `name` | Gavel |
-| `file` | `file_attachments` | `file_name` | File |
-| `email` | `email_messages` (group by thread) | `subject, from_*` | Mail |
-| `wiki` | `kb_articles` | `title` | BookOpen |
-
-Όλα φιλτράρονται με **company_id** (multi-tenant), respect σε RLS.
-
-## Slash Commands (`/`)
-
-Μόνο σε **AI chats** (Secretary, Quick, Sidebar Chat) — όχι σε comments/inbox.
-
-| Command | Action |
-|---------|--------|
-| `/summary` | Δημιουργεί σύνοψη ημέρας/εβδομάδας |
-| `/task` | Άνοιγμα task creation flow |
-| `/find` | Καθαρή αναζήτηση χωρίς AI |
-| `/calendar` | Εμφανίζει σημερινό schedule |
-| `/help` | Λίστα όλων |
-
-Το set έρχεται από registry, εύκολα επεκτάσιμο.
-
-## Hook: `useMentionSearch(query, opts)`
+## Αρχιτεκτονική
 
 ```text
-- Debounce 200ms
-- Παράλληλα queries σε όλους τους πίνακες (Promise.all)
-- React Query cache (staleTime 5min)
-- opts.types?: filter by allowed types (π.χ. comments → μόνο 'user')
-- opts.companyId: scoping
-- Returns: { results: GroupedResults, loading: boolean }
+ClientDetail.tsx (refactor: optimistic update handler)
+    ├── ClientSmartHeader (inline name/status/sector/avatar)
+    ├── ClientBusinessInfoCard ◄── NEW
+    │       └── AIEnrichButton (target: tax_id)
+    ├── ClientWebsitesCard (inline + AIEnrichButton target: website)
+    ├── ClientSocialCard (inline)
+    ├── ClientAdAccountsCard (inline)
+    └── ClientStrategyCard (inline)
+
+src/components/clients/
+    ├── InlineEditField.tsx ◄── NEW (universal)
+    ├── AIEnrichButton.tsx ◄── NEW
+    ├── AIEnrichDialog.tsx ◄── NEW (review suggestions)
+    └── detail/ClientBusinessInfoCard.tsx ◄── NEW
+
+src/hooks/useClientUpdate.ts ◄── NEW (mutation με optimistic + invalidation)
+
+supabase/functions/enrich-client/ ◄── NEW
+    └── index.ts (Firecrawl + Perplexity + Lovable AI orchestration)
 ```
-
-## Integration plan ανά σημείο
-
-| Σημείο | Πριν | Μετά |
-|--------|------|------|
-| `src/components/chat/ChatMessageInput.tsx` | custom textarea + παλιό MentionInput | `<MentionTextarea>` με όλα τα types |
-| `src/components/secretary/MentionInput.tsx` | local impl | proxy → `<MentionTextarea>` με `enableSlash` |
-| `src/components/secretary/SecretaryChat.tsx` | inline textarea (γρ. 630) | `<MentionTextarea enableSlash>` |
-| `src/components/quick-chat/QuickChatBar.tsx` | plain `<input>` (γρ. 543) | `<MentionTextarea enableSlash compact>` |
-| `src/components/comments/CommentsSection.tsx` | local MentionTextarea (γρ. 99-213) | `<MentionTextarea types={['user']}>` (διατηρεί behavior) |
-| `src/components/inbox/InboxComposeInput.tsx` | plain Textarea (γρ. 156) | `<MentionTextarea>` στο body |
-| `ChatThread.tsx` (αν στέλνει μηνύματα) | check & migrate | `<MentionTextarea>` |
-
-## Display των mentions
-
-Φτιάχνουμε **`<MentionRenderer text={...}>`** που:
-- Parse-άρει `@[name](type:id)` και `/[cmd](payload)`
-- Render-άρει inline chips (color-coded ανά type)
-- Click → navigate στο σωστό route (π.χ. `project:xxx` → `/projects/xxx`)
-- Tooltip με preview (όνομα + type + status)
-
-Χρησιμοποιείται σε:
-- ChatMessageItem (μηνύματα chat)
-- CommentsSection (renderCommentContent)
-- SecretaryChat message rendering
-- Inbox message body
-- Όπου αλλού δείχνουμε user-generated content
-
-## Backend awareness
-
-Τα Edge Functions ήδη γνωρίζουν το format `@[name](type:id)` (γρ. 2207 στο `secretary-agent`). Επεκτείνουμε:
-
-- `parseMentions(text)` helper στο shared `_shared/mentions.ts` (Deno)
-- Όταν το AI λάβει mentions → auto-fetch το αντίστοιχο entity context πριν την απάντηση (π.χ. mention contract → φέρνει contract details, parties, dates)
-- Notifications: αν user mention σε comment/chat → δημιουργείται `notifications` row για τον αναφερόμενο
-
-## UX leverages
-
-- **Keyboard**: `↑↓` navigation, `Enter`/`Tab` insert, `Esc` close, `@` ή `/` ξανά για re-trigger
-- **Grouped popover**: Όλα τα results γκρουπαρισμένα ανά type με headers (όπως Linear/Slack)
-- **Recents**: Top 3 πιο πρόσφατα mentions του χρήστη φαίνονται όταν `@` πατηθεί χωρίς query
-- **Empty state**: αν query > 1 char και 0 results → "Πρόσθεσε νέο…" CTA (όπου έχει νόημα)
-- **Loading skeleton**: shimmer rows όσο ψάχνει
-- **Mobile**: popover γίνεται bottom sheet σε <640px
-
-## Edge cases
-
-- Text μέσα σε email (`user@example.com`) → δεν ενεργοποιείται popover (regex απαιτεί whitespace πριν)
-- Stripping σε email subjects/SMS exports → `parseMentions(text, { format: 'plain' })` βγάζει μόνο τα labels
-- RLS: queries επιστρέφουν μόνο entities που ο user βλέπει — δεν διαρρέει info
-
-## Αρχεία
-
-| Ενέργεια | Αρχείο |
-|----------|--------|
-| **Νέο** | `src/components/mentions/mentionRegistry.ts` |
-| **Νέο** | `src/components/mentions/useMentionSearch.ts` |
-| **Νέο** | `src/components/mentions/MentionTextarea.tsx` |
-| **Νέο** | `src/components/mentions/MentionPopover.tsx` |
-| **Νέο** | `src/components/mentions/MentionRenderer.tsx` |
-| **Νέο** | `src/components/mentions/parseMentions.ts` |
-| **Νέο** | `supabase/functions/_shared/mentions.ts` |
-| **Refactor** | `src/components/chat/ChatMessageInput.tsx` (αντικατάσταση) |
-| **Refactor** | `src/components/chat/ChatMessageItem.tsx` (renderer) |
-| **Refactor** | `src/components/secretary/SecretaryChat.tsx` (textarea) |
-| **Refactor** | `src/components/secretary/MentionInput.tsx` (γίνεται wrapper) |
-| **Refactor** | `src/components/quick-chat/QuickChatBar.tsx` (input → textarea) |
-| **Refactor** | `src/components/comments/CommentsSection.tsx` (local → universal) |
-| **Refactor** | `src/components/inbox/InboxComposeInput.tsx` (body field) |
-| **Διαγραφή** | `src/components/chat/MentionInput.tsx` (αντικατάσταση από νέο) |
-| **Update** | `supabase/functions/secretary-agent/index.ts` (use shared parser, auto-fetch context) |
-| **Update** | `supabase/functions/quick-chat-gemini/index.ts` (ίδιο) |
 
 ## Τι ΔΕΝ αλλάζει
 
-- DB schemas (όλα τα entities ήδη υπάρχουν)
-- AI model selector (Claude/Gemini/GPT routing)
-- Voice commands, file processing, conversation history
-- Comments business logic (μόνο το input UI αλλάζει)
+- DB schema (όλα τα πεδία υπάρχουν ήδη)
+- `ClientForm` dialog — μένει ως fallback πλήρους επεξεργασίας
+- RLS, permissions
+- Άλλα subcomponents (Projects, Tasks, Files, Briefs, Team)
 
-## Migration ασφάλεια
+## Ερωτήσεις πριν προχωρήσω
 
-- Backwards-compatible: παλιά messages με `@Όνομα` (plain) εξακολουθούν να φαίνονται κανονικά (ο renderer fallback-άρει σε plain text αν δεν matchάρει `@[]()`)
-- Συνταξη `@[name](type:id)` ήδη γνωστή στο secretary-agent → δεν σπάει nothing
-
+<lov-actions>
+<lov-suggestion message="Συνέχισε με όλα τα 3 βήματα μαζί όπως είναι (inline editing + Business Info card + AI enrichment με Firecrawl & Perplexity).">Όλα μαζί, ως έχει</lov-suggestion>
+<lov-suggestion message="Ξεκίνα μόνο με inline editing + Business Info card. Το AI enrichment θα το κάνουμε σε δεύτερη φάση.">Πρώτα inline + Business Info</lov-suggestion>
+<lov-suggestion message="Για το ΑΦΜ lookup χρησιμοποίησε ΜΟΝΟ Perplexity (όχι Firecrawl για website) — απλούστερη και φθηνότερη υλοποίηση.">Μόνο Perplexity για AI</lov-suggestion>
+<lov-suggestion message="Πρόσθεσε και πεδίο ΓΕΜΗ, ΔΟΥ, νόμιμος εκπρόσωπος στην κάρτα Στοιχεία Επιχείρησης (χρειάζεται migration).">Επέκτεινε με ΓΕΜΗ/ΔΟΥ</lov-suggestion>
+</lov-actions>

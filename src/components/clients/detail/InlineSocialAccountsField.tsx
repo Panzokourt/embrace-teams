@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ExternalLink, Plus, Trash2, Pencil, Check, X, Loader2 } from 'lucide-react';
 import { useClientUpdate } from '@/hooks/useClientUpdate';
 import { toast } from 'sonner';
+import { openExternalUrl } from '@/lib/utils';
 
 export interface SocialAccount {
   platform: string;

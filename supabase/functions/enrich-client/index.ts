@@ -32,6 +32,7 @@ const FIELD_LABELS: Record<string, string> = {
   sector: 'Τομέας',
   social_accounts: 'Social Media',
   notes: 'Περιγραφή',
+  tags: 'Tags',
 };
 
 async function firecrawlCall(target: string, formats: any[]) {

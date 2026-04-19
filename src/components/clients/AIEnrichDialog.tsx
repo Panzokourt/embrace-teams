@@ -1,0 +1,185 @@
+import { useEffect, useState } from 'react';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { Sparkles, Loader2, ExternalLink } from 'lucide-react';
+
+export interface EnrichSuggestion {
+  field: string;             // e.g. 'tax_id', 'address', 'social_accounts'
+  label: string;             // human-readable label
+  value: any;                // suggested value
+  currentValue?: any;        // current DB value
+  confidence?: 'low' | 'medium' | 'high';
+  source?: string;           // 'firecrawl' | 'perplexity'
+  sourceUrl?: string;
+}
+
+interface Props {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  clientId: string;
+  suggestions: EnrichSuggestion[];
+  logoUrl?: string;
+  onApplied?: () => void;
+}
+
+const confidenceColor: Record<string, string> = {
+  high: 'bg-success/10 text-success border-success/20',
+  medium: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200',
+  low: 'bg-muted text-muted-foreground border-border',
+};
+
+function renderValue(v: any) {
+  if (v === null || v === undefined || v === '') return <span className="text-muted-foreground italic">—</span>;
+  if (typeof v === 'string') return <span className="break-words">{v}</span>;
+  if (Array.isArray(v)) return <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{JSON.stringify(v)}</code>;
+  return <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{JSON.stringify(v)}</code>;
+}
+
+export function AIEnrichDialog({ open, onOpenChange, clientId, suggestions, logoUrl, onApplied }: Props) {
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [applyLogo, setApplyLogo] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      const init: Record<string, boolean> = {};
+      suggestions.forEach(s => { init[s.field] = (s.confidence || 'medium') !== 'low'; });
+      setSelected(init);
+      setApplyLogo(!!logoUrl);
+    }
+  }, [open, suggestions, logoUrl]);
+
+  const toggle = (field: string) => setSelected(p => ({ ...p, [field]: !p[field] }));
+  const checkedCount = Object.values(selected).filter(Boolean).length + (applyLogo && logoUrl ? 1 : 0);
+
+  const apply = async () => {
+    setSaving(true);
+    try {
+      const updates: Record<string, any> = {};
+      suggestions.forEach(s => {
+        if (selected[s.field]) updates[s.field] = s.value;
+      });
+      if (applyLogo && logoUrl) updates.logo_url = logoUrl;
+
+      if (Object.keys(updates).length === 0) {
+        toast.info('Δεν επιλέχθηκε καμία πρόταση');
+        return;
+      }
+
+      const { error } = await supabase.from('clients').update(updates).eq('id', clientId);
+      if (error) throw error;
+      toast.success(`Εφαρμόστηκαν ${Object.keys(updates).length} προτάσεις`);
+      onApplied?.();
+      onOpenChange(false);
+    } catch (e: any) {
+      toast.error(e?.message || 'Σφάλμα εφαρμογής');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" /> AI Προτάσεις Στοιχείων
+          </DialogTitle>
+          <DialogDescription>
+            Επίλεξε ποιες προτάσεις θέλεις να εφαρμοστούν στην καρτέλα του πελάτη.
+          </DialogDescription>
+        </DialogHeader>
+
+        <ScrollArea className="max-h-[60vh] pr-3">
+          <div className="space-y-2">
+            {logoUrl && (
+              <label className="flex items-start gap-3 p-3 rounded-xl border border-border bg-card cursor-pointer hover:bg-secondary/40 transition-colors">
+                <Checkbox checked={applyLogo} onCheckedChange={() => setApplyLogo(v => !v)} className="mt-1" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="text-sm font-medium">Λογότυπο</span>
+                    <Badge variant="outline" className="text-xs">auto-detected</Badge>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <img src={logoUrl} alt="logo" className="h-12 w-12 object-contain rounded-md bg-secondary" />
+                    <span className="text-xs text-muted-foreground truncate">{logoUrl}</span>
+                  </div>
+                </div>
+              </label>
+            )}
+
+            {suggestions.length === 0 && !logoUrl && (
+              <p className="text-center py-8 text-muted-foreground">Δεν βρέθηκαν προτάσεις</p>
+            )}
+
+            {suggestions.map(s => (
+              <label
+                key={s.field}
+                className="flex items-start gap-3 p-3 rounded-xl border border-border bg-card cursor-pointer hover:bg-secondary/40 transition-colors"
+              >
+                <Checkbox
+                  checked={!!selected[s.field]}
+                  onCheckedChange={() => toggle(s.field)}
+                  className="mt-1"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="text-sm font-medium">{s.label}</span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {s.confidence && (
+                        <Badge className={`text-xs border ${confidenceColor[s.confidence]}`}>
+                          {s.confidence}
+                        </Badge>
+                      )}
+                      {s.source && (
+                        <Badge variant="outline" className="text-xs">{s.source}</Badge>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-1 text-sm">
+                    {s.currentValue !== undefined && s.currentValue !== null && s.currentValue !== '' && (
+                      <div className="flex gap-2">
+                        <span className="text-xs text-muted-foreground w-12 shrink-0">Τώρα:</span>
+                        <span className="text-muted-foreground line-through">{renderValue(s.currentValue)}</span>
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <span className="text-xs text-muted-foreground w-12 shrink-0">Νέο:</span>
+                      <div className="text-foreground min-w-0">{renderValue(s.value)}</div>
+                    </div>
+                  </div>
+                  {s.sourceUrl && (
+                    <a
+                      href={s.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-1"
+                    >
+                      <ExternalLink className="h-3 w-3" /> Πηγή
+                    </a>
+                  )}
+                </div>
+              </label>
+            ))}
+          </div>
+        </ScrollArea>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>Ακύρωση</Button>
+          <Button onClick={apply} disabled={saving || checkedCount === 0}>
+            {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Εφαρμογή ({checkedCount})
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

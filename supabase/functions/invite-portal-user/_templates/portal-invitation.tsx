@@ -18,6 +18,7 @@ interface PortalInvitationEmailProps {
   clientName: string
   inviterName: string
   acceptUrl: string
+  pin?: string
 }
 
 export const PortalInvitationEmail = ({
@@ -25,6 +26,7 @@ export const PortalInvitationEmail = ({
   clientName,
   inviterName,
   acceptUrl,
+  pin,
 }: PortalInvitationEmailProps) => (
   <Html>
     <Head />

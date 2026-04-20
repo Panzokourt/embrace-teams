@@ -283,7 +283,7 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
       {/* Sidebar — full height */}
       {sidebarMode !== 'hidden' && (
         <div
-          className="h-full shrink-0 transition-[width] duration-200 ease-apple overflow-visible relative"
+          className="h-full shrink-0 transition-[width] duration-200 ease-apple overflow-visible relative z-30"
           style={{ width: effectiveSidebarWidth }}
         >
           <AppSidebar

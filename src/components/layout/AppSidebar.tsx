@@ -250,7 +250,7 @@ export default function AppSidebar({
   const IconRail = ({ isMobile = false }: {isMobile?: boolean;}) =>
   <div
     className={cn(
-      "flex flex-col items-center py-3 gap-1 shrink-0 w-12 shadow-none",
+      "flex flex-col items-center py-3 gap-1 shrink-0 w-20 shadow-none",
       isMobile ?
       "bg-card border-r border-border/30" :
       "my-2 ml-2 rounded-2xl bg-[#1A1A1A] shadow-lg"
@@ -278,80 +278,64 @@ export default function AppSidebar({
       </div>
 
       {/* My Work standalone button */}
-      <Tooltip delayDuration={300}>
-        <TooltipTrigger asChild>
-          <button
-            onClick={() => { navigate('/'); handleNavClick(); setFlyoutCategory(null); setActiveCategory(null); }}
-            className={cn(
-              "relative flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 mb-1",
-              isMobile
-                ? (location.pathname === '/' || location.pathname === '/my-work') ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                : (location.pathname === '/' || location.pathname === '/my-work') ? "bg-white/15 text-white" : "text-white/50 hover:text-white hover:bg-white/10"
-            )}>
-            {(location.pathname === '/' || location.pathname === '/my-work') && !isMobile && (
-              <span className="absolute left-0.5 top-1/2 -translate-y-1/2 w-[3px] h-3 rounded-full bg-primary" />
-            )}
-            <LayoutList className="h-[18px] w-[18px]" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="right" sideOffset={8}>My Work</TooltipContent>
-      </Tooltip>
+      <button
+        onClick={() => { navigate('/'); handleNavClick(); setFlyoutCategory(null); setActiveCategory(null); }}
+        className={cn(
+          "relative flex flex-col items-center justify-center gap-1 w-[68px] py-1.5 rounded-lg transition-all duration-200 mb-0.5",
+          isMobile
+            ? (location.pathname === '/' || location.pathname === '/my-work') ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+            : (location.pathname === '/' || location.pathname === '/my-work') ? "bg-white/15 text-white" : "text-white/60 hover:text-white hover:bg-white/10"
+        )}>
+        {(location.pathname === '/' || location.pathname === '/my-work') && !isMobile && (
+          <span className="absolute left-0.5 top-1/2 -translate-y-1/2 w-[3px] h-3 rounded-full bg-primary" />
+        )}
+        <LayoutList className="h-[18px] w-[18px]" />
+        <span className="text-[9px] font-medium leading-tight">My Work</span>
+      </button>
 
       {/* Standalone: Files & Assets */}
-      <Tooltip delayDuration={300}>
-        <TooltipTrigger asChild>
-          <button
-            onClick={() => { navigate('/files'); handleNavClick(); setFlyoutCategory(null); setActiveCategory(null); }}
-            className={cn(
-              "relative flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200",
-              isMobile
-                ? location.pathname === '/files' ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                : location.pathname === '/files' ? "bg-white/15 text-white" : "text-white/50 hover:text-white hover:bg-white/10"
-            )}>
-            {location.pathname === '/files' && !isMobile && (
-              <span className="absolute left-0.5 top-1/2 -translate-y-1/2 w-[3px] h-3 rounded-full bg-primary" />
-            )}
-            <FileArchive className="h-[18px] w-[18px]" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="right" sideOffset={8}>Files & Assets</TooltipContent>
-      </Tooltip>
+      <button
+        onClick={() => { navigate('/files'); handleNavClick(); setFlyoutCategory(null); setActiveCategory(null); }}
+        className={cn(
+          "relative flex flex-col items-center justify-center gap-1 w-[68px] py-1.5 rounded-lg transition-all duration-200",
+          isMobile
+            ? location.pathname === '/files' ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+            : location.pathname === '/files' ? "bg-white/15 text-white" : "text-white/60 hover:text-white hover:bg-white/10"
+        )}>
+        {location.pathname === '/files' && !isMobile && (
+          <span className="absolute left-0.5 top-1/2 -translate-y-1/2 w-[3px] h-3 rounded-full bg-primary" />
+        )}
+        <FileArchive className="h-[18px] w-[18px]" />
+        <span className="text-[9px] font-medium leading-tight">Files</span>
+      </button>
 
 
-      <div className="w-6 h-px bg-white/10 mb-1" />
+      <div className="w-10 h-px bg-white/10 my-1" />
 
       {/* Category icons */}
-      <div className="flex-1 flex flex-col items-center gap-0.5">
+      <div className="flex-1 flex flex-col items-center gap-0.5 w-full px-1">
         {categories.map((cat) => {
         const isActive = (isEffectivelyCollapsed ? flyoutCategory === cat.id : activeCategory === cat.id) ||
         !flyoutCategory && activeCategory === cat.id;
         return (
-          <Tooltip key={cat.id} delayDuration={isEffectivelyCollapsed ? 600 : 300}>
-              <TooltipTrigger asChild>
-                <button
-                onClick={() => handleCategoryClick(cat.id)}
-                className={cn(
-                  "relative flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200",
-                  isMobile ?
-                  isActive ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/60" :
-                  isActive ? "bg-white/15 text-white" : "text-white/50 hover:text-white hover:bg-white/10"
-                )}>
-                
-                  {isActive && !isMobile &&
-                <span className="absolute left-0.5 top-1/2 -translate-y-1/2 w-[3px] h-3 rounded-full bg-primary" />
-                }
-                  {isActive && isMobile &&
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-full bg-primary" />
-                }
-                  <cat.icon className="h-[18px] w-[18px]" />
-                </button>
-              </TooltipTrigger>
-              {!flyoutCategory && isEffectivelyCollapsed &&
-            <TooltipContent side="right" sideOffset={8}>
-                  {cat.label}
-                </TooltipContent>
+          <button
+            key={cat.id}
+            onClick={() => handleCategoryClick(cat.id)}
+            className={cn(
+              "relative flex flex-col items-center justify-center gap-1 w-[68px] py-1.5 rounded-lg transition-all duration-200",
+              isMobile ?
+              isActive ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/60" :
+              isActive ? "bg-white/15 text-white" : "text-white/60 hover:text-white hover:bg-white/10"
+            )}>
+            {isActive && !isMobile &&
+              <span className="absolute left-0.5 top-1/2 -translate-y-1/2 w-[3px] h-3 rounded-full bg-primary" />
             }
-            </Tooltip>);
+            {isActive && isMobile &&
+              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-full bg-primary" />
+            }
+            <cat.icon className="h-[18px] w-[18px]" />
+            <span className="text-[9px] font-medium leading-tight truncate max-w-full px-1">{cat.label}</span>
+          </button>);
 
       })}
       </div>
@@ -579,7 +563,7 @@ export default function AppSidebar({
       {isEffectivelyCollapsed && flyoutCategory &&
       <div
         className="fixed top-0 bottom-0 w-56 bg-card border-r border-border/40 shadow-2xl z-[60] animate-slide-in-left"
-        style={{ left: 48 }}
+        style={{ left: 88 }}
         onMouseEnter={handleFlyoutEnter}
         onMouseLeave={handleFlyoutLeave}>
         

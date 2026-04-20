@@ -2,12 +2,13 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Search, X, Filter, Users, Briefcase, CalendarDays, Building2 } from 'lucide-react';
+import { Search, X, Filter, Users, Briefcase, CalendarDays, Building2, Import as ImportIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FinderColumnView } from './FinderColumnView';
 import { DestinationPickerDialog, type PickedDestination } from './DestinationPickerDialog';
+import { ImportWizard } from './import-wizard/ImportWizard';
 import { createProjectFilesObjectKey } from '@/utils/storageKeys';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -68,6 +69,7 @@ export function CentralFileExplorer() {
   const [pickerInitialProject, setPickerInitialProject] = useState<string | null>(null);
   const [pickerDefaultScope, setPickerDefaultScope] = useState<'project' | 'company'>('project');
   const pickerResolveRef = useRef<((d: PickedDestination | null) => void) | null>(null);
+  const [importWizardOpen, setImportWizardOpen] = useState(false);
 
   const canManage = isAdmin || isManager;
 
@@ -767,6 +769,16 @@ export function CentralFileExplorer() {
           </SelectContent>
         </Select>
 
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8"
+          onClick={() => setImportWizardOpen(true)}
+        >
+          <ImportIcon className="h-4 w-4 mr-1.5" />
+          Εισαγωγή
+        </Button>
+
         <span className="text-xs text-muted-foreground ml-auto">
           {virtualFiles.length} αρχεί{virtualFiles.length === 1 ? 'ο' : 'α'}
         </span>
@@ -800,6 +812,20 @@ export function CentralFileExplorer() {
         defaultScope={pickerDefaultScope}
         allowCompanyScope
         onConfirm={handlePickerConfirm}
+      />
+
+      <ImportWizard
+        open={importWizardOpen}
+        onOpenChange={setImportWizardOpen}
+        projects={projects}
+        clients={clients}
+        folders={folders}
+        onComplete={async () => {
+          await Promise.all([fetchFolders(), fetchFiles()]);
+        }}
+        onEntitiesChanged={async () => {
+          await Promise.all([fetchClients(), fetchProjects(), fetchFolders()]);
+        }}
       />
     </div>
   );

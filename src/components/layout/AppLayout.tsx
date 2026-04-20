@@ -49,7 +49,7 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
     try { return Number(localStorage.getItem(SIDEBAR_WIDTH_KEY)) || SIDEBAR_EXPANDED_DEFAULT; } catch { return SIDEBAR_EXPANDED_DEFAULT; }
   });
 
-  // Right panel
+  // Right panel — ALWAYS starts closed on every page load. Never persisted.
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<RightPanelTab>(() => {
     try { return (localStorage.getItem(PANEL_TAB_KEY) as RightPanelTab) || 'secretary'; } catch { return 'secretary'; }
@@ -88,18 +88,29 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
 
   // Listen for sidebar secretary button — but ignore events during initial mount window
   const mountTimeRef = useRef(Date.now());
+  const userInteractedRef = useRef(false);
   useEffect(() => {
     // Clear any legacy persisted "open" flag so nothing else can read it
     try { localStorage.removeItem(LEGACY_PANEL_OPEN_KEY); } catch {}
 
+    // Mark user interaction after first real input — only then can the panel be auto-opened by events
+    const markInteraction = () => { userInteractedRef.current = true; };
+    window.addEventListener('pointerdown', markInteraction, { once: true });
+    window.addEventListener('keydown', markInteraction, { once: true });
+
     const handler = () => {
-      // Ignore auto-dispatched events within first 500ms of mount
-      if (Date.now() - mountTimeRef.current < 500) return;
+      // Block auto-opens before any real user interaction OR within mount window
+      if (!userInteractedRef.current) return;
+      if (Date.now() - mountTimeRef.current < 1500) return;
       setRightPanelOpen(true);
       setActiveTab('secretary');
     };
     window.addEventListener('open-secretary-panel', handler);
-    return () => window.removeEventListener('open-secretary-panel', handler);
+    return () => {
+      window.removeEventListener('open-secretary-panel', handler);
+      window.removeEventListener('pointerdown', markInteraction);
+      window.removeEventListener('keydown', markInteraction);
+    };
   }, []);
 
   // Listen for secretary navigation events — navigate while keeping panel open

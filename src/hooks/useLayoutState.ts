@@ -50,9 +50,9 @@ export function useLayoutState() {
       layoutState === 'mobile' ? 'hidden' :
       layoutState === 'narrow' ? 'collapsed' : 'expanded';
 
+    // Desktop/laptop → docked sidebar (no overlay/dim). Mobile → drawer.
     const rightPanelMode: RightPanelMode =
-      layoutState === 'wide' ? 'docked' :
-      layoutState === 'mobile' ? 'drawer' : 'overlay';
+      layoutState === 'mobile' ? 'drawer' : 'docked';
 
     const density: Density =
       (layoutState === 'narrow' || layoutState === 'mobile') ? 'compact' : 'comfortable';

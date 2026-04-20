@@ -1974,6 +1974,7 @@ export type Database = {
       file_attachments: {
         Row: {
           ai_analysis: Json | null
+          company_id: string | null
           content_type: string | null
           created_at: string
           deliverable_id: string | null
@@ -1990,6 +1991,7 @@ export type Database = {
         }
         Insert: {
           ai_analysis?: Json | null
+          company_id?: string | null
           content_type?: string | null
           created_at?: string
           deliverable_id?: string | null
@@ -2006,6 +2008,7 @@ export type Database = {
         }
         Update: {
           ai_analysis?: Json | null
+          company_id?: string | null
           content_type?: string | null
           created_at?: string
           deliverable_id?: string | null
@@ -2021,6 +2024,13 @@ export type Database = {
           uploaded_by?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "file_attachments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "file_attachments_deliverable_id_fkey"
             columns: ["deliverable_id"]
@@ -2061,6 +2071,7 @@ export type Database = {
       file_folders: {
         Row: {
           color: string | null
+          company_id: string | null
           created_at: string
           created_by: string
           id: string
@@ -2072,6 +2083,7 @@ export type Database = {
         }
         Insert: {
           color?: string | null
+          company_id?: string | null
           created_at?: string
           created_by: string
           id?: string
@@ -2083,6 +2095,7 @@ export type Database = {
         }
         Update: {
           color?: string | null
+          company_id?: string | null
           created_at?: string
           created_by?: string
           id?: string
@@ -2093,6 +2106,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "file_folders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "file_folders_parent_folder_id_fkey"
             columns: ["parent_folder_id"]
@@ -7520,6 +7540,10 @@ export type Database = {
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
         Returns: number
+      }
+      ensure_company_root_folders: {
+        Args: { _company_id: string }
+        Returns: string
       }
       find_companies_by_domain: {
         Args: { _domain: string }

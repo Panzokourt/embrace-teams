@@ -1,135 +1,93 @@
 
 
-## Πρόβλημα
+## Πραγματική αιτία (επιβεβαιωμένη)
 
-Όταν ο πελάτης πατάει το κουμπί "Είσοδος στο Portal" στο email, καταλήγει στο **Lovable login** (`lovable.dev/login?...`) αντί για την σελίδα του Olseny portal. Επίσης ζητάς να μην είναι "ανοιχτό" το portal — να μπαίνει με κωδικό.
+Το published Olseny app (`app.olseny.com` και `olseny.lovable.app`) είναι **Private** στο επίπεδο Lovable hosting. Όταν κάποιος επισκέπτεται οποιοδήποτε URL — συμπεριλαμβανομένου του `/portal/access?token=...` — το Lovable edge τον στέλνει πρώτα στο `lovable.dev/auth-bridge` → `lovable.dev/login`, **πριν φορτώσει** η εφαρμογή React. Έτσι το `PortalAccess.tsx` και το `portal-token-exchange` δεν εκτελούνται ποτέ. Επιβεβαιώθηκε με fetch των URLs (όλα γυρίζουν το auth-bridge HTML) και με `get_publish_settings` → `effective_publish_visibility: "private"`.
 
-## Αιτία
+Επομένως όλα τα fixes που κάναμε στο email/edge function/PIN είναι σωστά — απλώς ο πελάτης δεν έφτανε ποτέ στη σελίδα μας.
 
-1. Το `adminClient.auth.admin.generateLink({ type: 'magiclink' })` παράγει link που δείχνει στο default Supabase auth callback. Επειδή το Lovable Cloud project έχει ως site URL το `lovable.dev`, η ανακατεύθυνση περνάει πρώτα από το Lovable bridge → εμφανίζεται το Lovable login.
-2. Το `redirectTo: portalUrl` (`https://app.olseny.com/portal`) δεν υπάρχει στη λίστα των allowed redirect URLs του auth, οπότε γίνεται fallback στο default site URL (Lovable).
-3. Δεν υπάρχει "πύλη" στο `/portal` — το ClientPortalLayout κοιτάει μόνο `useAuth().user`, όχι portal-specific session.
+## Λύση: Ξεχωριστό public portal σε subdomain
 
-## Λύση: Custom magic link μέσω Olseny domain (όχι Supabase auth flow)
+Θα δημιουργήσουμε **ξεχωριστή παρουσία** του portal σε δικό του δημόσιο domain, ώστε το κύριο workspace να παραμένει private χωρίς να χαλάει η πρόσβαση των πελατών.
 
-Αντί για Supabase magic link, θα χρησιμοποιήσουμε **δικό μας token-based access** που λειτουργεί 100% στο `app.olseny.com` και δεν περνάει από Lovable.
+### Αρχιτεκτονική
 
-### Νέο σύστημα prosvash
+```text
+app.olseny.com         → Private workspace (όπως είναι τώρα)
+                         μόνο μέλη της εταιρίας
 
-**Δύο τρόποι εισόδου** (επιλογή του admin που στέλνει την πρόσκληση):
+portal.olseny.com      → Public portal (νέο deployment)
+                         ίδιο codebase, ίδια DB, αλλά:
+                         - ορατό σε όλους
+                         - "guard" στο App.tsx που επιτρέπει
+                           μόνο τα /portal/* routes
+```
 
-**A) Magic link (default)** — One-click, χωρίς κωδικό
-- Στέλνεται email με link: `https://app.olseny.com/portal/access?token=<random-token>`
-- Το token ζει 30 ημέρες και κάνει automatic sign-in στο portal
+Το ίδιο codebase εξυπηρετεί και τα δύο. Με βάση το `window.location.hostname` το `App.tsx` επιλέγει τι να δείξει:
 
-**B) Magic link + PIN** — Επιπλέον προστασία
-- Στέλνεται link + 6-digit PIN στο email
-- Στο `/portal/access` ζητείται το PIN πριν την είσοδο
-- Το PIN επανα-χρησιμοποιείται για όλες τις μελλοντικές εισόδους (σαν "password" του portal)
+- σε `portal.olseny.com` → μόνο `/portal/*` routes· οποιοδήποτε άλλο path γίνεται redirect στο `/portal/access`.
+- σε `app.olseny.com` → όλη η εφαρμογή όπως σήμερα.
+
+Έτσι ο πελάτης που πατάει το magic link πέφτει σε **public** Lovable deployment, η σελίδα φορτώνει κανονικά, εκτελείται το token exchange και μπαίνει στο portal.
 
 ## Τι θα αλλάξω
 
-### 1. DB Migration
+### 1) Hosting / Domains (manual από εσένα μετά την υλοποίηση)
 
-Νέος πίνακας `client_portal_access_tokens`:
-```text
-id              uuid pk
-client_id       uuid fk → clients
-company_id      uuid fk → companies
-email           text
-user_id         uuid fk → auth.users (nullable, set on first use)
-token_hash      text   (sha256 of the URL token)
-pin_hash        text   (nullable, sha256 of PIN if "require_pin")
-require_pin     boolean default false
-expires_at      timestamptz
-last_used_at    timestamptz
-created_by      uuid
-created_at      timestamptz
-```
+- Project Settings → Domains → **Add custom domain** `portal.olseny.com`.
+- Αφού γίνει Active, θέλουμε **να αλλάξουμε το publish visibility σε `public`** (προτείνεται με `update_visibility` με τη συγκατάθεσή σου). Δεν υπάρχει per-domain visibility στο Lovable, άρα και τα δύο domains θα είναι public — γι' αυτό προστίθεται το hostname guard στον κώδικα (βλ. #2).
+- Σημείωση: το `app.olseny.com` δεν θα είναι πια "Private" στο Lovable επίπεδο, αλλά το guard στο App.tsx θα κρατά τη συμπεριφορά (όλα τα routes εκτός `/portal/*` θα απαιτούν login μέσω του υπάρχοντος `AppLayout` → `Navigate to="/auth"`). Καμία αλλαγή στην εμπειρία του staff.
 
-RLS: read μόνο μέσω SECURITY DEFINER function. Insert/manage μόνο σε admins της εταιρίας.
+### 2) Hostname guard στο App.tsx
 
-Νέα RPC functions:
-- `portal_validate_token(token text, pin text default null) returns jsonb` — επιστρέφει `{ valid, client_id, company_id, requires_pin, user_id }`
-- `portal_consume_token(token text, pin text default null) returns jsonb` — δημιουργεί session-ready response, log τη χρήση
+- Νέο helper `isPortalHost()` που κοιτάει `window.location.hostname` και επιστρέφει `true` για `portal.olseny.com` (ρυθμιζόμενο με Vite env `VITE_PORTAL_HOSTNAMES`, default `portal.olseny.com`).
+- Στο `App.tsx`, αν `isPortalHost()`:
+  - Render μόνο τα portal routes:
+    - `/portal/access` → `PortalAccess`
+    - `/portal/*` → `ClientPortalLayout` με τα 4 children
+    - `*` → `<Navigate to="/portal/access" replace />`
+- Αν όχι portal host → render τα κανονικά routes όπως τώρα.
 
-### 2. Edge function refactor: `invite-portal-user`
+### 3) Email link → νέο domain
 
-- Παύει να καλεί `inviteUserByEmail` / `generateLink` (αυτά παράγουν Lovable links)
-- Αντί γι' αυτό:
-  1. Δημιουργεί έναν auth user **passwordless** ή reuse υπάρχοντα (όπως τώρα)
-  2. Δημιουργεί entry στο `client_portal_users`
-  3. Δημιουργεί entry στο `client_portal_access_tokens` με random 32-byte token (+ optional PIN αν `require_pin=true`)
-  4. Στέλνει Resend email με link: `https://app.olseny.com/portal/access?token=...` και (αν PIN) εμφανίζει το PIN
-- Νέο body parameter: `require_pin: boolean` (default false)
+- Στο `invite-portal-user/index.ts` αλλάζω `baseUrl` από `https://app.olseny.com` σε `https://portal.olseny.com` (configurable μέσω env `PORTAL_PUBLIC_URL`, fallback `https://portal.olseny.com`).
+- Το `accessUrl` γίνεται `https://portal.olseny.com/portal/access?token=...`.
+- Re-deploy της edge function.
 
-### 3. Νέα edge function: `portal-token-exchange`
+### 4) ClientPortalLayout signOut
 
-Public function (no JWT). Δέχεται `{ token, pin? }`:
-- Καλεί `portal_validate_token`
-- Αν valid: χρησιμοποιεί service role για να κάνει `adminClient.auth.admin.generateLink` με τύπο `magiclink` **αλλά μόνο για επιστροφή access/refresh tokens** μέσω `signInWithIdToken`-style flow
-- Επιστρέφει `{ access_token, refresh_token }` που το client βάζει σε `supabase.auth.setSession`
+- Αυτή τη στιγμή το `signOut()` καλεί `supabase.auth.signOut()` και το `App.tsx` (στο portal host) θα κάνει redirect στο `/portal/access` αυτόματα μέσω του fallback. Καμία επιπλέον αλλαγή.
 
-Αυτό κρατάει την επικύρωση 100% στο δικό μας domain — ποτέ δεν περνάει από Lovable.
+### 5) Re-deploy `portal-token-exchange`
 
-### 4. Νέα route: `/portal/access`
+- Δεν αλλάζει η λογική του, μόνο επιβεβαιώνεται ότι είναι deployed (το έχουμε ήδη). Επειδή έχει `verify_jwt = false`, καλείται κανονικά από το public portal host.
 
-Νέο component `PortalAccess.tsx`:
-- Διαβάζει `?token=` από URL
-- Αν το token απαιτεί PIN, δείχνει input για 6-digit PIN
-- Καλεί την `portal-token-exchange` edge function
-- Με τα tokens κάνει `supabase.auth.setSession(...)` και redirect σε `/portal`
-- UI: full-screen Olseny-branded με logo, "Καλωσήρθατε στο Portal {clientName}"
+## Verification (αφού ολοκληρώσουμε)
 
-### 5. Update `PortalUserManager.tsx`
-
-Στο dialog πρόσκλησης:
-- Νέο checkbox: **"Απαιτείται PIN για είσοδο"** (default off)
-- Αν checked: σύντομη εξήγηση ότι θα σταλεί 6-digit PIN στο email
-- Νέο κουμπί δίπλα σε κάθε portal user: **"Επαναποστολή πρόσκλησης"** (refresh token + send new email)
-
-### 6. Update `ClientPortalLayout.tsx`
-
-Καμία αλλαγή στο logic — η session ήδη έχει σετ μέσω setSession από το `/portal/access`. Απλώς guard: αν δεν υπάρχει `client_portal_users` entry, redirect σε `/portal/access?error=no_access` αντί για `/auth`.
-
-### 7. Email template update
-
-Δύο variants:
-- `PortalInvitationEmail` (no PIN): ίδιο όπως τώρα, αλλά με νέο `acceptUrl` που δείχνει στο `app.olseny.com/portal/access?token=...`
-- `PortalInvitationEmailWithPin`: ίδιο layout + ένα styled box με το 6-digit PIN
-
-## Verification
-
-- Νέα πρόσκληση χωρίς PIN → email με Olseny link → click → auto sign-in → portal
-- Νέα πρόσκληση με PIN → email με link + PIN → click → PIN screen → input → portal
-- Λάθος PIN → error message, καμία είσοδος
-- Λήξη token (>30 ημέρες) → friendly error στη `/portal/access`
-- Επαναποστολή πρόσκλησης → νέο token, παλιό token invalidates
-- Δεν εμφανίζεται ποτέ το Lovable login
+- Connect `portal.olseny.com` → DNS Active.
+- Switch publish visibility σε public.
+- Νέα πρόσκληση πελάτη με PIN → email φτάνει με link `https://portal.olseny.com/portal/access?token=...`.
+- Άνοιγμα σε ιδιωτικό παράθυρο (χωρίς cookies) → φορτώνει η σελίδα PortalAccess (όχι Lovable login).
+- Με PIN → είσοδος → `/portal` (Επισκόπηση).
+- Έλεγχος: `https://portal.olseny.com/` → redirect σε `/portal/access`.
+- Έλεγχος: `https://portal.olseny.com/work` → redirect σε `/portal/access` (δεν εκτίθεται το staff app).
+- Έλεγχος: `https://app.olseny.com/work` → δουλεύει όπως πριν για το staff (μέσω login).
 
 ## Αρχεία που θα αλλάξουν
 
-**DB Migration (νέο):**
-- table `client_portal_access_tokens`
-- functions `portal_validate_token`, `portal_consume_token`, `portal_create_token`
-- RLS policies
+- `src/App.tsx` (νέος hostname guard, εναλλακτικό route tree για portal host)
+- `src/lib/portalHost.ts` **(νέο)** — `isPortalHost()` helper + env reading
+- `supabase/functions/invite-portal-user/index.ts` (αλλαγή `baseUrl` → `portal.olseny.com`)
+- (Re-deploy) `supabase/functions/portal-token-exchange/index.ts` — χωρίς αλλαγή κώδικα
 
-**Edge functions:**
-- `supabase/functions/invite-portal-user/index.ts` (refactor: αφαίρεση generateLink, χρήση custom token)
-- `supabase/functions/portal-token-exchange/index.ts` (νέο)
-- `supabase/functions/invite-portal-user/_templates/portal-invitation.tsx` (variant με PIN box)
+## Τι θα χρειαστώ από εσένα
 
-**Frontend:**
-- `src/pages/portal/PortalAccess.tsx` (νέο)
-- `src/App.tsx` (route `/portal/access`)
-- `src/components/portal/PortalUserManager.tsx` (PIN toggle + resend button)
-- `src/components/portal/ClientPortalLayout.tsx` (redirect target update)
+1. Έγκριση να αλλάξω το publish visibility σε **public** (πρέπει να γίνει για να φεύγει το auth-bridge).
+2. Μετά το deploy: να συνδέσεις στο Project Settings → Domains το `portal.olseny.com` και να περιμένεις να γίνει Active. Όταν ολοκληρωθεί, στέλνεις δοκιμαστική πρόσκληση και επιβεβαιώνουμε.
 
 ## Τεχνικές σημειώσεις
 
-- Δεν αλλάζουν Supabase Auth settings — δεν χρειάζεται να προστεθεί κάτι στα allowed redirect URLs.
-- Το token είναι 32-byte random base64url, hashed (sha256) στη DB.
-- Το PIN είναι 6 ψηφία, hashed (bcrypt-style μέσω pgcrypto `crypt`).
-- Rate limiting στο `portal-token-exchange`: max 5 PIN attempts ανά 15 λεπτά ανά token.
-- Backwards compatible: υπάρχοντες portal users συνεχίζουν να λειτουργούν αν είναι ήδη logged in.
+- Δεν αγγίζουμε Supabase Auth settings (site URL, redirect URLs).
+- Δεν αλλάζει το DB schema — μόνο frontend routing & ένα URL string στο edge function.
+- Backwards compat: παλιά tokens συνεχίζουν να λειτουργούν, αρκεί ο πελάτης να ανοίξει το νέο link (ή να ζητηθεί επαναποστολή για να πάρει `portal.olseny.com` URL).
 

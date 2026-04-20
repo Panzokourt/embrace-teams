@@ -14,8 +14,8 @@ import FocusOverlay from '@/components/focus/FocusOverlay';
 import { LayoutProvider, useLayout } from '@/contexts/LayoutContext';
 import { cn } from '@/lib/utils';
 
-const PANEL_OPEN_KEY = 'secretary-panel-open';
 const PANEL_TAB_KEY = 'secretary-panel-tab';
+const LEGACY_PANEL_OPEN_KEY = 'secretary-panel-open';
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed';
 const SIDEBAR_WIDTH_KEY = 'sidebar-width';
 const RIGHT_PANEL_WIDTH_KEY = 'right-panel-width';
@@ -86,9 +86,15 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  // Listen for sidebar secretary button
+  // Listen for sidebar secretary button — but ignore events during initial mount window
+  const mountTimeRef = useRef(Date.now());
   useEffect(() => {
+    // Clear any legacy persisted "open" flag so nothing else can read it
+    try { localStorage.removeItem(LEGACY_PANEL_OPEN_KEY); } catch {}
+
     const handler = () => {
+      // Ignore auto-dispatched events within first 500ms of mount
+      if (Date.now() - mountTimeRef.current < 500) return;
       setRightPanelOpen(true);
       setActiveTab('secretary');
     };

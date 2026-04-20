@@ -41,6 +41,7 @@ import { toast } from 'sonner';
 import { FilePreviewDialog } from './FilePreviewDialog';
 import type { FileFolder } from './FolderTree';
 import type { FileAttachment } from './FilesTableView';
+import { readDroppedItems, hasDirectoryEntry } from '@/utils/dropFolderReader';
 
 interface FinderColumnViewProps {
   files: FileAttachment[];

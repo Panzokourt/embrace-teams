@@ -14,8 +14,8 @@ import FocusOverlay from '@/components/focus/FocusOverlay';
 import { LayoutProvider, useLayout } from '@/contexts/LayoutContext';
 import { cn } from '@/lib/utils';
 
-const PANEL_OPEN_KEY = 'secretary-panel-open';
 const PANEL_TAB_KEY = 'secretary-panel-tab';
+const LEGACY_PANEL_OPEN_KEY = 'secretary-panel-open';
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed';
 const SIDEBAR_WIDTH_KEY = 'sidebar-width';
 const RIGHT_PANEL_WIDTH_KEY = 'right-panel-width';

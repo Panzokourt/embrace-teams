@@ -49,7 +49,7 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
     try { return Number(localStorage.getItem(SIDEBAR_WIDTH_KEY)) || SIDEBAR_EXPANDED_DEFAULT; } catch { return SIDEBAR_EXPANDED_DEFAULT; }
   });
 
-  // Right panel
+  // Right panel — ALWAYS starts closed on every page load. Never persisted.
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<RightPanelTab>(() => {
     try { return (localStorage.getItem(PANEL_TAB_KEY) as RightPanelTab) || 'secretary'; } catch { return 'secretary'; }

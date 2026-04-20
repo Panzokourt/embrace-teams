@@ -59,6 +59,7 @@ import PortalProjects from "@/pages/portal/PortalProjects";
 import PortalInvoices from "@/pages/portal/PortalInvoices";
 import PortalFiles from "@/pages/portal/PortalFiles";
 import PortalAccess from "@/pages/portal/PortalAccess";
+import { isPortalHost } from "@/lib/portalHost";
 
 function RedirectUserToEmployee() {
   const { id } = useParams();
@@ -75,6 +76,19 @@ const queryClient = new QueryClient({
   },
 });
 
+const PortalOnlyRoutes = () => (
+  <Routes>
+    <Route path="/portal/access" element={<PortalAccess />} />
+    <Route path="/portal" element={<ClientPortalLayout />}>
+      <Route index element={<PortalDashboard />} />
+      <Route path="projects" element={<PortalProjects />} />
+      <Route path="invoices" element={<PortalInvoices />} />
+      <Route path="files" element={<PortalFiles />} />
+    </Route>
+    <Route path="*" element={<Navigate to="/portal/access" replace />} />
+  </Routes>
+);
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider defaultTheme="dark" storageKey="agency-ui-theme">
@@ -84,6 +98,9 @@ const App = () => (
         <BrowserRouter>
           <AuthProvider>
             <ChatProvider>
+              {isPortalHost() ? (
+                <PortalOnlyRoutes />
+              ) : (
               <Routes>
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
@@ -177,6 +194,7 @@ const App = () => (
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>
+              )}
             </ChatProvider>
           </AuthProvider>
         </BrowserRouter>

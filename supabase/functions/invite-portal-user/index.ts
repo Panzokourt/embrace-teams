@@ -112,10 +112,14 @@ Deno.serve(async (req) => {
       .eq('id', caller.id)
       .single()
 
-    // ALWAYS use the production Olseny domain so links never go through Lovable preview/login.
-    // The optional `app_url` from the client is intentionally ignored to prevent preview URLs
-    // (e.g. *.lovable.app or *.lovable.dev) from being embedded in invitation emails.
-    const baseUrl = 'https://app.olseny.com'
+    // ALWAYS use the dedicated PUBLIC client-portal domain so links never go
+    // through the staff workspace (which is private at the Lovable hosting layer
+    // and would redirect visitors to lovable.dev/login). The portal subdomain is
+    // a separate public deployment of the same codebase that only exposes
+    // /portal/* routes (see src/lib/portalHost.ts + App.tsx).
+    // Configurable via env `PORTAL_PUBLIC_URL`; the optional `app_url` from the
+    // client is intentionally ignored to avoid preview URLs in emails.
+    const baseUrl = (Deno.env.get('PORTAL_PUBLIC_URL') || 'https://portal.olseny.com').replace(/\/+$/, '')
 
     const cleanName = (full_name && String(full_name).trim()) || null
 

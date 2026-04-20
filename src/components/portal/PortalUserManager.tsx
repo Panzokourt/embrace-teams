@@ -218,6 +218,22 @@ export function PortalUserManager() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="flex items-start gap-2 p-3 rounded-lg border border-border/40 bg-muted/30">
+                    <Checkbox
+                      id="require-pin"
+                      checked={requirePin}
+                      onCheckedChange={(c) => setRequirePin(!!c)}
+                      className="mt-0.5"
+                    />
+                    <div className="space-y-0.5">
+                      <Label htmlFor="require-pin" className="text-xs font-medium cursor-pointer">
+                        Απαιτείται PIN για είσοδο
+                      </Label>
+                      <p className="text-[10px] text-muted-foreground">
+                        Θα σταλεί 6-ψήφιος κωδικός στο email. Ο πελάτης θα τον χρειάζεται σε κάθε σύνδεση.
+                      </p>
+                    </div>
+                  </div>
                   <Button onClick={invitePortalUser} disabled={saving || !email || !selectedClient} className="w-full">
                     {saving ? 'Αποστολή...' : 'Αποστολή Πρόσκλησης'}
                   </Button>
@@ -247,6 +263,14 @@ export function PortalUserManager() {
                     </Badge>
                   </div>
                 </div>
+                <Button
+                  variant="ghost" size="sm" className="text-xs gap-1.5"
+                  onClick={() => resendInvitation(pu)}
+                  disabled={resendingId === pu.id}
+                >
+                  <RefreshCw className={`h-3 w-3 ${resendingId === pu.id ? 'animate-spin' : ''}`} />
+                  Επαναποστολή
+                </Button>
                 <Button
                   variant="ghost" size="sm" className="text-xs"
                   onClick={() => toggleAccess(pu.id, pu.is_active)}

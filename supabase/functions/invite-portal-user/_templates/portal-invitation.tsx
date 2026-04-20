@@ -63,9 +63,20 @@ export const PortalInvitationEmail = ({
           </Link>
         </Section>
 
-        <Text style={smallText}>
-          Πατώντας το παραπάνω κουμπί, θα συνδεθείτε αυτόματα στο portal σας.
-        </Text>
+        {pin ? (
+          <Section style={pinBox}>
+            <Text style={pinLabel}>Κωδικός εισόδου (PIN)</Text>
+            <Text style={pinCode}>{pin}</Text>
+            <Text style={pinHint}>
+              Θα σας ζητηθεί αυτός ο 6-ψήφιος κωδικός κατά την είσοδο. Φυλάξτε τον — θα τον
+              χρησιμοποιείτε σε κάθε μελλοντική σύνδεση.
+            </Text>
+          </Section>
+        ) : (
+          <Text style={smallText}>
+            Πατώντας το παραπάνω κουμπί, θα συνδεθείτε αυτόματα στο portal σας.
+          </Text>
+        )}
 
         <Hr style={hr} />
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FinderColumnView } from './FinderColumnView';
+import { DestinationPickerDialog, type PickedDestination } from './DestinationPickerDialog';
 import { createProjectFilesObjectKey } from '@/utils/storageKeys';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -42,8 +43,23 @@ function matchesTypeFilter(contentType: string | null, filter: FileTypeFilter): 
   }
 }
 
+const isVirtualId = (id: string | null | undefined): boolean =>
+  !!id && (id.startsWith('vp-') || id.startsWith('vc-') || id.startsWith('vd-'));
+
 interface ClientInfo { id: string; name: string }
 interface ProjectInfo { id: string; name: string; client_id?: string | null }
+
+interface PendingUpload {
+  kind: 'files' | 'folder';
+  files?: FileList;
+  folderEntries?: FileList | Array<{ file: File; relativePath: string }>;
+  targetFolderId: string | null;
+}
+
+interface PendingCreateFolder {
+  name: string;
+  parentId: string | null;
+}
 
 export function CentralFileExplorer() {
   const { user, isAdmin, isManager } = useAuth();
@@ -56,6 +72,12 @@ export function CentralFileExplorer() {
   const [uploading, setUploading] = useState(false);
   const [viewMode, setViewMode] = useState<FileViewMode>('by-project');
   const [typeFilter, setTypeFilter] = useState<FileTypeFilter>('all');
+
+  // Destination picker state
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerRestrict, setPickerRestrict] = useState<string[] | null>(null);
+  const [pickerInitialProject, setPickerInitialProject] = useState<string | null>(null);
+  const pickerResolveRef = useRef<((d: PickedDestination | null) => void) | null>(null);
 
   const canManage = isAdmin || isManager;
 
@@ -241,12 +263,122 @@ export function CentralFileExplorer() {
     return { virtualFolders: vFolders, virtualFiles: vFiles };
   }, [viewMode, typeFilteredFiles, folders, clients, projects]);
 
+  // ============================================================
+  // Destination resolution
+  // ============================================================
+
+  /**
+   * Resolves a drop/upload target into actual { projectId, folderId } values.
+   * Returns null if user cancelled the picker, or skip=true if no resolution needed
+   * (e.g. real folder already gives both).
+   */
+  const resolveDestination = useCallback(
+    async (
+      target: string | null
+    ): Promise<{ projectId: string | null; folderId: string | null } | null> => {
+      // Case 1: real folder UUID
+      if (target && !isVirtualId(target)) {
+        const folder = folders.find((f) => f.id === target);
+        if (folder) {
+          const projectId = (folder as any).project_id ?? null;
+          if (projectId) {
+            return { projectId, folderId: folder.id };
+          }
+          // Folder exists but no project — ask user to assign one
+          const picked = await openPicker({});
+          if (!picked) return null;
+          return { projectId: picked.projectId, folderId: folder.id };
+        }
+      }
+
+      // Case 2: virtual project group → upload to project root
+      if (target && target.startsWith('vp-')) {
+        const projectId = target.slice(3);
+        return { projectId, folderId: null };
+      }
+
+      // Case 3: virtual client group → restrict picker to that client's projects
+      if (target && target.startsWith('vc-')) {
+        const clientId = target.slice(3);
+        const clientProjects = projects.filter((p) => p.client_id === clientId);
+        if (clientProjects.length === 1) {
+          return { projectId: clientProjects[0].id, folderId: null };
+        }
+        const picked = await openPicker({
+          restrictToProjectIds: clientProjects.map((p) => p.id),
+        });
+        if (!picked) return null;
+        return { projectId: picked.projectId, folderId: picked.folderId };
+      }
+
+      // Case 4: virtual date group OR root (null) → ask user
+      const picked = await openPicker({});
+      if (!picked) return null;
+      return { projectId: picked.projectId, folderId: picked.folderId };
+    },
+    [folders, projects]
+  );
+
+  const openPicker = useCallback(
+    (opts: { restrictToProjectIds?: string[]; initialProjectId?: string }) =>
+      new Promise<PickedDestination | null>((resolve) => {
+        setPickerRestrict(opts.restrictToProjectIds ?? null);
+        setPickerInitialProject(opts.initialProjectId ?? null);
+        pickerResolveRef.current = resolve;
+        setPickerOpen(true);
+      }),
+    []
+  );
+
+  const handlePickerConfirm = (dest: PickedDestination) => {
+    pickerResolveRef.current?.(dest);
+    pickerResolveRef.current = null;
+  };
+
+  const handlePickerCancel = (open: boolean) => {
+    setPickerOpen(open);
+    if (!open && pickerResolveRef.current) {
+      pickerResolveRef.current(null);
+      pickerResolveRef.current = null;
+    }
+  };
+
+  // ============================================================
+  // Folder CRUD
+  // ============================================================
+
   const handleCreateFolder = async (name: string, parentId: string | null) => {
     if (!user) return;
+
+    // Resolve project context for the folder
+    let projectId: string | null = null;
+    let realParentId: string | null = null;
+
+    if (parentId && !isVirtualId(parentId)) {
+      // Real folder → inherit its project
+      const parent = folders.find((f) => f.id === parentId);
+      projectId = (parent as any)?.project_id ?? null;
+      realParentId = parentId;
+    } else if (parentId?.startsWith('vp-')) {
+      projectId = parentId.slice(3);
+      realParentId = null;
+    } else {
+      // root, vc-, vd- → ask for project
+      const dest = await resolveDestination(parentId);
+      if (!dest) return;
+      projectId = dest.projectId;
+      realParentId = dest.folderId;
+    }
+
+    if (!projectId) {
+      toast.error('Δεν είναι δυνατός ο εντοπισμός έργου');
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('file_folders')
-        .insert([{ name, parent_folder_id: parentId, created_by: user.id }]);
+        .insert([{ name, parent_folder_id: realParentId, created_by: user.id, project_id: projectId } as any]);
       if (error) throw error;
       toast.success('Ο φάκελος δημιουργήθηκε!');
       await fetchFolders();
@@ -257,6 +389,7 @@ export function CentralFileExplorer() {
   };
 
   const handleRenameFolder = async (folderId: string, newName: string) => {
+    if (isVirtualId(folderId)) return;
     try {
       const { error } = await supabase
         .from('file_folders')
@@ -272,6 +405,7 @@ export function CentralFileExplorer() {
   };
 
   const handleDeleteFolder = async (folderId: string) => {
+    if (isVirtualId(folderId)) return;
     try {
       const folder = folders.find((f) => f.id === folderId);
       if (folder) {
@@ -290,8 +424,20 @@ export function CentralFileExplorer() {
     }
   };
 
+  // ============================================================
+  // File uploads
+  // ============================================================
+
   const handleUpload = async (selectedFiles: FileList, folderId: string | null) => {
     if (!user) return;
+
+    const dest = await resolveDestination(folderId);
+    if (!dest) return; // user cancelled
+    if (!dest.projectId) {
+      toast.error('Δεν είναι δυνατός ο εντοπισμός έργου');
+      return;
+    }
+
     setUploading(true);
     try {
       for (const file of Array.from(selectedFiles)) {
@@ -301,7 +447,15 @@ export function CentralFileExplorer() {
 
         const { error: insertError } = await supabase
           .from('file_attachments')
-          .insert([{ file_name: file.name, file_path: fileName, file_size: file.size, content_type: file.type, uploaded_by: user.id, folder_id: folderId }]);
+          .insert([{
+            file_name: file.name,
+            file_path: fileName,
+            file_size: file.size,
+            content_type: file.type,
+            uploaded_by: user.id,
+            folder_id: dest.folderId,
+            project_id: dest.projectId,
+          }]);
         if (insertError) throw insertError;
       }
       toast.success('Τα αρχεία ανέβηκαν επιτυχώς!');
@@ -319,9 +473,16 @@ export function CentralFileExplorer() {
     targetFolderId: string | null
   ) => {
     if (!user) return;
+
+    const dest = await resolveDestination(targetFolderId);
+    if (!dest) return;
+    if (!dest.projectId) {
+      toast.error('Δεν είναι δυνατός ο εντοπισμός έργου');
+      return;
+    }
+
     setUploading(true);
     try {
-      // Normalize to array of { file, relativePath }
       const entries: Array<{ file: File; relativePath: string }> = Array.isArray(fileList)
         ? fileList
         : Array.from(fileList).map((file) => ({
@@ -329,20 +490,23 @@ export function CentralFileExplorer() {
             relativePath: (file as any).webkitRelativePath || file.name,
           }));
 
-      // Build folder structure from relativePath
       const folderMap = new Map<string, string>(); // relativeDirPath -> folderId
 
       for (const { file, relativePath } of entries) {
         const parts = relativePath.split('/');
-        
-        // Create folder hierarchy
-        let currentParent = targetFolderId;
+
+        let currentParent = dest.folderId;
         for (let i = 0; i < parts.length - 1; i++) {
           const dirPath = parts.slice(0, i + 1).join('/');
           if (!folderMap.has(dirPath)) {
             const { data, error } = await supabase
               .from('file_folders')
-              .insert([{ name: parts[i], parent_folder_id: currentParent, created_by: user.id }])
+              .insert([{
+                name: parts[i],
+                parent_folder_id: currentParent,
+                created_by: user.id,
+                project_id: dest.projectId,
+              } as any])
               .select('id')
               .single();
             if (error) throw error;
@@ -353,14 +517,21 @@ export function CentralFileExplorer() {
           }
         }
 
-        // Upload file
         const fileName = createProjectFilesObjectKey({ userId: user.id, originalName: file.name });
         const { error: uploadError } = await supabase.storage.from('project-files').upload(fileName, file);
         if (uploadError) throw uploadError;
 
         const { error: insertError } = await supabase
           .from('file_attachments')
-          .insert([{ file_name: file.name, file_path: fileName, file_size: file.size, content_type: file.type, uploaded_by: user.id, folder_id: currentParent }]);
+          .insert([{
+            file_name: file.name,
+            file_path: fileName,
+            file_size: file.size,
+            content_type: file.type,
+            uploaded_by: user.id,
+            folder_id: currentParent,
+            project_id: dest.projectId,
+          }]);
         if (insertError) throw insertError;
       }
 
@@ -392,11 +563,20 @@ export function CentralFileExplorer() {
   };
 
   const handleMoveFile = async (fileId: string, folderId: string | null) => {
+    // Resolve target before moving
+    const dest = await resolveDestination(folderId);
+    if (!dest) return;
+
     try {
-      const { error } = await supabase.from('file_attachments').update({ folder_id: folderId }).eq('id', fileId);
+      const { error } = await supabase
+        .from('file_attachments')
+        .update({ folder_id: dest.folderId, project_id: dest.projectId })
+        .eq('id', fileId);
       if (error) throw error;
-      setFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, folder_id: folderId } : f)));
-      const folderName = folderId ? folders.find((f) => f.id === folderId)?.name : 'Χωρίς φάκελο';
+      setFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, folder_id: dest.folderId, project_id: dest.projectId } : f)));
+      const folderName = dest.folderId
+        ? folders.find((f) => f.id === dest.folderId)?.name
+        : 'Ρίζα έργου';
       toast.success(`Μετακινήθηκε στο "${folderName}"`);
     } catch (error) {
       console.error('Error moving file:', error);
@@ -405,11 +585,36 @@ export function CentralFileExplorer() {
   };
 
   const handleMoveFolder = async (folderId: string, targetParentId: string | null) => {
+    if (isVirtualId(folderId)) {
+      toast.error('Δεν μπορείς να μετακινήσεις εικονική ομάδα');
+      return;
+    }
+
+    // Resolve target
+    let realParent: string | null = null;
+    let projectId: string | null = null;
+
+    if (targetParentId && !isVirtualId(targetParentId)) {
+      const parent = folders.find((f) => f.id === targetParentId);
+      realParent = targetParentId;
+      projectId = (parent as any)?.project_id ?? null;
+    } else if (targetParentId?.startsWith('vp-')) {
+      projectId = targetParentId.slice(3);
+      realParent = null;
+    } else {
+      const dest = await resolveDestination(targetParentId);
+      if (!dest) return;
+      projectId = dest.projectId;
+      realParent = dest.folderId;
+    }
+
     try {
-      const { error } = await supabase.from('file_folders').update({ parent_folder_id: targetParentId }).eq('id', folderId);
+      const update: any = { parent_folder_id: realParent };
+      if (projectId) update.project_id = projectId;
+      const { error } = await supabase.from('file_folders').update(update).eq('id', folderId);
       if (error) throw error;
       const folderName = folders.find((f) => f.id === folderId)?.name;
-      const targetName = targetParentId ? folders.find((f) => f.id === targetParentId)?.name : 'Ρίζα';
+      const targetName = realParent ? folders.find((f) => f.id === realParent)?.name : 'Ρίζα';
       toast.success(`"${folderName}" → "${targetName}"`);
       await fetchFolders();
     } catch (error) {
@@ -495,6 +700,16 @@ export function CentralFileExplorer() {
         loading={loading}
         uploading={uploading}
         searchQuery={searchQuery}
+      />
+
+      <DestinationPickerDialog
+        open={pickerOpen}
+        onOpenChange={handlePickerCancel}
+        projects={projects}
+        folders={folders}
+        restrictToProjectIds={pickerRestrict}
+        initialProjectId={pickerInitialProject}
+        onConfirm={handlePickerConfirm}
       />
     </div>
   );

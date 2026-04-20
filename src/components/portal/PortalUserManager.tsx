@@ -75,45 +75,27 @@ export function PortalUserManager() {
     setSaving(true);
 
     try {
-      // Check if user exists in profiles
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', email)
-        .maybeSingle();
-
-      if (!profile) {
-        toast.error('Ο χρήστης πρέπει πρώτα να δημιουργήσει λογαριασμό');
-        setSaving(false);
-        return;
-      }
-
-      const { error } = await supabase
-        .from('client_portal_users')
-        .insert({
-          user_id: profile.id,
+      const { data, error } = await supabase.functions.invoke('invite-portal-user', {
+        body: {
+          email: email.trim().toLowerCase(),
           client_id: selectedClient,
           company_id: company.id,
-          invited_by: (await supabase.auth.getUser()).data.user?.id,
-        });
+          app_url: window.location.origin,
+        },
+      });
 
-      if (error) {
-        if (error.code === '23505') {
-          toast.error('Ο χρήστης έχει ήδη πρόσβαση σε αυτόν τον πελάτη');
-        } else {
-          throw error;
-        }
-        return;
-      }
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-      toast.success('Πρόσκληση στάλθηκε επιτυχώς');
+      toast.success('Η πρόσκληση στάλθηκε. Ο χρήστης θα λάβει email με σύνδεσμο εισόδου.');
       setDialogOpen(false);
       setEmail('');
       setSelectedClient('');
       fetchData();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error('Σφάλμα κατά την πρόσκληση');
+      const msg = err?.message || 'Σφάλμα κατά την πρόσκληση';
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -185,7 +167,7 @@ export function PortalUserManager() {
                       onChange={(e) => setEmail(e.target.value)}
                     />
                     <p className="text-[10px] text-muted-foreground mt-1">
-                      Ο χρήστης πρέπει να έχει ήδη λογαριασμό στην πλατφόρμα
+                      Δεν χρειάζεται να έχει λογαριασμό — θα λάβει email με σύνδεσμο εισόδου.
                     </p>
                   </div>
                   <div>

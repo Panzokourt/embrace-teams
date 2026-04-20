@@ -890,6 +890,75 @@ export type Database = {
           },
         ]
       }
+      client_portal_access_tokens: {
+        Row: {
+          client_id: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          email: string
+          expires_at: string
+          id: string
+          last_used_at: string | null
+          pin_attempts: number
+          pin_hash: string | null
+          pin_locked_until: string | null
+          require_pin: boolean
+          revoked_at: string | null
+          token_hash: string
+          user_id: string | null
+        }
+        Insert: {
+          client_id: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          email: string
+          expires_at?: string
+          id?: string
+          last_used_at?: string | null
+          pin_attempts?: number
+          pin_hash?: string | null
+          pin_locked_until?: string | null
+          require_pin?: boolean
+          revoked_at?: string | null
+          token_hash: string
+          user_id?: string | null
+        }
+        Update: {
+          client_id?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          expires_at?: string
+          id?: string
+          last_used_at?: string | null
+          pin_attempts?: number
+          pin_hash?: string | null
+          pin_locked_until?: string | null
+          require_pin?: boolean
+          revoked_at?: string | null
+          token_hash?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_portal_access_tokens_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_portal_access_tokens_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_portal_users: {
         Row: {
           client_id: string
@@ -7507,6 +7576,7 @@ export type Database = {
       }
     }
     Functions: {
+      _hash_token: { Args: { _token: string }; Returns: string }
       accept_invitation: { Args: { _token: string }; Returns: Json }
       approve_join_request: {
         Args: {
@@ -7628,6 +7698,26 @@ export type Database = {
           source_queue: string
         }
         Returns: number
+      }
+      portal_consume_token: {
+        Args: { _pin?: string; _token: string }
+        Returns: Json
+      }
+      portal_create_token: {
+        Args: {
+          _client_id: string
+          _company_id: string
+          _email: string
+          _expires_in_days?: number
+          _pin?: string
+          _token: string
+          _user_id: string
+        }
+        Returns: string
+      }
+      portal_validate_token: {
+        Args: { _pin?: string; _token: string }
+        Returns: Json
       }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }

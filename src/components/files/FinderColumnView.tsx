@@ -239,7 +239,7 @@ export function FinderColumnView({
     setDragOverFolderId(null);
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent, colIndex: number, targetFolderId?: string) => {
+  const handleDrop = useCallback(async (e: React.DragEvent, colIndex: number, targetFolderId?: string) => {
     e.preventDefault();
     e.stopPropagation();
     setDragOverColumn(null);
@@ -258,17 +258,24 @@ export function FinderColumnView({
       return;
     }
 
-    // OS file drop — check for folder upload via webkitRelativePath
+    // OS drop — use webkitGetAsEntry to detect & traverse folders
+    const items = e.dataTransfer.items;
+    if (items && items.length > 0 && hasDirectoryEntry(items) && onUploadFolder) {
+      try {
+        const entries = await readDroppedItems(items);
+        if (entries.length > 0) {
+          await onUploadFolder(entries, dropTarget);
+        }
+        return;
+      } catch (err) {
+        console.error('Error reading dropped folder:', err);
+      }
+    }
+
+    // Plain files fallback
     const droppedFiles = e.dataTransfer.files;
     if (droppedFiles && droppedFiles.length > 0) {
-      const hasRelativePaths = Array.from(droppedFiles).some(
-        (f: any) => f.webkitRelativePath && f.webkitRelativePath.includes('/')
-      );
-      if (hasRelativePaths && onUploadFolder) {
-        onUploadFolder(droppedFiles, dropTarget);
-      } else {
-        onUpload(droppedFiles, dropTarget);
-      }
+      onUpload(droppedFiles, dropTarget);
     }
   }, [path, onUpload, onUploadFolder, onMoveFile, onMoveFolder]);
 

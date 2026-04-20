@@ -20,7 +20,7 @@ export default function ClientPortalLayout() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) { navigate('/auth'); return; }
+    if (!user) { navigate('/portal/access?error=no_access'); return; }
     fetchPortalAccess();
   }, [user]);
 
@@ -35,7 +35,7 @@ export default function ClientPortalLayout() {
       .maybeSingle();
 
     if (!data?.client) {
-      navigate('/auth');
+      navigate('/portal/access?error=no_access');
       return;
     }
     setClient(data.client as any);

@@ -29,6 +29,8 @@ project_id = "qsykyiqplslvmxdfudxq"
     verify_jwt = false
   [functions.invite-portal-user]
     verify_jwt = false
+  [functions.portal-token-exchange]
+    verify_jwt = false
   [functions.my-work-ai-chat]
     verify_jwt = false
   [functions.parse-document]

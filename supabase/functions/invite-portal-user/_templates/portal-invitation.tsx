@@ -18,6 +18,7 @@ interface PortalInvitationEmailProps {
   clientName: string
   inviterName: string
   acceptUrl: string
+  pin?: string
 }
 
 export const PortalInvitationEmail = ({
@@ -25,6 +26,7 @@ export const PortalInvitationEmail = ({
   clientName,
   inviterName,
   acceptUrl,
+  pin,
 }: PortalInvitationEmailProps) => (
   <Html>
     <Head />
@@ -61,9 +63,20 @@ export const PortalInvitationEmail = ({
           </Link>
         </Section>
 
-        <Text style={smallText}>
-          Πατώντας το παραπάνω κουμπί, θα συνδεθείτε αυτόματα στο portal σας.
-        </Text>
+        {pin ? (
+          <Section style={pinBox}>
+            <Text style={pinLabel}>Κωδικός εισόδου (PIN)</Text>
+            <Text style={pinCode}>{pin}</Text>
+            <Text style={pinHint}>
+              Θα σας ζητηθεί αυτός ο 6-ψήφιος κωδικός κατά την είσοδο. Φυλάξτε τον — θα τον
+              χρησιμοποιείτε σε κάθε μελλοντική σύνδεση.
+            </Text>
+          </Section>
+        ) : (
+          <Text style={smallText}>
+            Πατώντας το παραπάνω κουμπί, θα συνδεθείτε αυτόματα στο portal σας.
+          </Text>
+        )}
 
         <Hr style={hr} />
 
@@ -140,4 +153,37 @@ const footer: React.CSSProperties = {
   color: '#898989',
   fontSize: '12px',
   margin: '0 0 8px',
+}
+
+const pinBox: React.CSSProperties = {
+  backgroundColor: '#f9fafb',
+  border: '1px solid #e5e7eb',
+  borderRadius: '10px',
+  padding: '16px 20px',
+  margin: '8px 0 20px',
+  textAlign: 'center' as const,
+}
+
+const pinLabel: React.CSSProperties = {
+  color: '#6b7280',
+  fontSize: '12px',
+  textTransform: 'uppercase' as const,
+  letterSpacing: '0.05em',
+  margin: '0 0 6px',
+}
+
+const pinCode: React.CSSProperties = {
+  color: '#111',
+  fontSize: '28px',
+  fontWeight: 700,
+  letterSpacing: '0.3em',
+  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+  margin: '0 0 8px',
+}
+
+const pinHint: React.CSSProperties = {
+  color: '#6b7280',
+  fontSize: '12px',
+  lineHeight: '18px',
+  margin: 0,
 }

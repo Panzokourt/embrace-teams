@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { UserPlus, Trash2, ExternalLink, Copy, Check } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { UserPlus, Trash2, ExternalLink, Copy, Check, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface PortalUser {
@@ -29,7 +30,9 @@ export function PortalUserManager() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [selectedClient, setSelectedClient] = useState('');
+  const [requirePin, setRequirePin] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [resendingId, setResendingId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -81,16 +84,22 @@ export function PortalUserManager() {
           client_id: selectedClient,
           company_id: company.id,
           app_url: window.location.origin,
+          require_pin: requirePin,
         },
       });
 
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      toast.success('Η πρόσκληση στάλθηκε. Ο χρήστης θα λάβει email με σύνδεσμο εισόδου.');
+      toast.success(
+        requirePin
+          ? 'Η πρόσκληση στάλθηκε με PIN στο email του πελάτη.'
+          : 'Η πρόσκληση στάλθηκε. Ο χρήστης θα λάβει email με σύνδεσμο εισόδου.'
+      );
       setDialogOpen(false);
       setEmail('');
       setSelectedClient('');
+      setRequirePin(false);
       fetchData();
     } catch (err: any) {
       console.error(err);
@@ -98,6 +107,32 @@ export function PortalUserManager() {
       toast.error(msg);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const resendInvitation = async (pu: PortalUser) => {
+    if (!company?.id || !pu.profile?.email) {
+      toast.error('Λείπει το email του χρήστη');
+      return;
+    }
+    setResendingId(pu.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('invite-portal-user', {
+        body: {
+          email: pu.profile.email,
+          client_id: pu.client_id,
+          company_id: company.id,
+          app_url: window.location.origin,
+          require_pin: false,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success('Νέα πρόσκληση στάλθηκε. Το παλιό link ακυρώθηκε.');
+    } catch (err: any) {
+      toast.error(err?.message || 'Αποτυχία επαναποστολής');
+    } finally {
+      setResendingId(null);
     }
   };
 
@@ -183,6 +218,22 @@ export function PortalUserManager() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="flex items-start gap-2 p-3 rounded-lg border border-border/40 bg-muted/30">
+                    <Checkbox
+                      id="require-pin"
+                      checked={requirePin}
+                      onCheckedChange={(c) => setRequirePin(!!c)}
+                      className="mt-0.5"
+                    />
+                    <div className="space-y-0.5">
+                      <Label htmlFor="require-pin" className="text-xs font-medium cursor-pointer">
+                        Απαιτείται PIN για είσοδο
+                      </Label>
+                      <p className="text-[10px] text-muted-foreground">
+                        Θα σταλεί 6-ψήφιος κωδικός στο email. Ο πελάτης θα τον χρειάζεται σε κάθε σύνδεση.
+                      </p>
+                    </div>
+                  </div>
                   <Button onClick={invitePortalUser} disabled={saving || !email || !selectedClient} className="w-full">
                     {saving ? 'Αποστολή...' : 'Αποστολή Πρόσκλησης'}
                   </Button>
@@ -212,6 +263,14 @@ export function PortalUserManager() {
                     </Badge>
                   </div>
                 </div>
+                <Button
+                  variant="ghost" size="sm" className="text-xs gap-1.5"
+                  onClick={() => resendInvitation(pu)}
+                  disabled={resendingId === pu.id}
+                >
+                  <RefreshCw className={`h-3 w-3 ${resendingId === pu.id ? 'animate-spin' : ''}`} />
+                  Επαναποστολή
+                </Button>
                 <Button
                   variant="ghost" size="sm" className="text-xs"
                   onClick={() => toggleAccess(pu.id, pu.is_active)}

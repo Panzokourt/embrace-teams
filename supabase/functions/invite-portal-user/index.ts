@@ -10,6 +10,23 @@ const corsHeaders = {
     'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 }
 
+// Generate a URL-safe random token (~43 chars from 32 bytes)
+function generateToken(): string {
+  const bytes = new Uint8Array(32)
+  crypto.getRandomValues(bytes)
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+}
+
+// Generate a 6-digit numeric PIN
+function generatePin(): string {
+  const arr = new Uint32Array(1)
+  crypto.getRandomValues(arr)
+  return String(arr[0] % 1000000).padStart(6, '0')
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -21,12 +38,10 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const resendKey = Deno.env.get('RESEND_API_KEY')
 
-    // Verify caller
     const authHeader = req.headers.get('Authorization')
     if (!authHeader?.startsWith('Bearer ')) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
@@ -36,13 +51,12 @@ Deno.serve(async (req) => {
     const { data: { user: caller }, error: callerErr } = await userClient.auth.getUser()
     if (callerErr || !caller) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
     const body = await req.json()
-    const { email, client_id, company_id, app_url } = body
+    const { email, client_id, company_id, app_url, require_pin = false } = body
 
     if (!email || !client_id || !company_id) {
       return new Response(
@@ -53,8 +67,8 @@ Deno.serve(async (req) => {
 
     const normalizedEmail = String(email).trim().toLowerCase()
 
-    // Verify caller belongs to that company (and has a manageable role)
-    const { data: callerRole, error: callerRoleErr } = await userClient
+    // Verify caller belongs to the company with manage permissions
+    const { data: callerRole } = await userClient
       .from('user_company_roles')
       .select('role')
       .eq('user_id', caller.id)
@@ -62,18 +76,10 @@ Deno.serve(async (req) => {
       .eq('status', 'active')
       .maybeSingle()
 
-    if (callerRoleErr || !callerRole) {
-      return new Response(JSON.stringify({ error: 'You do not belong to this company' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
     const allowedRoles = ['super_admin', 'owner', 'admin', 'manager']
-    if (!allowedRoles.includes(callerRole.role)) {
+    if (!callerRole || !allowedRoles.includes(callerRole.role)) {
       return new Response(JSON.stringify({ error: 'Insufficient permissions' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
@@ -90,8 +96,7 @@ Deno.serve(async (req) => {
 
     if (!client || client.company_id !== company_id) {
       return new Response(JSON.stringify({ error: 'Client not found' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
@@ -108,9 +113,8 @@ Deno.serve(async (req) => {
       .single()
 
     const baseUrl = app_url || 'https://app.olseny.com'
-    const portalUrl = `${baseUrl}/portal`
 
-    // 1) Find or create the auth user
+    // 1) Find or create the auth user (passwordless — they sign in via portal token)
     let userId: string | null = null
 
     const { data: existingProfile } = await adminClient
@@ -121,91 +125,69 @@ Deno.serve(async (req) => {
 
     if (existingProfile) {
       userId = existingProfile.id
-      console.log(`Using existing user ${userId} for ${normalizedEmail}`)
     } else {
-      // Create new user via invite (they'll set password via magic link)
-      const { data: invited, error: inviteErr } = await adminClient.auth.admin.inviteUserByEmail(
-        normalizedEmail,
-        {
-          redirectTo: portalUrl,
-          data: {
-            portal_invite: true,
-            client_id,
-            company_id,
-            client_name: client.name,
-          },
-        }
-      )
-
-      if (inviteErr) {
-        // Fallback: try createUser without password (passwordless), user will get magic link
-        console.error('inviteUserByEmail failed, trying createUser:', inviteErr.message)
-        const { data: createdUser, error: createErr } = await adminClient.auth.admin.createUser({
-          email: normalizedEmail,
-          email_confirm: true,
-          user_metadata: {
-            portal_invite: true,
-            client_id,
-            company_id,
-            client_name: client.name,
-          },
-        })
-        if (createErr || !createdUser.user) {
-          console.error('createUser also failed:', createErr?.message)
-          return new Response(
-            JSON.stringify({ error: createErr?.message || 'Failed to create user' }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
-        }
-        userId = createdUser.user.id
-      } else {
-        userId = invited.user?.id ?? null
+      // Create user directly without sending Supabase email (we send our own)
+      const { data: createdUser, error: createErr } = await adminClient.auth.admin.createUser({
+        email: normalizedEmail,
+        email_confirm: true,
+        user_metadata: {
+          portal_invite: true,
+          client_id,
+          company_id,
+          client_name: client.name,
+        },
+      })
+      if (createErr || !createdUser.user) {
+        console.error('createUser failed:', createErr?.message)
+        return new Response(
+          JSON.stringify({ error: createErr?.message || 'Failed to create user' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
       }
-
-      if (!userId) {
-        return new Response(JSON.stringify({ error: 'Could not provision user' }), {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
+      userId = createdUser.user.id
     }
 
-    // 2) Insert client_portal_users row (idempotent)
+    if (!userId) {
+      return new Response(JSON.stringify({ error: 'Could not provision user' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // 2) Upsert client_portal_users
     const { error: portalErr } = await adminClient
       .from('client_portal_users')
       .upsert(
-        {
-          user_id: userId,
-          client_id,
-          company_id,
-          invited_by: caller.id,
-          is_active: true,
-        },
+        { user_id: userId, client_id, company_id, invited_by: caller.id, is_active: true },
         { onConflict: 'user_id,client_id', ignoreDuplicates: false }
       )
-
     if (portalErr) {
       console.error('Portal insert error:', portalErr)
       return new Response(JSON.stringify({ error: portalErr.message }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    // 3) Generate magic link & send custom email (only if user is new or has no password)
-    let magicLink = portalUrl
-    try {
-      const { data: linkData } = await adminClient.auth.admin.generateLink({
-        type: 'magiclink',
-        email: normalizedEmail,
-        options: { redirectTo: portalUrl },
+    // 3) Create custom access token (+optional PIN)
+    const token = generateToken()
+    const pin = require_pin ? generatePin() : null
+
+    const { error: tokenErr } = await adminClient.rpc('portal_create_token', {
+      _client_id: client_id,
+      _company_id: company_id,
+      _email: normalizedEmail,
+      _user_id: userId,
+      _token: token,
+      _pin: pin,
+      _expires_in_days: 30,
+    })
+    if (tokenErr) {
+      console.error('Token create error:', tokenErr)
+      return new Response(JSON.stringify({ error: tokenErr.message }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
-      if (linkData?.properties?.action_link) {
-        magicLink = linkData.properties.action_link
-      }
-    } catch (e) {
-      console.warn('generateLink failed, using portal url fallback:', e)
     }
+
+    const accessUrl = `${baseUrl}/portal/access?token=${encodeURIComponent(token)}`
 
     // 4) Send branded email via Resend
     if (resendKey) {
@@ -216,7 +198,8 @@ Deno.serve(async (req) => {
             companyName: company?.name || 'Olseny',
             clientName: client.name,
             inviterName: inviterProfile?.full_name || inviterProfile?.email || 'Η ομάδα',
-            acceptUrl: magicLink,
+            acceptUrl: accessUrl,
+            pin: pin || undefined,
           })
         )
         await resend.emails.send({
@@ -225,20 +208,15 @@ Deno.serve(async (req) => {
           subject: `Πρόσκληση στο Client Portal — ${client.name}`,
           html,
         })
-        console.log(`Portal invite email sent to ${normalizedEmail}`)
       } catch (e) {
         console.error('Resend send error:', e)
       }
     } else {
-      console.warn('RESEND_API_KEY not set — skipping branded email (Supabase invite email will be used)')
+      console.warn('RESEND_API_KEY not set — email not sent')
     }
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        user_id: userId,
-        email: normalizedEmail,
-      }),
+      JSON.stringify({ success: true, user_id: userId, email: normalizedEmail, has_pin: !!pin }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {

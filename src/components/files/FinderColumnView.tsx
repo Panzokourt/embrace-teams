@@ -47,7 +47,10 @@ interface FinderColumnViewProps {
   folders: FileFolder[];
   allFolders?: FileFolder[];
   onUpload: (files: FileList, folderId: string | null) => Promise<void>;
-  onUploadFolder?: (files: FileList, folderId: string | null) => Promise<void>;
+  onUploadFolder?: (
+    files: FileList | Array<{ file: File; relativePath: string }>,
+    folderId: string | null
+  ) => Promise<void>;
   onDelete: (file: FileAttachment) => Promise<void>;
   onCreateFolder: (name: string, parentId: string | null) => Promise<void>;
   onRenameFolder: (folderId: string, newName: string) => Promise<void>;

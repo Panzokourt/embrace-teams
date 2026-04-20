@@ -22,12 +22,17 @@ interface PortalUser {
   profile?: { full_name: string | null; email: string | null } | null;
 }
 
+// Always send invitations from the production domain so the magic link in the
+// email never points to a preview/Lovable URL.
+const PORTAL_BASE_URL = 'https://app.olseny.com';
+
 export function PortalUserManager() {
   const { company } = useAuth();
   const [portalUsers, setPortalUsers] = useState<PortalUser[]>([]);
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [selectedClient, setSelectedClient] = useState('');
   const [requirePin, setRequirePin] = useState(false);
@@ -58,17 +63,41 @@ export function PortalUserManager() {
     ]);
 
     // Fetch profiles for portal users
-    const userIds = (users || []).map(u => u.user_id);
-    let profileMap: Record<string, { full_name: string | null; email: string | null }> = {};
+    const userIds = Array.from(new Set((users || []).map((u: any) => u.user_id).filter(Boolean)));
+    const profileMap: Record<string, { full_name: string | null; email: string | null }> = {};
     if (userIds.length > 0) {
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, full_name, email')
         .in('id', userIds);
-      (profiles || []).forEach(p => { profileMap[p.id] = p; });
+      (profiles || []).forEach((p: any) => {
+        profileMap[p.id] = { full_name: p.full_name, email: p.email };
+      });
     }
 
-    setPortalUsers((users || []).map(u => ({ ...u, profile: profileMap[u.user_id] || null })) as any);
+    // Fallback: try to get email from active portal access tokens (covers cases where
+    // the profile row is missing email — guarantees the resend button always has an email).
+    const tokens = await supabase
+      .from('client_portal_access_tokens')
+      .select('user_id, email, created_at')
+      .eq('company_id', company.id)
+      .is('revoked_at', null)
+      .order('created_at', { ascending: false });
+
+    const tokenEmailMap: Record<string, string> = {};
+    (tokens.data || []).forEach((t: any) => {
+      if (t.user_id && t.email && !tokenEmailMap[t.user_id]) {
+        tokenEmailMap[t.user_id] = t.email;
+      }
+    });
+
+    setPortalUsers(
+      (users || []).map((u: any) => {
+        const profile = profileMap[u.user_id] || { full_name: null, email: null };
+        const email = profile.email || tokenEmailMap[u.user_id] || null;
+        return { ...u, profile: { full_name: profile.full_name, email } };
+      }) as PortalUser[]
+    );
     setClients(clientList || []);
     setLoading(false);
   };
@@ -81,9 +110,10 @@ export function PortalUserManager() {
       const { data, error } = await supabase.functions.invoke('invite-portal-user', {
         body: {
           email: email.trim().toLowerCase(),
+          full_name: fullName.trim() || null,
           client_id: selectedClient,
           company_id: company.id,
-          app_url: window.location.origin,
+          app_url: PORTAL_BASE_URL,
           require_pin: requirePin,
         },
       });
@@ -97,6 +127,7 @@ export function PortalUserManager() {
           : 'Η πρόσκληση στάλθηκε. Ο χρήστης θα λάβει email με σύνδεσμο εισόδου.'
       );
       setDialogOpen(false);
+      setFullName('');
       setEmail('');
       setSelectedClient('');
       setRequirePin(false);
@@ -111,24 +142,28 @@ export function PortalUserManager() {
   };
 
   const resendInvitation = async (pu: PortalUser) => {
-    if (!company?.id || !pu.profile?.email) {
-      toast.error('Λείπει το email του χρήστη');
+    if (!company?.id) return;
+    const targetEmail = pu.profile?.email;
+    if (!targetEmail) {
+      toast.error('Λείπει το email του χρήστη — διέγραψε και ξανά πρόσκαλεσε.');
       return;
     }
     setResendingId(pu.id);
     try {
       const { data, error } = await supabase.functions.invoke('invite-portal-user', {
         body: {
-          email: pu.profile.email,
+          email: targetEmail,
+          full_name: pu.profile?.full_name || null,
           client_id: pu.client_id,
           company_id: company.id,
-          app_url: window.location.origin,
+          app_url: PORTAL_BASE_URL,
           require_pin: false,
         },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       toast.success('Νέα πρόσκληση στάλθηκε. Το παλιό link ακυρώθηκε.');
+      fetchData();
     } catch (err: any) {
       toast.error(err?.message || 'Αποτυχία επαναποστολής');
     } finally {
@@ -158,7 +193,7 @@ export function PortalUserManager() {
     fetchData();
   };
 
-  const portalUrl = `${window.location.origin}/portal`;
+  const portalUrl = `${PORTAL_BASE_URL}/portal`;
 
   const copyPortalUrl = () => {
     navigator.clipboard.writeText(portalUrl);
@@ -194,6 +229,17 @@ export function PortalUserManager() {
                   <DialogTitle>Πρόσκληση στο Client Portal</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 pt-2">
+                  <div>
+                    <Label>Όνομα χρήστη</Label>
+                    <Input
+                      placeholder="π.χ. Γιάννης Παπαδόπουλος"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Προαιρετικό — εμφανίζεται στη λίστα και στο portal.
+                    </p>
+                  </div>
                   <div>
                     <Label>Email χρήστη</Label>
                     <Input
@@ -250,41 +296,52 @@ export function PortalUserManager() {
           </p>
         ) : (
           <div className="space-y-2">
-            {portalUsers.map((pu) => (
-              <div key={pu.id} className="flex items-center gap-3 p-2.5 rounded-lg border border-border/40">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">
-                    {pu.profile?.full_name || pu.profile?.email || 'Unknown'}
-                  </p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[10px] text-muted-foreground">{pu.client?.name}</span>
-                    <Badge variant={pu.is_active ? 'default' : 'secondary'} className="text-[9px] px-1.5 py-0">
-                      {pu.is_active ? 'Ενεργός' : 'Ανενεργός'}
-                    </Badge>
+            {portalUsers.map((pu) => {
+              const displayName =
+                pu.profile?.full_name?.trim() ||
+                pu.profile?.email ||
+                'Χωρίς όνομα';
+              const showEmailLine = !!pu.profile?.email && pu.profile.email !== displayName;
+              return (
+                <div key={pu.id} className="flex items-center gap-3 p-2.5 rounded-lg border border-border/40">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{displayName}</p>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      {showEmailLine && (
+                        <span className="text-[10px] text-muted-foreground truncate">
+                          {pu.profile?.email}
+                        </span>
+                      )}
+                      <span className="text-[10px] text-muted-foreground">·</span>
+                      <span className="text-[10px] text-muted-foreground">{pu.client?.name}</span>
+                      <Badge variant={pu.is_active ? 'default' : 'secondary'} className="text-[9px] px-1.5 py-0">
+                        {pu.is_active ? 'Ενεργός' : 'Ανενεργός'}
+                      </Badge>
+                    </div>
                   </div>
+                  <Button
+                    variant="ghost" size="sm" className="text-xs gap-1.5"
+                    onClick={() => resendInvitation(pu)}
+                    disabled={resendingId === pu.id}
+                  >
+                    <RefreshCw className={`h-3 w-3 ${resendingId === pu.id ? 'animate-spin' : ''}`} />
+                    Επαναποστολή
+                  </Button>
+                  <Button
+                    variant="ghost" size="sm" className="text-xs"
+                    onClick={() => toggleAccess(pu.id, pu.is_active)}
+                  >
+                    {pu.is_active ? 'Απενεργοποίηση' : 'Ενεργοποίηση'}
+                  </Button>
+                  <Button
+                    variant="ghost" size="icon" className="h-7 w-7 text-destructive"
+                    onClick={() => removeAccess(pu.id)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
-                <Button
-                  variant="ghost" size="sm" className="text-xs gap-1.5"
-                  onClick={() => resendInvitation(pu)}
-                  disabled={resendingId === pu.id}
-                >
-                  <RefreshCw className={`h-3 w-3 ${resendingId === pu.id ? 'animate-spin' : ''}`} />
-                  Επαναποστολή
-                </Button>
-                <Button
-                  variant="ghost" size="sm" className="text-xs"
-                  onClick={() => toggleAccess(pu.id, pu.is_active)}
-                >
-                  {pu.is_active ? 'Απενεργοποίηση' : 'Ενεργοποίηση'}
-                </Button>
-                <Button
-                  variant="ghost" size="icon" className="h-7 w-7 text-destructive"
-                  onClick={() => removeAccess(pu.id)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </CardContent>

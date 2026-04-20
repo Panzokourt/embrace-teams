@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json()
-    const { email, client_id, company_id, app_url, require_pin = false } = body
+    const { email, client_id, company_id, app_url, require_pin = false, full_name } = body
 
     if (!email || !client_id || !company_id) {
       return new Response(
@@ -112,19 +112,31 @@ Deno.serve(async (req) => {
       .eq('id', caller.id)
       .single()
 
-    const baseUrl = app_url || 'https://app.olseny.com'
+    // ALWAYS use the production Olseny domain so links never go through Lovable preview/login.
+    // The optional `app_url` from the client is intentionally ignored to prevent preview URLs
+    // (e.g. *.lovable.app or *.lovable.dev) from being embedded in invitation emails.
+    const baseUrl = 'https://app.olseny.com'
+
+    const cleanName = (full_name && String(full_name).trim()) || null
 
     // 1) Find or create the auth user (passwordless — they sign in via portal token)
     let userId: string | null = null
 
     const { data: existingProfile } = await adminClient
       .from('profiles')
-      .select('id')
+      .select('id, full_name, email')
       .eq('email', normalizedEmail)
       .maybeSingle()
 
     if (existingProfile) {
       userId = existingProfile.id
+      // Backfill name if profile is missing one and we now have it
+      if (cleanName && !existingProfile.full_name) {
+        await adminClient
+          .from('profiles')
+          .update({ full_name: cleanName })
+          .eq('id', userId)
+      }
     } else {
       // Create user directly without sending Supabase email (we send our own)
       const { data: createdUser, error: createErr } = await adminClient.auth.admin.createUser({
@@ -135,6 +147,7 @@ Deno.serve(async (req) => {
           client_id,
           company_id,
           client_name: client.name,
+          full_name: cleanName,
         },
       })
       if (createErr || !createdUser.user) {
@@ -145,6 +158,15 @@ Deno.serve(async (req) => {
         )
       }
       userId = createdUser.user.id
+
+      // Ensure the profile row has the name + email (handle_new_user trigger may set empty name)
+      await adminClient
+        .from('profiles')
+        .update({
+          email: normalizedEmail,
+          full_name: cleanName || normalizedEmail,
+        })
+        .eq('id', userId)
     }
 
     if (!userId) {

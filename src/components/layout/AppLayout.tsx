@@ -86,9 +86,15 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  // Listen for sidebar secretary button
+  // Listen for sidebar secretary button — but ignore events during initial mount window
+  const mountTimeRef = useRef(Date.now());
   useEffect(() => {
+    // Clear any legacy persisted "open" flag so nothing else can read it
+    try { localStorage.removeItem(LEGACY_PANEL_OPEN_KEY); } catch {}
+
     const handler = () => {
+      // Ignore auto-dispatched events within first 500ms of mount
+      if (Date.now() - mountTimeRef.current < 500) return;
       setRightPanelOpen(true);
       setActiveTab('secretary');
     };

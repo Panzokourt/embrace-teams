@@ -1,93 +1,96 @@
 
 
-## Πραγματική αιτία (επιβεβαιωμένη)
+## Τι θα φτιάξουμε
 
-Το published Olseny app (`app.olseny.com` και `olseny.lovable.app`) είναι **Private** στο επίπεδο Lovable hosting. Όταν κάποιος επισκέπτεται οποιοδήποτε URL — συμπεριλαμβανομένου του `/portal/access?token=...` — το Lovable edge τον στέλνει πρώτα στο `lovable.dev/auth-bridge` → `lovable.dev/login`, **πριν φορτώσει** η εφαρμογή React. Έτσι το `PortalAccess.tsx` και το `portal-token-exchange` δεν εκτελούνται ποτέ. Επιβεβαιώθηκε με fetch των URLs (όλα γυρίζουν το auth-bridge HTML) και με `get_publish_settings` → `effective_publish_visibility: "private"`.
+Νέο **Import Wizard** στη σελίδα Files που χειρίζεται μαζική εισαγωγή (από ένα αρχείο μέχρι ολόκληρο φάκελο με υποφακέλους), προτείνει έξυπνη συσχέτιση με υπάρχοντα έργα/πελάτες/φακέλους και δημιουργεί νέα entities επί τόπου όπου χρειάζεται.
 
-Επομένως όλα τα fixes που κάναμε στο email/edge function/PIN είναι σωστά — απλώς ο πελάτης δεν έφτανε ποτέ στη σελίδα μας.
-
-## Λύση: Ξεχωριστό public portal σε subdomain
-
-Θα δημιουργήσουμε **ξεχωριστή παρουσία** του portal σε δικό του δημόσιο domain, ώστε το κύριο workspace να παραμένει private χωρίς να χαλάει η πρόσβαση των πελατών.
-
-### Αρχιτεκτονική
+## UX flow (4 βήματα)
 
 ```text
-app.olseny.com         → Private workspace (όπως είναι τώρα)
-                         μόνο μέλη της εταιρίας
-
-portal.olseny.com      → Public portal (νέο deployment)
-                         ίδιο codebase, ίδια DB, αλλά:
-                         - ορατό σε όλους
-                         - "guard" στο App.tsx που επιτρέπει
-                           μόνο τα /portal/* routes
+[1 Επιλογή]  →  [2 Προορισμός]  →  [3 Αντιστοίχιση]  →  [4 Επιβεβαίωση]
+ Files/Folder    Έργο / Πελάτης    AI suggestions      Preview & Import
+                  / Εταιρία         per top-folder
 ```
 
-Το ίδιο codebase εξυπηρετεί και τα δύο. Με βάση το `window.location.hostname` το `App.tsx` επιλέγει τι να δείξει:
+### Βήμα 1 — Επιλογή πηγής
+- Drop zone + δύο κουμπιά: **"Επιλογή αρχείων"** και **"Επιλογή φακέλου"** (`webkitdirectory`).
+- Υποστήριξη drag-and-drop με `readDroppedItems` (υπάρχει ήδη στο `dropFolderReader.ts`) ώστε να δουλεύουν φάκελοι με υποφακέλους.
+- Live preview tree των επιλεγμένων αρχείων (πρώτα 50 + counter "και άλλα N").
 
-- σε `portal.olseny.com` → μόνο `/portal/*` routes· οποιοδήποτε άλλο path γίνεται redirect στο `/portal/access`.
-- σε `app.olseny.com` → όλη η εφαρμογή όπως σήμερα.
+### Βήμα 2 — Πού ανήκει
+Τρεις επιλογές με κάρτες (όπως στο `DestinationPickerDialog`):
+- **Σε Έργο** → dropdown έργων + κουμπί **"+ Νέο έργο"** που ανοίγει inline form (όνομα + προαιρετικός πελάτης). Αν επιλεγεί νέος πελάτης που δεν υπάρχει, προστίθεται κι αυτός inline.
+- **Σε Πελάτη** (χωρίς συγκεκριμένο έργο) → dropdown πελατών + **"+ Νέος πελάτης"**. Τα αρχεία πάνε σε auto-created project "{ClientName} – Γενικά" ή σε client-scoped folder ανάλογα με την επιλογή checkbox "Δημιούργησε project για αυτόν τον πελάτη".
+- **Στην Εταιρία** → dropdown company root folders (HR, Templates, κλπ.).
 
-Έτσι ο πελάτης που πατάει το magic link πέφτει σε **public** Lovable deployment, η σελίδα φορτώνει κανονικά, εκτελείται το token exchange και μπαίνει στο portal.
+Τα νέα clients/projects δημιουργούνται μόλις ο χρήστης προχωρήσει στο επόμενο βήμα (όχι στο τέλος), ώστε να φαίνονται στο tree της αντιστοίχισης.
 
-## Τι θα αλλάξω
+### Βήμα 3 — Αντιστοίχιση φακέλων (heart of the wizard)
+Εμφανίζεται **μόνο** αν η πηγή περιέχει υποφακέλους. Δείχνει πίνακα:
 
-### 1) Hosting / Domains (manual από εσένα μετά την υλοποίηση)
+| Φάκελος πηγής | Προτεινόμενος προορισμός | Ενέργεια |
+|---|---|---|
+| `Συμβόλαια/` | 📁 Συμβόλαια & Συμβάσεις (existing) | [Match ▾] [Νέος] |
+| `Briefs 2024/` | 📁 Briefs (existing, fuzzy 87%) | [Match ▾] [Νέος] |
+| `Random/` | — δεν βρέθηκε | [Match ▾] [Νέος] |
 
-- Project Settings → Domains → **Add custom domain** `portal.olseny.com`.
-- Αφού γίνει Active, θέλουμε **να αλλάξουμε το publish visibility σε `public`** (προτείνεται με `update_visibility` με τη συγκατάθεσή σου). Δεν υπάρχει per-domain visibility στο Lovable, άρα και τα δύο domains θα είναι public — γι' αυτό προστίθεται το hostname guard στον κώδικα (βλ. #2).
-- Σημείωση: το `app.olseny.com` δεν θα είναι πια "Private" στο Lovable επίπεδο, αλλά το guard στο App.tsx θα κρατά τη συμπεριφορά (όλα τα routes εκτός `/portal/*` θα απαιτούν login μέσω του υπάρχοντος `AppLayout` → `Navigate to="/auth"`). Καμία αλλαγή στην εμπειρία του staff.
+**Λογική προτάσεων** (client-side, χωρίς AI call):
+- Normalize ονομάτων (lowercase, αφαίρεση διακριτικών, trim αριθμών/ετών).
+- Έλεγχος έναντι (a) `DOCTYPE_FOLDER_MAP` ονομάτων (Συμβόλαια, Briefs, Προτάσεις, κλπ.), (b) folders από `project_folder_templates` του company, (c) υπάρχοντες φάκελοι του επιλεγμένου project/company.
+- Scoring: exact match → 100, contains → 70, Levenshtein-based fuzzy → 50-90. Threshold 60 για να εμφανιστεί ως "auto-suggest".
+- Default action: αν score ≥ 80 → "Match σε υπάρχον"· αλλιώς → "Δημιουργία νέου φακέλου με το ίδιο όνομα".
+- Ο χρήστης μπορεί να αλλάξει κάθε γραμμή χειροκίνητα.
 
-### 2) Hostname guard στο App.tsx
+Επιπλέον: checkbox **"Διατήρηση δομής υποφακέλων"** (default ON) — αν OFF, όλα τα αρχεία πέφτουν επίπεδα στον προορισμό κάθε top-folder.
 
-- Νέο helper `isPortalHost()` που κοιτάει `window.location.hostname` και επιστρέφει `true` για `portal.olseny.com` (ρυθμιζόμενο με Vite env `VITE_PORTAL_HOSTNAMES`, default `portal.olseny.com`).
-- Στο `App.tsx`, αν `isPortalHost()`:
-  - Render μόνο τα portal routes:
-    - `/portal/access` → `PortalAccess`
-    - `/portal/*` → `ClientPortalLayout` με τα 4 children
-    - `*` → `<Navigate to="/portal/access" replace />`
-- Αν όχι portal host → render τα κανονικά routes όπως τώρα.
+### Βήμα 4 — Επιβεβαίωση & Import
+- Summary: "X αρχεία, Y φάκελοι → προορισμός Z".
+- Progress bar ανά αρχείο κατά την εκτέλεση.
+- Reuse της υπάρχουσας `handleUploadFolder` λογικής αλλά με pre-resolved mapping (skip του destination picker και των auto-created folders όπου ταιριάζει).
+- Στο τέλος toast + redirect στον προορισμό μέσα στο Finder column view.
 
-### 3) Email link → νέο domain
+## Είσοδος στο wizard
 
-- Στο `invite-portal-user/index.ts` αλλάζω `baseUrl` από `https://app.olseny.com` σε `https://portal.olseny.com` (configurable μέσω env `PORTAL_PUBLIC_URL`, fallback `https://portal.olseny.com`).
-- Το `accessUrl` γίνεται `https://portal.olseny.com/portal/access?token=...`.
-- Re-deploy της edge function.
+Νέο κουμπί **"Εισαγωγή"** (icon `Import` / `FolderInput`) στο toolbar του `CentralFileExplorer`, δίπλα στο type filter. Ανοίγει το wizard χωρίς preselection.
 
-### 4) ClientPortalLayout signOut
-
-- Αυτή τη στιγμή το `signOut()` καλεί `supabase.auth.signOut()` και το `App.tsx` (στο portal host) θα κάνει redirect στο `/portal/access` αυτόματα μέσω του fallback. Καμία επιπλέον αλλαγή.
-
-### 5) Re-deploy `portal-token-exchange`
-
-- Δεν αλλάζει η λογική του, μόνο επιβεβαιώνεται ότι είναι deployed (το έχουμε ήδη). Επειδή έχει `verify_jwt = false`, καλείται κανονικά από το public portal host.
-
-## Verification (αφού ολοκληρώσουμε)
-
-- Connect `portal.olseny.com` → DNS Active.
-- Switch publish visibility σε public.
-- Νέα πρόσκληση πελάτη με PIN → email φτάνει με link `https://portal.olseny.com/portal/access?token=...`.
-- Άνοιγμα σε ιδιωτικό παράθυρο (χωρίς cookies) → φορτώνει η σελίδα PortalAccess (όχι Lovable login).
-- Με PIN → είσοδος → `/portal` (Επισκόπηση).
-- Έλεγχος: `https://portal.olseny.com/` → redirect σε `/portal/access`.
-- Έλεγχος: `https://portal.olseny.com/work` → redirect σε `/portal/access` (δεν εκτίθεται το staff app).
-- Έλεγχος: `https://app.olseny.com/work` → δουλεύει όπως πριν για το staff (μέσω login).
-
-## Αρχεία που θα αλλάξουν
-
-- `src/App.tsx` (νέος hostname guard, εναλλακτικό route tree για portal host)
-- `src/lib/portalHost.ts` **(νέο)** — `isPortalHost()` helper + env reading
-- `supabase/functions/invite-portal-user/index.ts` (αλλαγή `baseUrl` → `portal.olseny.com`)
-- (Re-deploy) `supabase/functions/portal-token-exchange/index.ts` — χωρίς αλλαγή κώδικα
-
-## Τι θα χρειαστώ από εσένα
-
-1. Έγκριση να αλλάξω το publish visibility σε **public** (πρέπει να γίνει για να φεύγει το auth-bridge).
-2. Μετά το deploy: να συνδέσεις στο Project Settings → Domains το `portal.olseny.com` και να περιμένεις να γίνει Active. Όταν ολοκληρωθεί, στέλνεις δοκιμαστική πρόσκληση και επιβεβαιώνουμε.
+Επίσης, αν ο χρήστης κάνει drag-and-drop **πάνω από 1 φάκελο ή >10 αρχεία** στο root level, ρωτάμε αν θέλει να ανοίξει το wizard αντί του απλού upload.
 
 ## Τεχνικές σημειώσεις
 
-- Δεν αγγίζουμε Supabase Auth settings (site URL, redirect URLs).
-- Δεν αλλάζει το DB schema — μόνο frontend routing & ένα URL string στο edge function.
-- Backwards compat: παλιά tokens συνεχίζουν να λειτουργούν, αρκεί ο πελάτης να ανοίξει το νέο link (ή να ζητηθεί επαναποστολή για να πάρει `portal.olseny.com` URL).
+**Νέα αρχεία:**
+- `src/components/files/import-wizard/ImportWizard.tsx` — το main dialog (4 steps, state machine).
+- `src/components/files/import-wizard/StepSource.tsx` — file/folder picker + drop + tree preview.
+- `src/components/files/import-wizard/StepDestination.tsx` — έργο/πελάτης/εταιρία + inline create.
+- `src/components/files/import-wizard/StepMapping.tsx` — πίνακας αντιστοίχισης folders.
+- `src/components/files/import-wizard/StepConfirm.tsx` — summary + progress.
+- `src/components/files/import-wizard/folderMatcher.ts` — pure utility: `suggestFolderMatch(srcName, candidates)` με normalization + Levenshtein.
+- `src/components/files/import-wizard/types.ts` — shared types (`SourceFile`, `FolderMapping`, `ImportPlan`).
+
+**Αρχεία που αλλάζουν:**
+- `src/components/files/CentralFileExplorer.tsx` — προσθήκη κουμπιού "Εισαγωγή" στο toolbar + handler που εκτελεί το import plan (επανάχρηση `handleUploadFolder` logic ή refactor σε helper που δέχεται pre-built `folderMap`).
+- `src/utils/dropFolderReader.ts` — ήδη χρησιμοποιείται, καμία αλλαγή.
+
+**Reuse:**
+- `DestinationPickerDialog` λογική για το Step 2 (όχι το ίδιο component, μόνο το pattern).
+- `DOCTYPE_FOLDER_MAP` από `FileUploadWizard.tsx` ως πηγή προτεινόμενων ονομάτων.
+- `ensure_company_root_folders` RPC — ήδη τρέχει στο mount.
+- `project_folder_templates` table — fetched once για να μπει στις υποψήφιες αντιστοιχίσεις.
+
+**Inline create endpoints:**
+- Νέος πελάτης: `INSERT INTO clients { name, company_id }` με τα standard fields. Αν χρειάζεται περισσότερα required fields, ανοίγει inline mini-form.
+- Νέο έργο: `INSERT INTO projects { name, client_id, company_id, created_by, status: 'active' }`. Trigger υπάρχει ήδη που δημιουργεί τους template folders αυτόματα — άρα μετά το insert ξανα-fetch-άρουμε folders και τα νέα default folders εμφανίζονται στο Step 3 ως candidates.
+
+**Performance:**
+- Για >100 αρχεία: chunked upload (10 παράλληλα) με `Promise.all` σε batches.
+- Progress callback μέσω state setter ανά batch.
+
+**Validation guards:**
+- Εμπόδιο submit αν δεν έχουν επιλεγεί αρχεία.
+- Εμπόδιο αν "Σε Έργο" χωρίς project selection.
+- Confirmation αν >50 αρχεία ή >10 νέοι φάκελοι.
+
+## Εκτός scope (για επόμενο iteration)
+- AI-powered semantic suggestions (π.χ. "αυτό μοιάζει με τιμολόγιο του Alpha Bank") — μόνο rule-based fuzzy matching τώρα.
+- Conflict resolution για διπλά ονόματα αρχείων (overwrite/rename/skip prompt). Default: keep both (storage key έχει timestamp ήδη).
+- Background/resume για πολύ μεγάλα imports.
 

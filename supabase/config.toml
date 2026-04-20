@@ -27,6 +27,8 @@ project_id = "qsykyiqplslvmxdfudxq"
     verify_jwt = false
   [functions.gmail-auth-start]
     verify_jwt = false
+  [functions.invite-portal-user]
+    verify_jwt = false
   [functions.my-work-ai-chat]
     verify_jwt = false
   [functions.parse-document]

@@ -314,16 +314,25 @@ export function CentralFileExplorer() {
     }
   };
 
-  const handleUploadFolder = async (fileList: FileList, targetFolderId: string | null) => {
+  const handleUploadFolder = async (
+    fileList: FileList | Array<{ file: File; relativePath: string }>,
+    targetFolderId: string | null
+  ) => {
     if (!user) return;
     setUploading(true);
     try {
-      const filesArray = Array.from(fileList);
-      // Build folder structure from webkitRelativePath
+      // Normalize to array of { file, relativePath }
+      const entries: Array<{ file: File; relativePath: string }> = Array.isArray(fileList)
+        ? fileList
+        : Array.from(fileList).map((file) => ({
+            file,
+            relativePath: (file as any).webkitRelativePath || file.name,
+          }));
+
+      // Build folder structure from relativePath
       const folderMap = new Map<string, string>(); // relativeDirPath -> folderId
 
-      for (const file of filesArray) {
-        const relativePath = (file as any).webkitRelativePath || file.name;
+      for (const { file, relativePath } of entries) {
         const parts = relativePath.split('/');
         
         // Create folder hierarchy

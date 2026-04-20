@@ -1,39 +1,63 @@
 
+## Τι συμβαίνει τώρα
 
-## Πρόβλημα
-Κάθε refresh ανοίγει αυτόματα το δεξί panel (Secretary), παρότι ο user δεν το ζήτησε.
+Υπάρχουν 2 ξεχωριστά προβλήματα:
 
-## Διάγνωση
-Στο `AppLayout.tsx`:
-- Το `rightPanelOpen` αρχικοποιείται σε `false` και **δεν** persistάρεται
-- Όμως υπάρχει event listener `open-secretary-panel` που σε κάθε λήψη event κάνει `setRightPanelOpen(true)`
-- Επιπλέον, υπάρχει νεκρή σταθερά `PANEL_OPEN_KEY = 'secretary-panel-open'` που υποδηλώνει ότι παλιότερα γινόταν persist — πιθανώς υπάρχει ακόμη παλιά τιμή `true` στο localStorage που κάποτε χρησιμοποιόταν, και κάποιο legacy hook/component μπορεί ακόμη να την διαβάζει ή να εκπέμπει `open-secretary-panel` στο mount.
+1. **Ανοίγει μόνο του στο refresh**
+   - Το `rightPanelOpen` ξεκινά `false`, αλλά κάτι το ξανανοίγει μετά το mount.
+   - Ο τωρινός guard των `500ms` δεν αρκεί, γιατί το άνοιγμα φαίνεται να συμβαίνει αργότερα ή από event/state path που παραμένει ενεργό.
 
-Επίσης ο `VoiceCommandProvider` εκπέμπει `open-secretary-panel` σε ορισμένες περιπτώσεις voice flow.
+2. **Όταν ανοίγει, σκουραίνει/μπλοκάρει την υπόλοιπη εφαρμογή**
+   - Στο `useLayoutState.ts`, για viewport σαν το δικό σου (`1422px`), το layout μπαίνει σε `standard`, και το `rightPanelMode` γίνεται `overlay`.
+   - Άρα το panel εμφανίζεται σαν modal layer με backdrop, όχι σαν το παλιό “κανονικό” δεξί sidebar.
 
 ## Σχέδιο διόρθωσης
 
-### 1. Force-closed στο πρώτο mount
-Στο `AppLayout.tsx`:
-- Διασφάλιση ότι το `rightPanelOpen` ξεκινά πάντα `false`
-- Προσθήκη ενός `useEffect` που **καθαρίζει** το legacy `secretary-panel-open` localStorage key (αν υπάρχει) ώστε να μην τραβιέται πουθενά αλλού
-- Αφαίρεση της νεκρής σταθεράς `PANEL_OPEN_KEY` για να μην γίνει κατά λάθος επανασύνδεση
+### 1. Να μην είναι ποτέ ανοιχτό στο αρχικό load
+Στο `AppLayout.tsx` θα γίνει πιο αυστηρό control ώστε το panel να ξεκινά και να **μένει κλειστό** στο app boot / refresh.
 
-### 2. Άμυνα στους event listeners
-- Ο listener του `open-secretary-panel` θα αγνοεί events που έρχονται **κατά το initial mount window** (π.χ. πρώτα ~500ms μετά το mount), ώστε ακόμα κι αν κάποιο legacy κομμάτι το dispatchάρει σε mount, να μην ανοίγει το panel
-- Παραμένει πλήρως λειτουργικό για user-initiated actions (κουμπιά, voice command, Cmd+J)
+Θα το διορθώσω με λογική τύπου:
+- explicit initial closed state
+- reset/ignore mount-time open triggers
+- άνοιγμα μόνο από ξεκάθαρα user-initiated actions:
+  - click στο topbar button
+  - `Cmd/Ctrl + J`
+  - συνειδητό voice submit
+  - συνειδητό secretary navigation action
 
-### 3. Verification
-- Hard refresh στο `/clients`, `/`, `/projects`: το panel πρέπει να είναι **κλειστό**
-- Πάτημα στο toggle icon → ανοίγει
-- Cmd+J → ανοίγει/κλείνει κανονικά
-- Voice command flow → εξακολουθεί να ανοίγει το panel μετά από user trigger
+### 2. Να φύγει το overlay behavior στο desktop
+Θα αλλάξω το responsive mapping ώστε σε desktop/laptop widths το δεξί panel να είναι **dockable sidebar** και όχι modal overlay.
+
+Στόχος:
+- **mobile** → drawer
+- **desktop / laptop** → docked right sidebar
+- χωρίς blur / dim / αποκλεισμό της υπόλοιπης εφαρμογής
+
+### 3. Να καθαρίσει η λογική ανοίγματος
+Θα περιορίσω τα programmatic open paths ώστε να μην μπορεί κάποιο background flow να ανοίγει το panel μόνο του.
+
+Πρακτικά:
+- review στο `open-secretary-panel`
+- έλεγχος του registration flow από `VoiceCommandProvider`
+- αποφυγή auto-open από mount/hydration side-effects
+- διατήρηση μόνο των πραγματικά επιθυμητών open actions
+
+### 4. Verification
+Θα ελεγχθεί ότι:
+- σε hard refresh το panel είναι **κλειστό**
+- η εφαρμογή μένει πλήρως usable χωρίς σκοτείνιασμα
+- με click στο toggle ανοίγει σαν κανονικό δεξί sidebar
+- με δεύτερο click κλείνει
+- `Cmd/Ctrl + J` λειτουργεί σωστά
+- mobile συνεχίζει να δουλεύει σαν drawer
 
 ## Αρχεία που θα αλλάξουν
 - `src/components/layout/AppLayout.tsx`
+- `src/hooks/useLayoutState.ts`
 
 ## Τεχνικές σημειώσεις
-- Καμία αλλαγή σε DB ή edge functions
-- Καμία αλλαγή στη συμπεριφορά ανοίγματος μέσω user actions
-- Μόνο guard ενάντια σε auto-open στο initial load
-
+- Δεν χρειάζεται DB αλλαγή
+- Δεν χρειάζεται backend αλλαγή
+- Το βασικό fix είναι:
+  1. **να σταματήσει το auto-open στο mount**
+  2. **να επιστρέψει το non-modal desktop right panel behavior**

@@ -58,6 +58,7 @@ import PortalDashboard from "@/pages/portal/PortalDashboard";
 import PortalProjects from "@/pages/portal/PortalProjects";
 import PortalInvoices from "@/pages/portal/PortalInvoices";
 import PortalFiles from "@/pages/portal/PortalFiles";
+import PortalAccess from "@/pages/portal/PortalAccess";
 
 function RedirectUserToEmployee() {
   const { id } = useParams();
@@ -93,6 +94,7 @@ const App = () => (
                 <Route path="/welcome" element={<WelcomeWizard />} />
                 <Route path="/platform-admin" element={<PlatformAdmin />} />
                 {/* Client Portal */}
+                <Route path="/portal/access" element={<PortalAccess />} />
                 <Route path="/portal" element={<ClientPortalLayout />}>
                   <Route index element={<PortalDashboard />} />
                   <Route path="projects" element={<PortalProjects />} />

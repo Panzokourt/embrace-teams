@@ -1,63 +1,49 @@
 
-## Τι συμβαίνει τώρα
 
-Υπάρχουν 2 ξεχωριστά προβλήματα:
+## Πρόβλημα
+Όταν σύρεις έναν φάκελο από το desktop στα Files, εμφανίζεται "Σφάλμα κατά το ανέβασμα". Στο console: `StorageUnknownError: Failed to fetch` στο `supabase.storage.upload`.
 
-1. **Ανοίγει μόνο του στο refresh**
-   - Το `rightPanelOpen` ξεκινά `false`, αλλά κάτι το ξανανοίγει μετά το mount.
-   - Ο τωρινός guard των `500ms` δεν αρκεί, γιατί το άνοιγμα φαίνεται να συμβαίνει αργότερα ή από event/state path που παραμένει ενεργό.
+## Διάγνωση
+Στο `FinderColumnView.tsx` (`handleDrop`):
 
-2. **Όταν ανοίγει, σκουραίνει/μπλοκάρει την υπόλοιπη εφαρμογή**
-   - Στο `useLayoutState.ts`, για viewport σαν το δικό σου (`1422px`), το layout μπαίνει σε `standard`, και το `rightPanelMode` γίνεται `overlay`.
-   - Άρα το panel εμφανίζεται σαν modal layer με backdrop, όχι σαν το παλιό “κανονικό” δεξί sidebar.
+1. Διαβάζει μόνο `e.dataTransfer.files` και ελέγχει `webkitRelativePath`.
+2. Όμως όταν σύρεις **φάκελο** από το OS, το `webkitRelativePath` είναι **πάντα κενό** στο native drop — υπάρχει μόνο όταν επιλέγεις φάκελο μέσω `<input type="file" webkitdirectory>`.
+3. Έτσι το flow πέφτει στο `onUpload(droppedFiles, ...)`, που προσπαθεί να ανεβάσει τον φάκελο σαν αρχείο → το Supabase storage σπάει με `Failed to fetch`.
+
+Η σωστή λύση είναι να χρησιμοποιηθεί το **`DataTransferItem.webkitGetAsEntry()`** API που εκθέτει `FileSystemDirectoryEntry` και επιτρέπει αναδρομική ανάγνωση των περιεχομένων του φακέλου.
 
 ## Σχέδιο διόρθωσης
 
-### 1. Να μην είναι ποτέ ανοιχτό στο αρχικό load
-Στο `AppLayout.tsx` θα γίνει πιο αυστηρό control ώστε το panel να ξεκινά και να **μένει κλειστό** στο app boot / refresh.
+### 1. Νέο utility `readDroppedItems` (`src/utils/dropFolderReader.ts`)
+- Δέχεται `DataTransferItemList`.
+- Καλεί `webkitGetAsEntry()` σε κάθε item.
+- Για `FileSystemFileEntry` → επιστρέφει `{ file, relativePath }`.
+- Για `FileSystemDirectoryEntry` → αναδρομική διάσχιση με `createReader().readEntries()`, χτίζει σωστό `relativePath` (π.χ. `MyFolder/sub/file.png`).
+- Επιστρέφει `Array<{ file: File; relativePath: string }>`.
 
-Θα το διορθώσω με λογική τύπου:
-- explicit initial closed state
-- reset/ignore mount-time open triggers
-- άνοιγμα μόνο από ξεκάθαρα user-initiated actions:
-  - click στο topbar button
-  - `Cmd/Ctrl + J`
-  - συνειδητό voice submit
-  - συνειδητό secretary navigation action
+### 2. Update `FinderColumnView.handleDrop`
+- Πριν διαβάσει `dataTransfer.files`, ελέγχει αν `dataTransfer.items` περιέχει directory entries.
+- Αν ναι → καλεί `readDroppedItems`, αν τουλάχιστον ένα entry έχει "/", περνά στο `onUploadFolder` ως pseudo-FileList με τα συλλεχθέντα files + relativePath.
+- Αν όχι → fallback στο υπάρχον behavior για flat files.
 
-### 2. Να φύγει το overlay behavior στο desktop
-Θα αλλάξω το responsive mapping ώστε σε desktop/laptop widths το δεξί panel να είναι **dockable sidebar** και όχι modal overlay.
-
-Στόχος:
-- **mobile** → drawer
-- **desktop / laptop** → docked right sidebar
-- χωρίς blur / dim / αποκλεισμό της υπόλοιπης εφαρμογής
-
-### 3. Να καθαρίσει η λογική ανοίγματος
-Θα περιορίσω τα programmatic open paths ώστε να μην μπορεί κάποιο background flow να ανοίγει το panel μόνο του.
-
-Πρακτικά:
-- review στο `open-secretary-panel`
-- έλεγχος του registration flow από `VoiceCommandProvider`
-- αποφυγή auto-open από mount/hydration side-effects
-- διατήρηση μόνο των πραγματικά επιθυμητών open actions
+### 3. Update `CentralFileExplorer.handleUploadFolder`
+- Αλλαγή signature ώστε να δέχεται είτε `FileList` είτε `Array<{ file, relativePath }>`.
+- Αντί για `webkitRelativePath`, χρησιμοποιεί το παρεχόμενο `relativePath` για να χτίσει την ιεραρχία φακέλων.
+- Διατηρεί συμβατότητα με το input-based folder upload (που χρησιμοποιεί `webkitRelativePath`).
 
 ### 4. Verification
-Θα ελεγχθεί ότι:
-- σε hard refresh το panel είναι **κλειστό**
-- η εφαρμογή μένει πλήρως usable χωρίς σκοτείνιασμα
-- με click στο toggle ανοίγει σαν κανονικό δεξί sidebar
-- με δεύτερο click κλείνει
-- `Cmd/Ctrl + J` λειτουργεί σωστά
-- mobile συνεχίζει να δουλεύει σαν drawer
+- Drag & drop ενός φακέλου με υποφακέλους & αρχεία στο root → δημιουργείται η ιεραρχία.
+- Drag & drop πολλαπλών αρχείων → ανεβαίνουν flat.
+- Drag & drop μέσα σε υπάρχοντα φάκελο (στήλη) → σωστή τοποθέτηση.
+- Browser-button "Ανέβασμα φακέλου" συνεχίζει να δουλεύει κανονικά.
 
 ## Αρχεία που θα αλλάξουν
-- `src/components/layout/AppLayout.tsx`
-- `src/hooks/useLayoutState.ts`
+- `src/utils/dropFolderReader.ts` (**νέο**)
+- `src/components/files/FinderColumnView.tsx`
+- `src/components/files/CentralFileExplorer.tsx`
 
 ## Τεχνικές σημειώσεις
-- Δεν χρειάζεται DB αλλαγή
-- Δεν χρειάζεται backend αλλαγή
-- Το βασικό fix είναι:
-  1. **να σταματήσει το auto-open στο mount**
-  2. **να επιστρέψει το non-modal desktop right panel behavior**
+- Καμία αλλαγή σε DB ή storage policies.
+- Το `webkitGetAsEntry` υποστηρίζεται σε όλους τους modern browsers (Chrome, Safari, Firefox, Edge).
+- Το αρχικό σφάλμα είναι frontend-only — δεν χρειάζεται server αλλαγή.
+

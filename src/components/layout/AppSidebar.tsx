@@ -563,7 +563,7 @@ export default function AppSidebar({
       {isEffectivelyCollapsed && flyoutCategory &&
       <div
         className="fixed top-0 bottom-0 w-56 bg-card border-r border-border/40 shadow-2xl z-[60] animate-slide-in-left"
-        style={{ left: 48 }}
+        style={{ left: 88 }}
         onMouseEnter={handleFlyoutEnter}
         onMouseLeave={handleFlyoutLeave}>
         

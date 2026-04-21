@@ -1,0 +1,61 @@
+import type { EntitySchema } from './types';
+
+export const projectSchema: EntitySchema = {
+  entity: 'projects',
+  label: 'Έργα',
+  labelPlural: 'έργα',
+  fields: [
+    {
+      key: 'name',
+      label: 'Όνομα έργου',
+      required: true,
+      type: 'string',
+      aliases: ['name', 'project', 'project_name', 'όνομα', 'ονομα', 'τίτλος', 'τιτλος', 'έργο', 'εργο'],
+    },
+    {
+      key: 'client_name',
+      label: 'Όνομα πελάτη',
+      type: 'string',
+      fk: 'client',
+      hint: 'Αν δεν υπάρχει, μπορεί να δημιουργηθεί αυτόματα',
+      aliases: ['client', 'client_name', 'πελάτης', 'πελατης', 'customer'],
+    },
+    {
+      key: 'status',
+      label: 'Κατάσταση',
+      type: 'enum',
+      enumValues: [
+        { value: 'lead', label: 'Lead' },
+        { value: 'proposal', label: 'Πρόταση' },
+        { value: 'negotiation', label: 'Διαπραγμάτευση' },
+        { value: 'active', label: 'Ενεργό' },
+        { value: 'completed', label: 'Ολοκληρώθηκε' },
+        { value: 'cancelled', label: 'Ακυρώθηκε' },
+        { value: 'tender', label: 'Διαγωνισμός' },
+        { value: 'won', label: 'Κερδήθηκε' },
+        { value: 'lost', label: 'Χάθηκε' },
+      ],
+      aliases: ['status', 'κατάσταση', 'κατασταση', 'state'],
+    },
+    { key: 'start_date', label: 'Ημερομηνία έναρξης', type: 'date', aliases: ['start_date', 'start', 'έναρξη', 'εναρξη'] },
+    { key: 'end_date', label: 'Ημερομηνία λήξης', type: 'date', aliases: ['end_date', 'end', 'λήξη', 'ληξη', 'deadline'] },
+    { key: 'budget', label: 'Προϋπολογισμός (€)', type: 'number', aliases: ['budget', 'προϋπολογισμός', 'προϋπολογισμος', 'amount'] },
+    {
+      key: 'agency_fee_percentage',
+      label: 'Προμήθεια (%)',
+      type: 'number',
+      aliases: ['commission', 'commission_rate', 'agency_fee', 'fee', 'προμήθεια', 'προμηθεια'],
+    },
+    { key: 'description', label: 'Περιγραφή', type: 'string', aliases: ['description', 'περιγραφή', 'περιγραφη', 'notes'] },
+  ],
+  exampleRow: {
+    name: 'Καμπάνια Άνοιξη 2026',
+    client_name: 'Acme Α.Ε.',
+    status: 'active',
+    start_date: '2026-04-01',
+    end_date: '2026-06-30',
+    budget: 15000,
+    agency_fee_percentage: 15,
+    description: 'Digital campaign για νέα σειρά προϊόντων',
+  },
+};

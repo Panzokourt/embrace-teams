@@ -20,11 +20,22 @@ interface TreeNode {
   children: Map<string, TreeNode>;
 }
 
+const SYSTEM_FILE_NAMES = new Set(['.ds_store', 'thumbs.db', 'desktop.ini']);
+
+function isSystemSourceFile(path: string): boolean {
+  return path
+    .split('/')
+    .filter(Boolean)
+    .some((part) => part.toLowerCase() === '__macosx' || SYSTEM_FILE_NAMES.has(part.toLowerCase()));
+}
+
 function fromFileList(list: FileList): SourceFile[] {
-  return Array.from(list).map((f) => ({
-    file: f,
-    relativePath: (f as any).webkitRelativePath || f.name,
-  }));
+  return Array.from(list)
+    .map((f) => ({
+      file: f,
+      relativePath: (f as any).webkitRelativePath || f.name,
+    }))
+    .filter((f) => !isSystemSourceFile(f.relativePath));
 }
 
 export function StepSource({
@@ -44,7 +55,7 @@ export function StepSource({
       setIsDragging(false);
       const items = e.dataTransfer.items;
       if (items && hasDirectoryEntry(items)) {
-        const dropped = await readDroppedItems(items);
+        const dropped = (await readDroppedItems(items)).filter((f) => !isSystemSourceFile(f.relativePath));
         onFilesChange([...files, ...dropped]);
         return;
       }

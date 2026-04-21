@@ -610,6 +610,7 @@ export default function ClientsPage() {
                 </form>
               </DialogContent>
             </Dialog>
+            </div>
           ) : undefined
         }
       />
@@ -647,6 +648,7 @@ export default function ClientsPage() {
         />
       )}
       <PaginationControls pagination={pagination} />
+      <ImportWizard open={importOpen} onOpenChange={setImportOpen} entity="clients" onComplete={fetchClients} />
     </div>
   );
 }

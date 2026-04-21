@@ -888,6 +888,7 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
         </>
       )}
       <PaginationControls pagination={pagination} />
+      <ImportWizard open={importOpen} onOpenChange={setImportOpen} entity="projects" onComplete={fetchProjects} />
     </div>
   );
 }

@@ -345,6 +345,12 @@ export function CentralFileExplorer() {
     async (
       target: string | null
     ): Promise<{ scope: 'project' | 'company'; projectId: string | null; folderId: string | null } | null> => {
+      // Lens cloned folder → resolve to the original real folder id
+      if (target?.startsWith('lens:')) {
+        const realFolderId = target.split(':').pop() ?? null;
+        return resolveDestination(realFolderId);
+      }
+
       // Case 1: real folder UUID
       if (target && !isVirtualId(target)) {
         const folder = folders.find((f) => f.id === target);

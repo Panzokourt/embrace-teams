@@ -85,18 +85,34 @@ export function ImportWizard({
     }
   }, [open, initialFiles]);
 
-  // Group source files by top-level folder
+  // Group source files by top-level folder and count nested folders
   const sourceFolders = useMemo(() => {
     const counts = new Map<string, number>();
+    const nested = new Map<string, Set<string>>();
     for (const sf of files) {
-      const idx = sf.relativePath.indexOf('/');
-      const top = idx > 0 ? sf.relativePath.slice(0, idx) : '';
+      const parts = sf.relativePath.split('/').filter(Boolean);
+      const top = parts.length > 1 ? parts[0] : '';
       counts.set(top, (counts.get(top) ?? 0) + 1);
+      if (parts.length > 2) {
+        if (!nested.has(top)) nested.set(top, new Set());
+        for (let i = 1; i < parts.length - 1; i++) {
+          nested.get(top)!.add(parts.slice(1, i + 1).join('/'));
+        }
+      }
     }
     return [...counts.entries()]
-      .map(([name, fileCount]) => ({ name, fileCount }))
+      .map(([name, fileCount]) => ({
+        name,
+        fileCount,
+        nestedFolderCount: nested.get(name)?.size ?? 0,
+      }))
       .sort((a, b) => a.name.localeCompare(b.name, 'el'));
   }, [files]);
+
+  const nestedFolderCount = useMemo(
+    () => sourceFolders.reduce((sum, sf) => sum + sf.nestedFolderCount, 0),
+    [sourceFolders]
+  );
 
   // Build initial mappings whenever destination/sourceFolders change and we enter step 2
   useEffect(() => {
@@ -226,13 +242,40 @@ export function ImportWizard({
     const rootFolderId =
       scope === 'company' ? destination.companyFolderId : null;
 
-    setProgress({ total: files.length, done: 0, failed: 0 });
+    const estimatedFolderTotal =
+      mappings.filter((m) => m.action.type === 'new' && m.sourceFolder).length +
+      (preserveStructure ? nestedFolderCount : 0);
+
+    setProgress({
+      phase: estimatedFolderTotal > 0 ? 'folders' : 'files',
+      total: estimatedFolderTotal > 0 ? estimatedFolderTotal : files.length,
+      done: 0,
+      failed: 0,
+      folderTotal: estimatedFolderTotal,
+      folderDone: 0,
+    });
     setDone(false);
 
     try {
       // Resolve top-level destination folder for each mapping
       const folderIdByTop = new Map<string, string | null>();
+      const folderIdBySourcePath = new Map<string, string | null>();
       const subfolderCache = new Map<string, string>();
+      let foldersDone = 0;
+
+      const markFolderProgress = (name: string) => {
+        if (estimatedFolderTotal <= 0) return;
+        foldersDone += 1;
+        setProgress({
+          phase: 'folders',
+          total: estimatedFolderTotal,
+          done: foldersDone,
+          failed: 0,
+          currentFolder: name,
+          folderTotal: estimatedFolderTotal,
+          folderDone: foldersDone,
+        });
+      };
 
       for (const m of mappings) {
         let folderId: string | null = rootFolderId;
@@ -246,15 +289,51 @@ export function ImportWizard({
             projectId,
             subfolderCache
           );
+          markFolderProgress(m.action.name);
         } else if (m.action.type === 'root') {
           folderId = rootFolderId;
         }
         folderIdByTop.set(m.sourceFolder, folderId);
+        if (m.sourceFolder) folderIdBySourcePath.set(m.sourceFolder, folderId);
+      }
+
+      if (preserveStructure) {
+        for (const sf of files) {
+          const parts = sf.relativePath.split('/').filter(Boolean);
+          if (parts.length <= 2) continue;
+          const top = parts[0];
+          let parent = folderIdByTop.get(top) ?? rootFolderId;
+          for (let p = 1; p < parts.length - 1; p++) {
+            const sourcePath = parts.slice(0, p + 1).join('/');
+            if (folderIdBySourcePath.has(sourcePath)) {
+              parent = folderIdBySourcePath.get(sourcePath) ?? null;
+              continue;
+            }
+            parent = await ensureSubfolder(
+              parts[p],
+              parent,
+              scope,
+              projectId,
+              subfolderCache
+            );
+            folderIdBySourcePath.set(sourcePath, parent);
+            markFolderProgress(sourcePath);
+          }
+        }
       }
 
       // Upload files in batches
       let doneCount = 0;
       let failedCount = 0;
+
+      setProgress({
+        phase: 'files',
+        total: files.length,
+        done: 0,
+        failed: 0,
+        folderTotal: estimatedFolderTotal,
+        folderDone: foldersDone,
+      });
 
       for (let i = 0; i < files.length; i += UPLOAD_PARALLELISM) {
         const batch = files.slice(i, i + UPLOAD_PARALLELISM);
@@ -264,23 +343,11 @@ export function ImportWizard({
             try {
               const { folderId: topFolderId } = buildPlanForFile(sf, folderIdByTop);
               let targetFolderId = topFolderId;
-
-              // Recreate intermediate sub-folders if requested
               if (preserveStructure) {
-                const parts = sf.relativePath.split('/');
-                // parts: [top, sub1, sub2, ..., filename]
+                const parts = sf.relativePath.split('/').filter(Boolean);
                 if (parts.length > 2) {
-                  let parent = targetFolderId;
-                  for (let p = 1; p < parts.length - 1; p++) {
-                    parent = await ensureSubfolder(
-                      parts[p],
-                      parent,
-                      scope,
-                      projectId,
-                      subfolderCache
-                    );
-                  }
-                  targetFolderId = parent;
+                  targetFolderId =
+                    folderIdBySourcePath.get(parts.slice(0, -1).join('/')) ?? topFolderId;
                 }
               }
 
@@ -315,10 +382,13 @@ export function ImportWizard({
               failedCount += 1;
             } finally {
               setProgress({
+                phase: 'files',
                 total: files.length,
                 done: doneCount,
                 failed: failedCount,
                 currentFile: sf.relativePath,
+                folderTotal: estimatedFolderTotal,
+                folderDone: foldersDone,
               });
             }
           })

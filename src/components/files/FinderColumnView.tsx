@@ -114,6 +114,8 @@ interface SelectionState {
 }
 
 const getItemKey = (item: ColumnItem): SelectionKey => `${item.kind}:${item.data.id}` as SelectionKey;
+const isVirtualFolderId = (id: string) =>
+  id.startsWith('vc-') || id.startsWith('vp-') || id.startsWith('vd-') || id.startsWith('lens:');
 const isInputTarget = (target: EventTarget | null) => {
   const el = target as HTMLElement | null;
   return !!el?.closest('input, textarea, [contenteditable="true"], [role="textbox"]');
@@ -402,7 +404,7 @@ export function FinderColumnView({
 
   // Build "Move to" folder list for context menus (only real folders, exclude virtual)
   const moveTargetFolders = useMemo(() => {
-    return moveFolders.filter((f) => !f.id.startsWith('vc-') && !f.id.startsWith('vp-') && !f.id.startsWith('vd-'));
+    return moveFolders.filter((f) => !isVirtualFolderId(f.id));
   }, [moveFolders]);
 
   const selectedKeys = selection.keys;
@@ -411,7 +413,7 @@ export function FinderColumnView({
     [filteredFiles, selectedKeys]
   );
   const selectedFolders = useMemo(
-    () => folders.filter((folder) => selectedKeys.has(`folder:${folder.id}` as SelectionKey) && !folder.id.startsWith('vc-') && !folder.id.startsWith('vp-') && !folder.id.startsWith('vd-')),
+    () => folders.filter((folder) => selectedKeys.has(`folder:${folder.id}` as SelectionKey) && !isVirtualFolderId(folder.id)),
     [folders, selectedKeys]
   );
   const selectedCount = selectedFiles.length + selectedFolders.length;
@@ -766,7 +768,7 @@ export function FinderColumnView({
                               );
                             }
 
-                            const isVirtualFolder = folder.id.startsWith('vc-') || folder.id.startsWith('vp-') || folder.id.startsWith('vd-');
+                            const isVirtualFolder = isVirtualFolderId(folder.id);
 
                             return (
                               <ContextMenu key={folder.id}>

@@ -222,8 +222,19 @@ export function ClientsTableView({
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                        <Building2 className="h-5 w-5 text-primary" />
+                      <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden">
+                        {client.logo_url ? (
+                          <img
+                            src={client.logo_url}
+                            alt={client.name}
+                            className="h-full w-full object-cover"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <Building2 className="h-5 w-5 text-primary" />
+                        )}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">

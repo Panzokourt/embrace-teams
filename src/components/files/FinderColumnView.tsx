@@ -35,6 +35,23 @@ import {
   ContextMenuSubTrigger,
   ContextMenuSubContent,
 } from '@/components/ui/context-menu';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -58,6 +75,10 @@ interface FinderColumnViewProps {
   onDeleteFolder: (folderId: string) => Promise<void>;
   onMoveFile?: (fileId: string, folderId: string | null) => Promise<void>;
   onMoveFolder?: (folderId: string, targetParentId: string | null) => Promise<void>;
+  onMoveFiles?: (fileIds: string[], folderId: string | null) => Promise<void>;
+  onMoveFolders?: (folderIds: string[], targetParentId: string | null) => Promise<void>;
+  onDeleteFiles?: (files: FileAttachment[]) => Promise<void>;
+  onDeleteFolders?: (folderIds: string[]) => Promise<void>;
   canManage: boolean;
   loading?: boolean;
   uploading?: boolean;
@@ -85,6 +106,19 @@ type ColumnItem =
   | { kind: 'folder'; data: FileFolder }
   | { kind: 'file'; data: FileAttachment };
 
+type SelectionKey = `file:${string}` | `folder:${string}`;
+
+interface SelectionState {
+  keys: Set<SelectionKey>;
+  anchor: { key: SelectionKey; columnIndex: number } | null;
+}
+
+const getItemKey = (item: ColumnItem): SelectionKey => `${item.kind}:${item.data.id}` as SelectionKey;
+const isInputTarget = (target: EventTarget | null) => {
+  const el = target as HTMLElement | null;
+  return !!el?.closest('input, textarea, [contenteditable="true"], [role="textbox"]');
+};
+
 export function FinderColumnView({
   files,
   folders,
@@ -97,6 +131,10 @@ export function FinderColumnView({
   onDeleteFolder,
   onMoveFile,
   onMoveFolder,
+  onMoveFiles,
+  onMoveFolders,
+  onDeleteFiles,
+  onDeleteFolders,
   canManage,
   loading,
   uploading,
@@ -104,6 +142,7 @@ export function FinderColumnView({
 }: FinderColumnViewProps) {
   const [path, setPath] = useState<(string | null)[]>([null]);
   const [selectedItem, setSelectedItem] = useState<ColumnItem | null>(null);
+  const [selection, setSelection] = useState<SelectionState>({ keys: new Set(), anchor: null });
   const [creatingInColumn, setCreatingInColumn] = useState<number | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
   const [dragOverColumn, setDragOverColumn] = useState<number | null>(null);
@@ -111,6 +150,7 @@ export function FinderColumnView({
   const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -124,20 +164,6 @@ export function FinderColumnView({
       scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
     }
   }, [path]);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && selectedItem?.kind === 'file' && !previewOpen) {
-        e.preventDefault();
-        setPreviewOpen(true);
-      }
-    };
-    const el = containerRef.current;
-    if (el) {
-      el.addEventListener('keydown', handler);
-      return () => el.removeEventListener('keydown', handler);
-    }
-  }, [selectedItem, previewOpen]);
 
   const filteredFiles = useMemo(() => {
     if (!searchQuery?.trim()) return files;
@@ -160,6 +186,17 @@ export function FinderColumnView({
     return ids;
   }, [files, folders]);
 
+  const folderById = useMemo(() => new Map(folders.map((folder) => [folder.id, folder])), [folders]);
+
+  const isFolderDescendant = useCallback((candidateId: string | null | undefined, ancestorId: string) => {
+    let current = candidateId ? folderById.get(candidateId) : undefined;
+    while (current) {
+      if (current.id === ancestorId) return true;
+      current = current.parent_folder_id ? folderById.get(current.parent_folder_id) : undefined;
+    }
+    return false;
+  }, [folderById]);
+
   function getColumnItems(parentId: string | null): ColumnItem[] {
     const childFolders = folders
       .filter((f) => f.parent_folder_id === parentId)
@@ -174,13 +211,40 @@ export function FinderColumnView({
     return [...childFolders, ...childFiles];
   }
 
-  function handleSelectItem(item: ColumnItem, columnIndex: number) {
+  const clearSelection = useCallback(() => {
+    setSelection({ keys: new Set(), anchor: null });
+  }, []);
+
+  const getColumnItemKeys = useCallback((columnIndex: number) => {
+    return getColumnItems(path[columnIndex] ?? null).map(getItemKey);
+  }, [path, folders, filteredFiles]);
+
+  function handleSelectItem(item: ColumnItem, columnIndex: number, event?: React.MouseEvent) {
+    const key = getItemKey(item);
     setSelectedItem(item);
-    if (item.kind === 'folder') {
+    setSelection((prev) => {
+      if (event?.shiftKey && prev.anchor?.columnIndex === columnIndex) {
+        const keys = getColumnItemKeys(columnIndex);
+        const a = keys.indexOf(prev.anchor.key);
+        const b = keys.indexOf(key);
+        if (a >= 0 && b >= 0) {
+          const next = new Set(prev.keys);
+          keys.slice(Math.min(a, b), Math.max(a, b) + 1).forEach((k) => next.add(k));
+          return { keys: next, anchor: prev.anchor };
+        }
+      }
+      if (event?.metaKey || event?.ctrlKey) {
+        const next = new Set(prev.keys);
+        next.has(key) ? next.delete(key) : next.add(key);
+        return { keys: next, anchor: { key, columnIndex } };
+      }
+      return { keys: new Set([key]), anchor: { key, columnIndex } };
+    });
+    if (item.kind === 'folder' && !event?.shiftKey && !event?.metaKey && !event?.ctrlKey) {
       const newPath = path.slice(0, columnIndex + 1);
       newPath.push(item.data.id);
       setPath(newPath);
-    } else {
+    } else if (item.kind === 'file') {
       setPath(path.slice(0, columnIndex + 1));
     }
   }
@@ -217,13 +281,19 @@ export function FinderColumnView({
 
   // --- Internal DnD handlers ---
   const handleDragStart = useCallback((e: React.DragEvent, item: ColumnItem) => {
-    if (item.kind === 'file') {
+    const key = getItemKey(item);
+    const draggedKeys = selection.keys.has(key) ? [...selection.keys] : [key];
+    const fileIds = draggedKeys.filter((k) => k.startsWith('file:')).map((k) => k.slice(5));
+    const folderIds = draggedKeys.filter((k) => k.startsWith('folder:')).map((k) => k.slice(7));
+    if (draggedKeys.length > 1) {
+      e.dataTransfer.setData('application/x-file-selection', JSON.stringify({ fileIds, folderIds }));
+    } else if (item.kind === 'file') {
       e.dataTransfer.setData('application/x-file-id', (item.data as FileAttachment).id);
     } else {
       e.dataTransfer.setData('application/x-folder-id', item.data.id);
     }
     e.dataTransfer.effectAllowed = 'move';
-  }, []);
+  }, [selection.keys]);
 
   const handleDragOver = useCallback((e: React.DragEvent, colIndex: number, targetFolderId?: string) => {
     e.preventDefault();
@@ -245,15 +315,32 @@ export function FinderColumnView({
     setDragOverColumn(null);
     setDragOverFolderId(null);
 
+    const selectionPayload = e.dataTransfer.getData('application/x-file-selection');
     const fileId = e.dataTransfer.getData('application/x-file-id');
     const folderId = e.dataTransfer.getData('application/x-folder-id');
     const dropTarget = targetFolderId ?? path[colIndex] ?? null;
+
+    if (selectionPayload) {
+      try {
+        const payload = JSON.parse(selectionPayload) as { fileIds: string[]; folderIds: string[] };
+        if (payload.folderIds.some((id) => id === dropTarget || isFolderDescendant(dropTarget, id))) {
+          toast.error('Δεν μπορείς να μετακινήσεις φάκελο μέσα στον εαυτό του');
+          return;
+        }
+        if (payload.fileIds.length && onMoveFiles) await onMoveFiles(payload.fileIds, dropTarget);
+        if (payload.folderIds.length && onMoveFolders) await onMoveFolders(payload.folderIds, dropTarget);
+        clearSelection();
+        return;
+      } catch (err) {
+        console.error('Invalid selection drag payload', err);
+      }
+    }
 
     if (fileId && onMoveFile) {
       onMoveFile(fileId, dropTarget);
       return;
     }
-    if (folderId && onMoveFolder && dropTarget !== folderId) {
+    if (folderId && onMoveFolder && dropTarget !== folderId && !isFolderDescendant(dropTarget, folderId)) {
       onMoveFolder(folderId, dropTarget);
       return;
     }
@@ -277,7 +364,7 @@ export function FinderColumnView({
     if (droppedFiles && droppedFiles.length > 0) {
       onUpload(droppedFiles, dropTarget);
     }
-  }, [path, onUpload, onUploadFolder, onMoveFile, onMoveFolder]);
+  }, [path, onUpload, onUploadFolder, onMoveFile, onMoveFolder, onMoveFiles, onMoveFolders, clearSelection, folders]);
 
   async function handleCreateFolder(columnIndex: number) {
     if (!newFolderName.trim()) return;
@@ -317,6 +404,112 @@ export function FinderColumnView({
   const moveTargetFolders = useMemo(() => {
     return moveFolders.filter((f) => !f.id.startsWith('vc-') && !f.id.startsWith('vp-') && !f.id.startsWith('vd-'));
   }, [moveFolders]);
+
+  const selectedKeys = selection.keys;
+  const selectedFiles = useMemo(
+    () => filteredFiles.filter((file) => selectedKeys.has(`file:${file.id}` as SelectionKey)),
+    [filteredFiles, selectedKeys]
+  );
+  const selectedFolders = useMemo(
+    () => folders.filter((folder) => selectedKeys.has(`folder:${folder.id}` as SelectionKey) && !folder.id.startsWith('vc-') && !folder.id.startsWith('vp-') && !folder.id.startsWith('vd-')),
+    [folders, selectedKeys]
+  );
+  const selectedCount = selectedFiles.length + selectedFolders.length;
+
+  const downloadFiles = async (downloadList: FileAttachment[]) => {
+    for (const file of downloadList) {
+      await handleDownload(file);
+      if (downloadList.length > 1) await new Promise((resolve) => window.setTimeout(resolve, 150));
+    }
+  };
+
+  const moveSelectionTo = async (folderId: string | null) => {
+    if (selectedFolders.some((folder) => folder.id === folderId || isFolderDescendant(folderId, folder.id))) {
+      toast.error('Δεν μπορείς να μετακινήσεις φάκελο μέσα στον εαυτό του');
+      return;
+    }
+    if (selectedFiles.length && onMoveFiles) await onMoveFiles(selectedFiles.map((file) => file.id), folderId);
+    if (selectedFolders.length && onMoveFolders) await onMoveFolders(selectedFolders.map((folder) => folder.id), folderId);
+    clearSelection();
+  };
+
+  const confirmBulkDelete = async () => {
+    if (selectedFiles.length && onDeleteFiles) await onDeleteFiles(selectedFiles);
+    if (selectedFolders.length && onDeleteFolders) await onDeleteFolders(selectedFolders.map((folder) => folder.id));
+    setBulkDeleteOpen(false);
+    clearSelection();
+    setSelectedItem(null);
+  };
+
+  const renderBulkContextContent = () => (
+    <ContextMenuContent className="w-56">
+      <ContextMenuItem disabled>{selectedCount} επιλεγμένα</ContextMenuItem>
+      <ContextMenuSeparator />
+      {selectedFiles.length > 0 && (
+        <ContextMenuItem onClick={() => downloadFiles(selectedFiles)}>
+          <Download className="h-3.5 w-3.5 mr-2" /> Λήψη αρχείων
+        </ContextMenuItem>
+      )}
+      {canManage && (onMoveFiles || onMoveFolders) && (
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>
+            <Move className="h-3.5 w-3.5 mr-2" /> Μετακίνηση σε...
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className="w-48 max-h-64 overflow-y-auto">
+            <ContextMenuItem onClick={() => moveSelectionTo(null)}>
+              <FolderInput className="h-3.5 w-3.5 mr-2" /> Ρίζα / χωρίς φάκελο
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            {moveTargetFolders.map((target) => (
+              <ContextMenuItem key={target.id} onClick={() => moveSelectionTo(target.id)}>
+                <Folder className="h-3.5 w-3.5 mr-2 text-primary/70" />
+                <span className="truncate">{target.name}</span>
+              </ContextMenuItem>
+            ))}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+      )}
+      {canManage && (onDeleteFiles || onDeleteFolders) && (
+        <>
+          <ContextMenuSeparator />
+          <ContextMenuItem onClick={() => setBulkDeleteOpen(true)} className="text-destructive">
+            <Trash2 className="h-3.5 w-3.5 mr-2" /> Διαγραφή επιλεγμένων
+          </ContextMenuItem>
+        </>
+      )}
+    </ContextMenuContent>
+  );
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (isInputTarget(e.target)) return;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        const columnIndex = path.length - 1;
+        const keys = getColumnItemKeys(columnIndex);
+        setSelection({ keys: new Set(keys), anchor: keys[0] ? { key: keys[0], columnIndex } : null });
+        return;
+      }
+      if (e.key === 'Escape') {
+        clearSelection();
+        return;
+      }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && canManage && selection.keys.size > 0) {
+        e.preventDefault();
+        setBulkDeleteOpen(true);
+        return;
+      }
+      if (e.code === 'Space' && selectedItem?.kind === 'file' && selection.keys.size <= 1 && !previewOpen) {
+        e.preventDefault();
+        setPreviewOpen(true);
+      }
+    };
+    const el = containerRef.current;
+    if (el) {
+      el.addEventListener('keydown', handler);
+      return () => el.removeEventListener('keydown', handler);
+    }
+  }, [selectedItem, previewOpen, selection.keys.size, canManage, path.length, getColumnItemKeys, clearSelection]);
 
   const breadcrumb = useMemo(() => {
     const items: { id: string | null; name: string }[] = [
@@ -373,6 +566,46 @@ export function FinderColumnView({
             </span>
           ))}
         </div>
+
+        {selectedCount > 1 && (
+          <div className="flex items-center gap-1 rounded-lg border border-border bg-background/80 px-2 py-1 shadow-sm shrink-0">
+            <span className="text-xs font-medium text-foreground px-1">{selectedCount} επιλεγμένα</span>
+            {selectedFiles.length > 0 && (
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => downloadFiles(selectedFiles)}>
+                <Download className="h-3.5 w-3.5" /> Λήψη
+              </Button>
+            )}
+            {canManage && (onMoveFiles || onMoveFolders) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">
+                    <Move className="h-3.5 w-3.5" /> Μετακίνηση
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-52 max-h-72 overflow-y-auto" align="end">
+                  <DropdownMenuItem onClick={() => moveSelectionTo(null)}>
+                    <FolderInput className="h-3.5 w-3.5 mr-2" /> Ρίζα / χωρίς φάκελο
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {moveTargetFolders.map((target) => (
+                    <DropdownMenuItem key={target.id} onClick={() => moveSelectionTo(target.id)}>
+                      <Folder className="h-3.5 w-3.5 mr-2 text-primary/70" />
+                      <span className="truncate">{target.name}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            {canManage && (onDeleteFiles || onDeleteFolders) && (
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-destructive hover:text-destructive" onClick={() => setBulkDeleteOpen(true)}>
+                <Trash2 className="h-3.5 w-3.5" /> Διαγραφή
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={clearSelection}>
+              <X className="h-3.5 w-3.5" /> Καθαρισμός
+            </Button>
+          </div>
+        )}
 
         {canManage && (
           <div className="flex items-center gap-1 shrink-0">
@@ -494,7 +727,9 @@ export function FinderColumnView({
                         )}
 
                         {items.map((item) => {
-                          const isSelected =
+                          const itemKey = getItemKey(item);
+                          const isMultiSelected = selection.keys.has(itemKey);
+                          const isActiveSelected =
                             selectedItem &&
                             ((item.kind === 'folder' &&
                               selectedItem.kind === 'folder' &&
@@ -550,10 +785,11 @@ export function FinderColumnView({
                                       setDragOverFolderId(null);
                                     }}
                                     onDrop={(e) => handleDrop(e, colIndex, folder.id)}
-                                    onClick={() => handleSelectItem(item, colIndex)}
+                                    onClick={(e) => handleSelectItem(item, colIndex, e)}
                                     className={cn(
-                                      'w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-muted/60 transition-colors',
-                                      (isSelected || isDrilledInto) && 'bg-primary/10 text-primary',
+                                      'w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-muted/60 transition-colors border-l-2 border-transparent',
+                                      (isActiveSelected || isDrilledInto) && 'bg-primary/10 text-primary',
+                                      isMultiSelected && 'bg-primary/15 text-primary border-l-primary ring-1 ring-primary/20',
                                       isFolderDragTarget && 'bg-primary/20 ring-1 ring-primary/40'
                                     )}
                                   >
@@ -565,7 +801,7 @@ export function FinderColumnView({
                                     <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
                                   </button>
                                 </ContextMenuTrigger>
-                                {canManage && !isVirtualFolder && (
+                                {canManage && !isVirtualFolder && (isMultiSelected && selectedCount > 1 ? renderBulkContextContent() : (
                                   <ContextMenuContent className="w-52">
                                     <ContextMenuItem onClick={() => handleUploadToColumn(folder.id)}>
                                       <Upload className="h-3.5 w-3.5 mr-2" /> Ανέβασμα αρχείου
@@ -612,7 +848,7 @@ export function FinderColumnView({
                                       <Trash2 className="h-3.5 w-3.5 mr-2" /> Διαγραφή
                                     </ContextMenuItem>
                                   </ContextMenuContent>
-                                )}
+                                ))}
                               </ContextMenu>
                             );
                           }
@@ -626,17 +862,19 @@ export function FinderColumnView({
                                 <button
                                   draggable={canManage}
                                   onDragStart={(e) => handleDragStart(e, item)}
-                                  onClick={() => handleSelectItem(item, colIndex)}
+                                  onClick={(e) => handleSelectItem(item, colIndex, e)}
                                   className={cn(
-                                    'w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-muted/60 transition-colors',
-                                    isSelected && 'bg-primary/10 text-primary'
+                                    'w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-muted/60 transition-colors border-l-2 border-transparent',
+                                    isActiveSelected && 'bg-primary/10 text-primary',
+                                    isMultiSelected && 'bg-primary/15 text-primary border-l-primary ring-1 ring-primary/20'
                                   )}
                                 >
                                   <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
                                   <span className="truncate flex-1">{fileData.file_name}</span>
                                 </button>
                               </ContextMenuTrigger>
-                              <ContextMenuContent className="w-52">
+                               {isMultiSelected && selectedCount > 1 ? renderBulkContextContent() : (
+                               <ContextMenuContent className="w-52">
                                 <ContextMenuItem onClick={() => {
                                   setSelectedItem(item);
                                   setPreviewOpen(true);
@@ -679,7 +917,8 @@ export function FinderColumnView({
                                     </ContextMenuItem>
                                   </>
                                 )}
-                              </ContextMenuContent>
+                               </ContextMenuContent>
+                               )}
                             </ContextMenu>
                           );
                         })}
@@ -802,6 +1041,23 @@ export function FinderColumnView({
         onChange={handleFolderInputChange}
         {...({ webkitdirectory: '', directory: '' } as any)}
       />
+
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Διαγραφή {selectedCount} αντικειμένων;</AlertDialogTitle>
+            <AlertDialogDescription>
+              Αυτό θα διαγράψει {selectedFiles.length} αρχεία και {selectedFolders.length} φακέλους. Τα αρχεία μέσα στους φακέλους θα μεταφερθούν στον γονικό φάκελο.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Ακύρωση</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmBulkDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Διαγραφή
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Preview Dialog */}
       <FilePreviewDialog

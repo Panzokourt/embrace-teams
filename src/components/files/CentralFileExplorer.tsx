@@ -149,6 +149,15 @@ export function CentralFileExplorer() {
     return files.filter((f) => matchesTypeFilter(f.content_type, typeFilter));
   }, [files, typeFilter]);
 
+  const isFolderDescendant = useCallback((candidateId: string | null, ancestorId: string) => {
+    let current = candidateId ? folders.find((f) => f.id === candidateId) : undefined;
+    while (current) {
+      if (current.id === ancestorId) return true;
+      current = current.parent_folder_id ? folders.find((f) => f.id === current!.parent_folder_id) : undefined;
+    }
+    return false;
+  }, [folders]);
+
   // Build virtual folders for grouped views
   const { virtualFolders, virtualFiles } = useMemo(() => {
     const vFolders: FileFolder[] = [];
@@ -631,6 +640,24 @@ export function CentralFileExplorer() {
     }
   };
 
+  const handleDeleteFiles = async (selectedFiles: FileAttachment[]) => {
+    const allowed = selectedFiles.filter((file) => canManage || user?.id === file.uploaded_by);
+    if (!allowed.length) {
+      toast.error('Δεν έχετε δικαίωμα διαγραφής');
+      return;
+    }
+    try {
+      await supabase.storage.from('project-files').remove(allowed.map((file) => file.file_path));
+      const { error } = await supabase.from('file_attachments').delete().in('id', allowed.map((file) => file.id));
+      if (error) throw error;
+      setFiles((prev) => prev.filter((file) => !allowed.some((deleted) => deleted.id === file.id)));
+      toast.success(`Διαγράφηκαν ${allowed.length} αρχεία`);
+    } catch (error) {
+      console.error('Error deleting files:', error);
+      toast.error('Σφάλμα κατά τη μαζική διαγραφή');
+    }
+  };
+
   const handleMoveFile = async (fileId: string, folderId: string | null) => {
     const dest = await resolveDestination(folderId);
     if (!dest) return;
@@ -654,6 +681,28 @@ export function CentralFileExplorer() {
     } catch (error) {
       console.error('Error moving file:', error);
       toast.error('Σφάλμα κατά τη μετακίνηση');
+    }
+  };
+
+  const handleMoveFiles = async (fileIds: string[], folderId: string | null) => {
+    const dest = await resolveDestination(folderId);
+    if (!dest) return;
+    try {
+      const update: any = { folder_id: dest.folderId };
+      if (dest.scope === 'project') {
+        update.project_id = dest.projectId;
+        update.company_id = null;
+      } else {
+        update.company_id = company?.id ?? null;
+        update.project_id = null;
+      }
+      const { error } = await supabase.from('file_attachments').update(update).in('id', fileIds);
+      if (error) throw error;
+      setFiles((prev) => prev.map((file) => (fileIds.includes(file.id) ? { ...file, ...update } : file)));
+      toast.success(`Μετακινήθηκαν ${fileIds.length} αρχεία`);
+    } catch (error) {
+      console.error('Error moving files:', error);
+      toast.error('Σφάλμα κατά τη μαζική μετακίνηση');
     }
   };
 
@@ -710,6 +759,40 @@ export function CentralFileExplorer() {
     } catch (error) {
       console.error('Error moving folder:', error);
       toast.error('Σφάλμα κατά τη μετακίνηση φακέλου');
+    }
+  };
+
+  const handleMoveFolders = async (folderIds: string[], targetParentId: string | null) => {
+    const realIds = folderIds.filter((id) => !isVirtualId(id));
+    if (realIds.some((id) => id === targetParentId || isFolderDescendant(targetParentId, id))) {
+      toast.error('Δεν μπορείς να μετακινήσεις φάκελο μέσα στον εαυτό του');
+      return;
+    }
+    for (const folderId of realIds) {
+      await handleMoveFolder(folderId, targetParentId);
+    }
+    if (realIds.length > 1) toast.success(`Μετακινήθηκαν ${realIds.length} φάκελοι`);
+  };
+
+  const handleDeleteFolders = async (folderIds: string[]) => {
+    const realIds = folderIds.filter((id) => !isVirtualId(id));
+    try {
+      for (const folderId of realIds) {
+        const folder = folders.find((f) => f.id === folderId);
+        if (folder) {
+          await supabase
+            .from('file_attachments')
+            .update({ folder_id: folder.parent_folder_id })
+            .eq('folder_id', folderId);
+        }
+      }
+      const { error } = await supabase.from('file_folders').delete().in('id', realIds);
+      if (error) throw error;
+      toast.success(`Διαγράφηκαν ${realIds.length} φάκελοι`);
+      await Promise.all([fetchFolders(), fetchFiles()]);
+    } catch (error) {
+      console.error('Error deleting folders:', error);
+      toast.error('Σφάλμα κατά τη μαζική διαγραφή φακέλων');
     }
   };
 
@@ -796,6 +879,10 @@ export function CentralFileExplorer() {
         onDeleteFolder={handleDeleteFolder}
         onMoveFile={handleMoveFile}
         onMoveFolder={handleMoveFolder}
+        onMoveFiles={handleMoveFiles}
+        onMoveFolders={handleMoveFolders}
+        onDeleteFiles={handleDeleteFiles}
+        onDeleteFolders={handleDeleteFolders}
         canManage={canManage}
         loading={loading}
         uploading={uploading}

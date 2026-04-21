@@ -227,7 +227,7 @@ export function ClientsTableView({
                           <img
                             src={client.logo_url}
                             alt={client.name}
-                            className="h-full w-full object-cover"
+                            className="h-full w-full object-contain p-0.5"
                             onError={(e) => {
                               (e.currentTarget as HTMLImageElement).style.display = 'none';
                             }}

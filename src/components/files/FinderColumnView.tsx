@@ -441,6 +441,45 @@ export function FinderColumnView({
     setSelectedItem(null);
   };
 
+  const renderBulkContextContent = () => (
+    <ContextMenuContent className="w-56">
+      <ContextMenuItem disabled>{selectedCount} επιλεγμένα</ContextMenuItem>
+      <ContextMenuSeparator />
+      {selectedFiles.length > 0 && (
+        <ContextMenuItem onClick={() => downloadFiles(selectedFiles)}>
+          <Download className="h-3.5 w-3.5 mr-2" /> Λήψη αρχείων
+        </ContextMenuItem>
+      )}
+      {canManage && (onMoveFiles || onMoveFolders) && (
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>
+            <Move className="h-3.5 w-3.5 mr-2" /> Μετακίνηση σε...
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className="w-48 max-h-64 overflow-y-auto">
+            <ContextMenuItem onClick={() => moveSelectionTo(null)}>
+              <FolderInput className="h-3.5 w-3.5 mr-2" /> Ρίζα / χωρίς φάκελο
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            {moveTargetFolders.map((target) => (
+              <ContextMenuItem key={target.id} onClick={() => moveSelectionTo(target.id)}>
+                <Folder className="h-3.5 w-3.5 mr-2 text-primary/70" />
+                <span className="truncate">{target.name}</span>
+              </ContextMenuItem>
+            ))}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+      )}
+      {canManage && (onDeleteFiles || onDeleteFolders) && (
+        <>
+          <ContextMenuSeparator />
+          <ContextMenuItem onClick={() => setBulkDeleteOpen(true)} className="text-destructive">
+            <Trash2 className="h-3.5 w-3.5 mr-2" /> Διαγραφή επιλεγμένων
+          </ContextMenuItem>
+        </>
+      )}
+    </ContextMenuContent>
+  );
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (isInputTarget(e.target)) return;

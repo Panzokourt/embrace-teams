@@ -1042,6 +1042,23 @@ export function FinderColumnView({
         {...({ webkitdirectory: '', directory: '' } as any)}
       />
 
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Διαγραφή {selectedCount} αντικειμένων;</AlertDialogTitle>
+            <AlertDialogDescription>
+              Αυτό θα διαγράψει {selectedFiles.length} αρχεία και {selectedFolders.length} φακέλους. Τα αρχεία μέσα στους φακέλους θα μεταφερθούν στον γονικό φάκελο.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Ακύρωση</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmBulkDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Διαγραφή
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Preview Dialog */}
       <FilePreviewDialog
         open={previewOpen}

@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import { InlineEditField } from '../InlineEditField';
 import { AIEnrichButton } from '../AIEnrichButton';
 import { useClientUpdate } from '@/hooks/useClientUpdate';
+import { useProjectCategories } from '@/hooks/useProjectCategories';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -39,7 +40,7 @@ const statusOptions = [
   { value: 'risk', label: 'Risk' },
 ];
 
-const sectorOptions = [
+const defaultSectorOptions = [
   { value: 'public', label: 'Δημόσιος Τομέας' },
   { value: 'private', label: 'Ιδιωτικός Τομέας' },
   { value: 'non_profit', label: 'Μη Κερδοσκοπικός' },
@@ -60,6 +61,17 @@ export function ClientSmartHeader({
   const update = useClientUpdate(client.id, { onPatched: onClientUpdated });
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const { data: categories = [] } = useProjectCategories();
+
+  const sectorOptions = categories.length > 0
+    ? [
+        ...categories.map(c => ({ value: c.name, label: c.name })),
+        // Include current value as option even if not in categories list
+        ...(client.sector && !categories.some(c => c.name === client.sector) && !defaultSectorOptions.some(o => o.value === client.sector)
+          ? [{ value: client.sector, label: client.sector }]
+          : []),
+      ]
+    : defaultSectorOptions;
 
   const save = (field: string) => async (v: string | null) => {
     await update.mutateAsync({ [field]: v });
@@ -98,7 +110,7 @@ export function ClientSmartHeader({
     }
   };
 
-  const sectorLabel = sectorOptions.find(o => o.value === client.sector)?.label;
+  const sectorLabel = sectorOptions.find(o => o.value === client.sector)?.label || client.sector || undefined;
   const statusKey = client.status || 'active';
   const statusLabel = statusOptions.find(o => o.value === statusKey)?.label || 'Active';
 
@@ -118,7 +130,7 @@ export function ClientSmartHeader({
             className="h-14 w-14 rounded-2xl bg-secondary flex items-center justify-center overflow-hidden relative"
           >
             {client.logo_url ? (
-              <img src={client.logo_url} alt={client.name} className="h-full w-full object-cover" />
+              <img src={client.logo_url} alt={client.name} className="h-full w-full object-contain p-1" />
             ) : (
               <Building2 className="h-7 w-7 text-muted-foreground" />
             )}

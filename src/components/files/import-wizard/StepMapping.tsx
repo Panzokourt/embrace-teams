@@ -28,7 +28,7 @@ interface StepMappingProps {
   destination: DestinationSelection;
   folders: FileFolder[];
   /** Top-level source folders + file counts (computed by parent). */
-  sourceFolders: { name: string; fileCount: number }[];
+  sourceFolders: { name: string; fileCount: number; nestedFolderCount?: number }[];
   mappings: FolderMapping[];
   onMappingsChange: (mappings: FolderMapping[]) => void;
   preserveStructure: boolean;
@@ -39,7 +39,7 @@ const NEW = '__new__';
 const ROOT = '__root__';
 
 export function buildInitialMappings(
-  sourceFolders: { name: string; fileCount: number }[],
+  sourceFolders: { name: string; fileCount: number; nestedFolderCount?: number }[],
   destination: DestinationSelection,
   folders: FileFolder[]
 ): FolderMapping[] {
@@ -165,9 +165,16 @@ export function StepMapping({
                   key={`${m.sourceFolder}-${idx}`}
                   className="grid grid-cols-[1fr_1.4fr_auto] gap-2 px-3 py-2 items-center text-xs"
                 >
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <Folder className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    <span className="truncate">{m.sourceFolder}</span>
+                  <div className="min-w-0 space-y-0.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Folder className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <span className="truncate">{m.sourceFolder}</span>
+                    </div>
+                    {preserveStructure && (sourceFolders[idx]?.nestedFolderCount ?? 0) > 0 && (
+                      <div className="text-[10px] text-muted-foreground truncate pl-5">
+                        +{sourceFolders[idx].nestedFolderCount} υποφάκελοι θα διατηρηθούν
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Select

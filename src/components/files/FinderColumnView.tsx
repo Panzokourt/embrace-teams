@@ -214,13 +214,40 @@ export function FinderColumnView({
     return [...childFolders, ...childFiles];
   }
 
-  function handleSelectItem(item: ColumnItem, columnIndex: number) {
+  const clearSelection = useCallback(() => {
+    setSelection({ keys: new Set(), anchor: null });
+  }, []);
+
+  const getColumnItemKeys = useCallback((columnIndex: number) => {
+    return getColumnItems(path[columnIndex] ?? null).map(getItemKey);
+  }, [path, folders, filteredFiles]);
+
+  function handleSelectItem(item: ColumnItem, columnIndex: number, event?: React.MouseEvent) {
+    const key = getItemKey(item);
     setSelectedItem(item);
-    if (item.kind === 'folder') {
+    setSelection((prev) => {
+      if (event?.shiftKey && prev.anchor?.columnIndex === columnIndex) {
+        const keys = getColumnItemKeys(columnIndex);
+        const a = keys.indexOf(prev.anchor.key);
+        const b = keys.indexOf(key);
+        if (a >= 0 && b >= 0) {
+          const next = new Set(prev.keys);
+          keys.slice(Math.min(a, b), Math.max(a, b) + 1).forEach((k) => next.add(k));
+          return { keys: next, anchor: prev.anchor };
+        }
+      }
+      if (event?.metaKey || event?.ctrlKey) {
+        const next = new Set(prev.keys);
+        next.has(key) ? next.delete(key) : next.add(key);
+        return { keys: next, anchor: { key, columnIndex } };
+      }
+      return { keys: new Set([key]), anchor: { key, columnIndex } };
+    });
+    if (item.kind === 'folder' && !event?.shiftKey && !event?.metaKey && !event?.ctrlKey) {
       const newPath = path.slice(0, columnIndex + 1);
       newPath.push(item.data.id);
       setPath(newPath);
-    } else {
+    } else if (item.kind === 'file') {
       setPath(path.slice(0, columnIndex + 1));
     }
   }

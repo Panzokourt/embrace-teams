@@ -1321,6 +1321,9 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
         </>
       )}
       <PaginationControls pagination={pagination} />
+      {!embedded && (
+        <ImportWizard open={importOpen} onOpenChange={setImportOpen} entity="tasks" onComplete={fetchTasks} />
+      )}
     </div>
   );
 }

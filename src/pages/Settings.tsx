@@ -43,6 +43,7 @@ import { ProjectFolderTemplatesManager } from '@/components/settings/ProjectFold
 import { PageHeader } from '@/components/shared/PageHeader';
 import { EmailAccountSetup } from '@/components/settings/EmailAccountSetup';
 import { DataManagementCard } from '@/components/settings/DataManagementCard';
+import { BulkImportCard } from '@/components/settings/BulkImportCard';
 import { PortalUserManager } from '@/components/portal/PortalUserManager';
 
 const DAY_LABELS = ['Δευτέρα', 'Τρίτη', 'Τετάρτη', 'Πέμπτη', 'Παρασκευή', 'Σάββατο', 'Κυριακή'];
@@ -502,6 +503,9 @@ export default function SettingsPage() {
 
       {/* Work Schedule */}
       <WorkScheduleCard />
+
+      {/* Bulk Import (Admin/Manager) */}
+      {isAdmin && <BulkImportCard />}
 
       {/* Data Management (Admin only) */}
       {isAdmin && <DataManagementCard />}

@@ -28,6 +28,7 @@ import { ProjectsTableView } from '@/components/projects/ProjectsTableView';
 import { ProjectGanttView } from '@/components/projects/ProjectGanttView';
 import { useProjectTemplates } from '@/hooks/useProjectTemplates';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { ImportWizard } from '@/components/import/ImportWizard';
 import { TemplatePreview } from '@/components/projects/TemplatePreview';
 import { DynamicProjectFields } from '@/components/projects/DynamicProjectFields';
 import { EditDeleteActions } from '@/components/dialogs/EditDeleteActions';
@@ -91,6 +92,7 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [viewMode, setViewMode] = usePersistedViewMode('projects', 'table');
@@ -613,10 +615,16 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
           <div className="flex items-center gap-3">
             <UnifiedViewToggle viewMode={viewMode} onViewModeChange={setViewMode} showCards showGantt />
             {canManage && (
-              <Button className="shadow-soft" onClick={() => setDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Νέο Έργο
-              </Button>
+              <>
+                <Button variant="outline" className="shadow-soft" onClick={() => setImportOpen(true)}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Μαζική Εισαγωγή
+                </Button>
+                <Button className="shadow-soft" onClick={() => setDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Νέο Έργο
+                </Button>
+              </>
             )}
           </div>
         }
@@ -880,6 +888,7 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
         </>
       )}
       <PaginationControls pagination={pagination} />
+      <ImportWizard open={importOpen} onOpenChange={setImportOpen} entity="projects" onComplete={fetchProjects} />
     </div>
   );
 }

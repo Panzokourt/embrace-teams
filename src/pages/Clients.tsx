@@ -28,10 +28,12 @@ import {
   Search,
   Loader2,
   X,
-  Sparkles
+  Sparkles,
+  Upload
 } from 'lucide-react';
 
 import { useProjectCategories } from '@/hooks/useProjectCategories';
+import { ImportWizard } from '@/components/import/ImportWizard';
 
 const defaultSectorOptions = [
   { value: 'public', label: 'Δημόσιος Τομέας' },
@@ -77,6 +79,7 @@ export default function ClientsPage() {
   const [tagInput, setTagInput] = useState('');
   const [enriching, setEnriching] = useState(false);
   const [pendingLogoUrl, setPendingLogoUrl] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -411,6 +414,11 @@ export default function ClientsPage() {
         }
         actions={
           canManage ? (
+            <div className="flex items-center gap-2">
+              <Button variant="outline" className="shadow-soft" onClick={() => setImportOpen(true)}>
+                <Upload className="h-4 w-4 mr-2" />
+                Μαζική Εισαγωγή
+              </Button>
             <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
               <DialogTrigger asChild>
                 <Button className="shadow-soft">
@@ -602,6 +610,7 @@ export default function ClientsPage() {
                 </form>
               </DialogContent>
             </Dialog>
+            </div>
           ) : undefined
         }
       />
@@ -639,6 +648,7 @@ export default function ClientsPage() {
         />
       )}
       <PaginationControls pagination={pagination} />
+      <ImportWizard open={importOpen} onOpenChange={setImportOpen} entity="clients" onComplete={fetchClients} />
     </div>
   );
 }

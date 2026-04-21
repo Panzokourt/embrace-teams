@@ -1,229 +1,225 @@
 
-## Στόχος
 
-Θα προσθέσουμε **desktop-style multi-select** στο Finder-style Files explorer, ώστε ο χρήστης να μπορεί να επιλέγει πολλά αρχεία/φακέλους και να κάνει μαζικές ενέργειες όπως στο macOS/Windows:
+## Πρόβλημα
 
-- Click: επιλέγει ένα item.
-- Shift + click: επιλέγει συνεχόμενο εύρος μέσα στην ίδια στήλη.
-- Ctrl/Cmd + click: προσθέτει/αφαιρεί μεμονωμένα items από την επιλογή.
-- Escape: καθαρίζει την επιλογή.
-- Drag επιλεγμένων items: μετακινεί όλο το selection μαζί.
-- Context menu σε selection: εμφανίζει μαζικές ενέργειες.
+Ναι — το πρόβλημα είναι αρχιτεκτονικό, όχι απλώς UI.
 
-## Τι θα αλλάξει στο UI
-
-### 1) Οπτική ένδειξη επιλογής πολλών items
-
-Στο `FinderColumnView` κάθε row (folder/file) θα μπορεί να εμφανίζεται ως:
-
-- απλά selected item: έντονο primary background όπως τώρα
-- multi-selected item: primary background + πιο καθαρό ring/left accent
-- drilled folder: θα συνεχίσει να δείχνει ότι είναι ανοιχτός στο path, αλλά δεν θα συγχέεται με το multi-selection
-
-Για παράδειγμα, αν επιλεγούν 8 φάκελοι/αρχεία, θα φαίνονται όλοι highlighted.
-
-### 2) Bulk action bar στο πάνω μέρος του explorer
-
-Όταν υπάρχουν πάνω από 1 επιλεγμένα items, στο toolbar του `FinderColumnView` θα εμφανίζεται μικρή μπάρα:
+Σήμερα οι προβολές **Κατά Πελάτη** και **Χρονολογικά** δεν αναπαράγουν τη real folder hierarchy. Δημιουργούν μόνο έναν “εικονικό” φάκελο πελάτη ή μήνα και μετά βάζουν όλα τα αρχεία απευθείας εκεί:
 
 ```text
-8 επιλεγμένα    [Μετακίνηση σε…] [Λήψη αρχείων] [Διαγραφή] [Καθαρισμός]
+Κατά Πελάτη
+CAMPEON
+  .DS_Store
+  file.pdf
+  file2.pdf
 ```
 
-Προσαρμογή ανά τύπο επιλογής:
-
-- Αν υπάρχουν μόνο αρχεία:
-  - Προεπισκόπηση για 1 αρχείο
-  - Λήψη
-  - Μετακίνηση
-  - Διαγραφή
-- Αν υπάρχουν folders:
-  - Μετακίνηση
-  - Διαγραφή
-- Αν η επιλογή είναι μικτή:
-  - Μετακίνηση
-  - Διαγραφή
-  - Λήψη μόνο για τα αρχεία της επιλογής
-
-### 3) Context menu για πολλά επιλεγμένα
-
-Αν κάνεις δεξί click πάνω σε ένα ήδη selected item, το menu θα δείχνει ενέργειες για όλα τα επιλεγμένα:
+ενώ η πραγματική δομή υπάρχει στο project view:
 
 ```text
-8 επιλεγμένα
-Μετακίνηση σε…
-Λήψη αρχείων
-Διαγραφή επιλεγμένων
+Κατά Έργο
+CAMPEON – Γενικά
+  HOUSEHOLD
+    ΠΙΣΤΟΠΟΙΗΤΙΚΑ
+      ΑΙΜΙΛΗ
+        file.pdf
 ```
 
-Αν κάνεις δεξί click σε item που δεν είναι selected, θα συμπεριφέρεται όπως σήμερα: επιλέγει αυτό το item και δείχνει τις ενέργειές του.
+Άρα όταν αλλάζει view, δεν “χάνονται” τα folders από τη βάση — απλώς η προβολή τα αγνοεί και ξαναδένει τα files flat πάνω στο virtual group.
 
-### 4) Drag & drop πολλών items
+## Προτεινόμενη λύση
 
-Αν έχεις επιλέξει 5 αρχεία/φακέλους και σύρεις ένα από αυτά σε άλλο φάκελο, θα μετακινηθούν και τα 5.
+Να αλλάξουμε το σύστημα των προβολών ώστε όλες οι προβολές να είναι **lenses πάνω στην ίδια πραγματική δομή**, όχι διαφορετικές εικονικές δομές που πετάνε τα folders.
 
-Θα υπάρχει προστασία ώστε:
+Δηλαδή:
 
-- να μην μετακινείται φάκελος μέσα στον εαυτό του
-- να μην μετακινείται φάκελος μέσα σε descendant του, αν μπορούμε να το εντοπίσουμε client-side από το `folders`
-- να αγνοούνται virtual folders (`vp-*`, `vc-*`, `vd-*`) όπως ήδη γίνεται
+- **Κατά Έργο**: `Έργο → πραγματικοί φάκελοι → αρχεία`
+- **Κατά Πελάτη**: `Πελάτης → Έργα πελάτη → πραγματικοί φάκελοι → αρχεία`
+- **Χρονολογικά**: `Μήνας → Έργα/Εταιρικά roots → πραγματικοί φάκελοι → αρχεία`
+- **Εταιρία**: `Εταιρικοί φάκελοι → αρχεία`
 
-## Τεχνική υλοποίηση
+Έτσι το ίδιο file/folder tree εμφανίζεται συνεπώς από διαφορετικές οπτικές, χωρίς να διαλύεται η ιεραρχία.
 
-### 1) Νέο selection model στο `FinderColumnView.tsx`
+## Νέα συμπεριφορά προβολών
 
-Θα αντικαταστήσουμε το μονό `selectedItem` ως μοναδική πηγή επιλογής με νέο state:
+### 1. Κατά Έργο
+
+Παραμένει όπως είναι, γιατί ήδη δουλεύει σωστά:
+
+```text
+CAMPEON – Γενικά
+  HOUSEHOLD
+    ΠΙΣΤΟΠΟΙΗΤΙΚΑ
+      ΑΙΜΙΛΗ
+        1. ΦΩΤΟΑΝΤΙΓΡΑΦΟ.pdf
+```
+
+Μικρή μόνο βελτίωση: θα χρησιμοποιεί κοινό helper για να μη διαφέρει από τις άλλες προβολές.
+
+### 2. Κατά Πελάτη
+
+Αντί να βάζει όλα τα files χύμα κάτω από τον πελάτη, θα δείχνει πρώτα τα έργα του πελάτη και μετά την πραγματική δομή φακέλων του κάθε έργου:
+
+```text
+CAMPEON
+  CAMPEON – Γενικά
+    HOUSEHOLD
+      ΠΙΣΤΟΠΟΙΗΤΙΚΑ
+        ΑΙΜΙΛΗ
+          1. ΦΩΤΟΑΝΤΙΓΡΑΦΟ.pdf
+  CAMPEON Gaming
+    Briefs
+    Συμβόλαια & Συμβάσεις
+```
+
+Αν ένας πελάτης έχει μόνο ένα project, πάλι θα εμφανίζεται το project ως ενδιάμεσο επίπεδο. Αυτό κρατάει τη λογική ξεκάθαρη και αποφεύγει collisions όταν δύο έργα έχουν ίδιους φακέλους.
+
+### 3. Χρονολογικά
+
+Αντί να εμφανίζει όλα τα αρχεία του μήνα flat, θα δείχνει:
+
+```text
+Απρίλιος 2026
+  CAMPEON – Γενικά
+    HOUSEHOLD
+      ΠΙΣΤΟΠΟΙΗΤΙΚΑ
+        ΑΙΜΙΛΗ
+          file.pdf
+  Εταιρικά
+    HR
+      file.pdf
+```
+
+Σημαντική λεπτομέρεια: στη χρονολογική προβολή θα εμφανίζονται μόνο τα branches της δομής που περιέχουν αρχεία του συγκεκριμένου μήνα. Δεν θα γεμίζει ο μήνας με άδειους φακέλους.
+
+### 4. Εταιρία
+
+Παραμένει ως καθαρή εταιρική προβολή:
+
+```text
+Templates
+HR
+Legal
+```
+
+και δεν θα μπερδεύεται με project files.
+
+## Τεχνική προσέγγιση
+
+### 1. Νέος helper για “scoped hierarchy”
+
+Στο `CentralFileExplorer.tsx` θα αντικατασταθεί η τωρινή λογική των `virtualFolders / virtualFiles` με helpers τύπου:
 
 ```ts
-type SelectionKey = `file:${string}` | `folder:${string}`;
-
-interface SelectionState {
-  keys: Set<SelectionKey>;
-  anchor: {
-    key: SelectionKey;
-    columnIndex: number;
-  } | null;
-}
+buildProjectLens(projects, folders, files)
+buildClientLens(clients, projects, folders, files)
+buildDateLens(projects, folders, files)
 ```
 
-Το υπάρχον `selectedItem` θα παραμείνει ως **active item** για preview/sidebar/Space preview, αλλά το multi-selection θα κρατιέται ξεχωριστά.
+Οι helpers θα κάνουν clone των real folders ως virtual nodes όταν χρειάζεται, αλλά θα κρατάνε σωστά τα parent-child relationships.
 
-### 2) Helper functions
+### 2. Stable virtual IDs για να μην συγκρούονται folders
 
-Θα προστεθούν pure helpers μέσα στο `FinderColumnView.tsx` ή σε μικρό utility αν μεγαλώσει πολύ:
-
-- `getItemKey(item)`
-- `isItemSelected(item)`
-- `getColumnItemKeys(columnIndex)`
-- `resolveSelectedFiles()`
-- `resolveSelectedFolders()`
-- `selectRange(anchor, clicked, columnIndex)`
-- `clearSelection()`
-
-Το Shift range θα δουλεύει μέσα στην ίδια στήλη, σύμφωνα με τη συνηθισμένη συμπεριφορά Finder/list views.
-
-### 3) Click behavior
-
-Στο row click:
-
-- `event.shiftKey`:
-  - αν υπάρχει anchor στην ίδια στήλη, επιλέγει όλα τα items ανάμεσα στο anchor και το clicked item
-  - αν δεν υπάρχει anchor, επιλέγει μόνο το clicked item και το κάνει anchor
-- `event.metaKey || event.ctrlKey`:
-  - toggle του clicked item χωρίς να χάνεται η υπόλοιπη επιλογή
-- απλό click:
-  - καθαρίζει την προηγούμενη επιλογή και επιλέγει μόνο το clicked item
-
-Για folders, το απλό click θα συνεχίσει να ανοίγει την επόμενη στήλη. Με Cmd/Ctrl ή Shift δεν θα αλλάζει απαραίτητα το path, ώστε να μπορείς να διαλέγεις πολλά folders χωρίς να “φεύγεις” συνέχεια σε άλλο επίπεδο.
-
-### 4) Bulk operations API από `CentralFileExplorer`
-
-Σήμερα υπάρχουν:
-
-- `handleMoveFile(fileId, folderId)`
-- `handleMoveFolder(folderId, targetParentId)`
-- `handleDeleteFile(file)`
-- `handleDeleteFolder(folderId)`
-
-Θα τα επαναχρησιμοποιήσουμε και θα περάσουμε στο `FinderColumnView` bulk handlers:
-
-```ts
-onMoveFiles?: (fileIds: string[], folderId: string | null) => Promise<void>;
-onMoveFolders?: (folderIds: string[], targetParentId: string | null) => Promise<void>;
-onDeleteFiles?: (files: FileAttachment[]) => Promise<void>;
-onDeleteFolders?: (folderIds: string[]) => Promise<void>;
-```
-
-Ή, για να κρατηθεί μικρότερο το API, θα υλοποιηθούν bulk wrappers μέσα στο `FinderColumnView` που καλούν σειριακά τα υπάρχοντα single handlers. Η προτεινόμενη λύση είναι να μπουν bulk wrappers στο `CentralFileExplorer` για καλύτερα toast messages και λιγότερα refreshes.
-
-### 5) Μαζική μετακίνηση
-
-Στο `CentralFileExplorer.tsx` θα προστεθούν:
-
-- `handleMoveFiles(fileIds, folderId)`
-- `handleMoveFolders(folderIds, targetParentId)`
-
-Για αρχεία, θα γίνεται ένα `.update(...)` με `.in('id', fileIds)` όπου είναι ασφαλές, αντί για πολλά sequential updates.
-
-Για folders, επειδή κάθε folder μπορεί να χρειάζεται validation και δεν πρέπει να μετακινηθεί σε invalid target, θα γίνει loop με checks και μετά refresh.
-
-Μετά τη μετακίνηση:
-
-- ενημέρωση local state
-- `toast.success("Μετακινήθηκαν X αντικείμενα")`
-- καθαρισμός selection
-
-### 6) Μαζική διαγραφή
-
-Θα προστεθεί confirmation dialog πριν τη διαγραφή:
+Για grouped views θα χρησιμοποιηθούν deterministic IDs:
 
 ```text
-Διαγραφή 8 αντικειμένων;
-Αυτό θα διαγράψει 5 αρχεία και 3 φακέλους. Τα αρχεία μέσα στους φακέλους θα μεταφερθούν στον γονικό φάκελο όπως γίνεται σήμερα.
+vc:{clientId}
+vp:{projectId}
+vd:{yyyy-MM}
+vd:{yyyy-MM}:project:{projectId}
+lens:{view}:{realFolderId}
 ```
 
-Συμπεριφορά:
+Έτσι το ίδιο real folder μπορεί να εμφανιστεί μέσα σε διαφορετικό context χωρίς να μπερδευτεί το `FinderColumnView`.
 
-- Αρχεία: remove από storage + delete rows
-- Φάκελοι: reuse της τωρινής λογικής `handleDeleteFolder`, που μεταφέρει τα αρχεία στον parent πριν διαγράψει τον φάκελο
-- Στο τέλος ένα συνολικό toast, όχι ένα toast ανά item
+### 3. Files θα δείχνουν στο cloned folder path, όχι στο group root
 
-### 7) Μαζική λήψη αρχείων
+Αν ένα file έχει `folder_id = AΙΜΙΛΗ`, τότε:
 
-Για πολλά selected αρχεία θα υλοποιηθεί πρακτικά:
+- στο Κατά Έργο θα μπει στο cloned/real `ΑΙΜΙΛΗ`
+- στο Κατά Πελάτη θα μπει στο `CAMPEON → Project → ... → ΑΙΜΙΛΗ`
+- στο Χρονολογικά θα μπει στο `Απρίλιος 2026 → Project → ... → ΑΙΜΙΛΗ`
 
-- για 1 αρχείο: ίδια συμπεριφορά με σήμερα
-- για πολλά αρχεία: δημιουργία signed URLs και άνοιγμα/λήψη sequential με μικρό delay ή fallback σε toast αν ο browser μπλοκάρει πολλαπλά popups
+Μόνο αρχεία χωρίς `folder_id` θα μπαίνουν στο αντίστοιχο project/month root.
 
-Δεν θα φτιάξουμε zip αρχείο σε αυτή τη φάση, γιατί αυτό θέλει backend packaging ή client-side zip dependency και μπορεί να γίνει ξεχωριστά σωστά.
+### 4. “Pruned tree” για Χρονολογικά
 
-### 8) Keyboard shortcuts
+Για κάθε μήνα:
 
-Στο focused explorer container:
+1. βρίσκουμε τα files του μήνα
+2. βρίσκουμε τους φακέλους τους
+3. ανεβαίνουμε στους ancestors μέχρι root
+4. εμφανίζουμε μόνο αυτά τα folders
 
-- `Escape`: clear selection
-- `Space`: preview μόνο όταν υπάρχει ακριβώς 1 selected file
-- `Delete` / `Backspace`: αν `canManage`, ανοίγει confirmation για διαγραφή selected items
-- `Cmd/Ctrl + A`: επιλέγει όλα τα items της τρέχουσας στήλης
+Έτσι διατηρείται η δομή χωρίς να εμφανίζονται άσχετοι/άδειοι φάκελοι.
 
-Θα αποφεύγεται η ενεργοποίηση shortcuts όταν ο χρήστης γράφει σε input/rename/create field.
+### 5. Προστασία στις ενέργειες επεξεργασίας
+
+Επειδή τα grouped views θα περιέχουν virtual/cloned folders:
+
+- Rename/Delete/Move θα επιτρέπονται μόνο σε real folders ή θα μεταφράζονται στο original real folder id.
+- Virtual group folders όπως `Πελάτης`, `Μήνας`, `Project group` δεν θα μπορούν να μετονομαστούν/διαγραφούν σαν κανονικοί φάκελοι.
+- Upload σε virtual client/date group θα συνεχίσει να ανοίγει destination picker, γιατί χρειάζεται project/folder απόφαση.
+- Upload σε real/cloned folder θα πηγαίνει στον αντίστοιχο πραγματικό folder.
+
+### 6. Αφαίρεση των duplicated flat `.DS_Store`
+
+Θα προστεθεί client-side φίλτρο για system artifacts που προκύπτουν από folder imports:
+
+```text
+.DS_Store
+__MACOSX
+Thumbs.db
+desktop.ini
+```
+
+Αυτό θα εφαρμοστεί:
+- στην εμφάνιση στο explorer
+- και στο import/upload flow ώστε να μην ξανανεβαίνουν τέτοια αρχεία
+
+Δεν θα διαγράψουμε αυτόματα όσα υπάρχουν ήδη στη βάση χωρίς ξεχωριστή έγκριση, αλλά δεν θα εμφανίζονται πλέον.
 
 ## Αρχεία που θα αλλάξουν
 
-- `src/components/files/FinderColumnView.tsx`
-  - νέο multi-selection state
-  - shift/cmd/ctrl click handling
-  - bulk toolbar
-  - bulk context menu
-  - multi-drag payload
-  - keyboard shortcuts
-  - confirmation dialog
-
 - `src/components/files/CentralFileExplorer.tsx`
-  - bulk move/delete handlers
-  - πιο καθαρά toast messages
-  - πιθανή χρήση `.in(...)` για μαζική ενημέρωση αρχείων
+  - αντικατάσταση της flat grouped-view λογικής
+  - νέοι hierarchy/lens builders
+  - σωστή αντιστοίχιση files σε cloned folder ids
+  - φίλτρο system files
+
+- `src/components/files/FinderColumnView.tsx`
+  - μικρή προσαρμογή ώστε να αναγνωρίζει cloned folder metadata/original ids
+  - προστασία bulk actions/context menu για virtual group nodes
+  - σωστό breadcrumbs label ανά view
 
 Πιθανώς:
-- `src/components/files/FilesTableView.tsx`
-  - όχι απαραίτητο για το Finder view, αλλά μπορούμε να εναρμονίσουμε αργότερα τη table view selection με Shift/Cmd αν ζητηθεί.
+- `src/components/files/import-wizard/ImportWizard.tsx`
+- `src/components/files/import-wizard/StepSource.tsx`
+
+μόνο για να αγνοούνται `.DS_Store`, `__MACOSX`, `Thumbs.db`, `desktop.ini` κατά την εισαγωγή.
 
 ## Τι δεν θα αλλάξει
 
 - Δεν αλλάζει το database schema.
 - Δεν αλλάζουν RLS policies.
-- Δεν αλλάζει το Import Wizard.
-- Δεν αφαιρείται η υπάρχουσα single-item συμπεριφορά.
-- Δεν θα προστεθεί zip download σε αυτή τη φάση.
+- Δεν αλλάζει ο τρόπος αποθήκευσης αρχείων.
+- Δεν θα διαγραφούν αυτόματα υπάρχοντα αρχεία.
+- Δεν θα χαλάσει η προβολή Κατά Έργο που ήδη δουλεύει σωστά.
 
 ## Verification
 
-1. Στο `/files`, επιλογή συνεχόμενων items με Shift μέσα στην ίδια στήλη.
-2. Επιλογή μη συνεχόμενων items με Cmd/Ctrl.
-3. Απλό click μετά από multi-selection καθαρίζει και κρατά μόνο το clicked item.
-4. Cmd/Ctrl + A επιλέγει όλα τα items της τρέχουσας στήλης.
-5. Drag selected files/folders σε άλλο folder → μετακινούνται όλα.
-6. Bulk delete με confirmation → διαγράφει σωστά και κάνει refresh.
-7. Space ανοίγει preview μόνο όταν έχει επιλεγεί ένα αρχείο.
-8. Escape καθαρίζει την επιλογή.
-9. Έλεγχος σε macOS-style και Windows-style modifiers: Cmd για Mac, Ctrl για Windows/Linux.
+1. Άνοιγμα `/files` σε **Κατά Έργο**: επιβεβαίωση ότι η υπάρχουσα δομή παραμένει σωστή.
+2. Αλλαγή σε **Κατά Πελάτη**: ο πελάτης δείχνει projects και κάτω από αυτά την ίδια folder/subfolder hierarchy.
+3. Αλλαγή σε **Χρονολογικά**: κάθε μήνας δείχνει pruned hierarchy, όχι flat λίστα.
+4. Άνοιγμα του path από τα screenshots:
+   `CAMPEON → ... → HOUSEHOLD → ΠΙΣΤΟΠΟΙΗΤΙΚΑ → ΑΙΜΙΛΗ`
+   και επιβεβαίωση ότι τα PDFs είναι μέσα στον σωστό υποφάκελο και όχι χύμα.
+5. Επιβεβαίωση ότι `.DS_Store` δεν εμφανίζεται και δεν ανεβαίνει σε νέο import.
+6. Έλεγχος ότι multi-select, bulk move/delete και drag/drop συνεχίζουν να δουλεύουν με real folders και προστατεύουν τα virtual group nodes.
+
+<lov-actions>
+<lov-suggestion message="Υλοποίησε τη νέα lens-based δομή προβολών στο Κεντρικό Αρχείο και μετά να το δοκιμάσουμε end-to-end σε Κατά Έργο, Κατά Πελάτη και Χρονολογικά.">Υλοποίηση & end-to-end test</lov-suggestion>
+<lov-suggestion message="Πρόσθεσε καθαρισμό για υπάρχοντα system files όπως .DS_Store, __MACOSX, Thumbs.db και desktop.ini από το Κεντρικό Αρχείο, με ασφαλές confirmation πριν τη διαγραφή.">Καθάρισμα system files</lov-suggestion>
+<lov-suggestion message="Πρόσθεσε ένδειξη πλήρους διαδρομής folder/file στο preview sidebar και στα tooltips, ώστε να είναι ξεκάθαρο πού ανήκει κάθε αρχείο σε όλες τις προβολές.">Πλήρης διαδρομή αρχείου</lov-suggestion>
+</lov-actions>
+

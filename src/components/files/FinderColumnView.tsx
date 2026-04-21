@@ -727,7 +727,9 @@ export function FinderColumnView({
                         )}
 
                         {items.map((item) => {
-                          const isSelected =
+                          const itemKey = getItemKey(item);
+                          const isMultiSelected = selection.keys.has(itemKey);
+                          const isActiveSelected =
                             selectedItem &&
                             ((item.kind === 'folder' &&
                               selectedItem.kind === 'folder' &&
@@ -783,10 +785,11 @@ export function FinderColumnView({
                                       setDragOverFolderId(null);
                                     }}
                                     onDrop={(e) => handleDrop(e, colIndex, folder.id)}
-                                    onClick={() => handleSelectItem(item, colIndex)}
+                                    onClick={(e) => handleSelectItem(item, colIndex, e)}
                                     className={cn(
-                                      'w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-muted/60 transition-colors',
-                                      (isSelected || isDrilledInto) && 'bg-primary/10 text-primary',
+                                      'w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-muted/60 transition-colors border-l-2 border-transparent',
+                                      (isActiveSelected || isDrilledInto) && 'bg-primary/10 text-primary',
+                                      isMultiSelected && 'bg-primary/15 text-primary border-l-primary ring-1 ring-primary/20',
                                       isFolderDragTarget && 'bg-primary/20 ring-1 ring-primary/40'
                                     )}
                                   >
@@ -798,7 +801,7 @@ export function FinderColumnView({
                                     <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
                                   </button>
                                 </ContextMenuTrigger>
-                                {canManage && !isVirtualFolder && (
+                                {canManage && !isVirtualFolder && (isMultiSelected && selectedCount > 1 ? renderBulkContextContent() : (
                                   <ContextMenuContent className="w-52">
                                     <ContextMenuItem onClick={() => handleUploadToColumn(folder.id)}>
                                       <Upload className="h-3.5 w-3.5 mr-2" /> Ανέβασμα αρχείου
@@ -845,7 +848,7 @@ export function FinderColumnView({
                                       <Trash2 className="h-3.5 w-3.5 mr-2" /> Διαγραφή
                                     </ContextMenuItem>
                                   </ContextMenuContent>
-                                )}
+                                ))}
                               </ContextMenu>
                             );
                           }
@@ -859,17 +862,19 @@ export function FinderColumnView({
                                 <button
                                   draggable={canManage}
                                   onDragStart={(e) => handleDragStart(e, item)}
-                                  onClick={() => handleSelectItem(item, colIndex)}
+                                  onClick={(e) => handleSelectItem(item, colIndex, e)}
                                   className={cn(
-                                    'w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-muted/60 transition-colors',
-                                    isSelected && 'bg-primary/10 text-primary'
+                                    'w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-muted/60 transition-colors border-l-2 border-transparent',
+                                    isActiveSelected && 'bg-primary/10 text-primary',
+                                    isMultiSelected && 'bg-primary/15 text-primary border-l-primary ring-1 ring-primary/20'
                                   )}
                                 >
                                   <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
                                   <span className="truncate flex-1">{fileData.file_name}</span>
                                 </button>
                               </ContextMenuTrigger>
-                              <ContextMenuContent className="w-52">
+                               {isMultiSelected && selectedCount > 1 ? renderBulkContextContent() : (
+                               <ContextMenuContent className="w-52">
                                 <ContextMenuItem onClick={() => {
                                   setSelectedItem(item);
                                   setPreviewOpen(true);
@@ -912,7 +917,8 @@ export function FinderColumnView({
                                     </ContextMenuItem>
                                   </>
                                 )}
-                              </ContextMenuContent>
+                               </ContextMenuContent>
+                               )}
                             </ContextMenu>
                           );
                         })}

@@ -1,225 +1,108 @@
 
 
-## Πρόβλημα
+## Στόχος
 
-Ναι — το πρόβλημα είναι αρχιτεκτονικό, όχι απλώς UI.
+Τρεις βελτιώσεις στην καρτέλα πελάτη (`/clients/:id`):
 
-Σήμερα οι προβολές **Κατά Πελάτη** και **Χρονολογικά** δεν αναπαράγουν τη real folder hierarchy. Δημιουργούν μόνο έναν “εικονικό” φάκελο πελάτη ή μήνα και μετά βάζουν όλα τα αρχεία απευθείας εκεί:
+1. Κουμπιά γρήγορης δημιουργίας μέσα σε sections (Projects, Briefs, Contacts, Media Plans, Files).
+2. Drag-and-drop για αναδιάταξη και απόκρυψη/εμφάνιση sections με persistence.
+3. Νέο "Stats Strip" με cards αμέσως κάτω από το header (Έσοδα, Μηνιαία, Margin, P&L μετρικές, Tasks snapshot).
 
-```text
-Κατά Πελάτη
-CAMPEON
-  .DS_Store
-  file.pdf
-  file2.pdf
-```
+## 1. Κουμπιά δημιουργίας ανά section
 
-ενώ η πραγματική δομή υπάρχει στο project view:
+Προσθήκη `+` button στο header κάθε section, που δείχνει στο ίδιο route δημιουργίας με pre-filled `client_id`:
 
-```text
-Κατά Έργο
-CAMPEON – Γενικά
-  HOUSEHOLD
-    ΠΙΣΤΟΠΟΙΗΤΙΚΑ
-      ΑΙΜΙΛΗ
-        file.pdf
-```
+- **Projects** → `/projects?new=true&client={id}` (ήδη υποστηρίζεται από το Smart Header dropdown)
+- **Briefs** → υπάρχει ήδη
+- **Contacts** → `/contacts?new=true&client={id}`
+- **Media Plans** → `/media-planning?new=true&client={id}`
+- **Files** → trigger upload dialog του ClientFilesCard
 
-Άρα όταν αλλάζει view, δεν “χάνονται” τα folders από τη βάση — απλώς η προβολή τα αγνοεί και ξαναδένει τα files flat πάνω στο virtual group.
+Ομοιόμορφο styling: `Button size="sm" variant="outline" h-7` με `Plus` icon, ακριβώς όπως στο `ClientBriefsCard`.
 
-## Προτεινόμενη λύση
+## 2. Draggable / Hideable sections
 
-Να αλλάξουμε το σύστημα των προβολών ώστε όλες οι προβολές να είναι **lenses πάνω στην ίδια πραγματική δομή**, όχι διαφορετικές εικονικές δομές που πετάνε τα folders.
+### Νέο hook `useClientDetailLayout`
 
-Δηλαδή:
-
-- **Κατά Έργο**: `Έργο → πραγματικοί φάκελοι → αρχεία`
-- **Κατά Πελάτη**: `Πελάτης → Έργα πελάτη → πραγματικοί φάκελοι → αρχεία`
-- **Χρονολογικά**: `Μήνας → Έργα/Εταιρικά roots → πραγματικοί φάκελοι → αρχεία`
-- **Εταιρία**: `Εταιρικοί φάκελοι → αρχεία`
-
-Έτσι το ίδιο file/folder tree εμφανίζεται συνεπώς από διαφορετικές οπτικές, χωρίς να διαλύεται η ιεραρχία.
-
-## Νέα συμπεριφορά προβολών
-
-### 1. Κατά Έργο
-
-Παραμένει όπως είναι, γιατί ήδη δουλεύει σωστά:
-
-```text
-CAMPEON – Γενικά
-  HOUSEHOLD
-    ΠΙΣΤΟΠΟΙΗΤΙΚΑ
-      ΑΙΜΙΛΗ
-        1. ΦΩΤΟΑΝΤΙΓΡΑΦΟ.pdf
-```
-
-Μικρή μόνο βελτίωση: θα χρησιμοποιεί κοινό helper για να μη διαφέρει από τις άλλες προβολές.
-
-### 2. Κατά Πελάτη
-
-Αντί να βάζει όλα τα files χύμα κάτω από τον πελάτη, θα δείχνει πρώτα τα έργα του πελάτη και μετά την πραγματική δομή φακέλων του κάθε έργου:
-
-```text
-CAMPEON
-  CAMPEON – Γενικά
-    HOUSEHOLD
-      ΠΙΣΤΟΠΟΙΗΤΙΚΑ
-        ΑΙΜΙΛΗ
-          1. ΦΩΤΟΑΝΤΙΓΡΑΦΟ.pdf
-  CAMPEON Gaming
-    Briefs
-    Συμβόλαια & Συμβάσεις
-```
-
-Αν ένας πελάτης έχει μόνο ένα project, πάλι θα εμφανίζεται το project ως ενδιάμεσο επίπεδο. Αυτό κρατάει τη λογική ξεκάθαρη και αποφεύγει collisions όταν δύο έργα έχουν ίδιους φακέλους.
-
-### 3. Χρονολογικά
-
-Αντί να εμφανίζει όλα τα αρχεία του μήνα flat, θα δείχνει:
-
-```text
-Απρίλιος 2026
-  CAMPEON – Γενικά
-    HOUSEHOLD
-      ΠΙΣΤΟΠΟΙΗΤΙΚΑ
-        ΑΙΜΙΛΗ
-          file.pdf
-  Εταιρικά
-    HR
-      file.pdf
-```
-
-Σημαντική λεπτομέρεια: στη χρονολογική προβολή θα εμφανίζονται μόνο τα branches της δομής που περιέχουν αρχεία του συγκεκριμένου μήνα. Δεν θα γεμίζει ο μήνας με άδειους φακέλους.
-
-### 4. Εταιρία
-
-Παραμένει ως καθαρή εταιρική προβολή:
-
-```text
-Templates
-HR
-Legal
-```
-
-και δεν θα μπερδεύεται με project files.
-
-## Τεχνική προσέγγιση
-
-### 1. Νέος helper για “scoped hierarchy”
-
-Στο `CentralFileExplorer.tsx` θα αντικατασταθεί η τωρινή λογική των `virtualFolders / virtualFiles` με helpers τύπου:
+`src/hooks/useClientDetailLayout.ts` — βασισμένο στο pattern του `useDashboardConfig`:
 
 ```ts
-buildProjectLens(projects, folders, files)
-buildClientLens(clients, projects, folders, files)
-buildDateLens(projects, folders, files)
+interface SectionConfig { id: string; visible: boolean; column: 'left' | 'right'; }
+const STORAGE_KEY = 'client_detail_layout_v1';
 ```
 
-Οι helpers θα κάνουν clone των real folders ως virtual nodes όταν χρειάζεται, αλλά θα κρατάνε σωστά τα parent-child relationships.
+Default sections:
+- **Left**: `business_info`, `websites`, `social`, `ad_accounts`, `strategy`
+- **Right**: `pl_summary`, `projects`, `media_plans`, `tasks_snapshot`, `briefs`, `team`, `contacts`
 
-### 2. Stable virtual IDs για να μην συγκρούονται folders
+Persistence per-user στο `localStorage` (απλό, ίδιο pattern με dashboard).
 
-Για grouped views θα χρησιμοποιηθούν deterministic IDs:
+### Νέο component `DraggableSection`
+
+`src/components/clients/detail/DraggableSection.tsx`:
+- Wrap κάθε card.
+- Drag handle (`GripVertical`) + κουμπί "Hide" (`EyeOff`) εμφανίζονται on hover πάνω-δεξιά της κάρτας.
+- Χρήση `@dnd-kit/sortable` (`useSortable`) όπως το `WidgetWrapper.tsx`.
+- Σταθερό layout χωρίς αλλαγή visual style των υπαρχόντων cards.
+
+### Layout management UI
+
+Νέο dropdown κουμπί "Layout" στο `ClientSmartHeader` (δεξιά, δίπλα στο "Πλήρης"):
+- Λίστα όλων των sections με toggle visibility (checkbox).
+- Επιλογή "Επαναφορά διάταξης".
+
+### DnD wiring στο `ClientDetail.tsx`
+
+- `DndContext` + `SortableContext` ανά στήλη (left/right) χρησιμοποιώντας τον υπάρχοντα `DroppableColumn` pattern.
+- Drag μεταξύ στηλών επιτρέπεται (cross-column move).
+- `onDragEnd` ενημερώνει το layout μέσω hook.
+
+## 3. Stats Strip κάτω από τον header
+
+Νέο component `ClientStatsStrip` (`src/components/clients/detail/ClientStatsStrip.tsx`):
 
 ```text
-vc:{clientId}
-vp:{projectId}
-vd:{yyyy-MM}
-vd:{yyyy-MM}:project:{projectId}
-lens:{view}:{realFolderId}
+[Έσοδα Έτους] [Μηνιαία] [Margin %] [Τιμολογημένα] [Εισπραγμένα] [Ανεξόφλητα] [Overdue Tasks] [This Week] [Open]
 ```
 
-Έτσι το ίδιο real folder μπορεί να εμφανιστεί μέσα σε διαφορετικό context χωρίς να μπερδευτεί το `FinderColumnView`.
+- Grid: `grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 xl:grid-cols-9 gap-3`.
+- Style βασισμένο στο `EmployeeStatsCard` (icon-circle αριστερά, value/label δεξιά, color variants: `primary`, `success`, `warning`, `destructive`).
+- Compact ύψος για να μην καταλαμβάνει πολύ vertical space.
 
-### 3. Files θα δείχνουν στο cloned folder path, όχι στο group root
+### Συνέπειες σε άλλα cards
 
-Αν ένα file έχει `folder_id = AΙΜΙΛΗ`, τότε:
-
-- στο Κατά Έργο θα μπει στο cloned/real `ΑΙΜΙΛΗ`
-- στο Κατά Πελάτη θα μπει στο `CAMPEON → Project → ... → ΑΙΜΙΛΗ`
-- στο Χρονολογικά θα μπει στο `Απρίλιος 2026 → Project → ... → ΑΙΜΙΛΗ`
-
-Μόνο αρχεία χωρίς `folder_id` θα μπαίνουν στο αντίστοιχο project/month root.
-
-### 4. “Pruned tree” για Χρονολογικά
-
-Για κάθε μήνα:
-
-1. βρίσκουμε τα files του μήνα
-2. βρίσκουμε τους φακέλους τους
-3. ανεβαίνουμε στους ancestors μέχρι root
-4. εμφανίζουμε μόνο αυτά τα folders
-
-Έτσι διατηρείται η δομή χωρίς να εμφανίζονται άσχετοι/άδειοι φάκελοι.
-
-### 5. Προστασία στις ενέργειες επεξεργασίας
-
-Επειδή τα grouped views θα περιέχουν virtual/cloned folders:
-
-- Rename/Delete/Move θα επιτρέπονται μόνο σε real folders ή θα μεταφράζονται στο original real folder id.
-- Virtual group folders όπως `Πελάτης`, `Μήνας`, `Project group` δεν θα μπορούν να μετονομαστούν/διαγραφούν σαν κανονικοί φάκελοι.
-- Upload σε virtual client/date group θα συνεχίσει να ανοίγει destination picker, γιατί χρειάζεται project/folder απόφαση.
-- Upload σε real/cloned folder θα πηγαίνει στον αντίστοιχο πραγματικό folder.
-
-### 6. Αφαίρεση των duplicated flat `.DS_Store`
-
-Θα προστεθεί client-side φίλτρο για system artifacts που προκύπτουν από folder imports:
-
-```text
-.DS_Store
-__MACOSX
-Thumbs.db
-desktop.ini
-```
-
-Αυτό θα εφαρμοστεί:
-- στην εμφάνιση στο explorer
-- και στο import/upload flow ώστε να μην ξανανεβαίνουν τέτοια αρχεία
-
-Δεν θα διαγράψουμε αυτόματα όσα υπάρχουν ήδη στη βάση χωρίς ξεχωριστή έγκριση, αλλά δεν θα εμφανίζονται πλέον.
+- Από `ClientSmartHeader`: αφαιρούνται οι 3 KPIs δεξιά (Έσοδα/Μηνιαία/Margin) — μετακινούνται στο strip.
+- `ClientPLSummary`: παραμένει ως card στο right column, αλλά το νέο strip δείχνει τα ίδια metrics σε compact form. Αν θέλει ο χρήστης, μπορεί να το κρύψει από το layout panel (σύσταση: το strip είναι quick glance, η κάρτα έχει progress bar + collection rate).
+- `ClientTasksSnapshot`: ομοίως παραμένει στο right column για περισσότερες λεπτομέρειες.
 
 ## Αρχεία που θα αλλάξουν
 
-- `src/components/files/CentralFileExplorer.tsx`
-  - αντικατάσταση της flat grouped-view λογικής
-  - νέοι hierarchy/lens builders
-  - σωστή αντιστοίχιση files σε cloned folder ids
-  - φίλτρο system files
+**Νέα:**
+- `src/hooks/useClientDetailLayout.ts`
+- `src/components/clients/detail/DraggableSection.tsx`
+- `src/components/clients/detail/ClientStatsStrip.tsx`
+- `src/components/clients/detail/ClientLayoutMenu.tsx` (dropdown για visibility/reset)
 
-- `src/components/files/FinderColumnView.tsx`
-  - μικρή προσαρμογή ώστε να αναγνωρίζει cloned folder metadata/original ids
-  - προστασία bulk actions/context menu για virtual group nodes
-  - σωστό breadcrumbs label ανά view
+**Τροποποιήσεις:**
+- `src/pages/ClientDetail.tsx` — DndContext, νέο stats strip, dynamic section rendering μέσω layout config.
+- `src/components/clients/detail/ClientSmartHeader.tsx` — αφαίρεση των 3 KPIs, προσθήκη `ClientLayoutMenu`.
+- `src/components/clients/detail/ClientProjectsCard.tsx` — νέο `+ New Project` button στο header.
+- `src/components/clients/detail/ClientContactsCard.tsx` — νέο `+ New Contact` button.
+- `src/components/clients/detail/ClientMediaPlansCard.tsx` — header redesign (CardHeader/CardTitle pattern) + `+ New Plan` button.
+- `src/components/clients/detail/ClientFilesCard.tsx` — `+ Upload` button.
 
-Πιθανώς:
-- `src/components/files/import-wizard/ImportWizard.tsx`
-- `src/components/files/import-wizard/StepSource.tsx`
+## Τι ΔΕΝ αλλάζει
 
-μόνο για να αγνοούνται `.DS_Store`, `__MACOSX`, `Thumbs.db`, `desktop.ini` κατά την εισαγωγή.
-
-## Τι δεν θα αλλάξει
-
-- Δεν αλλάζει το database schema.
-- Δεν αλλάζουν RLS policies.
-- Δεν αλλάζει ο τρόπος αποθήκευσης αρχείων.
-- Δεν θα διαγραφούν αυτόματα υπάρχοντα αρχεία.
-- Δεν θα χαλάσει η προβολή Κατά Έργο που ήδη δουλεύει σωστά.
+- DB schema, RLS, edge functions.
+- Visual style των υπαρχόντων cards (μόνο header tweaks).
+- Inline editing functionality στο header.
 
 ## Verification
 
-1. Άνοιγμα `/files` σε **Κατά Έργο**: επιβεβαίωση ότι η υπάρχουσα δομή παραμένει σωστή.
-2. Αλλαγή σε **Κατά Πελάτη**: ο πελάτης δείχνει projects και κάτω από αυτά την ίδια folder/subfolder hierarchy.
-3. Αλλαγή σε **Χρονολογικά**: κάθε μήνας δείχνει pruned hierarchy, όχι flat λίστα.
-4. Άνοιγμα του path από τα screenshots:
-   `CAMPEON → ... → HOUSEHOLD → ΠΙΣΤΟΠΟΙΗΤΙΚΑ → ΑΙΜΙΛΗ`
-   και επιβεβαίωση ότι τα PDFs είναι μέσα στον σωστό υποφάκελο και όχι χύμα.
-5. Επιβεβαίωση ότι `.DS_Store` δεν εμφανίζεται και δεν ανεβαίνει σε νέο import.
-6. Έλεγχος ότι multi-select, bulk move/delete και drag/drop συνεχίζουν να δουλεύουν με real folders και προστατεύουν τα virtual group nodes.
-
-<lov-actions>
-<lov-suggestion message="Υλοποίησε τη νέα lens-based δομή προβολών στο Κεντρικό Αρχείο και μετά να το δοκιμάσουμε end-to-end σε Κατά Έργο, Κατά Πελάτη και Χρονολογικά.">Υλοποίηση & end-to-end test</lov-suggestion>
-<lov-suggestion message="Πρόσθεσε καθαρισμό για υπάρχοντα system files όπως .DS_Store, __MACOSX, Thumbs.db και desktop.ini από το Κεντρικό Αρχείο, με ασφαλές confirmation πριν τη διαγραφή.">Καθάρισμα system files</lov-suggestion>
-<lov-suggestion message="Πρόσθεσε ένδειξη πλήρους διαδρομής folder/file στο preview sidebar και στα tooltips, ώστε να είναι ξεκάθαρο πού ανήκει κάθε αρχείο σε όλες τις προβολές.">Πλήρης διαδρομή αρχείου</lov-suggestion>
-</lov-actions>
+1. Στο `/clients/:id`, αμέσως κάτω από τον τίτλο εμφανίζεται strip με 9 stat cards.
+2. Hover σε κάθε section → εμφανίζεται grip handle + hide icon.
+3. Drag section από left στο right column → αποθηκεύεται και επιβιώνει refresh.
+4. Layout menu → toggle visibility και reset.
+5. Click `+` σε κάθε section → ανοίγει το αντίστοιχο create flow με προ-επιλεγμένο client.
+6. Responsive: mobile/tablet δείχνει stats strip σε 2-3 στήλες, sections σε single column (drag παραμένει active).
 

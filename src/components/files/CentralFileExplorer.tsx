@@ -879,6 +879,10 @@ export function CentralFileExplorer() {
         onDeleteFolder={handleDeleteFolder}
         onMoveFile={handleMoveFile}
         onMoveFolder={handleMoveFolder}
+        onMoveFiles={handleMoveFiles}
+        onMoveFolders={handleMoveFolders}
+        onDeleteFiles={handleDeleteFiles}
+        onDeleteFolders={handleDeleteFolders}
         canManage={canManage}
         loading={loading}
         uploading={uploading}

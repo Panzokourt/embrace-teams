@@ -16,6 +16,9 @@ export function StepConfirm({ summary, progress, done }: StepConfirmProps) {
   const pct = progress && progress.total > 0
     ? Math.round((progress.done / progress.total) * 100)
     : 0;
+  const folderPct = progress?.folderTotal
+    ? Math.round(((progress.folderDone ?? 0) / progress.folderTotal) * 100)
+    : 0;
 
   return (
     <div className="space-y-4">
@@ -28,25 +31,42 @@ export function StepConfirm({ summary, progress, done }: StepConfirmProps) {
           <span className="text-muted-foreground">Φάκελοι προς δημιουργία</span>
           <span className="font-medium tabular-nums">{summary.folderCount}</span>
         </div>
-        <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center justify-between gap-3 text-sm min-w-0">
           <span className="text-muted-foreground">Προορισμός</span>
-          <span className="font-medium truncate ml-3">{summary.destinationLabel}</span>
+          <span className="font-medium truncate min-w-0" title={summary.destinationLabel}>{summary.destinationLabel}</span>
         </div>
       </div>
 
       {progress && (
-        <div className="space-y-2">
+        <div className="space-y-3 min-w-0">
+          {!!progress.folderTotal && (
+            <div className="space-y-1.5">
+              <Progress value={folderPct} />
+              <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground min-w-0">
+                <span className="truncate min-w-0">
+                  {progress.phase === 'folders'
+                    ? progress.currentFolder ?? 'Δημιουργία δομής φακέλων…'
+                    : 'Η δομή φακέλων δημιουργήθηκε'}
+                </span>
+                <span className="tabular-nums shrink-0">
+                  {progress.folderDone ?? 0}/{progress.folderTotal}
+                </span>
+              </div>
+            </div>
+          )}
           <Progress value={pct} />
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span className="flex items-center gap-1.5 truncate">
+          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground min-w-0">
+            <span className="flex items-center gap-1.5 min-w-0 flex-1">
               {done ? (
                 <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
               ) : (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               )}
-              <span className="truncate">
+              <span className="truncate min-w-0" dir="rtl" title={progress.currentFile}>
                 {done
                   ? 'Ολοκληρώθηκε'
+                  : progress.phase === 'folders'
+                  ? 'Αναμονή για ανέβασμα αρχείων…'
                   : progress.currentFile ?? 'Προετοιμασία…'}
               </span>
             </span>

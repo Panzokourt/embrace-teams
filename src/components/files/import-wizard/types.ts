@@ -42,8 +42,12 @@ export interface ImportPlan {
 }
 
 export interface ImportProgress {
+  phase: 'folders' | 'files';
   total: number;
   done: number;
   currentFile?: string;
+  currentFolder?: string;
   failed: number;
+  folderTotal?: number;
+  folderDone?: number;
 }

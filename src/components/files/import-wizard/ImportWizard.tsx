@@ -441,7 +441,7 @@ export function ImportWizard({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !isImporting && onOpenChange(v)}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="w-[min(640px,calc(100vw-2rem))] max-w-none overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ImportIcon className="h-5 w-5" />
@@ -466,9 +466,14 @@ export function ImportWizard({
           ))}
         </div>
 
-        <div className="min-h-[280px]">
+        <div className="min-h-[340px] max-h-[60vh] overflow-y-auto overflow-x-hidden pr-1">
           {step === 0 && (
-            <StepSource files={files} onFilesChange={setFiles} />
+            <StepSource
+              files={files}
+              onFilesChange={setFiles}
+              preserveStructure={preserveStructure}
+              onPreserveStructureChange={setPreserveStructure}
+            />
           )}
           {step === 1 && (
             <StepDestination
@@ -496,7 +501,7 @@ export function ImportWizard({
             <StepConfirm
               summary={{
                 fileCount: files.length,
-                folderCount: newFolderCount,
+                folderCount: newFolderCount + (preserveStructure ? nestedFolderCount : 0),
                 destinationLabel,
               }}
               progress={progress}

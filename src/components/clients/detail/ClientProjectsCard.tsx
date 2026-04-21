@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { FolderKanban, ArrowRight } from 'lucide-react';
+import { FolderKanban, ArrowRight, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface Project {
@@ -34,8 +34,13 @@ export function ClientProjectsCard({ projects, clientId }: Props) {
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
             <FolderKanban className="h-4 w-4" /> Projects
+            <Badge variant="outline" className="text-xs ml-1">{projects.length}</Badge>
           </CardTitle>
-          <Badge variant="outline" className="text-xs">{projects.length}</Badge>
+          <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
+            <Link to={`/projects?new=true&client=${clientId}`}>
+              <Plus className="h-3.5 w-3.5 mr-1" /> New
+            </Link>
+          </Button>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">

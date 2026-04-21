@@ -89,7 +89,7 @@ async function importProjects(ctx: ExecutorContext): Promise<ImportSummary> {
     for (const name of missingNames) {
       const { data, error } = await supabase
         .from('clients')
-        .insert([{ name, company_id: ctx.companyId }])
+        .insert([{ name, company_id: ctx.companyId } as any])
         .select('id')
         .single();
       if (!error && data) {

@@ -1,96 +1,73 @@
 
 
-## Τι θα φτιάξουμε
+## Τι θα διορθώσουμε
 
-Νέο **Import Wizard** στη σελίδα Files που χειρίζεται μαζική εισαγωγή (από ένα αρχείο μέχρι ολόκληρο φάκελο με υποφακέλους), προτείνει έξυπνη συσχέτιση με υπάρχοντα έργα/πελάτες/φακέλους και δημιουργεί νέα entities επί τόπου όπου χρειάζεται.
+Δύο ξεχωριστά προβλήματα στο Import Wizard:
 
-## UX flow (4 βήματα)
+### A. UI σταθερότητα & υπερβολικό πλάτος
 
-```text
-[1 Επιλογή]  →  [2 Προορισμός]  →  [3 Αντιστοίχιση]  →  [4 Επιβεβαίωση]
- Files/Folder    Έργο / Πελάτης    AI suggestions      Preview & Import
-                  / Εταιρία         per top-folder
-```
+**Αιτία**: 
+- Το `DialogContent` έχει μόνο `sm:max-w-2xl` (max-width) χωρίς σταθερό πλάτος, οπότε το παράθυρο "αναπνέει" όταν αλλάζει το περιεχόμενο.
+- Στις λίστες αρχείων (StepSource & StepConfirm) τα `<span className="truncate">` βρίσκονται μέσα σε flex parent **χωρίς `min-w-0`**, άρα το `truncate` αγνοείται και τα μεγάλα paths σπρώχνουν το container πιο πλατύ → οριζόντιο scroll.
 
-### Βήμα 1 — Επιλογή πηγής
-- Drop zone + δύο κουμπιά: **"Επιλογή αρχείων"** και **"Επιλογή φακέλου"** (`webkitdirectory`).
-- Υποστήριξη drag-and-drop με `readDroppedItems` (υπάρχει ήδη στο `dropFolderReader.ts`) ώστε να δουλεύουν φάκελοι με υποφακέλους.
-- Live preview tree των επιλεγμένων αρχείων (πρώτα 50 + counter "και άλλα N").
+**Λύση**:
+1. **Σταθερό πλάτος dialog**: αλλαγή σε `w-[min(640px,calc(100vw-2rem))] max-w-none` στο `DialogContent` → ίδιο πλάτος σε όλα τα βήματα, responsive σε μικρές οθόνες.
+2. **Σταθερό ύψος content area**: το `<div className="min-h-[280px]">` γίνεται `min-h-[340px] max-h-[60vh] overflow-y-auto` ώστε όταν εμφανίζεται μεγάλη λίστα, scroll-άρει εσωτερικά αντί να μεγαλώνει το dialog.
+3. **Σωστό truncation των paths**: 
+   - StepSource list `<li>`: αλλαγή σε `flex items-center gap-2 min-w-0` στο parent + `flex-1 min-w-0 truncate` στο span. Ίδιο pattern στο StepConfirm currentFile.
+   - Επιπλέον `dir="rtl"` ή χρήση custom middle-truncation για paths (κρατάμε αρχή και τέλος, π.χ. `01. ΕΑΠ (...)/.../lifo.png`) ώστε ο χρήστης να βλέπει και το όνομα του αρχείου, όχι μόνο τους πρώτους χαρακτήρες.
+4. **Header/Stepper σταθερό**: το stepper bar μένει πάντα ορατό· τα steps γίνονται scroll-able εσωτερικά.
 
-### Βήμα 2 — Πού ανήκει
-Τρεις επιλογές με κάρτες (όπως στο `DestinationPickerDialog`):
-- **Σε Έργο** → dropdown έργων + κουμπί **"+ Νέο έργο"** που ανοίγει inline form (όνομα + προαιρετικός πελάτης). Αν επιλεγεί νέος πελάτης που δεν υπάρχει, προστίθεται κι αυτός inline.
-- **Σε Πελάτη** (χωρίς συγκεκριμένο έργο) → dropdown πελατών + **"+ Νέος πελάτης"**. Τα αρχεία πάνε σε auto-created project "{ClientName} – Γενικά" ή σε client-scoped folder ανάλογα με την επιλογή checkbox "Δημιούργησε project για αυτόν τον πελάτη".
-- **Στην Εταιρία** → dropdown company root folders (HR, Templates, κλπ.).
+### B. Διατήρηση υποφακέλων
 
-Τα νέα clients/projects δημιουργούνται μόλις ο χρήστης προχωρήσει στο επόμενο βήμα (όχι στο τέλος), ώστε να φαίνονται στο tree της αντιστοίχισης.
+**Αιτία**:
+1. Το βήμα Αντιστοίχισης δείχνει **μόνο τους top-level φακέλους** (στο case του χρήστη: 1 γραμμή `01. ΕΑΠ (2025-2026)`). Δεν είναι ξεκάθαρο ότι οι υπο-υπο-φάκελοι θα αναπαραχθούν αυτόματα — ο χρήστης νομίζει ότι θα χαθούν.
+2. **Race condition στο `ensureSubfolder`**: τρέχει με `UPLOAD_PARALLELISM = 8` παράλληλα, και για το ίδιο nested path (π.χ. `08. PROJECT MANAGEMENT/3. Δελτία Τύπου`) μπορούν 8 uploads να καλέσουν `INSERT` ταυτόχρονα πριν γεμίσει το cache → πολλαπλά διπλά folder records ή αποτυχίες constraint, με αποτέλεσμα τα αρχεία να καταλήγουν σε λάθος/null folder.
+3. Το `Φάκελοι προς δημιουργία: 1` στο Step 4 αναφέρει μόνο τους top-level — δεν δείχνει πόσοι nested θα δημιουργηθούν, οπότε ο χρήστης ανησυχεί.
 
-### Βήμα 3 — Αντιστοίχιση φακέλων (heart of the wizard)
-Εμφανίζεται **μόνο** αν η πηγή περιέχει υποφακέλους. Δείχνει πίνακα:
+**Λύση**:
 
-| Φάκελος πηγής | Προτεινόμενος προορισμός | Ενέργεια |
-|---|---|---|
-| `Συμβόλαια/` | 📁 Συμβόλαια & Συμβάσεις (existing) | [Match ▾] [Νέος] |
-| `Briefs 2024/` | 📁 Briefs (existing, fuzzy 87%) | [Match ▾] [Νέος] |
-| `Random/` | — δεν βρέθηκε | [Match ▾] [Νέος] |
+1. **Pre-compute όλης της δομής υποφακέλων** ΠΡΙΝ το upload:
+   - Νέα συνάρτηση `buildFolderTree(files)` που γυρίζει πλήρες tree με όλα τα μοναδικά paths (`08.PROJECT/3.Δελτία/8. Aitiseis september`).
+   - Στο Step Confirm, "Φάκελοι προς δημιουργία" δείχνει **σύνολο nested folders**, όχι μόνο top-level.
+   - Στο Step Mapping, κάτω από κάθε top-level row εμφανίζεται μικρό label `+N υποφάκελοι θα διατηρηθούν` (όταν preserveStructure = true), ώστε ο χρήστης να βλέπει ότι η ιεραρχία θα κρατηθεί.
 
-**Λογική προτάσεων** (client-side, χωρίς AI call):
-- Normalize ονομάτων (lowercase, αφαίρεση διακριτικών, trim αριθμών/ετών).
-- Έλεγχος έναντι (a) `DOCTYPE_FOLDER_MAP` ονομάτων (Συμβόλαια, Briefs, Προτάσεις, κλπ.), (b) folders από `project_folder_templates` του company, (c) υπάρχοντες φάκελοι του επιλεγμένου project/company.
-- Scoring: exact match → 100, contains → 70, Levenshtein-based fuzzy → 50-90. Threshold 60 για να εμφανιστεί ως "auto-suggest".
-- Default action: αν score ≥ 80 → "Match σε υπάρχον"· αλλιώς → "Δημιουργία νέου φακέλου με το ίδιο όνομα".
-- Ο χρήστης μπορεί να αλλάξει κάθε γραμμή χειροκίνητα.
+2. **Pre-create folders sequentially πριν τα uploads** (διορθώνει το race):
+   - Νέα φάση στο `runImport`: `await ensureAllFolders(tree, ...)` που δημιουργεί όλους τους φακέλους σειριακά (DFS), γεμίζει το `subfolderCache` με `relativePath → folderId`, και επιστρέφει το mapping.
+   - Στη συνέχεια τα παράλληλα uploads απλώς διαβάζουν το έτοιμο cache (`pathToFolderId.get(parentPath)`) — καμία εγγραφή folder κατά το upload phase.
+   - Το progress UI παίρνει νέα φάση: "Δημιουργία δομής φακέλων (X/Y)" πριν αρχίσει το "Ανέβασμα αρχείων".
 
-Επιπλέον: checkbox **"Διατήρηση δομής υποφακέλων"** (default ON) — αν OFF, όλα τα αρχεία πέφτουν επίπεδα στον προορισμό κάθε top-folder.
+3. **Preserve-structure ορατό στο Step 1**: το checkbox μετακινείται (αντίγραφο) και στο Step Source ως μόνιμη επιλογή με σαφές label, ώστε ο χρήστης να ξέρει εξαρχής τι θα γίνει.
 
-### Βήμα 4 — Επιβεβαίωση & Import
-- Summary: "X αρχεία, Y φάκελοι → προορισμός Z".
-- Progress bar ανά αρχείο κατά την εκτέλεση.
-- Reuse της υπάρχουσας `handleUploadFolder` λογικής αλλά με pre-resolved mapping (skip του destination picker και των auto-created folders όπου ταιριάζει).
-- Στο τέλος toast + redirect στον προορισμό μέσα στο Finder column view.
+4. **Tree preview στο Step Source**: αντί για flat λίστα paths, εμφάνιση συμπυκνωμένου tree (collapsed by default, expandable) με icons για folders και αρχεία. Δείχνει ξεκάθαρα ότι η δομή αναγνωρίστηκε. Παράδειγμα:
 
-## Είσοδος στο wizard
+   ```text
+   📁 01. ΕΑΠ (2025-2026)            186 αρχεία
+     📁 01. Social Media               45
+     📁 03. Δελτία Τύπου               87
+     📁 08. PROJECT MANAGEMENT         54
+   ```
 
-Νέο κουμπί **"Εισαγωγή"** (icon `Import` / `FolderInput`) στο toolbar του `CentralFileExplorer`, δίπλα στο type filter. Ανοίγει το wizard χωρίς preselection.
+   Toggle button "Δομή / Λίστα" για όποιον προτιμά την παλιά προβολή.
 
-Επίσης, αν ο χρήστης κάνει drag-and-drop **πάνω από 1 φάκελο ή >10 αρχεία** στο root level, ρωτάμε αν θέλει να ανοίξει το wizard αντί του απλού upload.
+## Αρχεία που αλλάζουν
 
-## Τεχνικές σημειώσεις
+- `src/components/files/import-wizard/ImportWizard.tsx` — σταθερό πλάτος/ύψος dialog· νέα `ensureAllFolders` φάση· progress φάσεις (folders → files)· σύνολο nested στο summary.
+- `src/components/files/import-wizard/StepSource.tsx` — `min-w-0` fixes, νέο tree-view component, preserve-structure checkbox, middle-truncation για paths.
+- `src/components/files/import-wizard/StepConfirm.tsx` — `min-w-0` fix στο currentFile· δείχνει 2 progress bars (folders, files) όταν χρειάζεται.
+- `src/components/files/import-wizard/StepMapping.tsx` — δείχνει nested folder count κάτω από κάθε mapping row.
+- `src/components/files/import-wizard/types.ts` — επέκταση `ImportProgress` με `phase: 'folders' | 'files'`.
 
-**Νέα αρχεία:**
-- `src/components/files/import-wizard/ImportWizard.tsx` — το main dialog (4 steps, state machine).
-- `src/components/files/import-wizard/StepSource.tsx` — file/folder picker + drop + tree preview.
-- `src/components/files/import-wizard/StepDestination.tsx` — έργο/πελάτης/εταιρία + inline create.
-- `src/components/files/import-wizard/StepMapping.tsx` — πίνακας αντιστοίχισης folders.
-- `src/components/files/import-wizard/StepConfirm.tsx` — summary + progress.
-- `src/components/files/import-wizard/folderMatcher.ts` — pure utility: `suggestFolderMatch(srcName, candidates)` με normalization + Levenshtein.
-- `src/components/files/import-wizard/types.ts` — shared types (`SourceFile`, `FolderMapping`, `ImportPlan`).
+## Τι ΔΕΝ αλλάζει
 
-**Αρχεία που αλλάζουν:**
-- `src/components/files/CentralFileExplorer.tsx` — προσθήκη κουμπιού "Εισαγωγή" στο toolbar + handler που εκτελεί το import plan (επανάχρηση `handleUploadFolder` logic ή refactor σε helper που δέχεται pre-built `folderMap`).
-- `src/utils/dropFolderReader.ts` — ήδη χρησιμοποιείται, καμία αλλαγή.
+- Η DB / RLS / edge functions.
+- Το flow των βημάτων (4 steps).
+- Η λογική fuzzy matching.
 
-**Reuse:**
-- `DestinationPickerDialog` λογική για το Step 2 (όχι το ίδιο component, μόνο το pattern).
-- `DOCTYPE_FOLDER_MAP` από `FileUploadWizard.tsx` ως πηγή προτεινόμενων ονομάτων.
-- `ensure_company_root_folders` RPC — ήδη τρέχει στο mount.
-- `project_folder_templates` table — fetched once για να μπει στις υποψήφιες αντιστοιχίσεις.
+## Verification
 
-**Inline create endpoints:**
-- Νέος πελάτης: `INSERT INTO clients { name, company_id }` με τα standard fields. Αν χρειάζεται περισσότερα required fields, ανοίγει inline mini-form.
-- Νέο έργο: `INSERT INTO projects { name, client_id, company_id, created_by, status: 'active' }`. Trigger υπάρχει ήδη που δημιουργεί τους template folders αυτόματα — άρα μετά το insert ξανα-fetch-άρουμε folders και τα νέα default folders εμφανίζονται στο Step 3 ως candidates.
-
-**Performance:**
-- Για >100 αρχεία: chunked upload (10 παράλληλα) με `Promise.all` σε batches.
-- Progress callback μέσω state setter ανά batch.
-
-**Validation guards:**
-- Εμπόδιο submit αν δεν έχουν επιλεγεί αρχεία.
-- Εμπόδιο αν "Σε Έργο" χωρίς project selection.
-- Confirmation αν >50 αρχεία ή >10 νέοι φάκελοι.
-
-## Εκτός scope (για επόμενο iteration)
-- AI-powered semantic suggestions (π.χ. "αυτό μοιάζει με τιμολόγιο του Alpha Bank") — μόνο rule-based fuzzy matching τώρα.
-- Conflict resolution για διπλά ονόματα αρχείων (overwrite/rename/skip prompt). Default: keep both (storage key έχει timestamp ήδη).
-- Background/resume για πολύ μεγάλα imports.
+1. Drag-drop ενός φακέλου με βαθιά ιεραρχία (όπως το `01. ΕΑΠ`) → το dialog διατηρεί σταθερό πλάτος, η λίστα εμφανίζει όλους τους φακέλους ως tree.
+2. Step 4 → "Φάκελοι προς δημιουργία: 23" (πραγματικός αριθμός), 2 progress bars.
+3. Άνοιγμα του Files μετά το import → όλη η ιεραρχία `01. ΕΑΠ/08. PROJECT MANAGEMENT/3. Δελτία Τύπου/8. Aitiseis september/...` υπάρχει με τα αρχεία στους σωστούς φακέλους.
+4. Δοκιμή σε narrow viewport (768px) → δεν εμφανίζεται horizontal scrollbar.
 

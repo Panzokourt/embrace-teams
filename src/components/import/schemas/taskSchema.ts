@@ -1,0 +1,78 @@
+import type { EntitySchema } from './types';
+
+export const taskSchema: EntitySchema = {
+  entity: 'tasks',
+  label: 'Tasks',
+  labelPlural: 'tasks',
+  fields: [
+    {
+      key: 'title',
+      label: 'Τίτλος',
+      required: true,
+      type: 'string',
+      aliases: ['title', 'task', 'name', 'όνομα', 'ονομα', 'τίτλος', 'τιτλος'],
+    },
+    {
+      key: 'project_name',
+      label: 'Όνομα έργου',
+      type: 'string',
+      fk: 'project',
+      hint: 'Αν δεν υπάρχει, μπορεί να δημιουργηθεί αυτόματα',
+      aliases: ['project', 'project_name', 'έργο', 'εργο'],
+    },
+    {
+      key: 'assigned_to_email',
+      label: 'Email αναθέτη',
+      type: 'email',
+      fk: 'user',
+      hint: 'Αν δεν βρεθεί, η εργασία παραμένει unassigned',
+      aliases: ['assigned_to', 'assignee', 'assigned_to_email', 'email', 'υπεύθυνος', 'υπευθυνος'],
+    },
+    {
+      key: 'status',
+      label: 'Κατάσταση',
+      type: 'enum',
+      enumValues: [
+        { value: 'todo', label: 'Προς Υλοποίηση' },
+        { value: 'in_progress', label: 'Σε Εξέλιξη' },
+        { value: 'review', label: 'Αναθεώρηση' },
+        { value: 'internal_review', label: 'Εσωτ. Έγκριση' },
+        { value: 'client_review', label: 'Έγκριση Πελάτη' },
+        { value: 'completed', label: 'Ολοκληρώθηκε' },
+      ],
+      aliases: ['status', 'κατάσταση', 'κατασταση'],
+    },
+    {
+      key: 'priority',
+      label: 'Προτεραιότητα',
+      type: 'enum',
+      enumValues: [
+        { value: 'low', label: 'Χαμηλή' },
+        { value: 'medium', label: 'Μέτρια' },
+        { value: 'high', label: 'Υψηλή' },
+        { value: 'urgent', label: 'Επείγουσα' },
+      ],
+      aliases: ['priority', 'προτεραιότητα', 'προτεραιοτητα'],
+    },
+    { key: 'start_date', label: 'Ημερομηνία έναρξης', type: 'date', aliases: ['start_date', 'start', 'έναρξη', 'εναρξη'] },
+    { key: 'due_date', label: 'Ημερομηνία λήξης', type: 'date', aliases: ['due_date', 'due', 'λήξη', 'ληξη', 'deadline'] },
+    {
+      key: 'estimated_hours',
+      label: 'Εκτιμώμενες ώρες',
+      type: 'number',
+      aliases: ['estimated_hours', 'hours', 'ώρες', 'ωρες', 'estimate'],
+    },
+    { key: 'description', label: 'Περιγραφή', type: 'string', aliases: ['description', 'περιγραφή', 'περιγραφη', 'notes'] },
+  ],
+  exampleRow: {
+    title: 'Σχεδιασμός νέου landing page',
+    project_name: 'Καμπάνια Άνοιξη 2026',
+    assigned_to_email: 'designer@acme.gr',
+    status: 'todo',
+    priority: 'high',
+    start_date: '2026-04-05',
+    due_date: '2026-04-20',
+    estimated_hours: 8,
+    description: 'Πρώτη έκδοση σε desktop & mobile',
+  },
+};

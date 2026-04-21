@@ -441,6 +441,37 @@ export function FinderColumnView({
     setSelectedItem(null);
   };
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (isInputTarget(e.target)) return;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        const columnIndex = path.length - 1;
+        const keys = getColumnItemKeys(columnIndex);
+        setSelection({ keys: new Set(keys), anchor: keys[0] ? { key: keys[0], columnIndex } : null });
+        return;
+      }
+      if (e.key === 'Escape') {
+        clearSelection();
+        return;
+      }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && canManage && selection.keys.size > 0) {
+        e.preventDefault();
+        setBulkDeleteOpen(true);
+        return;
+      }
+      if (e.code === 'Space' && selectedItem?.kind === 'file' && selection.keys.size <= 1 && !previewOpen) {
+        e.preventDefault();
+        setPreviewOpen(true);
+      }
+    };
+    const el = containerRef.current;
+    if (el) {
+      el.addEventListener('keydown', handler);
+      return () => el.removeEventListener('keydown', handler);
+    }
+  }, [selectedItem, previewOpen, selection.keys.size, canManage, path.length, getColumnItemKeys, clearSelection]);
+
   const breadcrumb = useMemo(() => {
     const items: { id: string | null; name: string }[] = [
       { id: null, name: 'Αρχεία' },

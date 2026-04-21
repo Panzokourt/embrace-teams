@@ -52,6 +52,14 @@ interface ImportWizardProps {
 const STEPS = ['Επιλογή', 'Προορισμός', 'Αντιστοίχιση', 'Επιβεβαίωση'] as const;
 
 const UPLOAD_PARALLELISM = 8;
+const SYSTEM_FILE_NAMES = new Set(['.ds_store', 'thumbs.db', 'desktop.ini']);
+
+function isSystemSourceFile(path: string): boolean {
+  return path
+    .split('/')
+    .filter(Boolean)
+    .some((part) => part.toLowerCase() === '__macosx' || SYSTEM_FILE_NAMES.has(part.toLowerCase()));
+}
 
 export function ImportWizard({
   open,
@@ -76,7 +84,7 @@ export function ImportWizard({
   useEffect(() => {
     if (open) {
       setStep(0);
-      setFiles(initialFiles ?? []);
+      setFiles((initialFiles ?? []).filter((file) => !isSystemSourceFile(file.relativePath)));
       setDestination(null);
       setMappings([]);
       setPreserveStructure(true);

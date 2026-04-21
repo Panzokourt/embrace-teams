@@ -45,8 +45,25 @@ function matchesTypeFilter(contentType: string | null, filter: FileTypeFilter): 
   }
 }
 
+const SYSTEM_FILE_NAMES = new Set(['.ds_store', 'thumbs.db', 'desktop.ini']);
+
+function isSystemFileName(pathOrName: string): boolean {
+  const parts = pathOrName.split('/').filter(Boolean);
+  return parts.some((part) => {
+    const lower = part.toLowerCase();
+    return lower === '__macosx' || SYSTEM_FILE_NAMES.has(lower);
+  });
+}
+
 const isVirtualId = (id: string | null | undefined): boolean =>
-  !!id && (id.startsWith('vp-') || id.startsWith('vc-') || id.startsWith('vd-') || id.startsWith('vco-') || id === 'vco-root');
+  !!id && (
+    id.startsWith('vp-') ||
+    id.startsWith('vc-') ||
+    id.startsWith('vd-') ||
+    id.startsWith('vco-') ||
+    id.startsWith('lens:') ||
+    id === 'vco-root'
+  );
 
 interface ClientInfo { id: string; name: string }
 interface ProjectInfo { id: string; name: string; client_id?: string | null }
@@ -158,139 +175,167 @@ export function CentralFileExplorer() {
     return false;
   }, [folders]);
 
-  // Build virtual folders for grouped views
+  const visibleFiles = useMemo(
+    () => typeFilteredFiles.filter((file) => !isSystemFileName(file.file_name)),
+    [typeFilteredFiles]
+  );
+
+  // Build lens-based folders for every grouped view while preserving real hierarchy.
   const { virtualFolders, virtualFiles } = useMemo(() => {
     const vFolders: FileFolder[] = [];
     const vFiles: FileAttachment[] = [];
+    const folderById = new Map(folders.map((folder) => [folder.id, folder]));
+
+    const makeGroup = (id: string, name: string, parent_folder_id: string | null = null) => ({
+      id,
+      name,
+      parent_folder_id,
+      created_by: '',
+      created_at: '',
+      color: null,
+    } as FileFolder);
+
+    const cloneFolderBranch = (folder: FileFolder, parentId: string | null, lensPrefix?: string): FileFolder => {
+      const cloneId = lensPrefix ? `${lensPrefix}:${folder.id}` : folder.id;
+      const clone = {
+        ...folder,
+        id: cloneId,
+        parent_folder_id: parentId,
+        original_id: folder.id,
+      } as FileFolder;
+      vFolders.push(clone);
+      return clone;
+    };
+
+    const addFolderAncestors = (folderId: string | null, rootParentId: string, lensPrefix?: string): string | null => {
+      if (!folderId) return rootParentId;
+      const chain: FileFolder[] = [];
+      let current = folderById.get(folderId);
+      while (current) {
+        chain.unshift(current);
+        current = current.parent_folder_id ? folderById.get(current.parent_folder_id) : undefined;
+      }
+
+      let parent = rootParentId;
+      for (const folder of chain) {
+        const cloneId = lensPrefix ? `${lensPrefix}:${folder.id}` : folder.id;
+        if (!vFolders.some((existing) => existing.id === cloneId)) {
+          cloneFolderBranch(folder, parent, lensPrefix);
+        }
+        parent = cloneId;
+      }
+      return parent;
+    };
 
     if (viewMode === 'company') {
-      // Pure company view: real company-scoped folders + files
       const companyFolders = folders.filter(
         (f) => (f as any).company_id && !(f as any).project_id && !(f as any).tender_id
       );
       vFolders.push(...companyFolders);
+      visibleFiles.forEach((f) => {
+        if ((f as any).company_id && !(f as any).project_id) vFiles.push(f);
+      });
+    } else if (viewMode === 'by-project') {
+      const projectIds = new Set(visibleFiles.map((f) => f.project_id).filter(Boolean) as string[]);
 
-      typeFilteredFiles.forEach((f) => {
-        if ((f as any).company_id && !(f as any).project_id) {
-          vFiles.push(f);
-        }
+      projects.forEach((project) => {
+        if (!projectIds.has(project.id)) return;
+        const projectRootId = `vp-${project.id}`;
+        vFolders.push(makeGroup(projectRootId, project.name));
+
+        folders
+          .filter((folder) => (folder as any).project_id === project.id)
+          .forEach((folder) => {
+            if (folder.parent_folder_id) return;
+            cloneFolderBranch(folder, projectRootId);
+          });
+
+        folders
+          .filter((folder) => (folder as any).project_id === project.id && folder.parent_folder_id)
+          .forEach((folder) => vFolders.push(folder));
+      });
+
+      visibleFiles.forEach((file) => {
+        if (!file.project_id) return;
+        if (file.folder_id && folderById.has(file.folder_id)) vFiles.push(file);
+        else vFiles.push({ ...file, folder_id: `vp-${file.project_id}` });
       });
     } else if (viewMode === 'by-client') {
-      const clientIds = new Set(typeFilteredFiles.map((f) => f.project_id).filter(Boolean));
-      const projectClientMap = new Map(projects.map((p) => [p.id, p.client_id]));
-      const relevantClientIds = new Set<string>();
-      
-      clientIds.forEach((pid) => {
-        const clientId = projectClientMap.get(pid!);
-        if (clientId) relevantClientIds.add(clientId);
+      const projectById = new Map(projects.map((project) => [project.id, project]));
+      const clientIds = new Set<string>();
+      visibleFiles.forEach((file) => {
+        const clientId = file.project_id ? projectById.get(file.project_id)?.client_id : null;
+        if (clientId) clientIds.add(clientId);
       });
 
       clients.forEach((client) => {
-        if (relevantClientIds.has(client.id)) {
-          vFolders.push({
-            id: `vc-${client.id}`,
-            name: client.name,
-            parent_folder_id: null,
-            created_by: '',
-            created_at: '',
-            color: null,
-          } as FileFolder);
-        }
-      });
+        if (!clientIds.has(client.id)) return;
+        const clientRootId = `vc-${client.id}`;
+        vFolders.push(makeGroup(clientRootId, client.name));
 
-      typeFilteredFiles.forEach((f) => {
-        if (f.project_id) {
-          const clientId = projectClientMap.get(f.project_id);
-          if (clientId) {
-            vFiles.push({ ...f, folder_id: `vc-${clientId}` });
-            return;
-          }
-        }
-        // Skip pure company files in client view
-        if (!(f as any).company_id) {
-          vFiles.push({ ...f, folder_id: null });
-        }
-      });
-    } else if (viewMode === 'by-project') {
-      const projectIds = new Set(typeFilteredFiles.map((f) => f.project_id).filter(Boolean));
-
-      const projectFoldersMap = new Map<string, FileFolder[]>();
-      folders.forEach((f) => {
-        const pid = (f as any).project_id;
-        if (pid && projectIds.has(pid)) {
-          if (!projectFoldersMap.has(pid)) projectFoldersMap.set(pid, []);
-          projectFoldersMap.get(pid)!.push(f);
-        }
-      });
-
-      projects.forEach((project) => {
-        if (projectIds.has(project.id)) {
-          const vpId = `vp-${project.id}`;
-          vFolders.push({
-            id: vpId,
-            name: project.name,
-            parent_folder_id: null,
-            created_by: '',
-            created_at: '',
-            color: null,
-          } as FileFolder);
-
-          const realFolders = projectFoldersMap.get(project.id) || [];
-          realFolders.forEach((rf) => {
-            if (!rf.parent_folder_id) {
-              vFolders.push({
-                ...rf,
-                id: rf.id,
-                parent_folder_id: vpId,
-              } as FileFolder);
-            } else {
-              vFolders.push(rf);
-            }
+        projects
+          .filter((project) => project.client_id === client.id && visibleFiles.some((file) => file.project_id === project.id))
+          .forEach((project) => {
+            const projectRootId = `vp-${project.id}`;
+            vFolders.push(makeGroup(projectRootId, project.name, clientRootId));
+            folders
+              .filter((folder) => (folder as any).project_id === project.id)
+              .forEach((folder) => {
+                const parentId = folder.parent_folder_id ?? projectRootId;
+                vFolders.push({ ...folder, parent_folder_id: parentId } as FileFolder);
+              });
           });
-        }
       });
 
-      typeFilteredFiles.forEach((f) => {
-        if (f.project_id) {
-          if (f.folder_id && folders.some(fl => fl.id === f.folder_id)) {
-            vFiles.push(f);
-          } else {
-            vFiles.push({ ...f, folder_id: `vp-${f.project_id}` });
-          }
-        } else if (!(f as any).company_id) {
-          vFiles.push({ ...f, folder_id: null });
-        }
+      visibleFiles.forEach((file) => {
+        if (!file.project_id) return;
+        if (file.folder_id && folderById.has(file.folder_id)) vFiles.push(file);
+        else vFiles.push({ ...file, folder_id: `vp-${file.project_id}` });
       });
     } else if (viewMode === 'by-date') {
+      const projectById = new Map(projects.map((project) => [project.id, project]));
       const monthGroups = new Map<string, string>();
-      typeFilteredFiles.forEach((f) => {
-        const date = new Date(f.created_at);
+      visibleFiles.forEach((file) => {
+        const date = new Date(file.created_at);
         const key = format(date, 'yyyy-MM');
-        if (!monthGroups.has(key)) {
-          monthGroups.set(key, format(date, 'LLLL yyyy', { locale: el }));
-        }
+        if (!monthGroups.has(key)) monthGroups.set(key, format(date, 'LLLL yyyy', { locale: el }));
       });
 
-      const sortedMonths = [...monthGroups.entries()].sort((a, b) => b[0].localeCompare(a[0], 'el', { numeric: true }));
-      sortedMonths.forEach(([key, label]) => {
-        vFolders.push({
-          id: `vd-${key}`,
-          name: label.charAt(0).toUpperCase() + label.slice(1),
-          parent_folder_id: null,
-          created_by: '',
-          created_at: '',
-          color: null,
-        } as FileFolder);
-      });
+      [...monthGroups.entries()]
+        .sort((a, b) => b[0].localeCompare(a[0], 'el', { numeric: true }))
+        .forEach(([monthKey, label]) => {
+          const monthRootId = `vd-${monthKey}`;
+          vFolders.push(makeGroup(monthRootId, label.charAt(0).toUpperCase() + label.slice(1)));
 
-      typeFilteredFiles.forEach((f) => {
-        const key = format(new Date(f.created_at), 'yyyy-MM');
-        vFiles.push({ ...f, folder_id: `vd-${key}` });
-      });
+          const monthFiles = visibleFiles.filter((file) => format(new Date(file.created_at), 'yyyy-MM') === monthKey);
+          const roots = new Map<string, { id: string; label: string; projectId: string | null }>();
+          monthFiles.forEach((file) => {
+            if (file.project_id) {
+              const project = projectById.get(file.project_id);
+              roots.set(`project:${file.project_id}`, {
+                id: `vd-${monthKey}-project-${file.project_id}`,
+                label: project?.name ?? 'Χωρίς έργο',
+                projectId: file.project_id,
+              });
+            } else if ((file as any).company_id) {
+              roots.set('company', { id: `vd-${monthKey}-company`, label: 'Εταιρικά', projectId: null });
+            }
+          });
+
+          roots.forEach((root) => vFolders.push(makeGroup(root.id, root.label, monthRootId)));
+
+          monthFiles.forEach((file) => {
+            const root = file.project_id ? roots.get(`project:${file.project_id}`) : roots.get('company');
+            if (!root) return;
+            const lensPrefix = `lens:${monthKey}:${root.projectId ?? 'company'}`;
+            const folderId = addFolderAncestors(file.folder_id, root.id, lensPrefix);
+            vFiles.push({ ...file, folder_id: folderId });
+          });
+        });
     }
 
     return { virtualFolders: vFolders, virtualFiles: vFiles };
-  }, [viewMode, typeFilteredFiles, folders, clients, projects]);
+  }, [viewMode, visibleFiles, folders, clients, projects]);
 
   // ============================================================
   // Destination resolution
@@ -300,6 +345,12 @@ export function CentralFileExplorer() {
     async (
       target: string | null
     ): Promise<{ scope: 'project' | 'company'; projectId: string | null; folderId: string | null } | null> => {
+      // Lens cloned folder → resolve to the original real folder id
+      if (target?.startsWith('lens:')) {
+        const realFolderId = target.split(':').pop() ?? null;
+        return resolveDestination(realFolderId);
+      }
+
       // Case 1: real folder UUID
       if (target && !isVirtualId(target)) {
         const folder = folders.find((f) => f.id === target);
@@ -527,7 +578,8 @@ export function CentralFileExplorer() {
 
     setUploading(true);
     try {
-      for (const file of Array.from(selectedFiles)) {
+      const uploadFiles = Array.from(selectedFiles).filter((file) => !isSystemFileName(file.name));
+      for (const file of uploadFiles) {
         const fileName = createProjectFilesObjectKey({ userId: user.id, originalName: file.name });
         const { error: uploadError } = await supabase.storage.from('project-files').upload(fileName, file);
         if (uploadError) throw uploadError;
@@ -566,12 +618,12 @@ export function CentralFileExplorer() {
 
     setUploading(true);
     try {
-      const entries: Array<{ file: File; relativePath: string }> = Array.isArray(fileList)
+      const entries: Array<{ file: File; relativePath: string }> = (Array.isArray(fileList)
         ? fileList
         : Array.from(fileList).map((file) => ({
             file,
             relativePath: (file as any).webkitRelativePath || file.name,
-          }));
+          }))).filter((entry) => !isSystemFileName(entry.relativePath));
 
       const folderMap = new Map<string, string>();
 
@@ -863,7 +915,7 @@ export function CentralFileExplorer() {
         </Button>
 
         <span className="text-xs text-muted-foreground ml-auto">
-          {virtualFiles.length} αρχεί{virtualFiles.length === 1 ? 'ο' : 'α'}
+          {visibleFiles.length} αρχεί{visibleFiles.length === 1 ? 'ο' : 'α'}
         </span>
       </div>
 

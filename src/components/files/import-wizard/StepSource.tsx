@@ -27,7 +27,12 @@ function fromFileList(list: FileList): SourceFile[] {
   }));
 }
 
-export function StepSource({ files, onFilesChange }: StepSourceProps) {
+export function StepSource({
+  files,
+  onFilesChange,
+  preserveStructure,
+  onPreserveStructureChange,
+}: StepSourceProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);

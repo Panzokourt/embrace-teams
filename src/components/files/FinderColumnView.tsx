@@ -419,6 +419,42 @@ export function FinderColumnView({
     return moveFolders.filter((f) => !f.id.startsWith('vc-') && !f.id.startsWith('vp-') && !f.id.startsWith('vd-'));
   }, [moveFolders]);
 
+  const selectedKeys = selection.keys;
+  const selectedFiles = useMemo(
+    () => filteredFiles.filter((file) => selectedKeys.has(`file:${file.id}` as SelectionKey)),
+    [filteredFiles, selectedKeys]
+  );
+  const selectedFolders = useMemo(
+    () => folders.filter((folder) => selectedKeys.has(`folder:${folder.id}` as SelectionKey) && !folder.id.startsWith('vc-') && !folder.id.startsWith('vp-') && !folder.id.startsWith('vd-')),
+    [folders, selectedKeys]
+  );
+  const selectedCount = selectedFiles.length + selectedFolders.length;
+
+  const downloadFiles = async (downloadList: FileAttachment[]) => {
+    for (const file of downloadList) {
+      await handleDownload(file);
+      if (downloadList.length > 1) await new Promise((resolve) => window.setTimeout(resolve, 150));
+    }
+  };
+
+  const moveSelectionTo = async (folderId: string | null) => {
+    if (selectedFolders.some((folder) => folder.id === folderId || isFolderDescendant(folderId, folder.id))) {
+      toast.error('Δεν μπορείς να μετακινήσεις φάκελο μέσα στον εαυτό του');
+      return;
+    }
+    if (selectedFiles.length && onMoveFiles) await onMoveFiles(selectedFiles.map((file) => file.id), folderId);
+    if (selectedFolders.length && onMoveFolders) await onMoveFolders(selectedFolders.map((folder) => folder.id), folderId);
+    clearSelection();
+  };
+
+  const confirmBulkDelete = async () => {
+    if (selectedFiles.length && onDeleteFiles) await onDeleteFiles(selectedFiles);
+    if (selectedFolders.length && onDeleteFolders) await onDeleteFolders(selectedFolders.map((folder) => folder.id));
+    setBulkDeleteOpen(false);
+    clearSelection();
+    setSelectedItem(null);
+  };
+
   const breadcrumb = useMemo(() => {
     const items: { id: string | null; name: string }[] = [
       { id: null, name: 'Αρχεία' },

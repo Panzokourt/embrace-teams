@@ -34,6 +34,7 @@ import { UnifiedViewToggle, usePersistedViewMode, type UnifiedViewMode } from '@
 import { TasksTableView } from '@/components/tasks/TasksTableView';
 import { TaskGanttView } from '@/components/tasks/TaskGanttView';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { ImportWizard } from '@/components/import/ImportWizard';
 import { toast } from 'sonner';
 import { 
   CheckSquare, 
@@ -48,6 +49,7 @@ import {
   GripVertical,
   Pencil,
   Trash2,
+  Upload,
 } from 'lucide-react';
 import { format, isPast, isToday } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -135,6 +137,7 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
   const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -842,6 +845,13 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
               onViewModeChange={setViewMode}
               showGantt
             />
+
+            {canManage && !embedded && (
+              <Button variant="outline" onClick={() => setImportOpen(true)}>
+                <Upload className="h-4 w-4 mr-2" />
+                Μαζική Εισαγωγή
+              </Button>
+            )}
 
             {canManage && (
               <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>

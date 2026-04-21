@@ -131,6 +131,10 @@ export function FinderColumnView({
   onDeleteFolder,
   onMoveFile,
   onMoveFolder,
+  onMoveFiles,
+  onMoveFolders,
+  onDeleteFiles,
+  onDeleteFolders,
   canManage,
   loading,
   uploading,
@@ -138,6 +142,7 @@ export function FinderColumnView({
 }: FinderColumnViewProps) {
   const [path, setPath] = useState<(string | null)[]>([null]);
   const [selectedItem, setSelectedItem] = useState<ColumnItem | null>(null);
+  const [selection, setSelection] = useState<SelectionState>({ keys: new Set(), anchor: null });
   const [creatingInColumn, setCreatingInColumn] = useState<number | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
   const [dragOverColumn, setDragOverColumn] = useState<number | null>(null);
@@ -145,6 +150,7 @@ export function FinderColumnView({
   const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);

@@ -572,7 +572,8 @@ export function CentralFileExplorer() {
 
     setUploading(true);
     try {
-      for (const file of Array.from(selectedFiles)) {
+      const uploadFiles = Array.from(selectedFiles).filter((file) => !isSystemFileName(file.name));
+      for (const file of uploadFiles) {
         const fileName = createProjectFilesObjectKey({ userId: user.id, originalName: file.name });
         const { error: uploadError } = await supabase.storage.from('project-files').upload(fileName, file);
         if (uploadError) throw uploadError;
@@ -611,12 +612,12 @@ export function CentralFileExplorer() {
 
     setUploading(true);
     try {
-      const entries: Array<{ file: File; relativePath: string }> = Array.isArray(fileList)
+      const entries: Array<{ file: File; relativePath: string }> = (Array.isArray(fileList)
         ? fileList
         : Array.from(fileList).map((file) => ({
             file,
             relativePath: (file as any).webkitRelativePath || file.name,
-          }));
+          }))).filter((entry) => !isSystemFileName(entry.relativePath));
 
       const folderMap = new Map<string, string>();
 

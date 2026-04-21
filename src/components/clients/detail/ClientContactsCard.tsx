@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { BookUser, Mail, Phone, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -14,16 +15,26 @@ interface Contact {
 
 interface Props {
   contacts: Contact[];
+  clientId?: string;
   onEdit?: () => void;
 }
 
-export function ClientContactsCard({ contacts, onEdit }: Props) {
+export function ClientContactsCard({ contacts, clientId, onEdit }: Props) {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <BookUser className="h-4 w-4" /> Client Contacts
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <BookUser className="h-4 w-4" /> Client Contacts
+          </CardTitle>
+          {clientId && (
+            <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
+              <Link to={`/contacts?new=true&client=${clientId}`}>
+                <Plus className="h-3.5 w-3.5 mr-1" /> New
+              </Link>
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-2">
         {contacts.length === 0 ? (

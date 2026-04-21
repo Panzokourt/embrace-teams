@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Megaphone, ArrowRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Megaphone, ArrowRight, Plus } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 
 interface MediaPlan {
   id: string;
@@ -59,14 +60,22 @@ export function ClientMediaPlansCard({ clientId }: { clientId: string }) {
 
   return (
     <Card>
-      <CardContent className="p-5 space-y-3">
-        <div className="flex items-center gap-2">
-          <Megaphone className="h-4 w-4 text-muted-foreground" />
-          <p className="text-sm font-semibold">Media Plans</p>
-          {plans.length > 0 && (
-            <Badge variant="secondary" className="text-[10px]">{plans.length}</Badge>
-          )}
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Megaphone className="h-4 w-4" /> Media Plans
+            {plans.length > 0 && (
+              <Badge variant="outline" className="text-xs ml-1">{plans.length}</Badge>
+            )}
+          </CardTitle>
+          <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
+            <Link to={`/media-planning?new=true&client=${clientId}`}>
+              <Plus className="h-3.5 w-3.5 mr-1" /> New
+            </Link>
+          </Button>
         </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
 
         {plans.length === 0 ? (
           <p className="text-xs text-muted-foreground py-2">Δεν υπάρχουν media plans</p>

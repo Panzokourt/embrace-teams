@@ -6,9 +6,17 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Building2, Loader2 } from 'lucide-react';
 import { startOfYear, startOfWeek, endOfWeek, isBefore } from 'date-fns';
+import {
+  DndContext, DragEndEvent, PointerSensor, useSensor, useSensors, closestCorners,
+} from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 
 import { ClientForm } from '@/components/clients/ClientForm';
 import { ClientSmartHeader } from '@/components/clients/detail/ClientSmartHeader';
+import { ClientStatsStrip } from '@/components/clients/detail/ClientStatsStrip';
+import { ClientLayoutMenu } from '@/components/clients/detail/ClientLayoutMenu';
+import { DraggableSection } from '@/components/clients/detail/DraggableSection';
+import { DroppableColumn } from '@/components/dnd/DroppableColumn';
 import { ClientWebsitesCard } from '@/components/clients/detail/ClientWebsitesCard';
 import { ClientBusinessInfoCard } from '@/components/clients/detail/ClientBusinessInfoCard';
 import { ClientSocialCard } from '@/components/clients/detail/ClientSocialCard';
@@ -22,11 +30,13 @@ import { ClientContactsCard } from '@/components/clients/detail/ClientContactsCa
 import { ClientFilesCard } from '@/components/clients/detail/ClientFilesCard';
 import { ClientMediaPlansCard } from '@/components/clients/detail/ClientMediaPlansCard';
 import { ClientPLSummary } from '@/components/clients/detail/ClientPLSummary';
+import { useClientDetailLayout } from '@/hooks/useClientDetailLayout';
 
 export default function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isAdmin, isManager } = useAuth();
+  const canEdit = isAdmin || isManager;
   const [loading, setLoading] = useState(true);
   const [client, setClient] = useState<any>(null);
   const [projects, setProjects] = useState<any[]>([]);
@@ -36,6 +46,11 @@ export default function ClientDetailPage() {
   const [briefs, setBriefs] = useState<any[]>([]);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [editOpen, setEditOpen] = useState(false);
+
+  const { layout, leftSections, rightSections, toggleVisibility, hideSection, resetLayout, moveSection } =
+    useClientDetailLayout();
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   useEffect(() => {
     if (id) fetchAll();
@@ -50,7 +65,6 @@ export default function ClientDetailPage() {
     if (!id) return;
     setLoading(true);
     try {
-      // Fetch client
       const { data: clientData, error } = await supabase
         .from('clients')
         .select('*')
@@ -59,7 +73,6 @@ export default function ClientDetailPage() {
       if (error) throw error;
       setClient(clientData);
 
-      // Parallel fetches
       const [projectsRes, contactsRes, briefsRes, invoicesRes] = await Promise.all([
         supabase.from('projects').select('id, name, status, progress, budget, start_date, end_date')
           .eq('client_id', id).order('created_at', { ascending: false }),
@@ -77,7 +90,6 @@ export default function ClientDetailPage() {
       setBriefs(briefsRes.data || []);
       setInvoices(invoicesRes.data || []);
 
-      // Fetch tasks for these projects
       if (prjs.length > 0) {
         const projectIds = prjs.map(p => p.id);
         const { data: tasksData } = await supabase
@@ -86,7 +98,6 @@ export default function ClientDetailPage() {
           .in('project_id', projectIds);
         setTasks(tasksData || []);
 
-        // Fetch team members via project_user_access
         const { data: accessData } = await supabase
           .from('project_user_access')
           .select('user_id')
@@ -131,10 +142,14 @@ export default function ClientDetailPage() {
   }, [revenueThisYear]);
 
   const totalBudget = useMemo(() => projects.reduce((s, p) => s + (p.budget || 0), 0), [projects]);
-  const totalCost = useMemo(() => invoices.reduce((s, i) => s + Number(i.amount), 0), [invoices]);
-  const marginPercent = totalBudget > 0 ? Math.round(((totalBudget - totalCost) / totalBudget) * 100) : 0;
+  const invoicedTotal = useMemo(() => invoices.reduce((s, i) => s + Number(i.amount), 0), [invoices]);
+  const collectedTotal = useMemo(
+    () => invoices.filter(i => i.paid).reduce((s, i) => s + Number(i.amount), 0),
+    [invoices]
+  );
+  const outstandingTotal = invoicedTotal - collectedTotal;
+  const marginPercent = totalBudget > 0 ? Math.round(((totalBudget - invoicedTotal) / totalBudget) * 100) : 0;
 
-  // Task snapshots
   const overdueTasks = tasks.filter(t => t.status !== 'done' && t.due_date && isBefore(new Date(t.due_date), now)).length;
   const dueThisWeek = tasks.filter(t => {
     if (t.status === 'done' || !t.due_date) return false;
@@ -149,6 +164,44 @@ export default function ClientDetailPage() {
   const additionalWebsites = Array.isArray(client?.additional_websites) ? client.additional_websites : [];
   const strategy = (client?.strategy && typeof client.strategy === 'object' && !Array.isArray(client.strategy))
     ? client.strategy : {};
+
+  const renderSection = (sectionId: string) => {
+    if (!client) return null;
+    switch (sectionId) {
+      case 'business_info':
+        return <ClientBusinessInfoCard client={client} canEdit={canEdit} onRefresh={fetchAll} onClientUpdated={handleClientPatched} />;
+      case 'websites':
+        return <ClientWebsitesCard clientId={client.id} clientName={client.name} taxId={client.tax_id} primaryWebsite={client.website} additionalWebsites={additionalWebsites} canEdit={canEdit} onRefresh={fetchAll} onClientUpdated={handleClientPatched} />;
+      case 'social':
+        return <ClientSocialCard clientId={client.id} accounts={socialAccounts} canEdit={canEdit} onClientUpdated={handleClientPatched} />;
+      case 'ad_accounts':
+        return <ClientAdAccountsCard accounts={adAccounts} onEdit={() => setEditOpen(true)} />;
+      case 'strategy':
+        return <ClientStrategyCard strategy={strategy} onEdit={() => setEditOpen(true)} />;
+      case 'pl_summary':
+        return <ClientPLSummary invoices={invoices} totalBudget={totalBudget} />;
+      case 'projects':
+        return <ClientProjectsCard projects={projects} clientId={client.id} />;
+      case 'media_plans':
+        return <ClientMediaPlansCard clientId={client.id} />;
+      case 'tasks_snapshot':
+        return <ClientTasksSnapshot overdue={overdueTasks} dueThisWeek={dueThisWeek} open={openTasks} />;
+      case 'briefs':
+        return <ClientBriefsCard briefs={briefs} clientId={client.id} />;
+      case 'team':
+        return <ClientTeamCard members={teamMembers} onEdit={() => setEditOpen(true)} />;
+      case 'contacts':
+        return <ClientContactsCard contacts={contacts} clientId={client.id} onEdit={() => setEditOpen(true)} />;
+      default:
+        return null;
+    }
+  };
+
+  const handleDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    moveSection(String(active.id), String(over.id));
+  };
 
   if (loading) {
     return (
@@ -168,64 +221,71 @@ export default function ClientDetailPage() {
     );
   }
 
+  const leftIds = leftSections.map(s => s.id);
+  const rightIds = rightSections.map(s => s.id);
+
   return (
     <div className="p-6 lg:p-8 space-y-6 max-w-[1400px] mx-auto">
       {/* SECTION 1 — Smart Header */}
       <ClientSmartHeader
         client={client}
-        revenueThisYear={revenueThisYear}
-        monthlyRevenue={monthlyRevenue}
-        marginPercent={marginPercent}
-        canEdit={isAdmin || isManager}
+        canEdit={canEdit}
         onEdit={() => setEditOpen(true)}
         onRefresh={fetchAll}
         onClientUpdated={handleClientPatched}
+        layoutMenu={
+          <ClientLayoutMenu
+            layout={layout}
+            onToggle={toggleVisibility}
+            onReset={resetLayout}
+          />
+        }
       />
 
-      {/* SECTION 2 — Main Grid */}
-      <div className="grid grid-cols-12 gap-6">
-        {/* Left Column — Business & Strategy */}
-        <div className="col-span-12 lg:col-span-7 space-y-6">
-          <ClientBusinessInfoCard
-            client={client}
-            canEdit={isAdmin || isManager}
-            onRefresh={fetchAll}
-            onClientUpdated={handleClientPatched}
-          />
-          <ClientWebsitesCard
-            clientId={client.id}
-            clientName={client.name}
-            taxId={client.tax_id}
-            primaryWebsite={client.website}
-            additionalWebsites={additionalWebsites}
-            canEdit={isAdmin || isManager}
-            onRefresh={fetchAll}
-            onClientUpdated={handleClientPatched}
-          />
-          <ClientSocialCard
-            clientId={client.id}
-            accounts={socialAccounts}
-            canEdit={isAdmin || isManager}
-            onClientUpdated={handleClientPatched}
-          />
-          <ClientAdAccountsCard accounts={adAccounts} onEdit={() => setEditOpen(true)} />
-          <ClientStrategyCard strategy={strategy} onEdit={() => setEditOpen(true)} />
-        </div>
+      {/* SECTION 2 — Stats Strip */}
+      <ClientStatsStrip
+        revenueThisYear={revenueThisYear}
+        monthlyRevenue={monthlyRevenue}
+        marginPercent={marginPercent}
+        invoiced={invoicedTotal}
+        collected={collectedTotal}
+        outstanding={outstandingTotal}
+        overdueTasks={overdueTasks}
+        dueThisWeek={dueThisWeek}
+        openTasks={openTasks}
+      />
 
-        {/* Right Column — Execution & People */}
-          <div className="col-span-12 lg:col-span-5 space-y-6">
-            <ClientPLSummary invoices={invoices} totalBudget={totalBudget} />
-            <ClientProjectsCard projects={projects} clientId={client.id} />
-            <ClientMediaPlansCard clientId={client.id} />
-            <ClientTasksSnapshot overdue={overdueTasks} dueThisWeek={dueThisWeek} open={openTasks} />
-            <ClientBriefsCard briefs={briefs} clientId={client.id} />
-            <ClientTeamCard members={teamMembers} onEdit={() => setEditOpen(true)} />
-            <ClientContactsCard contacts={contacts} onEdit={() => setEditOpen(true)} />
+      {/* SECTION 3 — Draggable Grid */}
+      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+        <div className="grid grid-cols-12 gap-6">
+          <div className="col-span-12 lg:col-span-7">
+            <DroppableColumn id="column:left" items={leftIds} className="space-y-6">
+              <SortableContext items={leftIds} strategy={verticalListSortingStrategy}>
+                {leftSections.map(s => (
+                  <DraggableSection key={s.id} id={s.id} onHide={hideSection}>
+                    {renderSection(s.id)}
+                  </DraggableSection>
+                ))}
+              </SortableContext>
+            </DroppableColumn>
           </div>
-      </div>
 
-      {/* SECTION 3 — Files (full width) */}
-      <ClientFilesCard files={[]} />
+          <div className="col-span-12 lg:col-span-5">
+            <DroppableColumn id="column:right" items={rightIds} className="space-y-6">
+              <SortableContext items={rightIds} strategy={verticalListSortingStrategy}>
+                {rightSections.map(s => (
+                  <DraggableSection key={s.id} id={s.id} onHide={hideSection}>
+                    {renderSection(s.id)}
+                  </DraggableSection>
+                ))}
+              </SortableContext>
+            </DroppableColumn>
+          </div>
+        </div>
+      </DndContext>
+
+      {/* SECTION 4 — Files (full width) */}
+      <ClientFilesCard files={[]} clientId={client.id} />
 
       <ClientForm open={editOpen} onOpenChange={setEditOpen} client={client} onSaved={fetchAll} />
     </div>

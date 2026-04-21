@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { FileText, Download, File, Image, Presentation } from 'lucide-react';
+import { FileText, Download, File, Image, Presentation, Plus } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
 
@@ -17,6 +18,7 @@ interface FileItem {
 
 interface Props {
   files: FileItem[];
+  clientId?: string;
 }
 
 const categories = ['contracts', 'proposals', 'presentations', 'reports', 'creative'] as const;
@@ -35,13 +37,22 @@ function getFileIcon(contentType: string | null) {
   return <File className="h-4 w-4 text-muted-foreground" />;
 }
 
-export function ClientFilesCard({ files }: Props) {
+export function ClientFilesCard({ files, clientId }: Props) {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <FileText className="h-4 w-4" /> Files & Documents
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <FileText className="h-4 w-4" /> Files & Documents
+          </CardTitle>
+          {clientId && (
+            <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
+              <Link to={`/files?client=${clientId}`}>
+                <Plus className="h-3.5 w-3.5 mr-1" /> Upload
+              </Link>
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="contracts">

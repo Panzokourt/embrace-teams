@@ -6,7 +6,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
   Building2, Pencil, Plus, FolderKanban, FileText, UserPlus, BookOpen,
-  ArrowLeft, TrendingUp, DollarSign, Percent, Camera, Loader2,
+  ArrowLeft, Camera, Loader2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { InlineEditField } from '../InlineEditField';
@@ -26,13 +26,11 @@ interface Props {
     tax_id: string | null;
     company_id: string;
   };
-  revenueThisYear: number;
-  monthlyRevenue: number;
-  marginPercent: number;
   canEdit: boolean;
   onEdit: () => void;
   onRefresh?: () => void;
   onClientUpdated?: (updated: any) => void;
+  layoutMenu?: React.ReactNode;
 }
 
 const statusOptions = [
@@ -56,7 +54,7 @@ const statusBadgeClass: Record<string, string> = {
 };
 
 export function ClientSmartHeader({
-  client, revenueThisYear, monthlyRevenue, marginPercent, canEdit, onEdit, onRefresh, onClientUpdated,
+  client, canEdit, onEdit, onRefresh, onClientUpdated, layoutMenu,
 }: Props) {
   const navigate = useNavigate();
   const update = useClientUpdate(client.id, { onPatched: onClientUpdated });
@@ -180,30 +178,9 @@ export function ClientSmartHeader({
           </div>
         </div>
 
-        {/* KPIs */}
-        <div className="hidden lg:flex items-center gap-6">
-          <div className="text-right">
-            <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
-              <TrendingUp className="h-3.5 w-3.5" /> Έσοδα Έτους
-            </div>
-            <p className="text-lg font-semibold">€{revenueThisYear.toLocaleString()}</p>
-          </div>
-          <div className="text-right">
-            <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
-              <DollarSign className="h-3.5 w-3.5" /> Μηνιαία
-            </div>
-            <p className="text-lg font-semibold">€{monthlyRevenue.toLocaleString()}</p>
-          </div>
-          <div className="text-right">
-            <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
-              <Percent className="h-3.5 w-3.5" /> Margin
-            </div>
-            <p className="text-lg font-semibold">{marginPercent}%</p>
-          </div>
-        </div>
-
         {/* Actions */}
         <div className="flex items-center gap-2">
+          {layoutMenu}
           {canEdit && (
             <AIEnrichButton
               clientId={client.id}

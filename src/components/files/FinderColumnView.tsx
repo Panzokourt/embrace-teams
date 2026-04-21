@@ -284,13 +284,19 @@ export function FinderColumnView({
 
   // --- Internal DnD handlers ---
   const handleDragStart = useCallback((e: React.DragEvent, item: ColumnItem) => {
-    if (item.kind === 'file') {
+    const key = getItemKey(item);
+    const draggedKeys = selection.keys.has(key) ? [...selection.keys] : [key];
+    const fileIds = draggedKeys.filter((k) => k.startsWith('file:')).map((k) => k.slice(5));
+    const folderIds = draggedKeys.filter((k) => k.startsWith('folder:')).map((k) => k.slice(7));
+    if (draggedKeys.length > 1) {
+      e.dataTransfer.setData('application/x-file-selection', JSON.stringify({ fileIds, folderIds }));
+    } else if (item.kind === 'file') {
       e.dataTransfer.setData('application/x-file-id', (item.data as FileAttachment).id);
     } else {
       e.dataTransfer.setData('application/x-folder-id', item.data.id);
     }
     e.dataTransfer.effectAllowed = 'move';
-  }, []);
+  }, [selection.keys]);
 
   const handleDragOver = useCallback((e: React.DragEvent, colIndex: number, targetFolderId?: string) => {
     e.preventDefault();
@@ -312,15 +318,32 @@ export function FinderColumnView({
     setDragOverColumn(null);
     setDragOverFolderId(null);
 
+    const selectionPayload = e.dataTransfer.getData('application/x-file-selection');
     const fileId = e.dataTransfer.getData('application/x-file-id');
     const folderId = e.dataTransfer.getData('application/x-folder-id');
     const dropTarget = targetFolderId ?? path[colIndex] ?? null;
+
+    if (selectionPayload) {
+      try {
+        const payload = JSON.parse(selectionPayload) as { fileIds: string[]; folderIds: string[] };
+        if (payload.folderIds.some((id) => id === dropTarget || isFolderDescendant(dropTarget, id))) {
+          toast.error('Δεν μπορείς να μετακινήσεις φάκελο μέσα στον εαυτό του');
+          return;
+        }
+        if (payload.fileIds.length && onMoveFiles) await onMoveFiles(payload.fileIds, dropTarget);
+        if (payload.folderIds.length && onMoveFolders) await onMoveFolders(payload.folderIds, dropTarget);
+        clearSelection();
+        return;
+      } catch (err) {
+        console.error('Invalid selection drag payload', err);
+      }
+    }
 
     if (fileId && onMoveFile) {
       onMoveFile(fileId, dropTarget);
       return;
     }
-    if (folderId && onMoveFolder && dropTarget !== folderId) {
+    if (folderId && onMoveFolder && dropTarget !== folderId && !isFolderDescendant(dropTarget, folderId)) {
       onMoveFolder(folderId, dropTarget);
       return;
     }
@@ -344,7 +367,7 @@ export function FinderColumnView({
     if (droppedFiles && droppedFiles.length > 0) {
       onUpload(droppedFiles, dropTarget);
     }
-  }, [path, onUpload, onUploadFolder, onMoveFile, onMoveFolder]);
+  }, [path, onUpload, onUploadFolder, onMoveFile, onMoveFolder, onMoveFiles, onMoveFolders, clearSelection, folders]);
 
   async function handleCreateFolder(columnIndex: number) {
     if (!newFolderName.trim()) return;

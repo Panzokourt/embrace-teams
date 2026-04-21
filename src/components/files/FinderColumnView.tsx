@@ -200,6 +200,17 @@ export function FinderColumnView({
     return ids;
   }, [files, folders]);
 
+  const folderById = useMemo(() => new Map(folders.map((folder) => [folder.id, folder])), [folders]);
+
+  const isFolderDescendant = useCallback((candidateId: string | null | undefined, ancestorId: string) => {
+    let current = candidateId ? folderById.get(candidateId) : undefined;
+    while (current) {
+      if (current.id === ancestorId) return true;
+      current = current.parent_folder_id ? folderById.get(current.parent_folder_id) : undefined;
+    }
+    return false;
+  }, [folderById]);
+
   function getColumnItems(parentId: string | null): ColumnItem[] {
     const childFolders = folders
       .filter((f) => f.parent_folder_id === parentId)

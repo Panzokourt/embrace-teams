@@ -528,6 +528,46 @@ export function FinderColumnView({
           ))}
         </div>
 
+        {selectedCount > 1 && (
+          <div className="flex items-center gap-1 rounded-lg border border-border bg-background/80 px-2 py-1 shadow-sm shrink-0">
+            <span className="text-xs font-medium text-foreground px-1">{selectedCount} επιλεγμένα</span>
+            {selectedFiles.length > 0 && (
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => downloadFiles(selectedFiles)}>
+                <Download className="h-3.5 w-3.5" /> Λήψη
+              </Button>
+            )}
+            {canManage && (onMoveFiles || onMoveFolders) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">
+                    <Move className="h-3.5 w-3.5" /> Μετακίνηση
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-52 max-h-72 overflow-y-auto" align="end">
+                  <DropdownMenuItem onClick={() => moveSelectionTo(null)}>
+                    <FolderInput className="h-3.5 w-3.5 mr-2" /> Ρίζα / χωρίς φάκελο
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {moveTargetFolders.map((target) => (
+                    <DropdownMenuItem key={target.id} onClick={() => moveSelectionTo(target.id)}>
+                      <Folder className="h-3.5 w-3.5 mr-2 text-primary/70" />
+                      <span className="truncate">{target.name}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            {canManage && (onDeleteFiles || onDeleteFolders) && (
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-destructive hover:text-destructive" onClick={() => setBulkDeleteOpen(true)}>
+                <Trash2 className="h-3.5 w-3.5" /> Διαγραφή
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={clearSelection}>
+              <X className="h-3.5 w-3.5" /> Καθαρισμός
+            </Button>
+          </div>
+        )}
+
         {canManage && (
           <div className="flex items-center gap-1 shrink-0">
             <Button

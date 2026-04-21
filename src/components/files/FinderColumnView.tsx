@@ -35,6 +35,23 @@ import {
   ContextMenuSubTrigger,
   ContextMenuSubContent,
 } from '@/components/ui/context-menu';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -58,6 +75,10 @@ interface FinderColumnViewProps {
   onDeleteFolder: (folderId: string) => Promise<void>;
   onMoveFile?: (fileId: string, folderId: string | null) => Promise<void>;
   onMoveFolder?: (folderId: string, targetParentId: string | null) => Promise<void>;
+  onMoveFiles?: (fileIds: string[], folderId: string | null) => Promise<void>;
+  onMoveFolders?: (folderIds: string[], targetParentId: string | null) => Promise<void>;
+  onDeleteFiles?: (files: FileAttachment[]) => Promise<void>;
+  onDeleteFolders?: (folderIds: string[]) => Promise<void>;
   canManage: boolean;
   loading?: boolean;
   uploading?: boolean;
@@ -84,6 +105,19 @@ function formatFileSize(bytes: number | null) {
 type ColumnItem =
   | { kind: 'folder'; data: FileFolder }
   | { kind: 'file'; data: FileAttachment };
+
+type SelectionKey = `file:${string}` | `folder:${string}`;
+
+interface SelectionState {
+  keys: Set<SelectionKey>;
+  anchor: { key: SelectionKey; columnIndex: number } | null;
+}
+
+const getItemKey = (item: ColumnItem): SelectionKey => `${item.kind}:${item.data.id}` as SelectionKey;
+const isInputTarget = (target: EventTarget | null) => {
+  const el = target as HTMLElement | null;
+  return !!el?.closest('input, textarea, [contenteditable="true"], [role="textbox"]');
+};
 
 export function FinderColumnView({
   files,

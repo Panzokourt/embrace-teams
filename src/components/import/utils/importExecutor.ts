@@ -35,14 +35,14 @@ async function importClients(ctx: ExecutorContext): Promise<ImportSummary> {
     const payload = batch.map((r) => ({
       ...r.values,
       company_id: ctx.companyId,
-    }));
+    })) as any;
     const { data, error } = await supabase.from('clients').insert(payload).select('id');
     if (error) {
       // Per-row fallback so other batches keep going
       for (const r of batch) {
         const { error: e2 } = await supabase
           .from('clients')
-          .insert([{ ...r.values, company_id: ctx.companyId }]);
+          .insert([{ ...r.values, company_id: ctx.companyId } as any]);
         if (e2) {
           summary.failed += 1;
           summary.failures.push({ index: r.index, error: e2.message, data: r.values });

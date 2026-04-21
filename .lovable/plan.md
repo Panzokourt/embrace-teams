@@ -2,107 +2,148 @@
 
 ## Στόχος
 
-Τρεις βελτιώσεις στην καρτέλα πελάτη (`/clients/:id`):
+Νέο **Bulk Import Wizard** που επιτρέπει στον χρήστη να ανεβάζει `.xlsx` ή `.csv` αρχεία και να εισάγει μαζικά **Πελάτες**, **Έργα** ή **Tasks**, με AI-assisted column mapping, validation, inline δημιουργία εξαρτήσεων (π.χ. αν λείπει πελάτης για ένα έργο), και downloadable templates.
 
-1. Κουμπιά γρήγορης δημιουργίας μέσα σε sections (Projects, Briefs, Contacts, Media Plans, Files).
-2. Drag-and-drop για αναδιάταξη και απόκρυψη/εμφάνιση sections με persistence.
-3. Νέο "Stats Strip" με cards αμέσως κάτω από το header (Έσοδα, Μηνιαία, Margin, P&L μετρικές, Tasks snapshot).
+## Πού θα εμφανίζεται
 
-## 1. Κουμπιά δημιουργίας ανά section
+Νέο κουμπί **"Μαζική Εισαγωγή"** (icon: `Upload`) στο `PageHeader` τριών σελίδων:
 
-Προσθήκη `+` button στο header κάθε section, που δείχνει στο ίδιο route δημιουργίας με pre-filled `client_id`:
+- `/clients`
+- `/projects`
+- `/tasks`
 
-- **Projects** → `/projects?new=true&client={id}` (ήδη υποστηρίζεται από το Smart Header dropdown)
-- **Briefs** → υπάρχει ήδη
-- **Contacts** → `/contacts?new=true&client={id}`
-- **Media Plans** → `/media-planning?new=true&client={id}`
-- **Files** → trigger upload dialog του ClientFilesCard
+Επίσης ένα κεντρικό entry στο sidebar `Settings → Import / Export` για όσους θέλουν να ξεκινήσουν από εκεί επιλέγοντας entity type.
 
-Ομοιόμορφο styling: `Button size="sm" variant="outline" h-7` με `Plus` icon, ακριβώς όπως στο `ClientBriefsCard`.
-
-## 2. Draggable / Hideable sections
-
-### Νέο hook `useClientDetailLayout`
-
-`src/hooks/useClientDetailLayout.ts` — βασισμένο στο pattern του `useDashboardConfig`:
-
-```ts
-interface SectionConfig { id: string; visible: boolean; column: 'left' | 'right'; }
-const STORAGE_KEY = 'client_detail_layout_v1';
-```
-
-Default sections:
-- **Left**: `business_info`, `websites`, `social`, `ad_accounts`, `strategy`
-- **Right**: `pl_summary`, `projects`, `media_plans`, `tasks_snapshot`, `briefs`, `team`, `contacts`
-
-Persistence per-user στο `localStorage` (απλό, ίδιο pattern με dashboard).
-
-### Νέο component `DraggableSection`
-
-`src/components/clients/detail/DraggableSection.tsx`:
-- Wrap κάθε card.
-- Drag handle (`GripVertical`) + κουμπί "Hide" (`EyeOff`) εμφανίζονται on hover πάνω-δεξιά της κάρτας.
-- Χρήση `@dnd-kit/sortable` (`useSortable`) όπως το `WidgetWrapper.tsx`.
-- Σταθερό layout χωρίς αλλαγή visual style των υπαρχόντων cards.
-
-### Layout management UI
-
-Νέο dropdown κουμπί "Layout" στο `ClientSmartHeader` (δεξιά, δίπλα στο "Πλήρης"):
-- Λίστα όλων των sections με toggle visibility (checkbox).
-- Επιλογή "Επαναφορά διάταξης".
-
-### DnD wiring στο `ClientDetail.tsx`
-
-- `DndContext` + `SortableContext` ανά στήλη (left/right) χρησιμοποιώντας τον υπάρχοντα `DroppableColumn` pattern.
-- Drag μεταξύ στηλών επιτρέπεται (cross-column move).
-- `onDragEnd` ενημερώνει το layout μέσω hook.
-
-## 3. Stats Strip κάτω από τον header
-
-Νέο component `ClientStatsStrip` (`src/components/clients/detail/ClientStatsStrip.tsx`):
+## Wizard flow (5 βήματα)
 
 ```text
-[Έσοδα Έτους] [Μηνιαία] [Margin %] [Τιμολογημένα] [Εισπραγμένα] [Ανεξόφλητα] [Overdue Tasks] [This Week] [Open]
+[1 Entity & Source] → [2 Upload] → [3 Mapping] → [4 Validation] → [5 Import]
 ```
 
-- Grid: `grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 xl:grid-cols-9 gap-3`.
-- Style βασισμένο στο `EmployeeStatsCard` (icon-circle αριστερά, value/label δεξιά, color variants: `primary`, `success`, `warning`, `destructive`).
-- Compact ύψος για να μην καταλαμβάνει πολύ vertical space.
+### Βήμα 1 — Entity & Source
 
-### Συνέπειες σε άλλα cards
+- Επιλογή τι θα εισαχθεί: **Πελάτες / Έργα / Tasks**
+- Δύο επιλογές πηγής:
+  - **Κατέβασε template** (`.xlsx` με προ-συμπληρωμένο header + 2 παραδείγματα + dropdown validation σε enum πεδία).
+  - **Ανέβασε υπάρχον αρχείο** (`.xlsx` ή `.csv`).
 
-- Από `ClientSmartHeader`: αφαιρούνται οι 3 KPIs δεξιά (Έσοδα/Μηνιαία/Margin) — μετακινούνται στο strip.
-- `ClientPLSummary`: παραμένει ως card στο right column, αλλά το νέο strip δείχνει τα ίδια metrics σε compact form. Αν θέλει ο χρήστης, μπορεί να το κρύψει από το layout panel (σύσταση: το strip είναι quick glance, η κάρτα έχει progress bar + collection rate).
-- `ClientTasksSnapshot`: ομοίως παραμένει στο right column για περισσότερες λεπτομέρειες.
+### Βήμα 2 — Upload & Preview
 
-## Αρχεία που θα αλλάξουν
+- Drag-and-drop ή file picker.
+- Ανίχνευση αρχείου με `xlsx` (SheetJS) για excel, `papaparse` για csv.
+- Επιλογή sheet αν το excel έχει πολλά.
+- Preview πρώτων 10 γραμμών σε πίνακα.
+- Auto-detect headers (πρώτη γραμμή).
 
-**Νέα:**
-- `src/hooks/useClientDetailLayout.ts`
-- `src/components/clients/detail/DraggableSection.tsx`
-- `src/components/clients/detail/ClientStatsStrip.tsx`
-- `src/components/clients/detail/ClientLayoutMenu.tsx` (dropdown για visibility/reset)
+### Βήμα 3 — AI-assisted Column Mapping
 
-**Τροποποιήσεις:**
-- `src/pages/ClientDetail.tsx` — DndContext, νέο stats strip, dynamic section rendering μέσω layout config.
-- `src/components/clients/detail/ClientSmartHeader.tsx` — αφαίρεση των 3 KPIs, προσθήκη `ClientLayoutMenu`.
-- `src/components/clients/detail/ClientProjectsCard.tsx` — νέο `+ New Project` button στο header.
-- `src/components/clients/detail/ClientContactsCard.tsx` — νέο `+ New Contact` button.
-- `src/components/clients/detail/ClientMediaPlansCard.tsx` — header redesign (CardHeader/CardTitle pattern) + `+ New Plan` button.
-- `src/components/clients/detail/ClientFilesCard.tsx` — `+ Upload` button.
+- Πίνακας: αριστερά οι columns του αρχείου, δεξιά dropdown με τα πεδία του target entity.
+- **Αυτόματη πρόταση mapping** με δύο επίπεδα:
+  1. Local fuzzy match (π.χ. `όνομα` → `name`, `email` → `contact_email`).
+  2. AI fallback μέσω **Lovable AI Gateway** (`google/gemini-2.5-flash-lite`) που δέχεται headers + 3 sample rows και επιστρέφει JSON mapping suggestion με confidence.
+- Επισήμανση required πεδίων που λείπουν (κόκκινο badge).
+- Δυνατότητα να αγνοηθεί column.
+
+### Βήμα 4 — Validation & Resolution
+
+Per-row validation με inline επεξεργασία στον πίνακα:
+
+- **Format checks**: email, ημερομηνίες (ISO ή `dd/mm/yyyy`), αριθμοί, enums.
+- **Foreign key resolution**:
+  - Projects → matching `client_id` με `client_name` column. Αν δεν βρεθεί:
+    - πρόταση "Δημιουργία νέου πελάτη" (one-click ανά row ή bulk για όλα τα missing).
+  - Tasks → matching `project_id` με `project_name`, `assigned_to` με email/full_name. Ομοίως one-click create για projects, ή skip για users (προτείνεται unassigned).
+- **Duplicate detection** (case-insensitive) μέσα στο file αλλά και έναντι DB (warning, όχι block).
+- Color-coded summary: ✅ Έγκυρα / ⚠️ Με warnings / ❌ Σφάλματα.
+- Ο χρήστης μπορεί να επεξεργαστεί κάθε cell inline πριν προχωρήσει.
+
+### Βήμα 5 — Import & Report
+
+- Progress bar (batched inserts ανά 50 rows).
+- Δημιουργία deps πρώτα (νέοι πελάτες → νέα έργα → tasks) με σωστή σειρά εξαρτήσεων.
+- Final report: πόσα δημιουργήθηκαν, πόσα παραλείφθηκαν, πόσα απέτυχαν, με downloadable error log (`.csv`).
+- Buttons: "Δες τα νέα δεδομένα" → πλοηγεί στη λίστα φιλτραρισμένη στα νεοεισαχθέντα.
+
+## Templates
+
+Auto-generated `.xlsx` ανά entity με:
+
+- **Clients template**: `name*, sector, website, contact_email, contact_phone, address, tax_id, tags, status, notes`
+- **Projects template**: `name*, client_name, status, start_date, end_date, budget, commission_rate, description, category`
+- **Tasks template**: `title*, project_name, assigned_to_email, status, priority, due_date, estimated_hours, description`
+
+(Αστερίσκος = υποχρεωτικό.)
+
+Δεύτερο sheet "Οδηγίες" με enum values και format examples.
+
+## Τεχνική προσέγγιση
+
+### Νέα dependencies
+
+- `xlsx` (SheetJS) για read/write `.xlsx`.
+- `papaparse` για csv parsing.
+
+### Νέα αρχεία
+
+```text
+src/components/import/
+  ImportWizard.tsx                  # Κύριο dialog/stepper
+  steps/
+    StepEntitySource.tsx
+    StepUpload.tsx
+    StepMapping.tsx
+    StepValidation.tsx
+    StepImport.tsx
+  schemas/
+    clientSchema.ts                 # field defs + validators
+    projectSchema.ts
+    taskSchema.ts
+  utils/
+    parseFile.ts                    # xlsx + csv → rows
+    fuzzyMatch.ts                   # header → field
+    validators.ts
+    templateBuilder.ts              # κατασκευή downloadable template
+    importExecutor.ts               # batched inserts με dep resolution
+src/hooks/
+  useImportWizard.ts                # state machine
+```
+
+### Νέο edge function
+
+```text
+supabase/functions/ai-suggest-mapping/index.ts
+```
+
+Δέχεται `{entity, headers, sampleRows}`, καλεί Lovable AI Gateway με JSON tool-call, επιστρέφει `{mapping: {col: field}, confidence}`.
+
+### Τροποποιήσεις
+
+- `src/pages/Clients.tsx`, `src/pages/Projects.tsx`, `src/pages/Tasks.tsx`:
+  - Νέο κουμπί "Μαζική Εισαγωγή" στο `PageHeader.actions`.
+  - Mount του `<ImportWizard entity="..." onComplete={refresh} />`.
+- `src/pages/Settings.tsx` (ή `OrganizationSettings`): νέα entry "Import / Export" που ανοίγει το wizard με entity picker.
+
+### Ασφάλεια & multi-tenant
+
+- Όλα τα inserts περιλαμβάνουν `company_id` από `useAuth().company.id`.
+- Ο χρήστης πρέπει να έχει role `owner/admin/manager` (έλεγχος μέσω `is_admin_or_manager`).
+- Tasks: `created_by` = current user, `assigned_to` resolution ψάχνει μόνο σε users του same company.
 
 ## Τι ΔΕΝ αλλάζει
 
-- DB schema, RLS, edge functions.
-- Visual style των υπαρχόντων cards (μόνο header tweaks).
-- Inline editing functionality στο header.
+- DB schema (κανένα νέο table).
+- RLS policies.
+- Storage buckets.
+- Δεν διαγράφεται/ενημερώνεται κανένα υπάρχον record (μόνο insert mode σε αυτή τη φάση).
 
 ## Verification
 
-1. Στο `/clients/:id`, αμέσως κάτω από τον τίτλο εμφανίζεται strip με 9 stat cards.
-2. Hover σε κάθε section → εμφανίζεται grip handle + hide icon.
-3. Drag section από left στο right column → αποθηκεύεται και επιβιώνει refresh.
-4. Layout menu → toggle visibility και reset.
-5. Click `+` σε κάθε section → ανοίγει το αντίστοιχο create flow με προ-επιλεγμένο client.
-6. Responsive: mobile/tablet δείχνει stats strip σε 2-3 στήλες, sections σε single column (drag παραμένει active).
+1. `/clients` → "Μαζική Εισαγωγή" → download template → άνοιγμα στο Excel: σωστά headers + dropdown validation.
+2. Upload csv με 50 πελάτες → preview, mapping auto-suggest, validation καθαρό → import → εμφανίζονται όλοι στη λίστα.
+3. `/projects` → upload xlsx με στήλη `client_name` που δεν υπάρχει → wizard προτείνει "Δημιουργία πελάτη" → bulk-create → import περνά.
+4. `/tasks` → upload με `assigned_to_email` που δεν αντιστοιχεί σε χρήστη → row περνά ως unassigned με warning.
+5. Σκόπιμα λάθη (κενό όνομα, λάθος email) → block με κόκκινο highlight & inline edit.
+6. Άκυρο file format → καθαρό error message.
+7. Final report → download `.csv` με failed rows + λόγο.
+8. Ο χρήστης χωρίς admin/manager role δεν βλέπει το κουμπί.
 

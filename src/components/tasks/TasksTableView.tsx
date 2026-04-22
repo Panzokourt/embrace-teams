@@ -1139,6 +1139,7 @@ export function TasksTableView({
             )}
           </TableBody>
         </Table>
+        </DndContext>
       </div>
 
       {/* Bulk Actions Dialog */}

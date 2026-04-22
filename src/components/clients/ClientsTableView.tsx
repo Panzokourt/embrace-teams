@@ -16,9 +16,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+  ContextMenuCheckboxItem,
+} from '@/components/ui/context-menu';
 import { 
   MoreHorizontal, Pencil, Trash2, Building2, Mail, Phone, 
-  MapPin, ExternalLink, ArrowUpDown, ArrowUp, ArrowDown, GripVertical
+  MapPin, ExternalLink, ArrowUpDown, ArrowUp, ArrowDown, GripVertical,
+  EyeOff, Eye, RotateCcw, Pin, Columns3
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { exportToCSV } from '@/utils/exportUtils';
@@ -106,6 +119,26 @@ const DEFAULT_ORDER: ColKey[] = ['name', 'contact', 'sector', 'address', 'status
 const MIN_WIDTH = 60;
 const STORAGE_KEY = 'clients-table-col-widths-v1';
 const ORDER_STORAGE_KEY = 'clients-table-col-order-v1';
+const HIDDEN_STORAGE_KEY = 'clients-table-col-hidden-v1';
+
+const COL_LABELS: Record<ColKey, string> = {
+  name: 'Επωνυμία',
+  contact: 'Επικοινωνία',
+  sector: 'Τομέας',
+  address: 'Διεύθυνση',
+  status: 'Status',
+  projects: 'Έργα',
+  date: 'Ημ/νία',
+  actions: 'Ενέργειες',
+};
+
+const SORTABLE_FIELD_BY_COL: Partial<Record<ColKey, SortField>> = {
+  name: 'name',
+  contact: 'contact_email',
+  status: 'status',
+  projects: 'projectCount',
+  date: 'created_at',
+};
 
 export function ClientsTableView({
   clients,
@@ -140,6 +173,41 @@ export function ClientsTableView({
     } catch {}
     return DEFAULT_ORDER;
   });
+
+  const [hidden, setHidden] = useState<Set<ColKey>>(() => {
+    if (typeof window === 'undefined') return new Set();
+    try {
+      const raw = localStorage.getItem(HIDDEN_STORAGE_KEY);
+      if (raw) return new Set(JSON.parse(raw) as ColKey[]);
+    } catch {}
+    return new Set();
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(HIDDEN_STORAGE_KEY, JSON.stringify(Array.from(hidden)));
+    } catch {}
+  }, [hidden]);
+
+  const visibleOrder = useMemo(() => order.filter(k => !hidden.has(k)), [order, hidden]);
+
+  const hideColumn = (key: ColKey) => setHidden(prev => new Set(prev).add(key));
+  const showColumn = (key: ColKey) => setHidden(prev => {
+    const next = new Set(prev);
+    next.delete(key);
+    return next;
+  });
+  const resetColumnWidth = (key: ColKey) =>
+    setWidths(prev => ({ ...prev, [key]: DEFAULT_WIDTHS[key] }));
+  const resetAllColumns = () => {
+    setWidths(DEFAULT_WIDTHS);
+    setOrder(DEFAULT_ORDER);
+    setHidden(new Set());
+    toast.success('Οι στήλες επαναφέρθηκαν');
+  };
+  const sortAsc = (field: SortField) => { setSortField(field); setSortDirection('asc'); };
+  const sortDesc = (field: SortField) => { setSortField(field); setSortDirection('desc'); };
+  const clearSort = () => { setSortField(null); };
 
   useEffect(() => {
     try {
@@ -435,7 +503,7 @@ export function ClientsTableView({
     }
   };
 
-  const totalWidth = SELECT_WIDTH + order.reduce((s, k) => s + widths[k], 0);
+  const totalWidth = SELECT_WIDTH + visibleOrder.reduce((s, k) => s + widths[k], 0);
 
   return (
     <div className="space-y-4">
@@ -463,14 +531,25 @@ export function ClientsTableView({
                     onCheckedChange={toggleSelectAll} 
                   />
                 </TableHead>
-                <SortableContext items={order} strategy={horizontalListSortingStrategy}>
-                  {order.map(key => (
+                <SortableContext items={visibleOrder} strategy={horizontalListSortingStrategy}>
+                  {visibleOrder.map(key => (
                     <SortableHeaderCell
                       key={key}
                       colKey={key}
                       width={widths[key]}
                       content={renderHeader(key)}
                       resizeHandle={<ResizeHandle colKey={key} />}
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      hidden={hidden}
+                      allColumns={DEFAULT_ORDER}
+                      onSortAsc={sortAsc}
+                      onSortDesc={sortDesc}
+                      onClearSort={clearSort}
+                      onHide={hideColumn}
+                      onShow={showColumn}
+                      onResetWidth={resetColumnWidth}
+                      onResetAll={resetAllColumns}
                     />
                   ))}
                 </SortableContext>
@@ -479,7 +558,7 @@ export function ClientsTableView({
             <TableBody>
               {sortedClients.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={order.length + 1} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={visibleOrder.length + 1} className="h-24 text-center text-muted-foreground">
                     Δεν βρέθηκαν πελάτες
                   </TableCell>
                 </TableRow>
@@ -500,7 +579,7 @@ export function ClientsTableView({
                         onCheckedChange={() => toggleSelect(client.id)}
                       />
                     </TableCell>
-                    {order.map(key => (
+                    {visibleOrder.map(key => (
                       <TableCell key={key} style={{ width: widths[key] }} className="overflow-hidden">
                         {renderCell(key, client)}
                       </TableCell>
@@ -521,9 +600,24 @@ interface SortableHeaderCellProps {
   width: number;
   content: React.ReactNode;
   resizeHandle: React.ReactNode;
+  sortField: SortField | null;
+  sortDirection: 'asc' | 'desc';
+  hidden: Set<ColKey>;
+  allColumns: ColKey[];
+  onSortAsc: (f: SortField) => void;
+  onSortDesc: (f: SortField) => void;
+  onClearSort: () => void;
+  onHide: (k: ColKey) => void;
+  onShow: (k: ColKey) => void;
+  onResetWidth: (k: ColKey) => void;
+  onResetAll: () => void;
 }
 
-function SortableHeaderCell({ colKey, width, content, resizeHandle }: SortableHeaderCellProps) {
+function SortableHeaderCell({
+  colKey, width, content, resizeHandle,
+  sortField, sortDirection, hidden, allColumns,
+  onSortAsc, onSortDesc, onClearSort, onHide, onShow, onResetWidth, onResetAll,
+}: SortableHeaderCellProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: colKey });
 
   const style: React.CSSProperties = {
@@ -535,22 +629,103 @@ function SortableHeaderCell({ colKey, width, content, resizeHandle }: SortableHe
     zIndex: isDragging ? 20 : undefined,
   };
 
+  const sortableField = SORTABLE_FIELD_BY_COL[colKey];
+  const isCurrentSort = sortableField && sortField === sortableField;
+  const hiddenList = allColumns.filter(k => hidden.has(k));
+
   return (
-    <TableHead ref={setNodeRef} style={style} className="relative">
-      <div className="flex items-center gap-1 min-w-0">
-        <button
-          type="button"
-          {...attributes}
-          {...listeners}
-          className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground shrink-0 -ml-1"
-          aria-label="Μετακίνηση στήλης"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <GripVertical className="h-3.5 w-3.5" />
-        </button>
-        {content}
-      </div>
-      {resizeHandle}
-    </TableHead>
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <TableHead ref={setNodeRef} style={style} className="relative">
+          <div className="flex items-center gap-1 min-w-0">
+            <button
+              type="button"
+              {...attributes}
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground shrink-0 -ml-1"
+              aria-label="Μετακίνηση στήλης"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <GripVertical className="h-3.5 w-3.5" />
+            </button>
+            {content}
+          </div>
+          {resizeHandle}
+        </TableHead>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-56">
+        <ContextMenuLabel className="text-xs text-muted-foreground">
+          {COL_LABELS[colKey]}
+        </ContextMenuLabel>
+        <ContextMenuSeparator />
+        {sortableField && (
+          <>
+            <ContextMenuItem onClick={() => onSortAsc(sortableField)}>
+              <ArrowUp className="h-4 w-4 mr-2" />
+              Ταξινόμηση αύξουσα
+              {isCurrentSort && sortDirection === 'asc' && <span className="ml-auto text-xs">✓</span>}
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => onSortDesc(sortableField)}>
+              <ArrowDown className="h-4 w-4 mr-2" />
+              Ταξινόμηση φθίνουσα
+              {isCurrentSort && sortDirection === 'desc' && <span className="ml-auto text-xs">✓</span>}
+            </ContextMenuItem>
+            {isCurrentSort && (
+              <ContextMenuItem onClick={onClearSort}>
+                <ArrowUpDown className="h-4 w-4 mr-2" />
+                Καθαρισμός ταξινόμησης
+              </ContextMenuItem>
+            )}
+            <ContextMenuSeparator />
+          </>
+        )}
+        <ContextMenuItem onClick={() => onHide(colKey)}>
+          <EyeOff className="h-4 w-4 mr-2" />
+          Απόκρυψη στήλης
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => onResetWidth(colKey)}>
+          <RotateCcw className="h-4 w-4 mr-2" />
+          Επαναφορά πλάτους
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>
+            <Columns3 className="h-4 w-4 mr-2" />
+            Στήλες
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className="w-56">
+            {allColumns.map(k => (
+              <ContextMenuCheckboxItem
+                key={k}
+                checked={!hidden.has(k)}
+                onCheckedChange={(checked) => checked ? onShow(k) : onHide(k)}
+              >
+                {COL_LABELS[k]}
+              </ContextMenuCheckboxItem>
+            ))}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+        {hiddenList.length > 0 && (
+          <ContextMenuSub>
+            <ContextMenuSubTrigger>
+              <Eye className="h-4 w-4 mr-2" />
+              Εμφάνιση κρυμμένης
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent>
+              {hiddenList.map(k => (
+                <ContextMenuItem key={k} onClick={() => onShow(k)}>
+                  {COL_LABELS[k]}
+                </ContextMenuItem>
+              ))}
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+        )}
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={onResetAll}>
+          <RotateCcw className="h-4 w-4 mr-2" />
+          Επαναφορά όλων
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }

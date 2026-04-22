@@ -171,9 +171,10 @@ export function ContactsTableView({ contacts, loading, onEdit, onRefresh }: Cont
             <SelectItem value="organization">Οργανισμός</SelectItem>
           </SelectContent>
         </Select>
+        <HorizontalScrollButtons containerRef={scrollRef} className="ml-auto" />
       </div>
 
-      <div className="rounded-xl border border-border/60 overflow-x-auto">
+      <StickyHorizontalScroll ref={scrollRef} className="rounded-xl border border-border/60">
         <layout.DndContext
           sensors={layout.sensors}
           collisionDetection={layout.closestCenter}

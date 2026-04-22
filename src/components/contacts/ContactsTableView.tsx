@@ -221,7 +221,7 @@ export function ContactsTableView({ contacts, loading, onEdit, onRefresh }: Cont
             </TableBody>
           </Table>
         </layout.DndContext>
-      </div>
+      </StickyHorizontalScroll>
     </div>
   );
 }

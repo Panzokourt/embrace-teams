@@ -324,7 +324,7 @@ export function UsersTableView({
             </TableBody>
           </Table>
         </layout.DndContext>
-      </div>
+      </StickyHorizontalScroll>
     </div>
   );
 }

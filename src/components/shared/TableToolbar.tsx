@@ -66,6 +66,8 @@ interface TableToolbarProps {
   groupBy?: GroupByField;
   onGroupByChange?: (groupBy: GroupByField) => void;
   groupOptions?: GroupOption[];
+  /** Optional extra actions rendered at the end of the toolbar (e.g. horizontal scroll buttons). */
+  extraActions?: React.ReactNode;
 }
 
 export function TableToolbar({
@@ -85,6 +87,7 @@ export function TableToolbar({
   groupBy = 'none',
   onGroupByChange,
   groupOptions = DEFAULT_GROUP_OPTIONS,
+  extraActions,
 }: TableToolbarProps) {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [viewName, setViewName] = useState('');
@@ -206,6 +209,9 @@ export function TableToolbar({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* Extra actions (e.g. horizontal scroll buttons) */}
+      {extraActions}
 
       {/* Bulk Actions (shown when items selected) */}
       {selectedCount > 0 && onBulkAction && bulkActions.length > 0 && (

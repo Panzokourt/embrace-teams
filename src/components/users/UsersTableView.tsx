@@ -1,4 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
+import { StickyHorizontalScroll, type StickyHorizontalScrollHandle } from '@/components/shared/StickyHorizontalScroll';
+import { HorizontalScrollButtons } from '@/components/shared/HorizontalScrollButtons';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
@@ -98,6 +100,7 @@ export function UsersTableView({
   const navigate = useNavigate();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const layout = useColumnLayout<ColKey>({ storageKey: 'users-table', columns: COLUMNS });
+  const scrollRef = useRef<StickyHorizontalScrollHandle>(null);
 
   const sortedUsers = useMemo(() => {
     if (!layout.sortField) return users;
@@ -262,10 +265,11 @@ export function UsersTableView({
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex justify-end items-center gap-2">
+        <HorizontalScrollButtons containerRef={scrollRef} />
         <Button variant="outline" size="sm" onClick={handleExport}>Εξαγωγή CSV</Button>
       </div>
-      <div className="rounded-xl border border-border/50 bg-card overflow-x-auto">
+      <StickyHorizontalScroll ref={scrollRef} className="rounded-xl border border-border/50 bg-card">
         <layout.DndContext
           sensors={layout.sensors}
           collisionDetection={layout.closestCenter}
@@ -320,7 +324,7 @@ export function UsersTableView({
             </TableBody>
           </Table>
         </layout.DndContext>
-      </div>
+      </StickyHorizontalScroll>
     </div>
   );
 }

@@ -1,4 +1,6 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
+import { StickyHorizontalScroll, type StickyHorizontalScrollHandle } from '@/components/shared/StickyHorizontalScroll';
+import { HorizontalScrollButtons } from '@/components/shared/HorizontalScrollButtons';
 import { useNavigate } from 'react-router-dom';
 import { 
   Table, 
@@ -98,6 +100,7 @@ export function TendersTableView({
   canManage,
 }: TendersTableViewProps) {
   const navigate = useNavigate();
+  const scrollRef = useRef<StickyHorizontalScrollHandle>(null);
   const layout = useTableViews({ storageKey: 'tenders_table', defaultColumns: DEFAULT_COLUMNS });
   const {
     columns,
@@ -517,10 +520,11 @@ export function TendersTableView({
         groupBy={groupBy}
         onGroupByChange={setGroupBy}
         groupOptions={GROUP_OPTIONS}
+        extraActions={<HorizontalScrollButtons containerRef={scrollRef} />}
       />
 
       {/* Table */}
-      <div className="rounded-md border overflow-x-auto">
+      <StickyHorizontalScroll ref={scrollRef} className="rounded-md border">
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -563,7 +567,7 @@ export function TendersTableView({
             </TableBody>
           </Table>
         </DndContext>
-      </div>
+      </StickyHorizontalScroll>
     </div>
   );
 }

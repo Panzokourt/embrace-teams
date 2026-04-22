@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { StickyHorizontalScroll, type StickyHorizontalScrollHandle } from '@/components/shared/StickyHorizontalScroll';
+import { HorizontalScrollButtons } from '@/components/shared/HorizontalScrollButtons';
 import { useNavigate } from 'react-router-dom';
 import { 
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
@@ -159,6 +161,7 @@ export function ProjectsTableView({
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const lastSelectedIndex = useRef<number | null>(null);
+  const scrollRef = useRef<StickyHorizontalScrollHandle>(null);
 
   // Expand state
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
@@ -836,9 +839,10 @@ export function ProjectsTableView({
         groupBy={groupBy}
         onGroupByChange={setGroupBy}
         groupOptions={GROUP_OPTIONS}
+        extraActions={<HorizontalScrollButtons containerRef={scrollRef} />}
       />
 
-      <div className="rounded-md border overflow-x-auto">
+      <StickyHorizontalScroll ref={scrollRef} className="rounded-md border">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <Table style={{ width: totalWidth, tableLayout: 'fixed' }}>
             <TableHeader>
@@ -879,7 +883,7 @@ export function ProjectsTableView({
             </TableBody>
           </Table>
         </DndContext>
-      </div>
+      </StickyHorizontalScroll>
     </div>
   );
 }

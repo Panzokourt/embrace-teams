@@ -1,4 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
+import { StickyHorizontalScroll, type StickyHorizontalScrollHandle } from '@/components/shared/StickyHorizontalScroll';
+import { HorizontalScrollButtons } from '@/components/shared/HorizontalScrollButtons';
 import { useNavigate } from 'react-router-dom';
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -47,6 +49,7 @@ export function ContactsTableView({ contacts, loading, onEdit, onRefresh }: Cont
   const [entityFilter, setEntityFilter] = useState('all');
 
   const layout = useColumnLayout<ColKey>({ storageKey: 'contacts-table', columns: COLUMNS });
+  const scrollRef = useRef<StickyHorizontalScrollHandle>(null);
 
   const filtered = useMemo(() => contacts.filter(c => {
     const matchesSearch = !search || c.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -168,9 +171,10 @@ export function ContactsTableView({ contacts, loading, onEdit, onRefresh }: Cont
             <SelectItem value="organization">Οργανισμός</SelectItem>
           </SelectContent>
         </Select>
+        <HorizontalScrollButtons containerRef={scrollRef} className="ml-auto" />
       </div>
 
-      <div className="rounded-xl border border-border/60 overflow-x-auto">
+      <StickyHorizontalScroll ref={scrollRef} className="rounded-xl border border-border/60">
         <layout.DndContext
           sensors={layout.sensors}
           collisionDetection={layout.closestCenter}
@@ -217,7 +221,7 @@ export function ContactsTableView({ contacts, loading, onEdit, onRefresh }: Cont
             </TableBody>
           </Table>
         </layout.DndContext>
-      </div>
+      </StickyHorizontalScroll>
     </div>
   );
 }

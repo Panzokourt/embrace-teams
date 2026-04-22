@@ -1,4 +1,6 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
+import { StickyHorizontalScroll, type StickyHorizontalScrollHandle } from '@/components/shared/StickyHorizontalScroll';
+import { HorizontalScrollButtons } from '@/components/shared/HorizontalScrollButtons';
 import { useNavigate } from 'react-router-dom';
 import { 
   Table, 
@@ -206,6 +208,7 @@ export function TasksTableView({
   showProject = true
 }: TasksTableViewProps) {
   const navigate = useNavigate();
+  const scrollRef = useRef<StickyHorizontalScrollHandle>(null);
   const layout = useTableViews({ storageKey: 'tasks_table', defaultColumns: DEFAULT_COLUMNS });
   const {
     columns, setColumns, orderedColumns, columnWidths, setColumnWidth,
@@ -965,10 +968,11 @@ export function TasksTableView({
         groupBy={groupBy}
         onGroupByChange={setGroupBy}
         groupOptions={GROUP_OPTIONS}
+        extraActions={<HorizontalScrollButtons containerRef={scrollRef} />}
       />
 
       {/* Table */}
-      <div className="rounded-md border overflow-x-auto">
+      <StickyHorizontalScroll ref={scrollRef} className="rounded-md border">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <Table style={{ width: totalWidth, tableLayout: 'fixed' }}>
           <TableHeader>
@@ -1152,7 +1156,7 @@ export function TasksTableView({
           </TableBody>
         </Table>
         </DndContext>
-      </div>
+      </StickyHorizontalScroll>
 
       {/* Bulk Actions Dialog */}
       <BulkActionsDialog

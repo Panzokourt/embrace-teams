@@ -503,7 +503,7 @@ export function ClientsTableView({
     }
   };
 
-  const totalWidth = SELECT_WIDTH + order.reduce((s, k) => s + widths[k], 0);
+  const totalWidth = SELECT_WIDTH + visibleOrder.reduce((s, k) => s + widths[k], 0);
 
   return (
     <div className="space-y-4">

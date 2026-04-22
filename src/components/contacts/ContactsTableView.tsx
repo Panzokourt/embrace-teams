@@ -1,4 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
+import { StickyHorizontalScroll, type StickyHorizontalScrollHandle } from '@/components/shared/StickyHorizontalScroll';
+import { HorizontalScrollButtons } from '@/components/shared/HorizontalScrollButtons';
 import { useNavigate } from 'react-router-dom';
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';

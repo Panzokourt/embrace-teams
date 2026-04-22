@@ -1,20 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, FolderKanban, CheckSquare, FileText, Users, BookUser, Zap, Menu, Timer, Square, Sparkles } from 'lucide-react';
+import { Search, FolderKanban, CheckSquare, FileText, Users, BookUser, Menu, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
 import { supabase } from '@/integrations/supabase/client';
-import { cn } from '@/lib/utils';
-import WorkDayClock from '@/components/topbar/WorkDayClock';
-import { useFocusMode } from '@/contexts/FocusContext';
-import { useAuth } from '@/contexts/AuthContext';
-import { XPBadge } from '@/components/gamification/XPBadge';
 import { useLayout } from '@/contexts/LayoutContext';
-import { useTimeTracking } from '@/hooks/useTimeTracking';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import SetupGuide from '@/components/onboarding/SetupGuide';
-import { ActiveTimerPopover } from '@/components/time-tracking/ActiveTimerPopover';
 
 interface SearchResult {
   id: string;
@@ -38,10 +31,7 @@ interface TopBarProps {
 
 export default function TopBar({ onMobileMenuToggle, showHamburger, onQuickChatToggle }: TopBarProps) {
   const navigate = useNavigate();
-  const { enterFocus } = useFocusMode();
-  const { user } = useAuth();
   const { layoutState } = useLayout();
-  const { activeTimer, elapsed, formatElapsed, stopTimer, fetchActiveTimer } = useTimeTracking();
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -120,53 +110,6 @@ export default function TopBar({ onMobileMenuToggle, showHamburger, onQuickChatT
         </Button>
       )}
 
-      {/* Work Day Clock — hidden on mobile */}
-      {!isMobile && <WorkDayClock compact={isNarrow} />}
-
-      {/* Active Timer Indicator */}
-      {activeTimer?.is_running && (
-        <>
-          <div className="w-px h-5 bg-border/50 shrink-0" />
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Timer className="h-3.5 w-3.5 text-primary animate-pulse shrink-0" />
-            <ActiveTimerPopover
-              activeTimer={activeTimer}
-              elapsed={elapsed}
-              formatElapsed={formatElapsed}
-              onUpdated={fetchActiveTimer}
-            >
-              <button
-                className="text-xs font-mono font-semibold text-primary hover:underline cursor-pointer"
-                title="Λεπτομέρειες timer"
-              >
-                {formatElapsed(elapsed)}
-              </button>
-            </ActiveTimerPopover>
-            {!isNarrow && (
-              <span className="text-[10px] text-muted-foreground truncate max-w-[100px]">
-                {(activeTimer as any)?.task?.title || ''}
-              </span>
-            )}
-            <Tooltip delayDuration={200}>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-1.5 text-[10px] text-destructive hover:bg-destructive/10 gap-1"
-                  onClick={(e) => { e.stopPropagation(); stopTimer(); }}
-                >
-                  <Square className="h-3 w-3 fill-current" />
-                  End
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Σταμάτημα Timer</TooltipContent>
-            </Tooltip>
-          </div>
-        </>
-      )}
-
-      {!isMobile && <div className="w-px h-5 bg-border/50 shrink-0" />}
-
       {/* Search */}
       <div className="flex-1 min-w-0 max-w-2xl">
         <Popover open={searchOpen} onOpenChange={setSearchOpen}>
@@ -216,28 +159,6 @@ export default function TopBar({ onMobileMenuToggle, showHamburger, onQuickChatT
       <div className="flex items-center gap-2 shrink-0">
         {/* Setup Guide */}
         <SetupGuide />
-
-        {/* XP Badge — hide on mobile */}
-        {!isMobile && <XPBadge userId={user?.id} size="sm" showXP={!isNarrow} />}
-
-        {/* Work Mode */}
-        <Tooltip delayDuration={300}>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => enterFocus()}
-              className={cn(
-                "gap-1.5 bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 hover:from-violet-600/30 hover:to-fuchsia-600/30 text-violet-400 hover:text-violet-300 border border-violet-500/20 h-8 px-2.5",
-                isNarrow && "px-2"
-              )}
-            >
-              <Zap className="h-3.5 w-3.5 shrink-0" />
-              {!isNarrow && <span className="text-xs font-semibold">Work Mode</span>}
-            </Button>
-          </TooltipTrigger>
-          {isNarrow && <TooltipContent>Work Mode</TooltipContent>}
-        </Tooltip>
 
         {/* Quick Chat */}
         <Tooltip delayDuration={300}>

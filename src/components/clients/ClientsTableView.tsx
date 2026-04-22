@@ -528,7 +528,7 @@ export function ClientsTableView({
 
       <StickyHorizontalScroll ref={scrollRef} className="rounded-xl border border-border/50 bg-card shadow-soft">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <Table style={{ width: totalWidth, tableLayout: 'fixed' }}>
+          <Table unstyledWrapper style={{ width: totalWidth, tableLayout: 'fixed' }}>
             <TableHeader>
               <TableRow className="bg-secondary/30 hover:bg-secondary/30">
                 <TableHead style={{ width: SELECT_WIDTH }}>

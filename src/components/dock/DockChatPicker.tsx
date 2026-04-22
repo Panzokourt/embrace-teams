@@ -43,9 +43,9 @@ export default function DockChatPicker() {
   };
 
   const handleStartDM = async (userId: string) => {
-    const ch = await findOrCreateDM(userId);
+    const ch = await findOrCreateDM(userId) as any;
     if (ch) {
-      openFloatingWindow(ch.id, ch.name, ch.type as any);
+      openFloatingWindow(ch.id, ch.name || 'Direct Message', (ch.type || 'direct') as any);
       closePanel();
     }
     setDmOpen(false);

@@ -161,6 +161,7 @@ export function ProjectsTableView({
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const lastSelectedIndex = useRef<number | null>(null);
+  const scrollRef = useRef<StickyHorizontalScrollHandle>(null);
 
   // Expand state
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());

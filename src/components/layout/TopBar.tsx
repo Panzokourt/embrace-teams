@@ -110,53 +110,6 @@ export default function TopBar({ onMobileMenuToggle, showHamburger, onQuickChatT
         </Button>
       )}
 
-      {/* Work Day Clock — hidden on mobile */}
-      {!isMobile && <WorkDayClock compact={isNarrow} />}
-
-      {/* Active Timer Indicator */}
-      {activeTimer?.is_running && (
-        <>
-          <div className="w-px h-5 bg-border/50 shrink-0" />
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Timer className="h-3.5 w-3.5 text-primary animate-pulse shrink-0" />
-            <ActiveTimerPopover
-              activeTimer={activeTimer}
-              elapsed={elapsed}
-              formatElapsed={formatElapsed}
-              onUpdated={fetchActiveTimer}
-            >
-              <button
-                className="text-xs font-mono font-semibold text-primary hover:underline cursor-pointer"
-                title="Λεπτομέρειες timer"
-              >
-                {formatElapsed(elapsed)}
-              </button>
-            </ActiveTimerPopover>
-            {!isNarrow && (
-              <span className="text-[10px] text-muted-foreground truncate max-w-[100px]">
-                {(activeTimer as any)?.task?.title || ''}
-              </span>
-            )}
-            <Tooltip delayDuration={200}>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-1.5 text-[10px] text-destructive hover:bg-destructive/10 gap-1"
-                  onClick={(e) => { e.stopPropagation(); stopTimer(); }}
-                >
-                  <Square className="h-3 w-3 fill-current" />
-                  End
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Σταμάτημα Timer</TooltipContent>
-            </Tooltip>
-          </div>
-        </>
-      )}
-
-      {!isMobile && <div className="w-px h-5 bg-border/50 shrink-0" />}
-
       {/* Search */}
       <div className="flex-1 min-w-0 max-w-2xl">
         <Popover open={searchOpen} onOpenChange={setSearchOpen}>

@@ -492,11 +492,6 @@ export function ProjectsTableView({
     progress: 120, budget: 140, agency_fee: 100, start_date: 120,
     end_date: 120, tasks: 100, actions: 80,
   };
-  const visibleOrderedColumns = orderedColumns.filter(c => c.visible);
-  const totalWidth = visibleOrderedColumns.reduce(
-    (s, c) => s + (columnWidths[c.id] ?? PROJ_DEFAULT_WIDTHS[c.id] ?? 120),
-    0
-  );
   const PROJ_HEADER_SORT: Record<string, SortField | undefined> = {
     name: 'name', status: 'status', progress: 'progress',
     budget: 'budget', start_date: 'start_date',

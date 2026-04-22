@@ -596,7 +596,7 @@ export function ClientsTableView({
             </TableBody>
           </Table>
         </DndContext>
-      </div>
+      </StickyHorizontalScroll>
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useLayout } from '@/contexts/LayoutContext';
 import SetupGuide from '@/components/onboarding/SetupGuide';
 import TopBarDateTime from './TopBarDateTime';
+import CompanySwitcher from './CompanySwitcher';
 
 interface SearchResult {
   id: string;
@@ -160,10 +161,15 @@ export default function TopBar({ onMobileMenuToggle, showHamburger, onQuickChatT
           </Popover>
         </div>
 
-        {/* Right actions */}
+        {/* Right actions (centered cluster) */}
         <div className="flex items-center gap-2 shrink-0 pointer-events-auto">
           <SetupGuide />
         </div>
+      </div>
+
+      {/* Far-right cluster — Company Switcher */}
+      <div className="ml-auto flex items-center gap-2 shrink-0">
+        <CompanySwitcher compact />
       </div>
     </div>
   );

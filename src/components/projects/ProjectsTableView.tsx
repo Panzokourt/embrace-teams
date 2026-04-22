@@ -310,6 +310,12 @@ export function ProjectsTableView({
     } else { setSortField(field); setSortDirection('asc'); }
   };
 
+  const onMenuSort = (field: string, dir: 'asc' | 'desc') => {
+    setSortField(field as SortField);
+    setSortDirection(dir);
+  };
+  const onClearSort = () => { setSortField(null); setSortDirection(null); };
+
   const getSortIcon = (field: SortField) => {
     if (sortField !== field) return <ArrowUpDown className="h-3 w-3 text-muted-foreground" />;
     if (sortDirection === 'asc') return <ArrowUp className="h-3 w-3" />;

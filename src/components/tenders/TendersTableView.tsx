@@ -566,7 +566,7 @@ export function TendersTableView({
             </TableBody>
           </Table>
         </DndContext>
-      </div>
+      </StickyHorizontalScroll>
     </div>
   );
 }

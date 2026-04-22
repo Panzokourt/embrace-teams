@@ -1155,7 +1155,7 @@ export function TasksTableView({
           </TableBody>
         </Table>
         </DndContext>
-      </div>
+      </StickyHorizontalScroll>
 
       {/* Bulk Actions Dialog */}
       <BulkActionsDialog

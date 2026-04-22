@@ -66,6 +66,8 @@ interface TableToolbarProps {
   groupBy?: GroupByField;
   onGroupByChange?: (groupBy: GroupByField) => void;
   groupOptions?: GroupOption[];
+  /** Optional extra actions rendered at the end of the toolbar (e.g. horizontal scroll buttons). */
+  extraActions?: React.ReactNode;
 }
 
 export function TableToolbar({

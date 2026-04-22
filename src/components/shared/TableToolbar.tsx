@@ -210,6 +210,9 @@ export function TableToolbar({
         </DropdownMenuContent>
       </DropdownMenu>
 
+      {/* Extra actions (e.g. horizontal scroll buttons) */}
+      {extraActions}
+
       {/* Bulk Actions (shown when items selected) */}
       {selectedCount > 0 && onBulkAction && bulkActions.length > 0 && (
         <div className="flex items-center gap-2 ml-4 pl-4 border-l">

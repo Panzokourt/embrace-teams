@@ -830,95 +830,46 @@ export function ProjectsTableView({
       />
 
       <div className="rounded-md border overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {canManage && (
-                <TableHead className="w-[40px]">
-                  <Checkbox checked={selectedIds.size > 0 && selectedIds.size === sortedProjects.length} onCheckedChange={handleSelectAll} />
-                </TableHead>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <Table>
+            <TableHeader>
+              <SortableContext items={visibleOrderedColumns.map(c => c.id)} strategy={horizontalListSortingStrategy}>
+                <TableRow>
+                  {visibleOrderedColumns.map(c => renderProjectHeader(c.id))}
+                </TableRow>
+              </SortableContext>
+            </TableHeader>
+            <TableBody>
+              {sortedProjects.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={visibleOrderedColumns.length} className="text-center py-8 text-muted-foreground">
+                    Δεν υπάρχουν έργα
+                  </TableCell>
+                </TableRow>
+              ) : groupBy === 'none' ? (
+                sortedProjects.map((project, idx) => renderProjectRow(project, idx))
+              ) : (
+                groupedProjects.map(group => {
+                  const startIdx = flatIndex;
+                  const rows = group.projects.map((project, idx) => renderProjectRow(project, startIdx + idx));
+                  flatIndex += group.projects.length;
+                  return (
+                    <GroupedTableSection
+                      key={group.key}
+                      groupKey={group.key}
+                      groupLabel={group.label}
+                      itemCount={group.projects.length}
+                      colSpan={visibleOrderedColumns.length}
+                      badge={group.badge}
+                    >
+                      {rows}
+                    </GroupedTableSection>
+                  );
+                })
               )}
-              <ResizableTableHeader width={getColumnWidth('name')} onWidthChange={(w) => setColumnWidth('name', w)} minWidth={150} className="cursor-pointer select-none" onClick={() => toggleSort('name')}>
-                <div className="flex items-center gap-1">Όνομα {getSortIcon('name')}</div>
-              </ResizableTableHeader>
-              
-              {isColumnVisible('client') && (
-                <ResizableTableHeader width={getColumnWidth('client')} onWidthChange={(w) => setColumnWidth('client', w)} minWidth={100}>Πελάτης</ResizableTableHeader>
-              )}
-
-              {isColumnVisible('assignees') && (
-                <ResizableTableHeader width={getColumnWidth('assignees')} onWidthChange={(w) => setColumnWidth('assignees', w)} minWidth={80}>Υπεύθυνοι</ResizableTableHeader>
-              )}
-              
-              {isColumnVisible('status') && (
-                <ResizableTableHeader width={getColumnWidth('status')} onWidthChange={(w) => setColumnWidth('status', w)} minWidth={100} className="cursor-pointer select-none" onClick={() => toggleSort('status')}>
-                  <div className="flex items-center gap-1">Κατάσταση {getSortIcon('status')}</div>
-                </ResizableTableHeader>
-              )}
-              
-              {isColumnVisible('progress') && (
-                <ResizableTableHeader width={getColumnWidth('progress')} onWidthChange={(w) => setColumnWidth('progress', w)} minWidth={80} className="cursor-pointer select-none" onClick={() => toggleSort('progress')}>
-                  <div className="flex items-center gap-1">Πρόοδος {getSortIcon('progress')}</div>
-                </ResizableTableHeader>
-              )}
-              
-              {isColumnVisible('budget') && (
-                <ResizableTableHeader width={getColumnWidth('budget')} onWidthChange={(w) => setColumnWidth('budget', w)} minWidth={100} className="cursor-pointer select-none" onClick={() => toggleSort('budget')}>
-                  <div className="flex items-center gap-1">Προϋπολογισμός {getSortIcon('budget')}</div>
-                </ResizableTableHeader>
-              )}
-              
-              {isColumnVisible('agency_fee') && (
-                <ResizableTableHeader width={getColumnWidth('agency_fee')} onWidthChange={(w) => setColumnWidth('agency_fee', w)} minWidth={80}>Agency Fee</ResizableTableHeader>
-              )}
-              
-              {isColumnVisible('start_date') && (
-                <ResizableTableHeader width={getColumnWidth('start_date')} onWidthChange={(w) => setColumnWidth('start_date', w)} minWidth={90} className="cursor-pointer select-none" onClick={() => toggleSort('start_date')}>
-                  <div className="flex items-center gap-1">Έναρξη {getSortIcon('start_date')}</div>
-                </ResizableTableHeader>
-              )}
-              
-              {isColumnVisible('end_date') && (
-                <ResizableTableHeader width={getColumnWidth('end_date')} onWidthChange={(w) => setColumnWidth('end_date', w)} minWidth={90}>Λήξη</ResizableTableHeader>
-              )}
-              
-              {isColumnVisible('tasks') && (
-                <ResizableTableHeader width={getColumnWidth('tasks')} onWidthChange={(w) => setColumnWidth('tasks', w)} minWidth={80}>Tasks</ResizableTableHeader>
-              )}
-              
-              <TableHead className="w-[80px]">Ενέργειες</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sortedProjects.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={visibleColumnCount + (canManage ? 1 : 0)} className="text-center py-8 text-muted-foreground">
-                  Δεν υπάρχουν έργα
-                </TableCell>
-              </TableRow>
-            ) : groupBy === 'none' ? (
-              sortedProjects.map((project, idx) => renderProjectRow(project, idx))
-            ) : (
-              groupedProjects.map(group => {
-                const startIdx = flatIndex;
-                const rows = group.projects.map((project, idx) => renderProjectRow(project, startIdx + idx));
-                flatIndex += group.projects.length;
-                return (
-                  <GroupedTableSection
-                    key={group.key}
-                    groupKey={group.key}
-                    groupLabel={group.label}
-                    itemCount={group.projects.length}
-                    colSpan={visibleColumnCount + (canManage ? 1 : 0)}
-                    badge={group.badge}
-                  >
-                    {rows}
-                  </GroupedTableSection>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
+            </TableBody>
+          </Table>
+        </DndContext>
       </div>
     </div>
   );

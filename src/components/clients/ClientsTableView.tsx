@@ -558,7 +558,7 @@ export function ClientsTableView({
             <TableBody>
               {sortedClients.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={order.length + 1} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={visibleOrder.length + 1} className="h-24 text-center text-muted-foreground">
                     Δεν βρέθηκαν πελάτες
                   </TableCell>
                 </TableRow>

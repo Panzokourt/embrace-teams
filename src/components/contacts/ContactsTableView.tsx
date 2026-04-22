@@ -49,6 +49,7 @@ export function ContactsTableView({ contacts, loading, onEdit, onRefresh }: Cont
   const [entityFilter, setEntityFilter] = useState('all');
 
   const layout = useColumnLayout<ColKey>({ storageKey: 'contacts-table', columns: COLUMNS });
+  const scrollRef = useRef<StickyHorizontalScrollHandle>(null);
 
   const filtered = useMemo(() => contacts.filter(c => {
     const matchesSearch = !search || c.name?.toLowerCase().includes(search.toLowerCase()) ||

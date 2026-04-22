@@ -149,6 +149,7 @@ export function ClientsTableView({
   canManage
 }: ClientsTableViewProps) {
   const navigate = useNavigate();
+  const scrollRef = useRef<StickyHorizontalScrollHandle>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');

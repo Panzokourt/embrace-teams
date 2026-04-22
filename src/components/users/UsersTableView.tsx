@@ -100,6 +100,7 @@ export function UsersTableView({
   const navigate = useNavigate();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const layout = useColumnLayout<ColKey>({ storageKey: 'users-table', columns: COLUMNS });
+  const scrollRef = useRef<StickyHorizontalScrollHandle>(null);
 
   const sortedUsers = useMemo(() => {
     if (!layout.sortField) return users;

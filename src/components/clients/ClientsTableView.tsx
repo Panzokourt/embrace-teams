@@ -16,9 +16,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+  ContextMenuCheckboxItem,
+} from '@/components/ui/context-menu';
 import { 
   MoreHorizontal, Pencil, Trash2, Building2, Mail, Phone, 
-  MapPin, ExternalLink, ArrowUpDown, ArrowUp, ArrowDown, GripVertical
+  MapPin, ExternalLink, ArrowUpDown, ArrowUp, ArrowDown, GripVertical,
+  EyeOff, Eye, RotateCcw, Pin, Columns3
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { exportToCSV } from '@/utils/exportUtils';

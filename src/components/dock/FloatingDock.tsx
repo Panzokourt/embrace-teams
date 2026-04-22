@@ -3,6 +3,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
 import { cn } from '@/lib/utils';
 import { useDock, type DockPanelId } from '@/contexts/DockContext';
 import { useChat } from '@/contexts/ChatContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 import SecretaryChat from '@/components/secretary/SecretaryChat';
 import { NotificationList } from '@/components/notifications/NotificationList';
@@ -10,6 +11,10 @@ import { ActivityFeedContent } from '@/components/activity/ActivityFeedContent';
 import MemoryManager from '@/components/secretary/MemoryManager';
 import FloatingDockPanel from './FloatingDockPanel';
 import DockChatPicker from './DockChatPicker';
+import DockWorkDayClock from './DockWorkDayClock';
+import DockActiveTimer from './DockActiveTimer';
+import DockWorkMode from './DockWorkMode';
+import DockXPBadge from './DockXPBadge';
 
 interface DockItem {
   id: Exclude<DockPanelId, null> | 'quick-chat';
@@ -27,6 +32,7 @@ interface FloatingDockProps {
 export default function FloatingDock({ onQuickChatToggle, registerSendHandler }: FloatingDockProps) {
   const { activePanel, togglePanel, closePanel } = useDock();
   const { floatingWindows } = useChat();
+  const { user } = useAuth();
 
   const items: DockItem[] = [
     { id: 'secretary', label: 'Secretary', icon: Bot, kind: 'panel' },
@@ -97,6 +103,22 @@ export default function FloatingDock({ onQuickChatToggle, registerSendHandler }:
           'animate-fade-in'
         )}
       >
+        {/* Workday clock + status */}
+        <DockWorkDayClock />
+
+        {/* Active task timer (only when running) */}
+        <DockActiveTimer />
+
+        {/* Divider */}
+        <div className="w-px h-6 bg-white/20 mx-1" />
+
+        {/* XP + Work Mode */}
+        <DockXPBadge userId={user?.id} />
+        <DockWorkMode />
+
+        {/* Divider */}
+        <div className="w-px h-6 bg-white/20 mx-1" />
+
         {items.map((item) => {
           const Icon = item.icon;
           const isActive = item.kind === 'panel' || item.kind === 'chat'

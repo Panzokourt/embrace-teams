@@ -1,20 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, FolderKanban, CheckSquare, FileText, Users, BookUser, Zap, Menu, Timer, Square, Sparkles } from 'lucide-react';
+import { Search, FolderKanban, CheckSquare, FileText, Users, BookUser, Menu, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
 import { supabase } from '@/integrations/supabase/client';
-import { cn } from '@/lib/utils';
-import WorkDayClock from '@/components/topbar/WorkDayClock';
-import { useFocusMode } from '@/contexts/FocusContext';
-import { useAuth } from '@/contexts/AuthContext';
-import { XPBadge } from '@/components/gamification/XPBadge';
 import { useLayout } from '@/contexts/LayoutContext';
-import { useTimeTracking } from '@/hooks/useTimeTracking';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import SetupGuide from '@/components/onboarding/SetupGuide';
-import { ActiveTimerPopover } from '@/components/time-tracking/ActiveTimerPopover';
 
 interface SearchResult {
   id: string;
@@ -38,10 +31,7 @@ interface TopBarProps {
 
 export default function TopBar({ onMobileMenuToggle, showHamburger, onQuickChatToggle }: TopBarProps) {
   const navigate = useNavigate();
-  const { enterFocus } = useFocusMode();
-  const { user } = useAuth();
   const { layoutState } = useLayout();
-  const { activeTimer, elapsed, formatElapsed, stopTimer, fetchActiveTimer } = useTimeTracking();
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);

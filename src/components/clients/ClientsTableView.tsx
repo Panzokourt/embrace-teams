@@ -119,6 +119,26 @@ const DEFAULT_ORDER: ColKey[] = ['name', 'contact', 'sector', 'address', 'status
 const MIN_WIDTH = 60;
 const STORAGE_KEY = 'clients-table-col-widths-v1';
 const ORDER_STORAGE_KEY = 'clients-table-col-order-v1';
+const HIDDEN_STORAGE_KEY = 'clients-table-col-hidden-v1';
+
+const COL_LABELS: Record<ColKey, string> = {
+  name: 'Επωνυμία',
+  contact: 'Επικοινωνία',
+  sector: 'Τομέας',
+  address: 'Διεύθυνση',
+  status: 'Status',
+  projects: 'Έργα',
+  date: 'Ημ/νία',
+  actions: 'Ενέργειες',
+};
+
+const SORTABLE_FIELD_BY_COL: Partial<Record<ColKey, SortField>> = {
+  name: 'name',
+  contact: 'contact_email',
+  status: 'status',
+  projects: 'projectCount',
+  date: 'created_at',
+};
 
 export function ClientsTableView({
   clients,

@@ -39,9 +39,8 @@ export const StickyHorizontalScroll = forwardRef<
   const syncingRef = useRef<'real' | 'proxy' | null>(null);
 
   const [hasOverflow, setHasOverflow] = useState(false);
-  const [bottomVisible, setBottomVisible] = useState(true);
+  const [nativeScrollbarVisible, setNativeScrollbarVisible] = useState(false);
   const [contentWidth, setContentWidth] = useState(0);
-  const [viewportWidth, setViewportWidth] = useState(0);
   const [proxyRect, setProxyRect] = useState<{ left: number; width: number } | null>(null);
 
   useImperativeHandle(
@@ -61,10 +60,13 @@ export const StickyHorizontalScroll = forwardRef<
 
     const update = () => {
       setContentWidth(el.scrollWidth);
-      setViewportWidth(el.clientWidth);
       setHasOverflow(el.scrollWidth - el.clientWidth > 1);
       const rect = el.getBoundingClientRect();
       setProxyRect({ left: rect.left, width: rect.width });
+      // Native scrollbar is "visible" only when the bottom of the scroll
+      // container is itself within the viewport.
+      const vh = window.innerHeight || document.documentElement.clientHeight;
+      setNativeScrollbarVisible(rect.bottom <= vh && rect.bottom > 0);
     };
 
     update();
@@ -79,41 +81,6 @@ export const StickyHorizontalScroll = forwardRef<
       ro.disconnect();
       window.removeEventListener('resize', update);
       window.removeEventListener('scroll', update, true);
-    };
-  }, []);
-
-  // Track whether the bottom edge of the scroll container is in viewport
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-
-    // Sentinel at the bottom of the scroll wrapper
-    const sentinel = document.createElement('div');
-    sentinel.style.position = 'absolute';
-    sentinel.style.bottom = '0';
-    sentinel.style.left = '0';
-    sentinel.style.right = '0';
-    sentinel.style.height = '1px';
-    sentinel.style.pointerEvents = 'none';
-
-    const wrapper = el.parentElement;
-    if (!wrapper) return;
-    const prevPosition = wrapper.style.position;
-    if (!prevPosition) wrapper.style.position = 'relative';
-    wrapper.appendChild(sentinel);
-
-    const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => setBottomVisible(entry.isIntersecting));
-      },
-      { threshold: 0, rootMargin: '0px 0px -16px 0px' }
-    );
-    io.observe(sentinel);
-
-    return () => {
-      io.disconnect();
-      sentinel.remove();
-      wrapper.style.position = prevPosition;
     };
   }, []);
 
@@ -148,7 +115,13 @@ export const StickyHorizontalScroll = forwardRef<
     };
   }, []);
 
-  const showProxy = hasOverflow && !bottomVisible && proxyRect && proxyRect.width > 0;
+  // Always show the proxy bar whenever there is horizontal overflow, so users
+  // never have to scroll to the bottom of the page to find a scrollbar.
+  // Always show the proxy bar whenever there is horizontal overflow AND the
+  // real scrollbar is currently off-screen. This way users never have to
+  // scroll the page down to find the horizontal scrollbar.
+  const showProxy =
+    hasOverflow && !nativeScrollbarVisible && proxyRect && proxyRect.width > 0;
 
   return (
     <>
@@ -162,7 +135,7 @@ export const StickyHorizontalScroll = forwardRef<
       {showProxy && (
         <div
           aria-hidden="true"
-          className="fixed bottom-0 z-30 h-3 overflow-x-auto overflow-y-hidden rounded-t border-t border-border/60 bg-background/95 shadow-[0_-2px_8px_-2px_hsl(var(--foreground)/0.15)] backdrop-blur supports-[backdrop-filter]:bg-background/80 [&::-webkit-scrollbar]:h-3 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-border hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/50"
+          className="fixed bottom-0 z-30 h-3.5 overflow-x-auto overflow-y-hidden border-t border-border bg-background/95 shadow-[0_-4px_12px_-2px_hsl(var(--foreground)/0.18)] backdrop-blur supports-[backdrop-filter]:bg-background/85 [&::-webkit-scrollbar]:h-3.5 [&::-webkit-scrollbar-track]:bg-muted/40 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 [&::-webkit-scrollbar-thumb]:border-2 [&::-webkit-scrollbar-thumb]:border-background hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/70"
           style={{
             left: proxyRect.left,
             width: proxyRect.width,

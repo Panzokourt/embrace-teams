@@ -14,6 +14,7 @@ import { useLayout } from '@/contexts/LayoutContext';
 import { useTimeTracking } from '@/hooks/useTimeTracking';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import SetupGuide from '@/components/onboarding/SetupGuide';
+import { ActiveTimerPopover } from '@/components/time-tracking/ActiveTimerPopover';
 
 interface SearchResult {
   id: string;

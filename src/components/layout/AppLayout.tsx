@@ -196,7 +196,7 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
         </div>
       )}
 
-      {/* Middle column: TopBar + Content + Dock (centered within this column) */}
+      {/* Middle column: TopBar + Content + Dock + QuickChat (centered within this column) */}
       <div className="flex-1 min-w-0 flex flex-col h-full relative">
         <TopBar
           onMobileMenuToggle={() => setMobileSidebarOpen(true)}
@@ -207,13 +207,13 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
           <Outlet />
         </main>
 
-        {/* Floating dock — centered within main content area (not viewport) */}
+        {/* Floating dock + QuickChat — centered within main content area (not viewport) */}
         <FloatingDock onQuickChatToggle={toggleQuickChat} registerSendHandler={registerSendHandler} />
+        <QuickChatBar isOpen={quickChatOpen} onToggle={toggleQuickChat} />
       </div>
 
       <ChatFloatingBubbles />
       <FocusOverlay />
-      <QuickChatBar isOpen={quickChatOpen} onToggle={toggleQuickChat} />
     </div>
   );
 }

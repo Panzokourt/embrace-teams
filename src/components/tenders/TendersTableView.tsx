@@ -519,10 +519,11 @@ export function TendersTableView({
         groupBy={groupBy}
         onGroupByChange={setGroupBy}
         groupOptions={GROUP_OPTIONS}
+        extraActions={<HorizontalScrollButtons containerRef={scrollRef} />}
       />
 
       {/* Table */}
-      <div className="rounded-md border overflow-x-auto">
+      <StickyHorizontalScroll ref={scrollRef} className="rounded-md border">
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}

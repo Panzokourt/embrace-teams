@@ -579,7 +579,7 @@ export function ClientsTableView({
                         onCheckedChange={() => toggleSelect(client.id)}
                       />
                     </TableCell>
-                    {order.map(key => (
+                    {visibleOrder.map(key => (
                       <TableCell key={key} style={{ width: widths[key] }} className="overflow-hidden">
                         {renderCell(key, client)}
                       </TableCell>

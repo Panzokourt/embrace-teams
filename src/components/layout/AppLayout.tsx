@@ -85,7 +85,7 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
   // Register open panel for voice command
   useEffect(() => {
     if (onRegisterOpenPanel) {
-      onRegisterOpenPanel(() => openPanel('secretary'));
+      onRegisterOpenPanel(() => () => openPanel('secretary'));
     }
     return () => onRegisterOpenPanel?.(null);
   }, [onRegisterOpenPanel, openPanel]);

@@ -99,8 +99,7 @@ export default function FloatingDock({ onQuickChatToggle, registerSendHandler }:
           'rounded-full border border-white/10',
           'bg-gradient-to-r from-violet-600 via-fuchsia-600 to-indigo-600',
           'shadow-[0_8px_32px_-4px_rgba(139,92,246,0.5)]',
-          'backdrop-blur-xl',
-          'animate-fade-in'
+          'backdrop-blur-xl'
         )}
       >
         {/* Workday clock + status */}

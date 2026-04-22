@@ -98,6 +98,7 @@ export function TendersTableView({
   canManage,
 }: TendersTableViewProps) {
   const navigate = useNavigate();
+  const layout = useTableViews({ storageKey: 'tenders_table', defaultColumns: DEFAULT_COLUMNS });
   const {
     columns,
     setColumns,
@@ -111,7 +112,14 @@ export function TendersTableView({
     loadView,
     deleteView,
     resetToDefault,
-  } = useTableViews({ storageKey: 'tenders_table', defaultColumns: DEFAULT_COLUMNS });
+    orderedColumns,
+    sensors,
+    handleDragEnd,
+    DndContext,
+    SortableContext,
+    horizontalListSortingStrategy,
+    closestCenter,
+  } = layout;
 
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
@@ -212,6 +220,12 @@ export function TendersTableView({
     }
   };
 
+  const onMenuSort = (field: string, dir: 'asc' | 'desc') => {
+    setSortField(field as SortField);
+    setSortDirection(dir);
+  };
+  const onClearSort = () => { setSortField(null); setSortDirection(null); };
+
   const getSortIcon = (field: SortField) => {
     if (sortField !== field) return <ArrowUpDown className="h-3 w-3 text-muted-foreground" />;
     if (sortDirection === 'asc') return <ArrowUp className="h-3 w-3" />;
@@ -271,40 +285,89 @@ export function TendersTableView({
     toast.success('Εξαγωγή Excel ολοκληρώθηκε!');
   }, [tenders]);
 
-  const renderTenderRow = (tender: Tender) => {
-    const deadlineInfo = getDeadlineInfo(tender.submission_deadline);
-    
-    return (
-      <TableRow 
-        key={tender.id} 
-        className="group hover:bg-muted/50"
-      >
-        {/* Name */}
-        <TableCell className="font-medium" style={{ width: getColumnWidth('name') }}>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
-              onClick={() => navigate(`/tenders/${tender.id}`)}
-              title="Άνοιγμα διαγωνισμού"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-            </Button>
-            <div onClick={(e) => e.stopPropagation()} className="flex-1 min-w-0">
-              <EnhancedInlineEditCell
-                value={tender.name}
-                onSave={(val) => onInlineUpdate(tender.id, 'name', val)}
-                type="text"
-                disabled={!canManage}
-              />
-            </div>
-          </div>
-        </TableCell>
+  // Header registry: each entry produces the right ResizableTableHeader content
+  const HEADER_MIN_WIDTHS: Record<string, number> = {
+    name: 150, client: 100, stage: 100, deadline: 100,
+    days_left: 80, budget: 100, probability: 80, progress: 80, actions: 80,
+  };
+  const HEADER_SORT: Record<string, SortField | undefined> = {
+    name: 'name', stage: 'stage', deadline: 'deadline',
+    budget: 'budget', probability: 'probability',
+  };
+  const HEADER_LABELS: Record<string, string> = {
+    name: 'Όνομα', client: 'Πελάτης', stage: 'Στάδιο',
+    deadline: 'Προθεσμία', days_left: 'Ημέρες', budget: 'Προϋπολογισμός',
+    probability: 'Πιθανότητα', progress: 'Πρόοδος', actions: 'Ενέργειες',
+  };
 
-        {/* Client */}
-        {isColumnVisible('client') && (
-          <TableCell style={{ width: getColumnWidth('client') }} onClick={(e) => e.stopPropagation()}>
+  const renderHeaderCell = (colId: string) => {
+    if (colId === 'actions') {
+      return (
+        <ResizableTableHeader
+          key={colId}
+          columnId="actions"
+          layout={layout}
+          width={getColumnWidth('actions') ?? 80}
+          minWidth={80}
+          className="w-[80px]"
+        >
+          Ενέργειες
+        </ResizableTableHeader>
+      );
+    }
+    const sf = HEADER_SORT[colId];
+    return (
+      <ResizableTableHeader
+        key={colId}
+        columnId={colId}
+        layout={layout}
+        width={getColumnWidth(colId)}
+        onWidthChange={(w) => setColumnWidth(colId, w)}
+        minWidth={HEADER_MIN_WIDTHS[colId] ?? 80}
+        className={cn(sf && 'cursor-pointer select-none')}
+        onClick={sf ? () => toggleSort(sf) : undefined}
+        sortField={sf}
+        currentSortField={sortField}
+        currentSortDirection={sortDirection}
+        onSort={onMenuSort}
+        onClearSort={onClearSort}
+      >
+        <div className="flex items-center gap-1">
+          {HEADER_LABELS[colId]} {sf && getSortIcon(sf)}
+        </div>
+      </ResizableTableHeader>
+    );
+  };
+
+  const renderCellForColumn = (colId: string, tender: Tender, deadlineInfo: ReturnType<typeof getDeadlineInfo>) => {
+    switch (colId) {
+      case 'name':
+        return (
+          <TableCell key="name" className="font-medium" style={{ width: getColumnWidth('name') }}>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
+                onClick={() => navigate(`/tenders/${tender.id}`)}
+                title="Άνοιγμα διαγωνισμού"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+              </Button>
+              <div onClick={(e) => e.stopPropagation()} className="flex-1 min-w-0">
+                <EnhancedInlineEditCell
+                  value={tender.name}
+                  onSave={(val) => onInlineUpdate(tender.id, 'name', val)}
+                  type="text"
+                  disabled={!canManage}
+                />
+              </div>
+            </div>
+          </TableCell>
+        );
+      case 'client':
+        return (
+          <TableCell key="client" style={{ width: getColumnWidth('client') }} onClick={(e) => e.stopPropagation()}>
             <EnhancedInlineEditCell
               value={tender.client_id}
               onSave={(val) => onInlineUpdate(tender.id, 'client_id', val)}
@@ -315,11 +378,10 @@ export function TendersTableView({
               disabled={!canManage}
             />
           </TableCell>
-        )}
-
-        {/* Stage */}
-        {isColumnVisible('stage') && (
-          <TableCell style={{ width: getColumnWidth('stage') }} onClick={(e) => e.stopPropagation()}>
+        );
+      case 'stage':
+        return (
+          <TableCell key="stage" style={{ width: getColumnWidth('stage') }} onClick={(e) => e.stopPropagation()}>
             <EnhancedInlineEditCell
               value={tender.stage}
               onSave={(val) => onInlineUpdate(tender.id, 'stage', val)}
@@ -328,11 +390,10 @@ export function TendersTableView({
               disabled={!canManage}
             />
           </TableCell>
-        )}
-
-        {/* Deadline */}
-        {isColumnVisible('deadline') && (
-          <TableCell style={{ width: getColumnWidth('deadline') }} onClick={(e) => e.stopPropagation()}>
+        );
+      case 'deadline':
+        return (
+          <TableCell key="deadline" style={{ width: getColumnWidth('deadline') }} onClick={(e) => e.stopPropagation()}>
             <EnhancedInlineEditCell
               value={tender.submission_deadline}
               onSave={(val) => onInlineUpdate(tender.id, 'submission_deadline', val)}
@@ -340,11 +401,10 @@ export function TendersTableView({
               disabled={!canManage}
             />
           </TableCell>
-        )}
-
-        {/* Days Left */}
-        {isColumnVisible('days_left') && (
-          <TableCell style={{ width: getColumnWidth('days_left') }}>
+        );
+      case 'days_left':
+        return (
+          <TableCell key="days_left" style={{ width: getColumnWidth('days_left') }}>
             {deadlineInfo && (
               <div className={cn(
                 "flex items-center gap-1 text-sm",
@@ -356,18 +416,17 @@ export function TendersTableView({
                 ) : (
                   <Clock className="h-3 w-3" />
                 )}
-                {deadlineInfo.isOverdue 
+                {deadlineInfo.isOverdue
                   ? `${Math.abs(deadlineInfo.daysLeft)} μέρες πριν`
                   : `${deadlineInfo.daysLeft} μέρες`
                 }
               </div>
             )}
           </TableCell>
-        )}
-
-        {/* Budget */}
-        {isColumnVisible('budget') && (
-          <TableCell style={{ width: getColumnWidth('budget') }} onClick={(e) => e.stopPropagation()}>
+        );
+      case 'budget':
+        return (
+          <TableCell key="budget" style={{ width: getColumnWidth('budget') }} onClick={(e) => e.stopPropagation()}>
             <EnhancedInlineEditCell
               value={tender.budget}
               onSave={(val) => onInlineUpdate(tender.id, 'budget', val)}
@@ -376,11 +435,10 @@ export function TendersTableView({
               disabled={!canManage}
             />
           </TableCell>
-        )}
-
-        {/* Probability */}
-        {isColumnVisible('probability') && (
-          <TableCell style={{ width: getColumnWidth('probability') }} onClick={(e) => e.stopPropagation()}>
+        );
+      case 'probability':
+        return (
+          <TableCell key="probability" style={{ width: getColumnWidth('probability') }} onClick={(e) => e.stopPropagation()}>
             <EnhancedInlineEditCell
               value={tender.probability ?? 50}
               onSave={(val) => onInlineUpdate(tender.id, 'probability', val)}
@@ -388,11 +446,10 @@ export function TendersTableView({
               disabled={!canManage}
             />
           </TableCell>
-        )}
-
-        {/* Progress */}
-        {isColumnVisible('progress') && (
-          <TableCell style={{ width: getColumnWidth('progress') }} onClick={(e) => e.stopPropagation()}>
+        );
+      case 'progress':
+        return (
+          <TableCell key="progress" style={{ width: getColumnWidth('progress') }} onClick={(e) => e.stopPropagation()}>
             <EnhancedInlineEditCell
               value={tender.progress ?? 0}
               onSave={(val) => onInlineUpdate(tender.id, 'progress', val)}
@@ -400,18 +457,31 @@ export function TendersTableView({
               disabled={!canManage}
             />
           </TableCell>
-        )}
+        );
+      case 'actions':
+        return (
+          <TableCell key="actions" onClick={(e) => e.stopPropagation()}>
+            {canManage && (
+              <EditDeleteActions
+                onEdit={() => onEdit(tender)}
+                onDelete={() => onDelete(tender.id)}
+                itemName={tender.name}
+              />
+            )}
+          </TableCell>
+        );
+      default:
+        return null;
+    }
+  };
 
-        {/* Actions */}
-        <TableCell onClick={(e) => e.stopPropagation()}>
-          {canManage && (
-            <EditDeleteActions
-              onEdit={() => onEdit(tender)}
-              onDelete={() => onDelete(tender.id)}
-              itemName={tender.name}
-            />
-          )}
-        </TableCell>
+  const visibleOrderedColumns = orderedColumns.filter(c => c.visible);
+
+  const renderTenderRow = (tender: Tender) => {
+    const deadlineInfo = getDeadlineInfo(tender.submission_deadline);
+    return (
+      <TableRow key={tender.id} className="group hover:bg-muted/50">
+        {visibleOrderedColumns.map(c => renderCellForColumn(c.id, tender, deadlineInfo))}
       </TableRow>
     );
   };
@@ -443,135 +513,48 @@ export function TendersTableView({
 
       {/* Table */}
       <div className="rounded-md border overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <ResizableTableHeader 
-                width={getColumnWidth('name')}
-                onWidthChange={(w) => setColumnWidth('name', w)}
-                minWidth={150}
-                className="cursor-pointer select-none"
-                onClick={() => toggleSort('name')}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <Table>
+            <TableHeader>
+              <SortableContext
+                items={visibleOrderedColumns.map(c => c.id)}
+                strategy={horizontalListSortingStrategy}
               >
-                <div className="flex items-center gap-1">
-                  Όνομα {getSortIcon('name')}
-                </div>
-              </ResizableTableHeader>
-              
-              {isColumnVisible('client') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('client')}
-                  onWidthChange={(w) => setColumnWidth('client', w)}
-                  minWidth={100}
-                >
-                  Πελάτης
-                </ResizableTableHeader>
+                <TableRow>
+                  {visibleOrderedColumns.map(c => renderHeaderCell(c.id))}
+                </TableRow>
+              </SortableContext>
+            </TableHeader>
+            <TableBody>
+              {sortedTenders.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={visibleOrderedColumns.length} className="text-center py-8 text-muted-foreground">
+                    Δεν υπάρχουν διαγωνισμοί
+                  </TableCell>
+                </TableRow>
+              ) : groupBy === 'none' ? (
+                sortedTenders.map(tender => renderTenderRow(tender))
+              ) : (
+                groupedTenders.map(group => (
+                  <GroupedTableSection
+                    key={group.key}
+                    groupKey={group.key}
+                    groupLabel={group.label}
+                    itemCount={group.tenders.length}
+                    colSpan={visibleOrderedColumns.length}
+                    badge={group.badge}
+                  >
+                    {group.tenders.map(tender => renderTenderRow(tender))}
+                  </GroupedTableSection>
+                ))
               )}
-              
-              {isColumnVisible('stage') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('stage')}
-                  onWidthChange={(w) => setColumnWidth('stage', w)}
-                  minWidth={100}
-                  className="cursor-pointer select-none"
-                  onClick={() => toggleSort('stage')}
-                >
-                  <div className="flex items-center gap-1">
-                    Στάδιο {getSortIcon('stage')}
-                  </div>
-                </ResizableTableHeader>
-              )}
-              
-              {isColumnVisible('deadline') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('deadline')}
-                  onWidthChange={(w) => setColumnWidth('deadline', w)}
-                  minWidth={100}
-                  className="cursor-pointer select-none"
-                  onClick={() => toggleSort('deadline')}
-                >
-                  <div className="flex items-center gap-1">
-                    Προθεσμία {getSortIcon('deadline')}
-                  </div>
-                </ResizableTableHeader>
-              )}
-              
-              {isColumnVisible('days_left') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('days_left')}
-                  onWidthChange={(w) => setColumnWidth('days_left', w)}
-                  minWidth={80}
-                >
-                  Ημέρες
-                </ResizableTableHeader>
-              )}
-              
-              {isColumnVisible('budget') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('budget')}
-                  onWidthChange={(w) => setColumnWidth('budget', w)}
-                  minWidth={100}
-                  className="cursor-pointer select-none"
-                  onClick={() => toggleSort('budget')}
-                >
-                  <div className="flex items-center gap-1">
-                    Προϋπολογισμός {getSortIcon('budget')}
-                  </div>
-                </ResizableTableHeader>
-              )}
-              
-              {isColumnVisible('probability') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('probability')}
-                  onWidthChange={(w) => setColumnWidth('probability', w)}
-                  minWidth={80}
-                  className="cursor-pointer select-none"
-                  onClick={() => toggleSort('probability')}
-                >
-                  <div className="flex items-center gap-1">
-                    Πιθανότητα {getSortIcon('probability')}
-                  </div>
-                </ResizableTableHeader>
-              )}
-              
-              {isColumnVisible('progress') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('progress')}
-                  onWidthChange={(w) => setColumnWidth('progress', w)}
-                  minWidth={80}
-                >
-                  Πρόοδος
-                </ResizableTableHeader>
-              )}
-              
-              <TableHead className="w-[80px]">Ενέργειες</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sortedTenders.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={visibleColumnCount} className="text-center py-8 text-muted-foreground">
-                  Δεν υπάρχουν διαγωνισμοί
-                </TableCell>
-              </TableRow>
-            ) : groupBy === 'none' ? (
-              sortedTenders.map(tender => renderTenderRow(tender))
-            ) : (
-              groupedTenders.map(group => (
-                <GroupedTableSection
-                  key={group.key}
-                  groupKey={group.key}
-                  groupLabel={group.label}
-                  itemCount={group.tenders.length}
-                  colSpan={visibleColumnCount}
-                  badge={group.badge}
-                >
-                  {group.tenders.map(tender => renderTenderRow(tender))}
-                </GroupedTableSection>
-              ))
-            )}
-          </TableBody>
-        </Table>
+            </TableBody>
+          </Table>
+        </DndContext>
       </div>
     </div>
   );

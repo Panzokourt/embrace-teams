@@ -412,7 +412,19 @@ export function TasksTableView({
   const isColumnVisible = (columnId: string) => 
     columns.find(c => c.id === columnId)?.visible ?? true;
 
-  const getColumnWidth = (columnId: string) => columnWidths[columnId];
+  const TASK_DEFAULT_WIDTHS: Record<string, number> = {
+    select: 44, title: 360, assignee: 160, project: 180, deliverable: 160,
+    team: 140, start_date: 120, due_date: 120, status: 160, priority: 140,
+    progress: 140, estimated_hours: 110, actual_hours: 110,
+    task_type: 130, category: 140, timer: 110, actions: 80,
+  };
+
+  const getColumnWidth = (columnId: string) =>
+    columnWidths[columnId] ?? TASK_DEFAULT_WIDTHS[columnId];
+
+  const totalWidth = orderedColumns
+    .filter(c => c.visible && (c.id !== 'select' || canManage) && (c.id !== 'project' || showProject))
+    .reduce((s, c) => s + (columnWidths[c.id] ?? TASK_DEFAULT_WIDTHS[c.id] ?? 120), 0);
 
   const userOptions = users.map(u => ({
     value: u.id,
@@ -958,7 +970,7 @@ export function TasksTableView({
       {/* Table */}
       <div className="rounded-md border overflow-x-auto">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <Table>
+        <Table style={{ width: totalWidth, tableLayout: 'fixed' }}>
           <TableHeader>
             <SortableContext items={orderedColumns.filter(c => c.visible).map(c => c.id)} strategy={horizontalListSortingStrategy}>
             <TableRow>

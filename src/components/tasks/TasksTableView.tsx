@@ -381,6 +381,12 @@ export function TasksTableView({
     return <ArrowDown className="h-3 w-3" />;
   };
 
+  const onMenuSort = (field: string, dir: 'asc' | 'desc') => {
+    setSortField(field as SortField);
+    setSortDirection(dir);
+  };
+  const onClearSort = () => { setSortField(null); setSortDirection(null); };
+
   const toggleExpand = (taskId: string) => {
     const newExpanded = new Set(expandedTasks);
     if (newExpanded.has(taskId)) newExpanded.delete(taskId);

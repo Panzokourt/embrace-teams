@@ -87,6 +87,7 @@ export function TableToolbar({
   groupBy = 'none',
   onGroupByChange,
   groupOptions = DEFAULT_GROUP_OPTIONS,
+  extraActions,
 }: TableToolbarProps) {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [viewName, setViewName] = useState('');

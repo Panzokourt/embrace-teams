@@ -756,6 +756,10 @@ export function ProjectsTableView({
 
   // Computed visible columns (respect canManage for the "select" column)
   const visibleOrderedColumns = orderedColumns.filter(c => c.visible && (c.id !== 'select' || canManage));
+  const totalWidth = visibleOrderedColumns.reduce(
+    (s, c) => s + (columnWidths[c.id] ?? PROJ_DEFAULT_WIDTHS[c.id] ?? 120),
+    0
+  );
 
   const renderProjectRow = (project: Project, flatIndex: number) => {
     const assignees = getProjectAssignees(project);
@@ -836,7 +840,7 @@ export function ProjectsTableView({
 
       <div className="rounded-md border overflow-x-auto">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <Table>
+          <Table style={{ width: totalWidth, tableLayout: 'fixed' }}>
             <TableHeader>
               <SortableContext items={visibleOrderedColumns.map(c => c.id)} strategy={horizontalListSortingStrategy}>
                 <TableRow>

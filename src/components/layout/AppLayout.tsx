@@ -221,9 +221,13 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
 function AppLayoutWithVoice() {
   const [openPanelFn, setOpenPanelFn] = useState<(() => void) | null>(null);
 
+  const handleRegisterOpenPanel = useCallback((fn: (() => void) | null) => {
+    setOpenPanelFn(() => fn);
+  }, []);
+
   return (
     <VoiceCommandProvider onOpenSecretaryPanel={() => openPanelFn?.()}>
-      <AppLayoutInner onRegisterOpenPanel={setOpenPanelFn} />
+      <AppLayoutInner onRegisterOpenPanel={handleRegisterOpenPanel} />
     </VoiceCommandProvider>
   );
 }

@@ -102,79 +102,78 @@ export default function TopBar({ onMobileMenuToggle, showHamburger, onQuickChatT
   }, {});
 
   return (
-    <div className="sticky top-0 z-20 h-12 border-b border-border/40 bg-card/80 backdrop-blur-lg px-3 md:px-4 flex items-center gap-3 shrink-0">
-      {/* Hamburger for mobile */}
+    <div className="sticky top-0 z-20 h-12 border-b border-border/40 bg-card/80 backdrop-blur-lg px-3 md:px-4 flex items-center shrink-0 relative">
+      {/* Hamburger for mobile — stays in flow on the left */}
       {showHamburger && (
-        <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={onMobileMenuToggle}>
+        <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8 mr-2" onClick={onMobileMenuToggle}>
           <Menu className="h-4 w-4" />
         </Button>
       )}
 
-      {/* Search */}
-      <div className="flex-1 min-w-0 max-w-2xl">
-        <Popover open={searchOpen} onOpenChange={setSearchOpen}>
-          <PopoverTrigger asChild>
-            <button
-              className="flex h-8 w-full items-center gap-2 rounded-lg border border-border/60 px-2.5 text-xs transition-colors focus:outline-none bg-muted text-muted-foreground hover:bg-muted/80 min-w-0"
-              onClick={() => setSearchOpen(true)}
-            >
-              <Search className="h-3.5 w-3.5 shrink-0" />
-              {!isMobile && (
-                <span className="truncate text-xs">{isNarrow ? 'Αναζήτηση...' : 'Αναζήτηση projects, tasks...'}</span>
-              )}
-              {!isNarrow && (
-                <kbd className="ml-auto hidden rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground md:inline shrink-0">
-                  ⌘K
-                </kbd>
-              )}
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[var(--radix-popover-trigger-width)] min-w-[300px] p-0" align="start" sideOffset={8}>
-            <Command shouldFilter={false}>
-              <CommandInput placeholder="Αναζήτηση σε projects, tasks, tenders, clients..." value={query} onValueChange={onQueryChange} />
-              <CommandList>
-                {query.length >= 2 && !loading && results.length === 0 && <CommandEmpty>Δεν βρέθηκαν αποτελέσματα.</CommandEmpty>}
-                {loading && <div className="py-4 text-center text-sm text-muted-foreground">Αναζήτηση...</div>}
-                {Object.entries(grouped).map(([type, items]) => {
-                  const config = entityConfig[type as keyof typeof entityConfig];
-                  const Icon = config.icon;
-                  return (
-                    <CommandGroup key={type} heading={config.label}>
-                      {items.map((item) => (
-                        <CommandItem key={item.id} onSelect={() => handleSelect(item)} className="cursor-pointer">
-                          <Icon className={`mr-2 h-4 w-4 ${config.color}`} />
-                          <span className="truncate">{item.name}</span>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  );
-                })}
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
-      </div>
+      {/* Centered cluster — positioned relative to the viewport, not the column */}
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 h-12 z-20 flex items-center gap-3 w-[min(92vw,720px)] px-3 pointer-events-none">
+        {/* Search */}
+        <div className="flex-1 min-w-0 max-w-2xl pointer-events-auto">
+          <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+            <PopoverTrigger asChild>
+              <button
+                className="flex h-8 w-full items-center gap-2 rounded-lg border border-border/60 px-2.5 text-xs transition-colors focus:outline-none bg-muted text-muted-foreground hover:bg-muted/80 min-w-0"
+                onClick={() => setSearchOpen(true)}
+              >
+                <Search className="h-3.5 w-3.5 shrink-0" />
+                {!isMobile && (
+                  <span className="truncate text-xs">{isNarrow ? 'Αναζήτηση...' : 'Αναζήτηση projects, tasks...'}</span>
+                )}
+                {!isNarrow && (
+                  <kbd className="ml-auto hidden rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground md:inline shrink-0">
+                    ⌘K
+                  </kbd>
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[var(--radix-popover-trigger-width)] min-w-[300px] p-0" align="start" sideOffset={8}>
+              <Command shouldFilter={false}>
+                <CommandInput placeholder="Αναζήτηση σε projects, tasks, tenders, clients..." value={query} onValueChange={onQueryChange} />
+                <CommandList>
+                  {query.length >= 2 && !loading && results.length === 0 && <CommandEmpty>Δεν βρέθηκαν αποτελέσματα.</CommandEmpty>}
+                  {loading && <div className="py-4 text-center text-sm text-muted-foreground">Αναζήτηση...</div>}
+                  {Object.entries(grouped).map(([type, items]) => {
+                    const config = entityConfig[type as keyof typeof entityConfig];
+                    const Icon = config.icon;
+                    return (
+                      <CommandGroup key={type} heading={config.label}>
+                        {items.map((item) => (
+                          <CommandItem key={item.id} onSelect={() => handleSelect(item)} className="cursor-pointer">
+                            <Icon className={`mr-2 h-4 w-4 ${config.color}`} />
+                            <span className="truncate">{item.name}</span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    );
+                  })}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </div>
 
-      {/* Right actions */}
-      <div className="flex items-center gap-2 shrink-0">
-        {/* Setup Guide */}
-        <SetupGuide />
-
-        {/* Quick Chat */}
-        <Tooltip delayDuration={300}>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onQuickChatToggle}
-              className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
-            >
-              <Sparkles className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>AI Chat (⌘I)</TooltipContent>
-        </Tooltip>
-
+        {/* Right actions */}
+        <div className="flex items-center gap-2 shrink-0 pointer-events-auto">
+          <SetupGuide />
+          <Tooltip delayDuration={300}>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onQuickChatToggle}
+                className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
+              >
+                <Sparkles className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>AI Chat (⌘I)</TooltipContent>
+          </Tooltip>
+        </div>
       </div>
     </div>
   );

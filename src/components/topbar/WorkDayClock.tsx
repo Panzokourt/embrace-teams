@@ -7,6 +7,7 @@ import { Play, Square, Clock, Calendar, Circle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkDay, type WorkStatus } from '@/hooks/useWorkDay';
 import { useAuth } from '@/contexts/AuthContext';
+import WorkDayClockPopover from './WorkDayClockPopover';
 
 const statusConfig: Record<WorkStatus, { label: string; color: string }> = {
   online: { label: 'Ενεργός', color: 'text-emerald-500' },
@@ -29,7 +30,11 @@ function WorkDayClockInner({ compact = false }: { compact?: boolean }) {
     elapsedSeconds, scheduledMinutes,
     isOvertime, isNearEnd,
     workStatus, setWorkStatus, loading,
+    todayLog, schedule, fetchSchedule,
   } = useWorkDay();
+
+  const todayDow = (() => { const d = new Date().getDay(); return d === 0 ? 6 : d - 1; })();
+  const todaySchedule = schedule.find(s => s.day_of_week === todayDow);
 
   const [now, setNow] = useState(new Date());
 
@@ -67,13 +72,32 @@ function WorkDayClockInner({ compact = false }: { compact?: boolean }) {
       {/* Work Timer */}
       {isClockedIn && (
         <>
-          <div className={cn('flex items-center gap-1 font-mono text-xs font-semibold shrink-0', timerColor, isOvertime && 'animate-pulse')}>
-            <Clock className="h-3 w-3" />
-            <span>{formatTime(elapsedSeconds)}</span>
-            {!compact && scheduledMinutes > 0 && (
-              <span className="text-muted-foreground font-normal">/ {Math.floor(scheduledMinutes / 60)}ω</span>
-            )}
-          </div>
+          <WorkDayClockPopover
+            todayLog={todayLog as any}
+            todaySchedule={todaySchedule}
+            elapsedSeconds={elapsedSeconds}
+            scheduledMinutes={scheduledMinutes}
+            isOvertime={isOvertime}
+            isNearEnd={isNearEnd}
+            isClockedIn={isClockedIn}
+            clockOut={clockOut}
+            refresh={fetchSchedule}
+          >
+            <button
+              type="button"
+              className={cn(
+                'flex items-center gap-1 font-mono text-xs font-semibold shrink-0 hover:bg-muted/50 rounded-md px-1.5 py-0.5 transition-colors cursor-pointer',
+                timerColor,
+                isOvertime && 'animate-pulse',
+              )}
+            >
+              <Clock className="h-3 w-3" />
+              <span>{formatTime(elapsedSeconds)}</span>
+              {!compact && scheduledMinutes > 0 && (
+                <span className="text-muted-foreground font-normal">/ {Math.floor(scheduledMinutes / 60)}ω</span>
+              )}
+            </button>
+          </WorkDayClockPopover>
           <div className="w-px h-4 bg-border shrink-0" />
         </>
       )}

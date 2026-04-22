@@ -90,8 +90,10 @@ export default function FloatingDock({ onQuickChatToggle, registerSendHandler }:
         className={cn(
           'fixed bottom-4 left-1/2 -translate-x-1/2 z-50',
           'flex items-center gap-1 p-1.5',
-          'rounded-full border border-border/50',
-          'bg-card/85 backdrop-blur-xl shadow-2xl',
+          'rounded-full border border-white/10',
+          'bg-gradient-to-r from-violet-600 via-fuchsia-600 to-indigo-600',
+          'shadow-[0_8px_32px_-4px_rgba(139,92,246,0.5)]',
+          'backdrop-blur-xl',
           'animate-fade-in'
         )}
       >
@@ -108,20 +110,20 @@ export default function FloatingDock({ onQuickChatToggle, registerSendHandler }:
                   className={cn(
                     'group relative h-10 w-10 rounded-full flex items-center justify-center',
                     'transition-all duration-200 ease-out',
-                    'hover:bg-primary/10',
-                    isActive && 'bg-primary/15 text-primary'
+                    'hover:bg-white/15',
+                    isActive && 'bg-white/25 shadow-inner'
                   )}
                   aria-label={item.label}
                 >
                   <Icon
                     className={cn(
-                      'h-4 w-4 transition-transform duration-200',
+                      'h-4 w-4 text-white transition-transform duration-200 drop-shadow-sm',
                       'group-hover:scale-110',
-                      isActive ? 'text-primary' : 'text-foreground/80'
+                      isActive && 'scale-110'
                     )}
                   />
                   {item.badge && (
-                    <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-primary ring-2 ring-card" />
+                    <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-violet-600 animate-pulse" />
                   )}
                 </button>
               </TooltipTrigger>

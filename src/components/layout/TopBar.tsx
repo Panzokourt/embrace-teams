@@ -160,28 +160,6 @@ export default function TopBar({ onMobileMenuToggle, showHamburger, onQuickChatT
         {/* Setup Guide */}
         <SetupGuide />
 
-        {/* XP Badge — hide on mobile */}
-        {!isMobile && <XPBadge userId={user?.id} size="sm" showXP={!isNarrow} />}
-
-        {/* Work Mode */}
-        <Tooltip delayDuration={300}>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => enterFocus()}
-              className={cn(
-                "gap-1.5 bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 hover:from-violet-600/30 hover:to-fuchsia-600/30 text-violet-400 hover:text-violet-300 border border-violet-500/20 h-8 px-2.5",
-                isNarrow && "px-2"
-              )}
-            >
-              <Zap className="h-3.5 w-3.5 shrink-0" />
-              {!isNarrow && <span className="text-xs font-semibold">Work Mode</span>}
-            </Button>
-          </TooltipTrigger>
-          {isNarrow && <TooltipContent>Work Mode</TooltipContent>}
-        </Tooltip>
-
         {/* Quick Chat */}
         <Tooltip delayDuration={300}>
           <TooltipTrigger asChild>

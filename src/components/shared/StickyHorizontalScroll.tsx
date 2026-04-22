@@ -117,7 +117,11 @@ export const StickyHorizontalScroll = forwardRef<
 
   // Always show the proxy bar whenever there is horizontal overflow, so users
   // never have to scroll to the bottom of the page to find a scrollbar.
-  const showProxy = hasOverflow && proxyRect && proxyRect.width > 0;
+  // Always show the proxy bar whenever there is horizontal overflow AND the
+  // real scrollbar is currently off-screen. This way users never have to
+  // scroll the page down to find the horizontal scrollbar.
+  const showProxy =
+    hasOverflow && !nativeScrollbarVisible && proxyRect && proxyRect.width > 0;
 
   return (
     <>
@@ -131,7 +135,7 @@ export const StickyHorizontalScroll = forwardRef<
       {showProxy && (
         <div
           aria-hidden="true"
-          className="fixed bottom-0 z-30 h-3 overflow-x-auto overflow-y-hidden rounded-t border-t border-border/60 bg-background/95 shadow-[0_-2px_8px_-2px_hsl(var(--foreground)/0.15)] backdrop-blur supports-[backdrop-filter]:bg-background/80 [&::-webkit-scrollbar]:h-3 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-border hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/50"
+          className="fixed bottom-0 z-30 h-3.5 overflow-x-auto overflow-y-hidden border-t border-border bg-background/95 shadow-[0_-4px_12px_-2px_hsl(var(--foreground)/0.18)] backdrop-blur supports-[backdrop-filter]:bg-background/85 [&::-webkit-scrollbar]:h-3.5 [&::-webkit-scrollbar-track]:bg-muted/40 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 [&::-webkit-scrollbar-thumb]:border-2 [&::-webkit-scrollbar-thumb]:border-background hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/70"
           style={{
             left: proxyRect.left,
             width: proxyRect.width,

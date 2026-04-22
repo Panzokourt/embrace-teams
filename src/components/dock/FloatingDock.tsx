@@ -94,7 +94,7 @@ export default function FloatingDock({ onQuickChatToggle, registerSendHandler }:
 
       <div
         className={cn(
-          'absolute bottom-4 left-1/2 -translate-x-1/2 z-50',
+          'fixed bottom-4 left-1/2 -translate-x-1/2 z-50',
           'flex items-center gap-1 p-1.5',
           'rounded-full border border-white/10',
           'bg-gradient-to-r from-violet-600 via-fuchsia-600 to-indigo-600',

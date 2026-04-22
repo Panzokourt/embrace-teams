@@ -98,6 +98,7 @@ export function TendersTableView({
   canManage,
 }: TendersTableViewProps) {
   const navigate = useNavigate();
+  const layout = useTableViews({ storageKey: 'tenders_table', defaultColumns: DEFAULT_COLUMNS });
   const {
     columns,
     setColumns,
@@ -111,7 +112,14 @@ export function TendersTableView({
     loadView,
     deleteView,
     resetToDefault,
-  } = useTableViews({ storageKey: 'tenders_table', defaultColumns: DEFAULT_COLUMNS });
+    orderedColumns,
+    sensors,
+    handleDragEnd,
+    DndContext,
+    SortableContext,
+    horizontalListSortingStrategy,
+    closestCenter,
+  } = layout;
 
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);

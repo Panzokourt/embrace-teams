@@ -530,7 +530,7 @@ export function TendersTableView({
           collisionDetection={closestCenter}
           onDragEnd={handleDragEnd}
         >
-          <Table style={{ width: totalWidth, tableLayout: 'fixed' }}>
+          <Table unstyledWrapper style={{ width: totalWidth, tableLayout: 'fixed' }}>
             <TableHeader>
               <SortableContext
                 items={visibleOrderedColumns.map(c => c.id)}

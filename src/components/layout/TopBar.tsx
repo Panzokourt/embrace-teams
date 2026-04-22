@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, FolderKanban, CheckSquare, FileText, Users, PanelRightOpen, PanelRightClose, BookUser, Zap, Menu, Timer, Square, Sparkles } from 'lucide-react';
+import { Search, FolderKanban, CheckSquare, FileText, Users, BookUser, Zap, Menu, Timer, Square, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
@@ -31,14 +31,12 @@ const entityConfig = {
 };
 
 interface TopBarProps {
-  onPanelToggle: () => void;
-  rightPanelOpen?: boolean;
   onMobileMenuToggle?: () => void;
   showHamburger?: boolean;
   onQuickChatToggle?: () => void;
 }
 
-export default function TopBar({ onPanelToggle, rightPanelOpen, onMobileMenuToggle, showHamburger, onQuickChatToggle }: TopBarProps) {
+export default function TopBar({ onMobileMenuToggle, showHamburger, onQuickChatToggle }: TopBarProps) {
   const navigate = useNavigate();
   const { enterFocus } = useFocusMode();
   const { user } = useAuth();
@@ -256,20 +254,6 @@ export default function TopBar({ onPanelToggle, rightPanelOpen, onMobileMenuTogg
           <TooltipContent>AI Chat (⌘I)</TooltipContent>
         </Tooltip>
 
-        {/* Panel toggle */}
-        <Tooltip delayDuration={300}>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onPanelToggle}
-              className={cn("h-8 w-8 shrink-0", rightPanelOpen && "bg-secondary")}
-            >
-              {rightPanelOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Panel (⌘J)</TooltipContent>
-        </Tooltip>
       </div>
     </div>
   );

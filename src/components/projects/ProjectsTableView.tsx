@@ -838,9 +838,10 @@ export function ProjectsTableView({
         groupBy={groupBy}
         onGroupByChange={setGroupBy}
         groupOptions={GROUP_OPTIONS}
+        extraActions={<HorizontalScrollButtons containerRef={scrollRef} />}
       />
 
-      <div className="rounded-md border overflow-x-auto">
+      <StickyHorizontalScroll ref={scrollRef} className="rounded-md border">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <Table style={{ width: totalWidth, tableLayout: 'fixed' }}>
             <TableHeader>

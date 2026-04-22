@@ -1,78 +1,105 @@
 
 
-## Πάντα ορατό οριζόντιο scroll στους πίνακες
+## Γιατί δεν εμφανίζεται το sticky scrollbar / κουμπιά
 
-### Στόχος
-Όταν ένας πίνακας ξεπερνά το πλάτος της οθόνης, ο χρήστης να μπορεί να κάνει scroll οριζόντια **χωρίς να κατεβαίνει στο τέλος της σελίδας** για να βρει το native scrollbar.
-
-### Λύση: Sticky horizontal scrollbar (διπλή προσέγγιση)
-
-Θα προσθέσω **δύο μηχανισμούς** που λειτουργούν συμπληρωματικά:
-
-**1. Sticky native scrollbar στο κάτω μέρος του viewport**
-Ένα νέο component `<StickyHorizontalScroll>` που:
-- Τυλίγει τον πίνακα και παρακολουθεί το scroll position του.
-- Όταν ο πίνακας έχει overflow ΚΑΙ το κάτω άκρο του είναι εκτός viewport, εμφανίζει ένα μικρό **sticky scrollbar** καρφιτσωμένο στο κάτω μέρος της οθόνης (position: sticky, bottom: 0) που είναι συγχρονισμένο με το πραγματικό scroll του πίνακα.
-- Όταν φτάσεις στο τέλος του πίνακα, ο sticky scrollbar εξαφανίζεται (το native αναλαμβάνει).
-
-**2. Κουμπιά πλοήγησης δεξιά/αριστερά στο header του πίνακα**
-Στον toolbar πάνω από κάθε πίνακα (δίπλα στα Views/Group/Columns/Export), θα προστεθούν δύο μικρά κουμπιά `‹ ›`:
-- Εμφανίζονται μόνο αν υπάρχει οριζόντιο overflow.
-- Κάθε click κάνει smooth scroll κατά ~300px δεξιά/αριστερά.
-- Το αριστερό disabled όταν είσαι στην αρχή, το δεξί όταν είσαι στο τέλος.
-
-### Αρχιτεκτονική
-
-**Νέο component**: `src/components/shared/StickyHorizontalScroll.tsx`
-- Wrapper γύρω από το `<div className="overflow-x-auto">`.
-- Χρησιμοποιεί `IntersectionObserver` για να ξέρει αν το κάτω άκρο φαίνεται.
-- Χρησιμοποιεί `ResizeObserver` για να ξέρει αν χρειάζεται scrollbar.
-- Render ενός fixed-position proxy scrollbar στο bottom του viewport, συγχρονισμένο μέσω `scrollLeft` listeners (αμφίδρομα).
-- Expose ref που επιτρέπει `scrollBy({ left, behavior: 'smooth' })`.
-
-**Νέο component**: `src/components/shared/HorizontalScrollButtons.tsx`
-- Δέχεται ref στο scroll container.
-- Render δύο `<Button>` με `ChevronLeft` / `ChevronRight`.
-- Tracks `scrollLeft`, `scrollWidth`, `clientWidth` για enable/disable state.
-
-**Integration**:
-Αντικατάσταση του απλού `<div className="overflow-x-auto">` με το νέο pattern σε:
-- `ClientsTableView.tsx`
-- `ProjectsTableView.tsx`
-- `TasksTableView.tsx`
-- `TendersTableView.tsx`
-- `ContactsTableView.tsx`
-- `UsersTableView.tsx` (HR)
+Βρήκα την αιτία. Το `<Table>` component (`src/components/ui/table.tsx`) τυλίγει το `<table>` σε δικό του wrapper:
 
 ```tsx
-// Πριν
-<div className="rounded-md border overflow-x-auto">
-  <Table style={{ width: totalWidth, tableLayout: 'fixed' }}>...</Table>
+<div className="relative w-full overflow-auto">
+  <table ... />
 </div>
-
-// Μετά
-<StickyHorizontalScroll ref={scrollRef} className="rounded-md border">
-  <Table style={{ width: totalWidth, tableLayout: 'fixed' }}>...</Table>
-</StickyHorizontalScroll>
-
-// Στον toolbar
-<HorizontalScrollButtons containerRef={scrollRef} />
 ```
 
-### Τεχνικές λεπτομέρειες
-- Ο sticky scrollbar θα είναι **12px ύψος**, με thumb styling που ταιριάζει στο theme (subtle border, hover state).
-- Z-index υψηλό αλλά κάτω από modals/dropdowns (`z-30`).
-- Hidden όταν το ποντίκι είναι έξω από το page-shell (avoid clutter στο dashboard view).
-- Οι IntersectionObserver/ResizeObserver καθαρίζονται σωστά στο unmount.
-- Compatible με τα DndContext wrappers που ήδη υπάρχουν.
+Αυτό σημαίνει ότι **όλο το οριζόντιο overflow «καταναλώνεται» μέσα στον εσωτερικό wrapper του Table** πριν φτάσει ποτέ στο `StickyHorizontalScroll`. Συνέπεια:
 
-### Modified Files
-- `src/components/shared/StickyHorizontalScroll.tsx` (new)
-- `src/components/shared/HorizontalScrollButtons.tsx` (new)
-- `src/components/clients/ClientsTableView.tsx`
-- `src/components/projects/ProjectsTableView.tsx`
-- `src/components/tasks/TasksTableView.tsx`
-- `src/components/tenders/TendersTableView.tsx`
-- `src/components/contacts/ContactsTableView.tsx`
-- `src/components/users/UsersTableView.tsx`
+- Το `scrollRef.current.scrollWidth === clientWidth` → `hasOverflow = false` → η floating proxy μπάρα δεν εμφανίζεται ποτέ.
+- Ομοίως στο `HorizontalScrollButtons`: `overflow=false` → επιστρέφει `null`, γι' αυτό δεν βλέπεις τα `‹ ›` κουμπιά στον toolbar.
+
+Επιπλέον, ακόμα κι αν διορθωνόταν αυτό, το `<main className="overflow-auto">` στο `AppLayout` σημαίνει ότι η σελίδα κάνει scroll μέσα στο `<main>` και όχι στο window — οπότε ο υπολογισμός «πού είναι το native scrollbar» πρέπει να γίνεται σε σχέση με το `<main>`, όχι το viewport.
+
+## Λύση
+
+### 1. Ουδετεροποίηση του εσωτερικού wrapper του `<Table>` στους reorderable πίνακες
+
+Δύο επιλογές — προτείνω την **(α)** γιατί δεν αγγίζει το shared `Table` και δεν ρισκάρει regressions αλλού:
+
+**(α) Νέο variant του Table χωρίς wrapper.** Στο `src/components/ui/table.tsx` προσθέτω prop `unstyledWrapper?: boolean` (ή νέο export `RawTable`) που παραλείπει το `<div overflow-auto>` και κάνει render απευθείας `<table>`. Οι 6 πίνακες (Projects/Tasks/Tenders/Clients/Contacts/Users) θα το χρησιμοποιήσουν αφού ήδη δίνουν εξωτερικό scroll container (`StickyHorizontalScroll`).
+
+```tsx
+// src/components/ui/table.tsx
+const Table = React.forwardRef<..., { unstyledWrapper?: boolean } & ...>(
+  ({ className, unstyledWrapper, ...props }, ref) => {
+    if (unstyledWrapper) {
+      return <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />;
+    }
+    return (
+      <div className="relative w-full overflow-auto">
+        <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
+      </div>
+    );
+  }
+);
+```
+
+Σε `ProjectsTableView`/`TasksTableView`/`TendersTableView`/`ClientsTableView`/`ContactsTableView`/`UsersTableView`:
+```tsx
+<Table unstyledWrapper style={{ width: totalWidth, tableLayout: 'fixed' }}>
+```
+
+Έτσι, το οριζόντιο overflow βγαίνει στο `StickyHorizontalScroll` που είναι ο πραγματικός scroll container — και μετράται σωστά.
+
+### 2. Ορθή ανίχνευση scroll container για το «native scrollbar visible»
+
+Το `StickyHorizontalScroll` πρέπει να βρει τον κοντινότερο vertically-scrolling πρόγονο (το `<main>`) και να ακούει scroll εκεί, όχι μόνο στο window:
+
+```tsx
+// utility μέσα στο component
+function getScrollParent(el: HTMLElement | null): HTMLElement | Window {
+  let node = el?.parentElement;
+  while (node) {
+    const oy = getComputedStyle(node).overflowY;
+    if ((oy === 'auto' || oy === 'scroll') && node.scrollHeight > node.clientHeight) return node;
+    node = node.parentElement;
+  }
+  return window;
+}
+```
+
+Στο update():
+```tsx
+const scrollParent = getScrollParent(el);
+const parentRect = scrollParent === window
+  ? { top: 0, bottom: window.innerHeight }
+  : (scrollParent as HTMLElement).getBoundingClientRect();
+const rect = el.getBoundingClientRect();
+setNativeScrollbarVisible(rect.bottom <= parentRect.bottom + 1 && rect.bottom > parentRect.top);
+```
+
+Και attach scroll listener στον `scrollParent` αντί για window capture mode.
+
+### 3. Σωστό positioning του floating bar μέσα στο `<main>` περιοχή
+
+Επειδή υπάρχουν sidebar (αριστερά) και πιθανό right panel (δεξιά), το `position: fixed; bottom: 0; left: rect.left; width: rect.width` είναι σωστό (μετράει σε σχέση με το viewport και το rect του πραγματικού scroll container). Διατηρείται ως έχει.
+
+### 4. Force-show toggle για debugging (προαιρετικό)
+
+Προσθέτω ένα prop `alwaysShowProxy?: boolean` στο `StickyHorizontalScroll` ώστε να μπορούμε να κάνουμε γρήγορη επιβεβαίωση στο preview ότι εμφανίζεται. Default `false`.
+
+## Αρχεία προς τροποποίηση
+
+- `src/components/ui/table.tsx` — προσθήκη `unstyledWrapper` prop.
+- `src/components/shared/StickyHorizontalScroll.tsx` — `getScrollParent` + scroll listener στον σωστό parent.
+- `src/components/shared/HorizontalScrollButtons.tsx` — δεν χρειάζεται αλλαγή· θα δουλέψει αυτόματα μόλις το `StickyHorizontalScroll` αναλάβει το πραγματικό overflow.
+- `src/components/projects/ProjectsTableView.tsx` — `<Table unstyledWrapper ...>`.
+- `src/components/tasks/TasksTableView.tsx` — `<Table unstyledWrapper ...>`.
+- `src/components/tenders/TendersTableView.tsx` — `<Table unstyledWrapper ...>`.
+- `src/components/clients/ClientsTableView.tsx` — `<Table unstyledWrapper ...>`.
+- `src/components/contacts/ContactsTableView.tsx` — `<Table unstyledWrapper ...>`.
+- `src/components/users/UsersTableView.tsx` — `<Table unstyledWrapper ...>`.
+
+## Αναμενόμενο αποτέλεσμα
+
+- Στον πίνακα Έργων (και στους άλλους 5) θα εμφανιστούν ΑΜΕΣΩΣ τα κουμπιά `‹ ›` δίπλα στο «Εξαγωγή», ενεργά όταν υπάρχει overflow.
+- Όταν ο πίνακας έχει οριζόντιο overflow και δεν φαίνεται το κάτω μέρος του στο `<main>`, θα εμφανίζεται μια λεπτή sticky scrollbar καρφιτσωμένη στο κάτω μέρος της οθόνης, συγχρονισμένη με τον πίνακα.
+- Καμία αλλαγή στη συμπεριφορά άλλων `<Table>` instances (το νέο prop είναι opt-in).
 

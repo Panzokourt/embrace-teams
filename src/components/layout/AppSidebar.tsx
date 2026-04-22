@@ -342,17 +342,6 @@ export default function AppSidebar({
 
       {/* Bottom actions */}
       <div className="flex flex-col items-center gap-1 mt-auto">
-        {/* Company Switcher — icon only in rail */}
-        <Tooltip delayDuration={300}>
-          <TooltipTrigger asChild>
-            <div>
-              <CompanySwitcher compact iconOnly={isMobile ? false : true} />
-            </div>
-          </TooltipTrigger>
-          {!isMobile &&
-        <TooltipContent side="right" sideOffset={8}>Εταιρεία</TooltipContent>
-        }
-        </Tooltip>
         {/* Secretary AI */}
         <Tooltip delayDuration={300}>
           <TooltipTrigger asChild>

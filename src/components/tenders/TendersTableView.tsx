@@ -290,6 +290,10 @@ export function TendersTableView({
     name: 150, client: 100, stage: 100, deadline: 100,
     days_left: 80, budget: 100, probability: 80, progress: 80, actions: 80,
   };
+  const TENDER_DEFAULT_WIDTHS: Record<string, number> = {
+    name: 280, client: 180, stage: 140, deadline: 140,
+    days_left: 110, budget: 140, probability: 120, progress: 120, actions: 80,
+  };
   const HEADER_SORT: Record<string, SortField | undefined> = {
     name: 'name', stage: 'stage', deadline: 'deadline',
     budget: 'budget', probability: 'probability',

@@ -275,7 +275,7 @@ export function UsersTableView({
           collisionDetection={layout.closestCenter}
           onDragEnd={layout.handleDragEnd}
         >
-          <Table style={{ width: totalWidth, tableLayout: 'fixed' }}>
+          <Table unstyledWrapper style={{ width: totalWidth, tableLayout: 'fixed' }}>
             <TableHeader>
               <TableRow>
                 <layout.SortableContext

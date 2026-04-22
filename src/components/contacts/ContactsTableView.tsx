@@ -180,7 +180,7 @@ export function ContactsTableView({ contacts, loading, onEdit, onRefresh }: Cont
           collisionDetection={layout.closestCenter}
           onDragEnd={layout.handleDragEnd}
         >
-          <Table style={{ width: totalWidth, tableLayout: 'fixed' }}>
+          <Table unstyledWrapper style={{ width: totalWidth, tableLayout: 'fixed' }}>
             <TableHeader>
               <TableRow className="bg-muted/30">
                 <layout.SortableContext

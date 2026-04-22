@@ -2,12 +2,27 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
-  ({ className, ...props }, ref) => (
-    <div className="relative w-full overflow-auto">
-      <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
-    </div>
-  ),
+interface TableProps extends React.HTMLAttributes<HTMLTableElement> {
+  /**
+   * When true, omit the default `<div className="overflow-auto">` wrapper.
+   * Use this when the table is already placed inside an external scroll
+   * container (e.g. <StickyHorizontalScroll />) so horizontal overflow can
+   * be measured/synced by the parent.
+   */
+  unstyledWrapper?: boolean;
+}
+
+const Table = React.forwardRef<HTMLTableElement, TableProps>(
+  ({ className, unstyledWrapper, ...props }, ref) => {
+    if (unstyledWrapper) {
+      return <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />;
+    }
+    return (
+      <div className="relative w-full overflow-auto">
+        <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
+      </div>
+    );
+  },
 );
 Table.displayName = "Table";
 

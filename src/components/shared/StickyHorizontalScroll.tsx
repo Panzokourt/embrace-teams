@@ -20,6 +20,24 @@ interface StickyHorizontalScrollProps {
   className?: string;
   /** Optional className for the inner scrolling div. */
   innerClassName?: string;
+  /** Force the floating proxy scrollbar to always render (debugging). */
+  alwaysShowProxy?: boolean;
+}
+
+/** Find the nearest vertically-scrolling ancestor (the one whose own scrollbar
+ *  the user has to interact with). Falls back to window. */
+function getScrollParent(el: HTMLElement | null): HTMLElement | Window {
+  let node: HTMLElement | null = el?.parentElement ?? null;
+  while (node) {
+    const style = getComputedStyle(node);
+    const oy = style.overflowY;
+    const canScroll =
+      (oy === 'auto' || oy === 'scroll' || oy === 'overlay') &&
+      node.scrollHeight > node.clientHeight;
+    if (canScroll) return node;
+    node = node.parentElement;
+  }
+  return window;
 }
 
 /**
@@ -32,7 +50,7 @@ interface StickyHorizontalScrollProps {
 export const StickyHorizontalScroll = forwardRef<
   StickyHorizontalScrollHandle,
   StickyHorizontalScrollProps
->(({ children, className, innerClassName }, ref) => {
+>(({ children, className, innerClassName, alwaysShowProxy = false }, ref) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const proxyRef = useRef<HTMLDivElement>(null);
   const proxyInnerRef = useRef<HTMLDivElement>(null);
@@ -53,34 +71,56 @@ export const StickyHorizontalScroll = forwardRef<
     []
   );
 
-  // Track overflow + sizes
+  // Track overflow + sizes + native scrollbar visibility relative to the
+  // nearest vertically-scrolling ancestor (typically <main>), not just window.
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
+
+    const scrollParent = getScrollParent(el);
 
     const update = () => {
       setContentWidth(el.scrollWidth);
       setHasOverflow(el.scrollWidth - el.clientWidth > 1);
       const rect = el.getBoundingClientRect();
       setProxyRect({ left: rect.left, width: rect.width });
+
+      const parentBottom =
+        scrollParent === window
+          ? window.innerHeight || document.documentElement.clientHeight
+          : (scrollParent as HTMLElement).getBoundingClientRect().bottom;
+      const parentTop =
+        scrollParent === window
+          ? 0
+          : (scrollParent as HTMLElement).getBoundingClientRect().top;
+
       // Native scrollbar is "visible" only when the bottom of the scroll
-      // container is itself within the viewport.
-      const vh = window.innerHeight || document.documentElement.clientHeight;
-      setNativeScrollbarVisible(rect.bottom <= vh && rect.bottom > 0);
+      // container is itself currently inside the visible area of its
+      // scrolling ancestor.
+      setNativeScrollbarVisible(rect.bottom <= parentBottom + 1 && rect.bottom > parentTop);
     };
 
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
-    // Also observe children growth (e.g. table re-layout)
     Array.from(el.children).forEach((child) => ro.observe(child as Element));
+    if (scrollParent !== window) ro.observe(scrollParent as HTMLElement);
 
     window.addEventListener('resize', update);
+    // Listen to scroll on the real ancestor (e.g. <main className="overflow-auto">)
+    // AND window, in capture mode, to catch scroll on any intermediate container.
     window.addEventListener('scroll', update, true);
+    if (scrollParent !== window) {
+      (scrollParent as HTMLElement).addEventListener('scroll', update, { passive: true });
+    }
+
     return () => {
       ro.disconnect();
       window.removeEventListener('resize', update);
       window.removeEventListener('scroll', update, true);
+      if (scrollParent !== window) {
+        (scrollParent as HTMLElement).removeEventListener('scroll', update);
+      }
     };
   }, []);
 
@@ -113,15 +153,15 @@ export const StickyHorizontalScroll = forwardRef<
       real.removeEventListener('scroll', onRealScroll);
       proxy.removeEventListener('scroll', onProxyScroll);
     };
-  }, []);
+  }, [hasOverflow]);
 
-  // Always show the proxy bar whenever there is horizontal overflow, so users
-  // never have to scroll to the bottom of the page to find a scrollbar.
-  // Always show the proxy bar whenever there is horizontal overflow AND the
-  // real scrollbar is currently off-screen. This way users never have to
-  // scroll the page down to find the horizontal scrollbar.
+  // Show the proxy bar whenever there is horizontal overflow AND the real
+  // scrollbar is currently off-screen (so the user can't reach it without
+  // scrolling the page).
   const showProxy =
-    hasOverflow && !nativeScrollbarVisible && proxyRect && proxyRect.width > 0;
+    (alwaysShowProxy || (hasOverflow && !nativeScrollbarVisible)) &&
+    proxyRect &&
+    proxyRect.width > 0;
 
   return (
     <>

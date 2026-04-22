@@ -974,7 +974,7 @@ export function TasksTableView({
       {/* Table */}
       <StickyHorizontalScroll ref={scrollRef} className="rounded-md border">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <Table style={{ width: totalWidth, tableLayout: 'fixed' }}>
+        <Table unstyledWrapper style={{ width: totalWidth, tableLayout: 'fixed' }}>
           <TableHeader>
             <SortableContext items={orderedColumns.filter(c => c.visible).map(c => c.id)} strategy={horizontalListSortingStrategy}>
             <TableRow>

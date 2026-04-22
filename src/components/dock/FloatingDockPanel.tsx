@@ -15,7 +15,7 @@ export default function FloatingDockPanel({ title, icon, onClose, children, clas
   return (
     <div
       className={cn(
-        'fixed bottom-20 left-1/2 -translate-x-1/2 z-40',
+        'absolute bottom-20 left-1/2 -translate-x-1/2 z-40',
         'w-[min(92vw,420px)] h-[min(75vh,560px)]',
         'rounded-2xl border border-border/50 shadow-2xl',
         'bg-card/95 backdrop-blur-xl',

@@ -196,8 +196,8 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
         </div>
       )}
 
-      {/* Middle column: TopBar + Content */}
-      <div className="flex-1 min-w-0 flex flex-col h-full">
+      {/* Middle column: TopBar + Content + Dock + QuickChat (centered within this column) */}
+      <div className="flex-1 min-w-0 flex flex-col h-full relative">
         <TopBar
           onMobileMenuToggle={() => setMobileSidebarOpen(true)}
           showHamburger={sidebarMode === 'hidden'}
@@ -206,14 +206,14 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
         <main className="flex-1 overflow-auto">
           <Outlet />
         </main>
-      </div>
 
-      {/* Floating dock + popovers */}
-      <FloatingDock onQuickChatToggle={toggleQuickChat} registerSendHandler={registerSendHandler} />
+        {/* Floating dock + QuickChat — centered within main content area (not viewport) */}
+        <FloatingDock onQuickChatToggle={toggleQuickChat} registerSendHandler={registerSendHandler} />
+        <QuickChatBar isOpen={quickChatOpen} onToggle={toggleQuickChat} />
+      </div>
 
       <ChatFloatingBubbles />
       <FocusOverlay />
-      <QuickChatBar isOpen={quickChatOpen} onToggle={toggleQuickChat} />
     </div>
   );
 }

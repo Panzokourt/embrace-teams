@@ -428,7 +428,7 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
       onDragOver={handleDragOver}
       onDrop={handleDrop}
       className={cn(
-        'fixed bottom-20 left-1/2 -translate-x-1/2 w-full max-w-2xl z-40 transition-all duration-300 ease-out px-4',
+        'absolute bottom-20 left-1/2 -translate-x-1/2 w-full max-w-2xl z-40 transition-all duration-300 ease-out px-4',
         isOpen ? 'translate-y-0 opacity-100 pointer-events-auto' : 'translate-y-8 opacity-0 pointer-events-none'
       )}
     >

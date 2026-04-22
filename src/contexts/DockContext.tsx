@@ -34,13 +34,6 @@ export function DockProvider({ children }: { children: ReactNode }) {
 
   const notifyQuickChatOpened = useCallback(() => setActivePanel(null), []);
 
-  // Listen for legacy / external events to open the secretary panel
-  useEffect(() => {
-    const handler = () => openPanel('secretary');
-    window.addEventListener('open-secretary-panel', handler);
-    return () => window.removeEventListener('open-secretary-panel', handler);
-  }, [openPanel]);
-
   // ⌘+J → toggle secretary
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

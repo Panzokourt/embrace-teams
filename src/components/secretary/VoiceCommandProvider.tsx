@@ -36,18 +36,18 @@ export default function VoiceCommandProvider({ children, onOpenSecretaryPanel }:
   const sendToSecretary = useCallback((text: string) => {
     if (!text.trim()) return;
 
-    // If we have a registered send handler (Secretary is mounted), use it
+    // Only act if Secretary is mounted (handler registered).
+    // Never dispatch a global open event — that caused auto-open on refresh.
     if (sendHandler) {
       sendHandler(text);
-      // Open the panel
       if (onOpenSecretaryPanel) {
         onOpenSecretaryPanel();
       }
-    } else {
-      // Open secretary panel via custom event
-      window.dispatchEvent(new CustomEvent('open-secretary-panel'));
+    } else if (onOpenSecretaryPanel) {
+      // Open panel so user can type manually
+      onOpenSecretaryPanel();
     }
-  }, [sendHandler, navigate, location.pathname, onOpenSecretaryPanel]);
+  }, [sendHandler, onOpenSecretaryPanel]);
 
   // Global shortcut: Cmd/Ctrl + Shift + V
   useEffect(() => {

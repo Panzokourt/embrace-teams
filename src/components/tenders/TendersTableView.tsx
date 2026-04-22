@@ -100,6 +100,7 @@ export function TendersTableView({
   canManage,
 }: TendersTableViewProps) {
   const navigate = useNavigate();
+  const scrollRef = useRef<StickyHorizontalScrollHandle>(null);
   const layout = useTableViews({ storageKey: 'tenders_table', defaultColumns: DEFAULT_COLUMNS });
   const {
     columns,

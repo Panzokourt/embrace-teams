@@ -208,6 +208,7 @@ export function TasksTableView({
   showProject = true
 }: TasksTableViewProps) {
   const navigate = useNavigate();
+  const scrollRef = useRef<StickyHorizontalScrollHandle>(null);
   const layout = useTableViews({ storageKey: 'tasks_table', defaultColumns: DEFAULT_COLUMNS });
   const {
     columns, setColumns, orderedColumns, columnWidths, setColumnWidth,

@@ -513,135 +513,48 @@ export function TendersTableView({
 
       {/* Table */}
       <div className="rounded-md border overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <ResizableTableHeader 
-                width={getColumnWidth('name')}
-                onWidthChange={(w) => setColumnWidth('name', w)}
-                minWidth={150}
-                className="cursor-pointer select-none"
-                onClick={() => toggleSort('name')}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <Table>
+            <TableHeader>
+              <SortableContext
+                items={visibleOrderedColumns.map(c => c.id)}
+                strategy={horizontalListSortingStrategy}
               >
-                <div className="flex items-center gap-1">
-                  Όνομα {getSortIcon('name')}
-                </div>
-              </ResizableTableHeader>
-              
-              {isColumnVisible('client') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('client')}
-                  onWidthChange={(w) => setColumnWidth('client', w)}
-                  minWidth={100}
-                >
-                  Πελάτης
-                </ResizableTableHeader>
+                <TableRow>
+                  {visibleOrderedColumns.map(c => renderHeaderCell(c.id))}
+                </TableRow>
+              </SortableContext>
+            </TableHeader>
+            <TableBody>
+              {sortedTenders.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={visibleOrderedColumns.length} className="text-center py-8 text-muted-foreground">
+                    Δεν υπάρχουν διαγωνισμοί
+                  </TableCell>
+                </TableRow>
+              ) : groupBy === 'none' ? (
+                sortedTenders.map(tender => renderTenderRow(tender))
+              ) : (
+                groupedTenders.map(group => (
+                  <GroupedTableSection
+                    key={group.key}
+                    groupKey={group.key}
+                    groupLabel={group.label}
+                    itemCount={group.tenders.length}
+                    colSpan={visibleOrderedColumns.length}
+                    badge={group.badge}
+                  >
+                    {group.tenders.map(tender => renderTenderRow(tender))}
+                  </GroupedTableSection>
+                ))
               )}
-              
-              {isColumnVisible('stage') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('stage')}
-                  onWidthChange={(w) => setColumnWidth('stage', w)}
-                  minWidth={100}
-                  className="cursor-pointer select-none"
-                  onClick={() => toggleSort('stage')}
-                >
-                  <div className="flex items-center gap-1">
-                    Στάδιο {getSortIcon('stage')}
-                  </div>
-                </ResizableTableHeader>
-              )}
-              
-              {isColumnVisible('deadline') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('deadline')}
-                  onWidthChange={(w) => setColumnWidth('deadline', w)}
-                  minWidth={100}
-                  className="cursor-pointer select-none"
-                  onClick={() => toggleSort('deadline')}
-                >
-                  <div className="flex items-center gap-1">
-                    Προθεσμία {getSortIcon('deadline')}
-                  </div>
-                </ResizableTableHeader>
-              )}
-              
-              {isColumnVisible('days_left') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('days_left')}
-                  onWidthChange={(w) => setColumnWidth('days_left', w)}
-                  minWidth={80}
-                >
-                  Ημέρες
-                </ResizableTableHeader>
-              )}
-              
-              {isColumnVisible('budget') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('budget')}
-                  onWidthChange={(w) => setColumnWidth('budget', w)}
-                  minWidth={100}
-                  className="cursor-pointer select-none"
-                  onClick={() => toggleSort('budget')}
-                >
-                  <div className="flex items-center gap-1">
-                    Προϋπολογισμός {getSortIcon('budget')}
-                  </div>
-                </ResizableTableHeader>
-              )}
-              
-              {isColumnVisible('probability') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('probability')}
-                  onWidthChange={(w) => setColumnWidth('probability', w)}
-                  minWidth={80}
-                  className="cursor-pointer select-none"
-                  onClick={() => toggleSort('probability')}
-                >
-                  <div className="flex items-center gap-1">
-                    Πιθανότητα {getSortIcon('probability')}
-                  </div>
-                </ResizableTableHeader>
-              )}
-              
-              {isColumnVisible('progress') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('progress')}
-                  onWidthChange={(w) => setColumnWidth('progress', w)}
-                  minWidth={80}
-                >
-                  Πρόοδος
-                </ResizableTableHeader>
-              )}
-              
-              <TableHead className="w-[80px]">Ενέργειες</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sortedTenders.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={visibleColumnCount} className="text-center py-8 text-muted-foreground">
-                  Δεν υπάρχουν διαγωνισμοί
-                </TableCell>
-              </TableRow>
-            ) : groupBy === 'none' ? (
-              sortedTenders.map(tender => renderTenderRow(tender))
-            ) : (
-              groupedTenders.map(group => (
-                <GroupedTableSection
-                  key={group.key}
-                  groupKey={group.key}
-                  groupLabel={group.label}
-                  itemCount={group.tenders.length}
-                  colSpan={visibleColumnCount}
-                  badge={group.badge}
-                >
-                  {group.tenders.map(tender => renderTenderRow(tender))}
-                </GroupedTableSection>
-              ))
-            )}
-          </TableBody>
-        </Table>
+            </TableBody>
+          </Table>
+        </DndContext>
       </div>
     </div>
   );

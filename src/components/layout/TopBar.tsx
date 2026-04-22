@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, FolderKanban, CheckSquare, FileText, Users, BookUser, Menu, Sparkles } from 'lucide-react';
+import { Search, FolderKanban, CheckSquare, FileText, Users, BookUser, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
 import { supabase } from '@/integrations/supabase/client';
 import { useLayout } from '@/contexts/LayoutContext';
-import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import SetupGuide from '@/components/onboarding/SetupGuide';
+import TopBarDateTime from './TopBarDateTime';
 
 interface SearchResult {
   id: string;
@@ -103,12 +103,15 @@ export default function TopBar({ onMobileMenuToggle, showHamburger, onQuickChatT
 
   return (
     <div className="sticky top-0 z-20 h-12 border-b border-border/40 bg-card/80 backdrop-blur-lg px-3 md:px-4 flex items-center shrink-0 relative">
-      {/* Hamburger for mobile — stays in flow on the left */}
-      {showHamburger && (
-        <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8 mr-2" onClick={onMobileMenuToggle}>
-          <Menu className="h-4 w-4" />
-        </Button>
-      )}
+      {/* Left cluster — hamburger (mobile) + date/time */}
+      <div className="flex items-center gap-2 shrink-0">
+        {showHamburger && (
+          <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={onMobileMenuToggle}>
+            <Menu className="h-4 w-4" />
+          </Button>
+        )}
+        <TopBarDateTime />
+      </div>
 
       {/* Centered cluster — positioned relative to the viewport, not the column */}
       <div className="fixed top-0 left-1/2 -translate-x-1/2 h-12 z-20 flex items-center gap-3 w-[min(92vw,720px)] px-3 pointer-events-none">
@@ -160,19 +163,6 @@ export default function TopBar({ onMobileMenuToggle, showHamburger, onQuickChatT
         {/* Right actions */}
         <div className="flex items-center gap-2 shrink-0 pointer-events-auto">
           <SetupGuide />
-          <Tooltip delayDuration={300}>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onQuickChatToggle}
-                className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
-              >
-                <Sparkles className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>AI Chat (⌘I)</TooltipContent>
-          </Tooltip>
         </div>
       </div>
     </div>

@@ -480,6 +480,10 @@ export function TendersTableView({
   };
 
   const visibleOrderedColumns = orderedColumns.filter(c => c.visible);
+  const totalWidth = visibleOrderedColumns.reduce(
+    (s, c) => s + (columnWidths[c.id] ?? TENDER_DEFAULT_WIDTHS[c.id] ?? 120),
+    0
+  );
 
   const renderTenderRow = (tender: Tender) => {
     const deadlineInfo = getDeadlineInfo(tender.submission_deadline);
@@ -522,7 +526,7 @@ export function TendersTableView({
           collisionDetection={closestCenter}
           onDragEnd={handleDragEnd}
         >
-          <Table>
+          <Table style={{ width: totalWidth, tableLayout: 'fixed' }}>
             <TableHeader>
               <SortableContext
                 items={visibleOrderedColumns.map(c => c.id)}

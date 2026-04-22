@@ -600,9 +600,24 @@ interface SortableHeaderCellProps {
   width: number;
   content: React.ReactNode;
   resizeHandle: React.ReactNode;
+  sortField: SortField | null;
+  sortDirection: 'asc' | 'desc';
+  hidden: Set<ColKey>;
+  allColumns: ColKey[];
+  onSortAsc: (f: SortField) => void;
+  onSortDesc: (f: SortField) => void;
+  onClearSort: () => void;
+  onHide: (k: ColKey) => void;
+  onShow: (k: ColKey) => void;
+  onResetWidth: (k: ColKey) => void;
+  onResetAll: () => void;
 }
 
-function SortableHeaderCell({ colKey, width, content, resizeHandle }: SortableHeaderCellProps) {
+function SortableHeaderCell({
+  colKey, width, content, resizeHandle,
+  sortField, sortDirection, hidden, allColumns,
+  onSortAsc, onSortDesc, onClearSort, onHide, onShow, onResetWidth, onResetAll,
+}: SortableHeaderCellProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: colKey });
 
   const style: React.CSSProperties = {
@@ -614,22 +629,103 @@ function SortableHeaderCell({ colKey, width, content, resizeHandle }: SortableHe
     zIndex: isDragging ? 20 : undefined,
   };
 
+  const sortableField = SORTABLE_FIELD_BY_COL[colKey];
+  const isCurrentSort = sortableField && sortField === sortableField;
+  const hiddenList = allColumns.filter(k => hidden.has(k));
+
   return (
-    <TableHead ref={setNodeRef} style={style} className="relative">
-      <div className="flex items-center gap-1 min-w-0">
-        <button
-          type="button"
-          {...attributes}
-          {...listeners}
-          className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground shrink-0 -ml-1"
-          aria-label="Μετακίνηση στήλης"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <GripVertical className="h-3.5 w-3.5" />
-        </button>
-        {content}
-      </div>
-      {resizeHandle}
-    </TableHead>
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <TableHead ref={setNodeRef} style={style} className="relative">
+          <div className="flex items-center gap-1 min-w-0">
+            <button
+              type="button"
+              {...attributes}
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground shrink-0 -ml-1"
+              aria-label="Μετακίνηση στήλης"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <GripVertical className="h-3.5 w-3.5" />
+            </button>
+            {content}
+          </div>
+          {resizeHandle}
+        </TableHead>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-56">
+        <ContextMenuLabel className="text-xs text-muted-foreground">
+          {COL_LABELS[colKey]}
+        </ContextMenuLabel>
+        <ContextMenuSeparator />
+        {sortableField && (
+          <>
+            <ContextMenuItem onClick={() => onSortAsc(sortableField)}>
+              <ArrowUp className="h-4 w-4 mr-2" />
+              Ταξινόμηση αύξουσα
+              {isCurrentSort && sortDirection === 'asc' && <span className="ml-auto text-xs">✓</span>}
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => onSortDesc(sortableField)}>
+              <ArrowDown className="h-4 w-4 mr-2" />
+              Ταξινόμηση φθίνουσα
+              {isCurrentSort && sortDirection === 'desc' && <span className="ml-auto text-xs">✓</span>}
+            </ContextMenuItem>
+            {isCurrentSort && (
+              <ContextMenuItem onClick={onClearSort}>
+                <ArrowUpDown className="h-4 w-4 mr-2" />
+                Καθαρισμός ταξινόμησης
+              </ContextMenuItem>
+            )}
+            <ContextMenuSeparator />
+          </>
+        )}
+        <ContextMenuItem onClick={() => onHide(colKey)}>
+          <EyeOff className="h-4 w-4 mr-2" />
+          Απόκρυψη στήλης
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => onResetWidth(colKey)}>
+          <RotateCcw className="h-4 w-4 mr-2" />
+          Επαναφορά πλάτους
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>
+            <Columns3 className="h-4 w-4 mr-2" />
+            Στήλες
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className="w-56">
+            {allColumns.map(k => (
+              <ContextMenuCheckboxItem
+                key={k}
+                checked={!hidden.has(k)}
+                onCheckedChange={(checked) => checked ? onShow(k) : onHide(k)}
+              >
+                {COL_LABELS[k]}
+              </ContextMenuCheckboxItem>
+            ))}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+        {hiddenList.length > 0 && (
+          <ContextMenuSub>
+            <ContextMenuSubTrigger>
+              <Eye className="h-4 w-4 mr-2" />
+              Εμφάνιση κρυμμένης
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent>
+              {hiddenList.map(k => (
+                <ContextMenuItem key={k} onClick={() => onShow(k)}>
+                  {COL_LABELS[k]}
+                </ContextMenuItem>
+              ))}
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+        )}
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={onResetAll}>
+          <RotateCcw className="h-4 w-4 mr-2" />
+          Επαναφορά όλων
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }

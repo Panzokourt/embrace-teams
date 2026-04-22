@@ -208,7 +208,7 @@ export function TasksTableView({
   const navigate = useNavigate();
   const layout = useTableViews({ storageKey: 'tasks_table', defaultColumns: DEFAULT_COLUMNS });
   const {
-    columns, setColumns, columnWidths, setColumnWidth,
+    columns, setColumns, orderedColumns, columnWidths, setColumnWidth,
     groupBy, setGroupBy, savedViews, currentViewId,
     saveView, loadView, deleteView, resetToDefault,
     sensors, handleDragEnd,

@@ -957,8 +957,10 @@ export function TasksTableView({
 
       {/* Table */}
       <div className="rounded-md border overflow-x-auto">
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <Table>
           <TableHeader>
+            <SortableContext items={orderedColumns.filter(c => c.visible).map(c => c.id)} strategy={horizontalListSortingStrategy}>
             <TableRow>
               {isColumnVisible('select') && (
                 <TableHead className="w-[44px] min-w-[44px] max-w-[44px] px-3">
@@ -972,176 +974,110 @@ export function TasksTableView({
               )}
               
               <ResizableTableHeader 
+                columnId="title" layout={layout}
                 width={getColumnWidth('title')}
                 onWidthChange={(w) => setColumnWidth('title', w)}
                 minWidth={150}
                 className="cursor-pointer select-none"
                 onClick={() => toggleSort('title')}
+                sortField="title" currentSortField={sortField} currentSortDirection={sortDirection}
+                onSort={onMenuSort} onClearSort={onClearSort}
               >
-                <div className="flex items-center gap-1">
-                  Τίτλος {getSortIcon('title')}
-                </div>
+                <div className="flex items-center gap-1">Τίτλος {getSortIcon('title')}</div>
               </ResizableTableHeader>
               
               {isColumnVisible('assignee') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('assignee')}
-                  onWidthChange={(w) => setColumnWidth('assignee', w)}
-                  minWidth={100}
-                >
-                  Υπεύθυνος
-                </ResizableTableHeader>
+                <ResizableTableHeader columnId="assignee" layout={layout} width={getColumnWidth('assignee')} onWidthChange={(w) => setColumnWidth('assignee', w)} minWidth={100}>Υπεύθυνος</ResizableTableHeader>
               )}
               
               {isColumnVisible('project') && showProject && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('project')}
-                  onWidthChange={(w) => setColumnWidth('project', w)}
-                  minWidth={100}
-                >
-                  Έργο
-                </ResizableTableHeader>
+                <ResizableTableHeader columnId="project" layout={layout} width={getColumnWidth('project')} onWidthChange={(w) => setColumnWidth('project', w)} minWidth={100}>Έργο</ResizableTableHeader>
               )}
               
               {isColumnVisible('deliverable') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('deliverable')}
-                  onWidthChange={(w) => setColumnWidth('deliverable', w)}
-                  minWidth={100}
-                >
-                  Παραδοτέο
-                </ResizableTableHeader>
+                <ResizableTableHeader columnId="deliverable" layout={layout} width={getColumnWidth('deliverable')} onWidthChange={(w) => setColumnWidth('deliverable', w)} minWidth={100}>Παραδοτέο</ResizableTableHeader>
               )}
               
               {isColumnVisible('team') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('team')}
-                  onWidthChange={(w) => setColumnWidth('team', w)}
-                  minWidth={80}
-                >
-                  Ομάδα
-                </ResizableTableHeader>
+                <ResizableTableHeader columnId="team" layout={layout} width={getColumnWidth('team')} onWidthChange={(w) => setColumnWidth('team', w)} minWidth={80}>Ομάδα</ResizableTableHeader>
               )}
               
               {isColumnVisible('start_date') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('start_date')}
-                  onWidthChange={(w) => setColumnWidth('start_date', w)}
-                  minWidth={90}
-                >
-                  Έναρξη
-                </ResizableTableHeader>
+                <ResizableTableHeader columnId="start_date" layout={layout} width={getColumnWidth('start_date')} onWidthChange={(w) => setColumnWidth('start_date', w)} minWidth={90}>Έναρξη</ResizableTableHeader>
               )}
               
               {isColumnVisible('due_date') && (
                 <ResizableTableHeader 
-                  width={getColumnWidth('due_date')}
-                  onWidthChange={(w) => setColumnWidth('due_date', w)}
-                  minWidth={90}
-                  className="cursor-pointer select-none"
-                  onClick={() => toggleSort('due_date')}
+                  columnId="due_date" layout={layout}
+                  width={getColumnWidth('due_date')} onWidthChange={(w) => setColumnWidth('due_date', w)}
+                  minWidth={90} className="cursor-pointer select-none" onClick={() => toggleSort('due_date')}
+                  sortField="due_date" currentSortField={sortField} currentSortDirection={sortDirection}
+                  onSort={onMenuSort} onClearSort={onClearSort}
                 >
-                  <div className="flex items-center gap-1">
-                    Προθεσμία {getSortIcon('due_date')}
-                  </div>
+                  <div className="flex items-center gap-1">Προθεσμία {getSortIcon('due_date')}</div>
                 </ResizableTableHeader>
               )}
               
               {isColumnVisible('status') && (
                 <ResizableTableHeader 
-                  width={getColumnWidth('status')}
-                  onWidthChange={(w) => setColumnWidth('status', w)}
-                  minWidth={100}
-                  className="cursor-pointer select-none"
-                  onClick={() => toggleSort('status')}
+                  columnId="status" layout={layout}
+                  width={getColumnWidth('status')} onWidthChange={(w) => setColumnWidth('status', w)}
+                  minWidth={100} className="cursor-pointer select-none" onClick={() => toggleSort('status')}
+                  sortField="status" currentSortField={sortField} currentSortDirection={sortDirection}
+                  onSort={onMenuSort} onClearSort={onClearSort}
                 >
-                  <div className="flex items-center gap-1">
-                    Κατάσταση {getSortIcon('status')}
-                  </div>
+                  <div className="flex items-center gap-1">Κατάσταση {getSortIcon('status')}</div>
                 </ResizableTableHeader>
               )}
               
               {isColumnVisible('priority') && (
                 <ResizableTableHeader 
-                  width={getColumnWidth('priority')}
-                  onWidthChange={(w) => setColumnWidth('priority', w)}
-                  minWidth={100}
-                  className="cursor-pointer select-none"
-                  onClick={() => toggleSort('priority')}
+                  columnId="priority" layout={layout}
+                  width={getColumnWidth('priority')} onWidthChange={(w) => setColumnWidth('priority', w)}
+                  minWidth={100} className="cursor-pointer select-none" onClick={() => toggleSort('priority')}
+                  sortField="priority" currentSortField={sortField} currentSortDirection={sortDirection}
+                  onSort={onMenuSort} onClearSort={onClearSort}
                 >
-                  <div className="flex items-center gap-1">
-                    Προτεραιότητα {getSortIcon('priority')}
-                  </div>
+                  <div className="flex items-center gap-1">Προτεραιότητα {getSortIcon('priority')}</div>
                 </ResizableTableHeader>
               )}
               
               {isColumnVisible('progress') && (
                 <ResizableTableHeader 
-                  width={getColumnWidth('progress')}
-                  onWidthChange={(w) => setColumnWidth('progress', w)}
-                  minWidth={80}
-                  className="cursor-pointer select-none"
-                  onClick={() => toggleSort('progress')}
+                  columnId="progress" layout={layout}
+                  width={getColumnWidth('progress')} onWidthChange={(w) => setColumnWidth('progress', w)}
+                  minWidth={80} className="cursor-pointer select-none" onClick={() => toggleSort('progress')}
+                  sortField="progress" currentSortField={sortField} currentSortDirection={sortDirection}
+                  onSort={onMenuSort} onClearSort={onClearSort}
                 >
-                  <div className="flex items-center gap-1">
-                    Πρόοδος {getSortIcon('progress')}
-                  </div>
+                  <div className="flex items-center gap-1">Πρόοδος {getSortIcon('progress')}</div>
                 </ResizableTableHeader>
               )}
               
               {isColumnVisible('estimated_hours') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('estimated_hours')}
-                  onWidthChange={(w) => setColumnWidth('estimated_hours', w)}
-                  minWidth={80}
-                >
-                  Εκτίμηση
-                </ResizableTableHeader>
+                <ResizableTableHeader columnId="estimated_hours" layout={layout} width={getColumnWidth('estimated_hours')} onWidthChange={(w) => setColumnWidth('estimated_hours', w)} minWidth={80}>Εκτίμηση</ResizableTableHeader>
               )}
               
               {isColumnVisible('actual_hours') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('actual_hours')}
-                  onWidthChange={(w) => setColumnWidth('actual_hours', w)}
-                  minWidth={80}
-                >
-                  Πραγματικός
-                </ResizableTableHeader>
+                <ResizableTableHeader columnId="actual_hours" layout={layout} width={getColumnWidth('actual_hours')} onWidthChange={(w) => setColumnWidth('actual_hours', w)} minWidth={80}>Πραγματικός</ResizableTableHeader>
               )}
               
               {isColumnVisible('task_type') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('task_type')}
-                  onWidthChange={(w) => setColumnWidth('task_type', w)}
-                  minWidth={80}
-                >
-                  Τύπος
-                </ResizableTableHeader>
+                <ResizableTableHeader columnId="task_type" layout={layout} width={getColumnWidth('task_type')} onWidthChange={(w) => setColumnWidth('task_type', w)} minWidth={80}>Τύπος</ResizableTableHeader>
               )}
               
               {isColumnVisible('category') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('category')}
-                  onWidthChange={(w) => setColumnWidth('category', w)}
-                  minWidth={100}
-                >
-                  Κατηγορία
-                </ResizableTableHeader>
+                <ResizableTableHeader columnId="category" layout={layout} width={getColumnWidth('category')} onWidthChange={(w) => setColumnWidth('category', w)} minWidth={100}>Κατηγορία</ResizableTableHeader>
               )}
               
               {isColumnVisible('timer') && (
-                <ResizableTableHeader 
-                  width={getColumnWidth('timer')}
-                  onWidthChange={(w) => setColumnWidth('timer', w)}
-                  minWidth={80}
-                >
-                  Timer
-                </ResizableTableHeader>
+                <ResizableTableHeader columnId="timer" layout={layout} width={getColumnWidth('timer')} onWidthChange={(w) => setColumnWidth('timer', w)} minWidth={80}>Timer</ResizableTableHeader>
               )}
               
               <TableHead className="w-[40px]"><Flag className="h-3.5 w-3.5 text-muted-foreground" /></TableHead>
               <TableHead className="w-[80px]">Ενέργειες</TableHead>
             </TableRow>
+            </SortableContext>
           </TableHeader>
           <TableBody>
             {sortedTasks.length === 0 ? (

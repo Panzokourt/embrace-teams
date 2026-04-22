@@ -174,6 +174,41 @@ export function ClientsTableView({
     return DEFAULT_ORDER;
   });
 
+  const [hidden, setHidden] = useState<Set<ColKey>>(() => {
+    if (typeof window === 'undefined') return new Set();
+    try {
+      const raw = localStorage.getItem(HIDDEN_STORAGE_KEY);
+      if (raw) return new Set(JSON.parse(raw) as ColKey[]);
+    } catch {}
+    return new Set();
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(HIDDEN_STORAGE_KEY, JSON.stringify(Array.from(hidden)));
+    } catch {}
+  }, [hidden]);
+
+  const visibleOrder = useMemo(() => order.filter(k => !hidden.has(k)), [order, hidden]);
+
+  const hideColumn = (key: ColKey) => setHidden(prev => new Set(prev).add(key));
+  const showColumn = (key: ColKey) => setHidden(prev => {
+    const next = new Set(prev);
+    next.delete(key);
+    return next;
+  });
+  const resetColumnWidth = (key: ColKey) =>
+    setWidths(prev => ({ ...prev, [key]: DEFAULT_WIDTHS[key] }));
+  const resetAllColumns = () => {
+    setWidths(DEFAULT_WIDTHS);
+    setOrder(DEFAULT_ORDER);
+    setHidden(new Set());
+    toast.success('Οι στήλες επαναφέρθηκαν');
+  };
+  const sortAsc = (field: SortField) => { setSortField(field); setSortDirection('asc'); };
+  const sortDesc = (field: SortField) => { setSortField(field); setSortDirection('desc'); };
+  const clearSort = () => { setSortField(null); };
+
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(widths));

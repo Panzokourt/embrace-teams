@@ -146,11 +146,14 @@ export function ProjectsTableView({
   canManage,
 }: ProjectsTableViewProps) {
   const navigate = useNavigate();
+  const layout = useTableViews({ storageKey: 'projects_table', defaultColumns: DEFAULT_COLUMNS });
   const {
     columns, setColumns, columnWidths, setColumnWidth,
     groupBy, setGroupBy, savedViews, currentViewId,
     saveView, loadView, deleteView, resetToDefault,
-  } = useTableViews({ storageKey: 'projects_table', defaultColumns: DEFAULT_COLUMNS });
+    orderedColumns, sensors, handleDragEnd,
+    DndContext, SortableContext, horizontalListSortingStrategy, closestCenter,
+  } = layout;
 
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);

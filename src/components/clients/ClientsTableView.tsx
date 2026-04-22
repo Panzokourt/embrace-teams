@@ -518,12 +518,15 @@ export function ClientsTableView({
             </span>
           )}
         </div>
-        <Button variant="outline" size="sm" onClick={handleExport}>
-          Εξαγωγή CSV
-        </Button>
+        <div className="flex items-center gap-2">
+          <HorizontalScrollButtons containerRef={scrollRef} />
+          <Button variant="outline" size="sm" onClick={handleExport}>
+            Εξαγωγή CSV
+          </Button>
+        </div>
       </div>
 
-      <div className="rounded-xl border border-border/50 bg-card shadow-soft overflow-x-auto">
+      <StickyHorizontalScroll ref={scrollRef} className="rounded-xl border border-border/50 bg-card shadow-soft">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <Table style={{ width: totalWidth, tableLayout: 'fixed' }}>
             <TableHeader>

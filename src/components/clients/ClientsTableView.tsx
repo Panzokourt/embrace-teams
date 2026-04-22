@@ -531,14 +531,25 @@ export function ClientsTableView({
                     onCheckedChange={toggleSelectAll} 
                   />
                 </TableHead>
-                <SortableContext items={order} strategy={horizontalListSortingStrategy}>
-                  {order.map(key => (
+                <SortableContext items={visibleOrder} strategy={horizontalListSortingStrategy}>
+                  {visibleOrder.map(key => (
                     <SortableHeaderCell
                       key={key}
                       colKey={key}
                       width={widths[key]}
                       content={renderHeader(key)}
                       resizeHandle={<ResizeHandle colKey={key} />}
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      hidden={hidden}
+                      allColumns={DEFAULT_ORDER}
+                      onSortAsc={sortAsc}
+                      onSortDesc={sortDesc}
+                      onClearSort={clearSort}
+                      onHide={hideColumn}
+                      onShow={showColumn}
+                      onResetWidth={resetColumnWidth}
+                      onResetAll={resetAllColumns}
                     />
                   ))}
                 </SortableContext>

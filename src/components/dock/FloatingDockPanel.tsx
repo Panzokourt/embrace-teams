@@ -20,10 +20,8 @@ export default function FloatingDockPanel({ title, icon, onClose, children, clas
         'rounded-2xl border border-border/50 shadow-2xl',
         'bg-card/95 backdrop-blur-xl',
         'flex flex-col overflow-hidden',
-        'animate-scale-in origin-bottom',
         className
       )}
-      style={{ animationDuration: '180ms' }}
     >
       <div className="flex items-center justify-between px-3 py-2 border-b border-border/40 shrink-0">
         <div className="flex items-center gap-2 text-sm font-medium text-foreground">

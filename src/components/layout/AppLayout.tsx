@@ -85,7 +85,7 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
   // Register open panel for voice command
   useEffect(() => {
     if (onRegisterOpenPanel) {
-      onRegisterOpenPanel(() => openPanel('secretary'));
+      onRegisterOpenPanel(() => () => openPanel('secretary'));
     }
     return () => onRegisterOpenPanel?.(null);
   }, [onRegisterOpenPanel, openPanel]);
@@ -221,9 +221,13 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
 function AppLayoutWithVoice() {
   const [openPanelFn, setOpenPanelFn] = useState<(() => void) | null>(null);
 
+  const handleRegisterOpenPanel = useCallback((fn: (() => void) | null) => {
+    setOpenPanelFn(() => fn);
+  }, []);
+
   return (
     <VoiceCommandProvider onOpenSecretaryPanel={() => openPanelFn?.()}>
-      <AppLayoutInner onRegisterOpenPanel={setOpenPanelFn} />
+      <AppLayoutInner onRegisterOpenPanel={handleRegisterOpenPanel} />
     </VoiceCommandProvider>
   );
 }

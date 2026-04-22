@@ -882,7 +882,7 @@ export function ProjectsTableView({
             </TableBody>
           </Table>
         </DndContext>
-      </div>
+      </StickyHorizontalScroll>
     </div>
   );
 }

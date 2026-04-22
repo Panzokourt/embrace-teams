@@ -206,20 +206,14 @@ export function TasksTableView({
   showProject = true
 }: TasksTableViewProps) {
   const navigate = useNavigate();
+  const layout = useTableViews({ storageKey: 'tasks_table', defaultColumns: DEFAULT_COLUMNS });
   const {
-    columns,
-    setColumns,
-    columnWidths,
-    setColumnWidth,
-    groupBy,
-    setGroupBy,
-    savedViews,
-    currentViewId,
-    saveView,
-    loadView,
-    deleteView,
-    resetToDefault,
-  } = useTableViews({ storageKey: 'tasks_table', defaultColumns: DEFAULT_COLUMNS });
+    columns, setColumns, columnWidths, setColumnWidth,
+    groupBy, setGroupBy, savedViews, currentViewId,
+    saveView, loadView, deleteView, resetToDefault,
+    sensors, handleDragEnd,
+    DndContext, SortableContext, horizontalListSortingStrategy, closestCenter,
+  } = layout;
 
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['all']));

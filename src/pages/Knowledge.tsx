@@ -30,7 +30,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import {
   Plus, BookOpen, FileText, AlertTriangle, Activity, FileStack,
-  MessageCircleQuestion, Settings2, Upload, ArrowRight,
+  MessageCircleQuestion, Settings2, Upload, ArrowRight, Sparkles,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -204,6 +204,9 @@ export default function Knowledge() {
           <KBCategoryManager categories={categories} onCreate={(d) => createCategory.mutate(d)} onDelete={() => {}} />
           <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-1">
             <Upload className="h-4 w-4" /> Εισαγωγή
+          </Button>
+          <Button variant="outline" onClick={() => { setComposeSeed(null); setComposeOpen(true); }} className="gap-1">
+            <Sparkles className="h-4 w-4" /> AI Σύνταξη
           </Button>
           <Button onClick={() => setEditorOpen(true)} className="gap-1">
             <Plus className="h-4 w-4" /> Νέο Άρθρο

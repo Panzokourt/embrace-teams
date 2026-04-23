@@ -511,6 +511,9 @@ export default function SettingsPage() {
       {/* Data Management (Admin only) */}
       {isAdmin && <DataManagementCard />}
 
+      {/* AI Usage (Admin only) */}
+      {isAdmin && <AIUsageCard />}
+
       {/* Client Portal (Admin only) */}
       {isAdmin && <PortalUserManager />}
 

@@ -13,6 +13,10 @@ import { KBHealthCheck } from '@/components/knowledge/KBHealthCheck';
 import { KBPendingSourcesStrip } from '@/components/knowledge/KBPendingSourcesStrip';
 import { KBImportDialog } from '@/components/knowledge/KBImportDialog';
 import { AskExploreView } from '@/components/knowledge/AskExploreView';
+import { KBSuggestionsPanel } from '@/components/knowledge/KBSuggestionsPanel';
+import { KBAIComposeDialog } from '@/components/knowledge/KBAIComposeDialog';
+import { useAuth } from '@/contexts/AuthContext';
+import type { KBSuggestion } from '@/hooks/useKBSuggestions';
 import { EmbeddingsBackfillButton } from '@/components/knowledge/EmbeddingsBackfillButton';
 import { BriefsList } from '@/components/blueprints/BriefsList';
 import { Card, CardContent } from '@/components/ui/card';
@@ -26,7 +30,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import {
   Plus, BookOpen, FileText, AlertTriangle, Activity, FileStack,
-  MessageCircleQuestion, Settings2, Upload, ArrowRight,
+  MessageCircleQuestion, Settings2, Upload, ArrowRight, Sparkles,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -38,6 +42,7 @@ type TemplateSection = 'briefs' | 'documents';
 
 export default function Knowledge() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'library';
 
@@ -82,6 +87,10 @@ export default function Knowledge() {
   const [healthReport, setHealthReport] = useState<HealthReport | null>(null);
   const [manageSection, setManageSection] = useState<ManageSection>('reviews');
   const [templateSection, setTemplateSection] = useState<TemplateSection>('briefs');
+
+  // AI Compose από suggestion / button
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeSeed, setComposeSeed] = useState<{ title?: string; brief?: string; type?: string } | null>(null);
 
   // Document Template creation
   const [tplCreateOpen, setTplCreateOpen] = useState(false);
@@ -130,17 +139,27 @@ export default function Knowledge() {
     [...articles].filter(a => a.status !== 'deprecated').sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 9),
     [articles]);
 
-  const stats = useMemo(() => ({
-    total: articles.length,
-    sourcesPending: sources.filter(s => !s.compiled).length,
-    pendingReview: articles.filter(a => {
+  const stats = useMemo(() => {
+    const myPending = articles.filter(a => {
       if (a.status === 'deprecated') return false;
+      if (a.review_status === 'pending' && a.reviewer_id === profile?.id) return true;
+      return false;
+    }).length;
+    const allPending = articles.filter(a => {
+      if (a.status === 'deprecated') return false;
+      if (a.review_status === 'pending') return true;
       if (a.status === 'draft') return true;
       if (a.next_review_date && new Date(a.next_review_date) <= new Date()) return true;
       return false;
-    }).length,
-    healthScore: healthReport?.overall_score ?? null,
-  }), [articles, sources, healthReport]);
+    }).length;
+    return {
+      total: articles.length,
+      sourcesPending: sources.filter(s => !s.compiled).length,
+      pendingReview: myPending > 0 ? myPending : allPending,
+      pendingReviewMine: myPending,
+      healthScore: healthReport?.overall_score ?? null,
+    };
+  }, [articles, sources, healthReport, profile?.id]);
 
   const setTab = (tab: string) => {
     setSearchParams({ tab });
@@ -160,6 +179,23 @@ export default function Knowledge() {
     setHealthReport(result);
   };
 
+  const handleComposeFromSuggestion = (s: KBSuggestion) => {
+    setComposeSeed({ title: s.title, brief: s.topic_brief || s.reasoning, type: s.type });
+    setComposeOpen(true);
+  };
+
+  const handleComposeAccept = (data: { title: string; body: string; categoryId: string | null; articleType: string; tags: string[] }) => {
+    createArticle.mutate({
+      title: data.title,
+      body: data.body,
+      article_type: data.articleType,
+      category_id: data.categoryId,
+      status: 'draft',
+      visibility: 'internal',
+      tags: data.tags,
+    } as Partial<KBArticle>);
+  };
+
   // Dynamic header actions
   const headerActions = () => {
     if (activeTab === 'library') {
@@ -168,6 +204,9 @@ export default function Knowledge() {
           <KBCategoryManager categories={categories} onCreate={(d) => createCategory.mutate(d)} onDelete={() => {}} />
           <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-1">
             <Upload className="h-4 w-4" /> Εισαγωγή
+          </Button>
+          <Button variant="outline" onClick={() => { setComposeSeed(null); setComposeOpen(true); }} className="gap-1">
+            <Sparkles className="h-4 w-4" /> AI Σύνταξη
           </Button>
           <Button onClick={() => setEditorOpen(true)} className="gap-1">
             <Plus className="h-4 w-4" /> Νέο Άρθρο
@@ -250,6 +289,7 @@ export default function Knowledge() {
         {/* ===== LIBRARY ===== */}
         <TabsContent value="library" className="space-y-4 mt-4">
           <KBPendingSourcesStrip onImport={() => setImportOpen(true)} />
+          <KBSuggestionsPanel onCompose={handleComposeFromSuggestion} />
           <KBSearchBar value={search} onChange={setSearch} />
           <div className="grid narrow:grid-cols-[240px_1fr] gap-6">
             <div className="space-y-2">
@@ -462,6 +502,17 @@ export default function Knowledge() {
 
       {/* Unified Import Dialog */}
       <KBImportDialog open={importOpen} onOpenChange={setImportOpen} />
+
+      {/* AI Compose Dialog (από header / suggestions) */}
+      <KBAIComposeDialog
+        open={composeOpen}
+        onOpenChange={(v) => { setComposeOpen(v); if (!v) setComposeSeed(null); }}
+        categories={categories}
+        defaultTitle={composeSeed?.title}
+        defaultBrief={composeSeed?.brief}
+        defaultType={composeSeed?.type}
+        onAccept={handleComposeAccept}
+      />
 
       {/* Document Template Creation Dialog */}
       <Dialog open={tplCreateOpen} onOpenChange={setTplCreateOpen}>

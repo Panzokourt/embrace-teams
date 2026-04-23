@@ -4,7 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Plus } from 'lucide-react';
+import { Plus, RefreshCw } from 'lucide-react';
+import { useKBSync } from '@/hooks/useKBSync';
 import type { KBCategory } from '@/hooks/useKnowledgeBase';
 
 interface KBCategoryManagerProps {
@@ -17,6 +18,7 @@ export function KBCategoryManager({ categories, onCreate, onDelete }: KBCategory
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [parentId, setParentId] = useState('');
+  const sync = useKBSync();
 
   const handleCreate = () => {
     const parent = parentId ? categories.find(c => c.id === parentId) : null;
@@ -34,6 +36,17 @@ export function KBCategoryManager({ categories, onCreate, onDelete }: KBCategory
 
   return (
     <>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => sync.mutate()}
+        disabled={sync.isPending}
+        className="gap-1"
+        title="Συγχρονισμός με Departments / Clients / Services"
+      >
+        <RefreshCw className={`h-3.5 w-3.5 ${sync.isPending ? 'animate-spin' : ''}`} />
+        Sync
+      </Button>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)} className="gap-1">
         <Plus className="h-3.5 w-3.5" /> Κατηγορία
       </Button>

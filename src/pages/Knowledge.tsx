@@ -289,6 +289,7 @@ export default function Knowledge() {
         {/* ===== LIBRARY ===== */}
         <TabsContent value="library" className="space-y-4 mt-4">
           <KBPendingSourcesStrip onImport={() => setImportOpen(true)} />
+          <KBSuggestionsPanel onCompose={handleComposeFromSuggestion} />
           <KBSearchBar value={search} onChange={setSearch} />
           <div className="grid narrow:grid-cols-[240px_1fr] gap-6">
             <div className="space-y-2">

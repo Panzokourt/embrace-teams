@@ -1826,12 +1826,61 @@ Respond in Greek. Be thorough but concise.`;
       // ── WIKI & FILES EXECUTORS ──
 
       case "search_wiki": {
+        const limit = args.limit || 10;
+        // Hybrid: semantic via kb chunks → group by article. Fallback to lexical.
+        if (args.query) {
+          try {
+            const qVec = await embedText(String(args.query).slice(0, 4000), {
+              functionName: "secretary-agent",
+              companyId,
+              userId,
+            });
+            const { data: chunks, error: semErr } = await supabase.rpc("match_kb_chunks", {
+              query_embedding: qVec,
+              _company_id: companyId,
+              match_count: limit * 3,
+              similarity_threshold: 0.4,
+            });
+            if (!semErr && Array.isArray(chunks) && chunks.length > 0) {
+              // Group by article_id, keep best chunk
+              const byArticle = new Map<string, any>();
+              for (const c of chunks) {
+                const cur = byArticle.get(c.article_id);
+                if (!cur || c.similarity > cur.similarity) byArticle.set(c.article_id, c);
+              }
+              const articleIds = Array.from(byArticle.keys()).slice(0, limit);
+              const { data: arts } = await supabase
+                .from("kb_articles")
+                .select("id, title, tags, article_type, status")
+                .in("id", articleIds);
+              return {
+                articles: (arts || []).map((a: any) => {
+                  const best = byArticle.get(a.id);
+                  return {
+                    id: a.id,
+                    title: a.title,
+                    excerpt: best?.content?.substring(0, 300),
+                    tags: a.tags,
+                    type: a.article_type,
+                    status: a.status,
+                    similarity: best?.similarity,
+                  };
+                }),
+                count: articleIds.length,
+                mode: "semantic",
+              };
+            }
+          } catch (e) {
+            console.warn("search_wiki semantic failed, fallback:", (e as Error).message);
+          }
+        }
+        // Fallback: lexical
         let q = supabase
           .from("kb_articles")
           .select("id, title, body, tags, article_type, status, updated_at")
           .eq("company_id", companyId)
           .order("updated_at", { ascending: false })
-          .limit(args.limit || 10);
+          .limit(limit);
         const { data, error } = await q;
         if (error) throw error;
         let articles = data || [];
@@ -1858,6 +1907,7 @@ Respond in Greek. Be thorough but concise.`;
             status: a.status,
           })),
           count: articles.length,
+          mode: "lexical",
         };
       }
 

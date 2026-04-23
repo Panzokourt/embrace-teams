@@ -29,6 +29,7 @@ import { ClientTeamCard } from '@/components/clients/detail/ClientTeamCard';
 import { ClientContactsCard } from '@/components/clients/detail/ClientContactsCard';
 import { ClientFilesCard } from '@/components/clients/detail/ClientFilesCard';
 import { ClientMediaPlansCard } from '@/components/clients/detail/ClientMediaPlansCard';
+import { RelatedEntitiesCard } from '@/components/shared/RelatedEntitiesCard';
 import { ClientPLSummary } from '@/components/clients/detail/ClientPLSummary';
 import { useClientDetailLayout } from '@/hooks/useClientDetailLayout';
 
@@ -286,6 +287,9 @@ export default function ClientDetailPage() {
 
       {/* SECTION 4 — Files (full width) */}
       <ClientFilesCard files={[]} clientId={client.id} />
+
+      {/* Knowledge Graph related entities */}
+      <RelatedEntitiesCard entityType="client" entityId={client.id} hops={2} limit={20} title="Σχετιζόμενα από τον Knowledge Graph" />
 
       <ClientForm open={editOpen} onOpenChange={setEditOpen} client={client} onSaved={fetchAll} />
     </div>

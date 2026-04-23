@@ -1,3 +1,5 @@
+import { pickModel, logAICall } from "../_shared/ai-router.ts";
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
@@ -45,8 +47,10 @@ Deno.serve(async (req) => {
       };
     });
 
+    const MODEL = pickModel('classification');
+    const start = Date.now();
     const body = {
-      model: 'google/gemini-2.5-flash-lite',
+      model: MODEL,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
@@ -79,6 +83,7 @@ Deno.serve(async (req) => {
     });
 
     if (r.status === 429 || r.status === 402) {
+      await logAICall({ function_name: 'ai-suggest-mapping', task_type: 'classification', model: MODEL, start_ms: start, success: false, error_text: `${r.status}` });
       return new Response(
         JSON.stringify({ error: r.status === 429 ? 'Rate limit' : 'Credits exhausted' }),
         { status: r.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -86,11 +91,13 @@ Deno.serve(async (req) => {
     }
     if (!r.ok) {
       const t = await r.text();
+      await logAICall({ function_name: 'ai-suggest-mapping', task_type: 'classification', model: MODEL, start_ms: start, success: false, error_text: `${r.status}` });
       console.error('AI gateway error:', r.status, t);
       throw new Error('AI gateway request failed');
     }
 
     const data = await r.json();
+    await logAICall({ function_name: 'ai-suggest-mapping', task_type: 'classification', model: MODEL, start_ms: start, usage: data.usage });
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     let mapping: Record<string, string> = {};
     if (toolCall?.function?.arguments) {

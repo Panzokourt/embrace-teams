@@ -8,13 +8,12 @@ import { KBArticleEditor } from '@/components/knowledge/KBArticleEditor';
 import { KBCategoryManager } from '@/components/knowledge/KBCategoryManager';
 import { KBReviewQueue } from '@/components/knowledge/KBReviewQueue';
 import { KBTemplateCard } from '@/components/knowledge/KBTemplateCard';
-import { KBSourceUploader } from '@/components/knowledge/KBSourceUploader';
 import { KBSourceList } from '@/components/knowledge/KBSourceList';
-import { KBAskChat } from '@/components/knowledge/KBAskChat';
 import { KBHealthCheck } from '@/components/knowledge/KBHealthCheck';
+import { KBPendingSourcesStrip } from '@/components/knowledge/KBPendingSourcesStrip';
+import { KBImportDialog } from '@/components/knowledge/KBImportDialog';
+import { AskExploreView } from '@/components/knowledge/AskExploreView';
 import { EmbeddingsBackfillButton } from '@/components/knowledge/EmbeddingsBackfillButton';
-import { GraphExplorer } from '@/components/knowledge/GraphExplorer';
-import { ProjectTemplatesManager } from '@/components/settings/ProjectTemplatesManager';
 import { BriefsList } from '@/components/blueprints/BriefsList';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,22 +24,38 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Plus, BookOpen, FileText, AlertTriangle, Download, FileStack, MessageCircleQuestion, Settings2, Network } from 'lucide-react';
+import {
+  Plus, BookOpen, FileText, AlertTriangle, Activity, FileStack,
+  MessageCircleQuestion, Settings2, Upload, ArrowRight,
+} from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { KBArticle } from '@/hooks/useKnowledgeBase';
 import type { HealthReport } from '@/hooks/useKBCompiler';
 
 type ManageSection = 'reviews' | 'sources' | 'health';
+type TemplateSection = 'briefs' | 'documents';
 
 export default function Knowledge() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'wiki';
+  const activeTab = searchParams.get('tab') || 'library';
 
-  // Migrate old tab values
+  // Migrate old tab values to new structure
   useEffect(() => {
-    const oldTabs: Record<string, string> = { articles: 'wiki', playbook: 'wiki', templates: 'blueprints', reviews: 'manage', sources: 'manage', health: 'manage' };
+    const oldTabs: Record<string, string> = {
+      articles: 'library',
+      playbook: 'library',
+      wiki: 'library',
+      templates: 'templates',
+      blueprints: 'templates',
+      reviews: 'admin',
+      sources: 'admin',
+      health: 'admin',
+      manage: 'admin',
+      ask: 'discover',
+      graph: 'discover',
+    };
     if (oldTabs[activeTab]) {
       setSearchParams({ tab: oldTabs[activeTab] }, { replace: true });
     }
@@ -53,22 +68,22 @@ export default function Knowledge() {
   } = useKnowledgeBase();
 
   const {
-    sources, createSource, deleteSource, compileSource,
+    sources, deleteSource, compileSource,
     askWiki, askAnswer, askLoading,
     healthCheck,
   } = useKBCompiler();
 
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'approved' | 'review'>('all');
   const [editorOpen, setEditorOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editArticle, setEditArticle] = useState<KBArticle | null>(null);
   const [healthReport, setHealthReport] = useState<HealthReport | null>(null);
   const [manageSection, setManageSection] = useState<ManageSection>('reviews');
+  const [templateSection, setTemplateSection] = useState<TemplateSection>('briefs');
 
-  // Blueprints sub-section
-  const [blueprintSection, setBlueprintSection] = useState<'briefs' | 'projects' | 'documents'>('briefs');
-
-  // Template creation
+  // Document Template creation
   const [tplCreateOpen, setTplCreateOpen] = useState(false);
   const [tplTitle, setTplTitle] = useState('');
   const [tplDesc, setTplDesc] = useState('');
@@ -86,6 +101,11 @@ export default function Knowledge() {
       const catIds = new Set([selectedCategory, ...categories.filter(c => c.parent_id === selectedCategory).map(c => c.id)]);
       list = list.filter(a => a.category_id && catIds.has(a.category_id));
     }
+    if (statusFilter === 'draft') list = list.filter(a => a.status === 'draft');
+    else if (statusFilter === 'approved') list = list.filter(a => a.status === 'approved');
+    else if (statusFilter === 'review') {
+      list = list.filter(a => a.next_review_date && new Date(a.next_review_date) <= new Date());
+    }
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(a =>
@@ -95,7 +115,7 @@ export default function Knowledge() {
       );
     }
     return list;
-  }, [articles, selectedCategory, search, categories]);
+  }, [articles, selectedCategory, search, categories, statusFilter]);
 
   const filteredTemplates = useMemo(() => {
     let list = templates.filter(t => t.status !== 'deprecated');
@@ -107,20 +127,26 @@ export default function Knowledge() {
   }, [templates, search]);
 
   const recentArticles = useMemo(() =>
-    [...articles].filter(a => a.status !== 'deprecated').sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 6),
+    [...articles].filter(a => a.status !== 'deprecated').sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 9),
     [articles]);
 
   const stats = useMemo(() => ({
     total: articles.length,
-    drafts: articles.filter(a => a.status === 'draft').length,
-    pendingReview: articles.filter(a => a.next_review_date && new Date(a.next_review_date) <= new Date() && a.status !== 'deprecated').length,
-    sources: sources.length,
-  }), [articles, sources]);
+    sourcesPending: sources.filter(s => !s.compiled).length,
+    pendingReview: articles.filter(a => {
+      if (a.status === 'deprecated') return false;
+      if (a.status === 'draft') return true;
+      if (a.next_review_date && new Date(a.next_review_date) <= new Date()) return true;
+      return false;
+    }).length,
+    healthScore: healthReport?.overall_score ?? null,
+  }), [articles, sources, healthReport]);
 
   const setTab = (tab: string) => {
     setSearchParams({ tab });
     setSelectedCategory(null);
     setSearch('');
+    setStatusFilter('all');
   };
 
   const handleCreateTemplate = () => {
@@ -136,17 +162,20 @@ export default function Knowledge() {
 
   // Dynamic header actions
   const headerActions = () => {
-    if (activeTab === 'wiki') {
+    if (activeTab === 'library') {
       return (
         <div className="flex gap-2">
           <KBCategoryManager categories={categories} onCreate={(d) => createCategory.mutate(d)} onDelete={() => {}} />
+          <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-1">
+            <Upload className="h-4 w-4" /> Εισαγωγή
+          </Button>
           <Button onClick={() => setEditorOpen(true)} className="gap-1">
             <Plus className="h-4 w-4" /> Νέο Άρθρο
           </Button>
         </div>
       );
     }
-    if (activeTab === 'blueprints' && blueprintSection === 'documents') {
+    if (activeTab === 'templates' && templateSection === 'documents') {
       return (
         <Button onClick={() => setTplCreateOpen(true)} className="gap-1">
           <Plus className="h-4 w-4" /> Νέο Template
@@ -166,52 +195,61 @@ export default function Knowledge() {
         actions={headerActions()}
       />
 
-      {/* KPI Cards */}
+      {/* KPI Cards — actionable */}
       <div className="grid grid-cols-2 wide:grid-cols-4 gap-4">
-        <Card><CardContent className="p-4 text-center">
-          <FileText className="h-5 w-5 mx-auto text-primary mb-1" />
-          <p className="text-2xl font-bold">{stats.total}</p>
-          <p className="text-xs text-muted-foreground">Σύνολο Άρθρων</p>
-        </CardContent></Card>
-        <Card><CardContent className="p-4 text-center">
-          <Badge variant="warning" className="mb-1">Draft</Badge>
-          <p className="text-2xl font-bold">{stats.drafts}</p>
-          <p className="text-xs text-muted-foreground">Πρόχειρα</p>
-        </CardContent></Card>
-        <Card><CardContent className="p-4 text-center">
-          <AlertTriangle className="h-5 w-5 mx-auto text-warning mb-1" />
-          <p className="text-2xl font-bold">{stats.pendingReview}</p>
-          <p className="text-xs text-muted-foreground">Pending Review</p>
-        </CardContent></Card>
-        <Card><CardContent className="p-4 text-center">
-          <Download className="h-5 w-5 mx-auto text-primary mb-1" />
-          <p className="text-2xl font-bold">{stats.sources}</p>
-          <p className="text-xs text-muted-foreground">Πηγές</p>
-        </CardContent></Card>
+        <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => { setTab('library'); setStatusFilter('all'); }}>
+          <CardContent className="p-4 text-center">
+            <FileText className="h-5 w-5 mx-auto text-primary mb-1" />
+            <p className="text-2xl font-bold">{stats.total}</p>
+            <p className="text-xs text-muted-foreground">Άρθρα Wiki</p>
+          </CardContent>
+        </Card>
+        <Card className="cursor-pointer hover:border-warning/50 transition-colors" onClick={() => { setTab('admin'); setManageSection('sources'); }}>
+          <CardContent className="p-4 text-center">
+            <Upload className="h-5 w-5 mx-auto text-warning mb-1" />
+            <p className="text-2xl font-bold">{stats.sourcesPending}</p>
+            <p className="text-xs text-muted-foreground">Πηγές Pending</p>
+          </CardContent>
+        </Card>
+        <Card className="cursor-pointer hover:border-warning/50 transition-colors" onClick={() => { setTab('admin'); setManageSection('reviews'); }}>
+          <CardContent className="p-4 text-center">
+            <AlertTriangle className="h-5 w-5 mx-auto text-warning mb-1" />
+            <p className="text-2xl font-bold">{stats.pendingReview}</p>
+            <p className="text-xs text-muted-foreground">Εκκρεμή Reviews</p>
+          </CardContent>
+        </Card>
+        <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => { setTab('admin'); setManageSection('health'); }}>
+          <CardContent className="p-4 text-center">
+            <Activity className="h-5 w-5 mx-auto text-primary mb-1" />
+            <p className="text-2xl font-bold">
+              {stats.healthScore != null ? `${stats.healthScore}` : '—'}
+              {stats.healthScore != null && <span className="text-sm text-muted-foreground">/100</span>}
+            </p>
+            <p className="text-xs text-muted-foreground">Health Score</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Tabs — 4 clean tabs */}
       <Tabs value={activeTab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="wiki" className="gap-1.5">
-            <BookOpen className="h-3.5 w-3.5" /> Wiki
+          <TabsTrigger value="library" className="gap-1.5">
+            <BookOpen className="h-3.5 w-3.5" /> Βιβλιοθήκη
           </TabsTrigger>
-          <TabsTrigger value="blueprints" className="gap-1.5">
-            <FileStack className="h-3.5 w-3.5" /> Blueprints
+          <TabsTrigger value="templates" className="gap-1.5">
+            <FileStack className="h-3.5 w-3.5" /> Templates
           </TabsTrigger>
-          <TabsTrigger value="ask" className="gap-1.5">
-            <MessageCircleQuestion className="h-3.5 w-3.5" /> Ask AI
+          <TabsTrigger value="discover" className="gap-1.5">
+            <MessageCircleQuestion className="h-3.5 w-3.5" /> Ρώτα & Εξερεύνησε
           </TabsTrigger>
-          <TabsTrigger value="graph" className="gap-1.5">
-            <Network className="h-3.5 w-3.5" /> Graph
-          </TabsTrigger>
-          <TabsTrigger value="manage" className="gap-1.5">
-            <Settings2 className="h-3.5 w-3.5" /> Manage
+          <TabsTrigger value="admin" className="gap-1.5">
+            <Settings2 className="h-3.5 w-3.5" /> Διαχείριση
           </TabsTrigger>
         </TabsList>
 
-        {/* ===== Wiki Tab (merged Articles + Playbook) ===== */}
-        <TabsContent value="wiki" className="space-y-4 mt-4">
+        {/* ===== LIBRARY ===== */}
+        <TabsContent value="library" className="space-y-4 mt-4">
+          <KBPendingSourcesStrip onImport={() => setImportOpen(true)} />
           <KBSearchBar value={search} onChange={setSearch} />
           <div className="grid narrow:grid-cols-[240px_1fr] gap-6">
             <div className="space-y-2">
@@ -219,52 +257,87 @@ export default function Knowledge() {
               <KBCategoryTree categories={categories} selectedId={selectedCategory} onSelect={setSelectedCategory} />
             </div>
             <div>
-              <h3 className="text-sm font-medium mb-3">
-                {search || selectedCategory ? `Αποτελέσματα (${filteredArticles.length})` : 'Πρόσφατα Άρθρα'}
-              </h3>
+              <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+                <h3 className="text-sm font-medium">
+                  {search || selectedCategory || statusFilter !== 'all'
+                    ? `Αποτελέσματα (${filteredArticles.length})`
+                    : 'Πρόσφατα Άρθρα'}
+                </h3>
+                <div className="inline-flex bg-muted rounded-md p-0.5 text-xs">
+                  {(['all', 'draft', 'approved', 'review'] as const).map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setStatusFilter(f)}
+                      className={`px-2.5 py-1 rounded transition-colors ${
+                        statusFilter === f ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {f === 'all' ? 'Όλα' : f === 'draft' ? 'Drafts' : f === 'approved' ? 'Approved' : 'Needs review'}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {(search || selectedCategory ? filteredArticles : recentArticles).map(article => (
+                {(search || selectedCategory || statusFilter !== 'all' ? filteredArticles : recentArticles).map(article => (
                   <KBArticleCard key={article.id} article={article} onClick={() => navigate(`/knowledge/articles/${article.id}`)} />
                 ))}
               </div>
-              {filteredArticles.length === 0 && (search || selectedCategory) && (
-                <p className="text-sm text-muted-foreground py-8 text-center">Δεν βρέθηκαν άρθρα.</p>
+              {filteredArticles.length === 0 && (search || selectedCategory || statusFilter !== 'all') && (
+                <div className="text-sm text-muted-foreground py-12 text-center space-y-3">
+                  <p>Δεν βρέθηκαν άρθρα.</p>
+                  <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} className="gap-1">
+                    <Upload className="h-3.5 w-3.5" /> Εισαγωγή νέας πηγής
+                  </Button>
+                </div>
+              )}
+              {recentArticles.length === 0 && !search && !selectedCategory && statusFilter === 'all' && (
+                <Card>
+                  <CardContent className="py-10 text-center space-y-3">
+                    <BookOpen className="h-10 w-10 mx-auto text-muted-foreground opacity-40" />
+                    <p className="text-sm text-muted-foreground">Δεν υπάρχουν άρθρα ακόμη. Ξεκίνα ανεβάζοντας έγγραφα ή γράφοντας το πρώτο σου άρθρο.</p>
+                    <div className="flex justify-center gap-2">
+                      <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-1">
+                        <Upload className="h-4 w-4" /> Ανέβασμα εγγράφων
+                      </Button>
+                      <Button onClick={() => setEditorOpen(true)} className="gap-1">
+                        <Plus className="h-4 w-4" /> Νέο άρθρο
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               )}
             </div>
           </div>
         </TabsContent>
 
-        {/* ===== Blueprints Tab (merged Blueprints page + KB Templates) ===== */}
-        <TabsContent value="blueprints" className="space-y-4 mt-4">
+        {/* ===== TEMPLATES ===== */}
+        <TabsContent value="templates" className="space-y-4 mt-4">
           <div className="flex gap-2 border-b pb-2">
             <Button
-              variant={blueprintSection === 'briefs' ? 'default' : 'ghost'}
+              variant={templateSection === 'briefs' ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => setBlueprintSection('briefs')}
+              onClick={() => setTemplateSection('briefs')}
             >
-              Προ-φόρμες
+              Briefs
             </Button>
             <Button
-              variant={blueprintSection === 'projects' ? 'default' : 'ghost'}
+              variant={templateSection === 'documents' ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => setBlueprintSection('projects')}
-            >
-              Project Templates
-            </Button>
-            <Button
-              variant={blueprintSection === 'documents' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setBlueprintSection('documents')}
+              onClick={() => setTemplateSection('documents')}
             >
               Document Templates
             </Button>
+            <div className="ml-auto text-xs text-muted-foreground self-center hidden md:flex items-center gap-1">
+              <span>Project Templates →</span>
+              <Button variant="link" size="sm" className="h-auto p-0 text-xs gap-0.5" onClick={() => navigate('/settings?tab=templates')}>
+                Ρυθμίσεις <ArrowRight className="h-3 w-3" />
+              </Button>
+            </div>
           </div>
 
-          {blueprintSection === 'briefs' && <BriefsList />}
+          {templateSection === 'briefs' && <BriefsList />}
 
-          {blueprintSection === 'projects' && <ProjectTemplatesManager />}
-
-          {blueprintSection === 'documents' && (
+          {templateSection === 'documents' && (
             <div className="space-y-4">
               <KBSearchBar value={search} onChange={setSearch} placeholder="Αναζήτηση templates..." />
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -284,53 +357,23 @@ export default function Knowledge() {
           )}
         </TabsContent>
 
-        {/* Reviews Tab */}
-        <TabsContent value="reviews" className="space-y-4 mt-4">
-          <KBReviewQueue
-            articles={articles}
-            onApprove={(id) => updateArticle.mutate({ id, status: 'approved' })}
-            onDeprecate={(id) => deleteArticle.mutate(id)}
-            onSelect={(article) => setEditArticle(article)}
-          />
+        {/* ===== DISCOVER (Ask + Graph) ===== */}
+        <TabsContent value="discover" className="mt-4">
+          <AskExploreView onAsk={askWiki} answer={askAnswer} isLoading={askLoading} />
         </TabsContent>
 
-        {/* Sources Tab */}
-        <TabsContent value="sources" className="space-y-4 mt-4">
-          <div className="grid lg:grid-cols-[1fr_350px] gap-6">
-            <KBSourceList
-              sources={sources}
-              onCompile={(id) => compileSource.mutate(id)}
-              onDelete={(id) => deleteSource.mutate(id)}
-              compilingId={compileSource.isPending ? (compileSource.variables as string) : undefined}
-            />
-            <KBSourceUploader
-              onSubmit={(data) => createSource.mutate(data)}
-              isLoading={createSource.isPending}
-            />
-          </div>
-        </TabsContent>
-
-        {/* Ask Wiki Tab */}
-        <TabsContent value="ask" className="mt-4">
-          <Card>
-            <CardContent className="p-0">
-              <KBAskChat onAsk={askWiki} answer={askAnswer} isLoading={askLoading} />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ===== Graph Tab ===== */}
-        <TabsContent value="graph" className="mt-4">
-          <GraphExplorer />
-        </TabsContent>
-        <TabsContent value="manage" className="space-y-4 mt-4">
-          <div className="flex gap-2 border-b pb-2">
+        {/* ===== ADMIN ===== */}
+        <TabsContent value="admin" className="space-y-4 mt-4">
+          <div className="flex gap-2 border-b pb-2 flex-wrap">
             <Button
               variant={manageSection === 'reviews' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setManageSection('reviews')}
             >
               Reviews
+              {stats.pendingReview > 0 && (
+                <Badge variant="warning" className="ml-1.5 h-5 px-1.5 text-[10px]">{stats.pendingReview}</Badge>
+              )}
             </Button>
             <Button
               variant={manageSection === 'sources' ? 'default' : 'ghost'}
@@ -338,13 +381,16 @@ export default function Knowledge() {
               onClick={() => setManageSection('sources')}
             >
               Πηγές
+              {stats.sourcesPending > 0 && (
+                <Badge variant="warning" className="ml-1.5 h-5 px-1.5 text-[10px]">{stats.sourcesPending}</Badge>
+              )}
             </Button>
             <Button
               variant={manageSection === 'health' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setManageSection('health')}
             >
-              Health Check
+              Health & Embeddings
             </Button>
             <div className="ml-auto">
               <EmbeddingsBackfillButton />
@@ -361,16 +407,23 @@ export default function Knowledge() {
           )}
 
           {manageSection === 'sources' && (
-            <div className="grid lg:grid-cols-[1fr_350px] gap-6">
+            <div className="space-y-3">
+              <Card className="border-primary/30 bg-primary/5">
+                <CardContent className="p-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">Εισαγωγή νέας πηγής</p>
+                    <p className="text-xs text-muted-foreground">Ανέβασε αρχεία (PDF/DOCX), επικόλλησε κείμενο ή πρόσθεσε URL.</p>
+                  </div>
+                  <Button onClick={() => setImportOpen(true)} className="gap-1">
+                    <Upload className="h-4 w-4" /> Εισαγωγή
+                  </Button>
+                </CardContent>
+              </Card>
               <KBSourceList
                 sources={sources}
                 onCompile={(id) => compileSource.mutate(id)}
                 onDelete={(id) => deleteSource.mutate(id)}
                 compilingId={compileSource.isPending ? (compileSource.variables as string) : undefined}
-              />
-              <KBSourceUploader
-                onSubmit={(data) => createSource.mutate(data)}
-                isLoading={createSource.isPending}
               />
             </div>
           )}
@@ -407,7 +460,10 @@ export default function Knowledge() {
         />
       )}
 
-      {/* Template Creation Dialog */}
+      {/* Unified Import Dialog */}
+      <KBImportDialog open={importOpen} onOpenChange={setImportOpen} />
+
+      {/* Document Template Creation Dialog */}
       <Dialog open={tplCreateOpen} onOpenChange={setTplCreateOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Νέο Template</DialogTitle></DialogHeader>

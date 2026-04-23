@@ -49,13 +49,13 @@ export default function DockQuickActions() {
         <PopoverContent side="top" align="center" sideOffset={12} className="w-56 p-2">
           <div className="space-y-1">
             <button
-              onClick={() => { navigate('/projects?new=true'); setOpen(false); }}
+              onClick={() => { navigate('/work?tab=projects&new=1'); setOpen(false); }}
               className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted transition-colors text-left"
             >
               <FolderKanban className="h-4 w-4 text-muted-foreground shrink-0" /> Νέο Έργο
             </button>
             <button
-              onClick={() => { navigate('/tasks?new=true'); setOpen(false); }}
+              onClick={() => { navigate('/work?tab=tasks&new=1'); setOpen(false); }}
               className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted transition-colors text-left"
             >
               <CheckSquare className="h-4 w-4 text-muted-foreground shrink-0" /> Νέο Task

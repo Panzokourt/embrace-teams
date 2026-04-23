@@ -179,6 +179,23 @@ export default function Knowledge() {
     setHealthReport(result);
   };
 
+  const handleComposeFromSuggestion = (s: KBSuggestion) => {
+    setComposeSeed({ title: s.title, brief: s.topic_brief || s.reasoning, type: s.type });
+    setComposeOpen(true);
+  };
+
+  const handleComposeAccept = (data: { title: string; body: string; categoryId: string | null; articleType: string; tags: string[] }) => {
+    createArticle.mutate({
+      title: data.title,
+      body: data.body,
+      article_type: data.articleType,
+      category_id: data.categoryId,
+      status: 'draft',
+      visibility: 'internal',
+      tags: data.tags,
+    } as Partial<KBArticle>);
+  };
+
   // Dynamic header actions
   const headerActions = () => {
     if (activeTab === 'library') {

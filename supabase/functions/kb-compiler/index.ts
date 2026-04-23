@@ -203,6 +203,42 @@ Rules:
         .update({ compiled: true, compiled_at: new Date().toISOString() })
         .eq("id", sourceId);
 
+      // ── Phase 1: auto-embed created/updated articles ──
+      // We rebuild chunks here directly (service role) so this is atomic with compile.
+      const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+      const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const svc = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+      const { chunkText: chunk } = await import("../_shared/ai-router.ts");
+      for (const articleId of createdIds) {
+        try {
+          const { data: art } = await svc
+            .from("kb_articles")
+            .select("id, title, body, company_id")
+            .eq("id", articleId)
+            .single();
+          if (!art) continue;
+          await svc.from("kb_article_chunks").delete().eq("article_id", art.id);
+          const pieces = chunk(`${art.title}\n\n${art.body || ""}`, 500, 50);
+          for (const p of pieces) {
+            const v = await embedText(p.content, {
+              functionName: "kb-compiler",
+              companyId: art.company_id,
+              userId,
+            });
+            await svc.from("kb_article_chunks").insert({
+              article_id: art.id,
+              company_id: art.company_id,
+              chunk_index: p.index,
+              content: p.content,
+              tokens: p.tokens,
+              embedding: vecLiteral(v) as any,
+            });
+          }
+        } catch (e) {
+          console.warn(`auto-embed failed for ${articleId}:`, (e as Error).message);
+        }
+      }
+
       return new Response(
         JSON.stringify({ success: true, pages_processed: pages.length, article_ids: createdIds }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -215,35 +251,87 @@ Rules:
         return new Response(JSON.stringify({ error: "question required" }), { status: 400, headers: corsHeaders });
       }
 
-      const { data: wikiArticles } = await supabase
-        .from("kb_articles")
-        .select("id, title, body, tags")
-        .eq("company_id", companyId)
-        .neq("status", "deprecated");
+      // ── Phase 1: hybrid semantic retrieval ──
+      // 1) Embed the question
+      // 2) Try semantic match against kb_article_chunks
+      // 3) Fallback to ALL articles if too few semantic hits (FTS-like behavior)
+      let contextChunks: { article_id: string; content: string; similarity?: number }[] = [];
+      try {
+        const qVec = await embedText(question, {
+          functionName: "kb-compiler",
+          companyId,
+          userId,
+        });
+        const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+        const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const svc = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+        const { data: matches } = await svc.rpc("match_kb_chunks", {
+          query_embedding: vecLiteral(qVec) as any,
+          _company_id: companyId,
+          match_count: 8,
+          similarity_threshold: 0.4,
+        });
+        if (matches && matches.length > 0) {
+          contextChunks = matches.map((m: any) => ({
+            article_id: m.article_id,
+            content: m.content,
+            similarity: m.similarity,
+          }));
+        }
+      } catch (e) {
+        console.warn("semantic retrieval failed, will use full wiki:", (e as Error).message);
+      }
 
-      const wikiContext = (wikiArticles || [])
-        .map((a: any) => `## ${a.title}\n${a.body}\n---`)
-        .join("\n\n");
+      let wikiContext = "";
+      let usedSemantic = contextChunks.length > 0;
+      if (usedSemantic) {
+        // Resolve article titles for the matched chunks
+        const articleIds = Array.from(new Set(contextChunks.map((c) => c.article_id)));
+        const { data: articleTitles } = await supabase
+          .from("kb_articles")
+          .select("id, title")
+          .in("id", articleIds);
+        const titleById = new Map((articleTitles || []).map((a: any) => [a.id, a.title]));
+        wikiContext = contextChunks
+          .map(
+            (c) =>
+              `## ${titleById.get(c.article_id) || "Untitled"} (relevance: ${(c.similarity || 0).toFixed(2)})\n${c.content}\n---`
+          )
+          .join("\n\n");
+      } else {
+        // Fallback: dump all wiki content (legacy behavior)
+        const { data: wikiArticles } = await supabase
+          .from("kb_articles")
+          .select("id, title, body, tags")
+          .eq("company_id", companyId)
+          .neq("status", "deprecated");
+        wikiContext = (wikiArticles || [])
+          .map((a: any) => `## ${a.title}\n${a.body}\n---`)
+          .join("\n\n");
+      }
 
       const askPrompt = `You are a helpful wiki assistant. Answer the user's question based ONLY on the wiki content below. Cite specific pages using [Page Title] format. If the wiki doesn't contain relevant information, say so clearly.
 
-WIKI CONTENT:
+WIKI CONTENT (${usedSemantic ? "semantic matches" : "full wiki"}):
 ${wikiContext || "(wiki is empty)"}
 
 USER QUESTION: ${question}`;
 
-      const askResponse = await fetch(GATEWAY_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-pro",
+      let askResponse: Response;
+      try {
+        askResponse = await callAIStream({
+          // Summarization-class task → flash by default; big cost win vs pro.
+          task_type: "summarization",
+          functionName: "kb-compiler",
+          companyId,
+          userId,
           messages: [{ role: "user", content: askPrompt }],
-          stream: true,
-        }),
-      });
+        });
+      } catch (e) {
+        const msg = (e as Error).message;
+        const status = msg.includes("rate limit") ? 429 : msg.includes("credits") ? 402 : 500;
+        return new Response(JSON.stringify({ error: msg }), { status, headers: corsHeaders });
+      }
 
       if (!askResponse.ok) {
         const status = askResponse.status;

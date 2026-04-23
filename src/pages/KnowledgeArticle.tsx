@@ -87,9 +87,11 @@ export default function KnowledgeArticle() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold">{article.title}</h1>
-              <div className="flex items-center gap-2 mt-2">
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
                 <Badge variant={statusVariant[article.status]}>{article.status}</Badge>
                 <Badge variant="outline">{article.visibility === 'internal' ? 'Internal' : 'Client Visible'}</Badge>
+                {article.review_status === 'pending' && <Badge variant="warning">Αναμονή review</Badge>}
+                {article.review_status === 'changes_requested' && <Badge variant="destructive">Ζητήθηκαν αλλαγές</Badge>}
                 <span className="text-xs text-muted-foreground">v{article.version}</span>
               </div>
             </div>

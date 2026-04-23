@@ -139,6 +139,7 @@ Neuro Rationale: ${insight.neuro_rationale}
 ## Related Entity Data
 ${entityContext}
 
+${graphSummary ? `## Knowledge Graph Subgraph (3-hop neighbors)\n${graphSummary}\n` : ""}
 ${marketResearch ? `## Market Research (Perplexity)\n${marketResearch}` : ""}
 
 Provide a deep dive analysis.`;

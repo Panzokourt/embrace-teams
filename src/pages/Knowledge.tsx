@@ -42,6 +42,7 @@ type TemplateSection = 'briefs' | 'documents';
 
 export default function Knowledge() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'library';
 
@@ -86,6 +87,10 @@ export default function Knowledge() {
   const [healthReport, setHealthReport] = useState<HealthReport | null>(null);
   const [manageSection, setManageSection] = useState<ManageSection>('reviews');
   const [templateSection, setTemplateSection] = useState<TemplateSection>('briefs');
+
+  // AI Compose από suggestion / button
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeSeed, setComposeSeed] = useState<{ title?: string; brief?: string; type?: string } | null>(null);
 
   // Document Template creation
   const [tplCreateOpen, setTplCreateOpen] = useState(false);

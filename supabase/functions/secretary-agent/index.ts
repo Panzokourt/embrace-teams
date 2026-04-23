@@ -2489,7 +2489,8 @@ ${contextParts.join("\n")}`;
             }
           } else {
             // ── Lovable AI Gateway (Gemini/GPT) ──
-            const gatewayModel = requestedModel || "google/gemini-2.5-pro";
+            // Use ai-router policy: secretary chat = reasoning task (defaults to gemini-2.5-pro)
+            const gatewayModel = requestedModel || pickModel("reasoning");
 
             // Tool calling loop (max 8 iterations)
             for (let i = 0; i < 8; i++) {

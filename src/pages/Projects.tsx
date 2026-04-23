@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { usePagination } from '@/hooks/usePagination';
 import { PaginationControls } from '@/components/shared/PaginationControls';
 import { useAuth } from '@/contexts/AuthContext';
@@ -82,6 +82,7 @@ interface Profile {
 
 export default function ProjectsPage({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { isAdmin, isManager, company, user } = useAuth();
   const { logCreate, logUpdate, logDelete, logStatusChange } = useActivityLogger();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -109,6 +110,18 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
   const [projectMetadata, setProjectMetadata] = useState<Record<string, unknown>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { applyTemplate, applying: applyingTemplate } = useProjectTemplates();
+
+  // Auto-open create dialog when ?new=1 is in URL
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setEditingProject(null);
+      setDialogOpen(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('new');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),

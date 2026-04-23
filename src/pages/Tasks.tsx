@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { usePagination } from '@/hooks/usePagination';
 import { PaginationControls } from '@/components/shared/PaginationControls';
 import { useAuth } from '@/contexts/AuthContext';
@@ -126,6 +126,7 @@ const statusConfig: Record<TaskStatus, { icon: React.ReactNode; label: string; c
 
 export default function TasksPage({ embedded = false, projectId }: { embedded?: boolean; projectId?: string }) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { isAdmin, isManager } = useAuth();
   const { logCreate, logUpdate, logDelete, logStatusChange } = useActivityLogger();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -143,7 +144,19 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [viewMode, setViewMode] = usePersistedViewMode('tasks', 'table');
 
+  // Auto-open create dialog when ?new=1 is in URL
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setEditingTask(null);
+      setDialogOpen(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('new');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
   const [deliverables, setDeliverables] = useState<{ id: string; name: string }[]>([]);
+
 
   const [formData, setFormData] = useState({
     title: '',

@@ -72,6 +72,52 @@ serve(async (req) => {
       tasks: (tasksRes.data || []).map((t: any) => ({ id: t.id, title: t.title, status: t.status, priority: t.priority, due_date: t.due_date })),
     });
 
+    // ── Phase 5: subgraph context (3 hops around primary entities) ──
+    let graphSummary = "";
+    try {
+      const primaryEntityIds: { type: string; id: string }[] = [
+        ...projectIds.map((id: string) => ({ type: "project", id })),
+        ...clientIds.map((id: string) => ({ type: "client", id })),
+      ].slice(0, 3);
+
+      const collected: any[] = [];
+      for (const ent of primaryEntityIds) {
+        const { data: nodeRow } = await serviceClient
+          .from("graph_nodes")
+          .select("id, company_id")
+          .eq("node_type", ent.type)
+          .eq("entity_id", ent.id)
+          .maybeSingle();
+        if (!nodeRow) continue;
+        const { data: neighbors } = await serviceClient.rpc("graph_neighbors", {
+          _node_id: nodeRow.id,
+          _hops: 2,
+          _relation_types: null,
+          _max_results: 25,
+        });
+        for (const n of (neighbors || [])) collected.push(n);
+      }
+      if (collected.length > 0) {
+        const seen = new Set<string>();
+        const lines: string[] = [];
+        for (const n of collected) {
+          if (seen.has(n.node_id)) continue;
+          seen.add(n.node_id);
+          const p = n.properties || {};
+          const summary = Object.entries(p)
+            .filter(([_, v]) => v != null && typeof v !== "object")
+            .slice(0, 3)
+            .map(([k, v]) => `${k}=${v}`)
+            .join(", ");
+          lines.push(`- [${n.node_type}] ${n.label}${summary ? ` (${summary})` : ""} · hop ${n.distance} via ${n.via_relation || "?"}`);
+          if (lines.length >= 30) break;
+        }
+        graphSummary = lines.join("\n");
+      }
+    } catch (e) {
+      console.warn("graph subgraph injection failed:", (e as Error).message);
+    }
+
     const systemPrompt = `You are "Brain Deep Dive", an expert AI analyst for a marketing agency. You are given an existing insight and must provide a comprehensive deep analysis.
 
 Your output must include:

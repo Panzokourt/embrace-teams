@@ -55,7 +55,11 @@ export default function OnboardingCompanyDocs({ userId, companyId, onNext, onBac
 
   const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files || []);
-    const newFiles = selected.map(f => ({ file: f, status: 'pending' as const }));
+    const newFiles = selected.map(f => ({
+      file: f,
+      status: 'pending' as const,
+      category: guessCategory(f.name),
+    }));
     setFiles(prev => [...prev, ...newFiles]);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -63,9 +67,23 @@ export default function OnboardingCompanyDocs({ userId, companyId, onNext, onBac
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const dropped = Array.from(e.dataTransfer.files);
-    const newFiles = dropped.map(f => ({ file: f, status: 'pending' as const }));
+    const newFiles = dropped.map(f => ({
+      file: f,
+      status: 'pending' as const,
+      category: guessCategory(f.name),
+    }));
     setFiles(prev => [...prev, ...newFiles]);
   };
+
+  const setCategory = (idx: number, cat: DocCategory) => {
+    setFiles(prev => prev.map((item, i) => i === idx ? { ...item, category: cat } : item));
+  };
+
+  const categorySummary = useMemo(() => {
+    const counts: Record<DocCategory, number> = { sop: 0, brand: 0, contract: 0, policy: 0, other: 0 };
+    files.forEach(f => { counts[f.category ?? 'other']++; });
+    return counts;
+  }, [files]);
 
   const removeFile = (idx: number) => {
     setFiles(prev => prev.filter((_, i) => i !== idx));

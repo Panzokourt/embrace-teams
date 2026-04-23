@@ -15,6 +15,7 @@ import DockWorkDayClock from './DockWorkDayClock';
 import DockActiveTimer from './DockActiveTimer';
 import DockWorkMode from './DockWorkMode';
 import DockXPBadge from './DockXPBadge';
+import DockQuickActions from './DockQuickActions';
 
 interface DockItem {
   id: Exclude<DockPanelId, null> | 'quick-chat';

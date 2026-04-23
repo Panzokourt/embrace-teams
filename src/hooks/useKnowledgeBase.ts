@@ -35,6 +35,11 @@ export interface KBArticle {
   attendees: string[];
   decisions: any;
   action_items: any;
+  reviewer_id: string | null;
+  review_status: 'none' | 'pending' | 'approved' | 'changes_requested' | string;
+  review_requested_at: string | null;
+  reviewed_at: string | null;
+  review_notes: string | null;
   created_at: string;
   updated_at: string;
 }

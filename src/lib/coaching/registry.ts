@@ -31,7 +31,7 @@ export interface CoachEntry {
   steps?: CoachStep[];
 
   /** Allowed company roles (omit = all roles). */
-  requiredRoles?: Array<'owner' | 'super_admin' | 'admin' | 'manager' | 'standard' | 'viewer'>;
+  requiredRoles?: Array<'owner' | 'admin' | 'manager' | 'member' | 'viewer' | 'billing'>;
 
   /** Higher = wins when multiple entries match same route. */
   priority?: number;

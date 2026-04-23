@@ -130,6 +130,39 @@ async function logCall(row: {
   }
 }
 
+// Public helper: log a single AI call from any edge function that does its own fetch.
+// Pass the gateway JSON response (or just usage) and timing info.
+export async function logAICall(params: {
+  function_name: string;
+  task_type: TaskType | string;
+  model: string;
+  start_ms: number;
+  company_id?: string | null;
+  user_id?: string | null;
+  usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+  success?: boolean;
+  error_text?: string | null;
+}) {
+  const u = params.usage || {};
+  const prompt = u.prompt_tokens ?? 0;
+  const completion = u.completion_tokens ?? 0;
+  const total = u.total_tokens ?? prompt + completion;
+  await logCall({
+    company_id: params.company_id ?? null,
+    user_id: params.user_id ?? null,
+    function_name: params.function_name,
+    task_type: String(params.task_type),
+    model_used: params.model,
+    prompt_tokens: prompt,
+    completion_tokens: completion,
+    total_tokens: total,
+    latency_ms: Date.now() - params.start_ms,
+    cost_estimate_usd: estimateCost(params.model, prompt, completion),
+    success: params.success !== false,
+    error_text: params.error_text ?? null,
+  });
+}
+
 // ── Main caller ──────────────────────────────────────────────────
 export async function callAI(opts: CallAIOptions): Promise<CallAIResult> {
   const apiKey = Deno.env.get("LOVABLE_API_KEY");

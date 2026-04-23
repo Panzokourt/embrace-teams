@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
+import { embedText, pickModel } from "../_shared/ai-router.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1677,6 +1678,19 @@ Respond in Greek. Be thorough but concise.`;
       // ── MEMORY TOOL EXECUTORS ──
 
       case "save_memory": {
+        // Generate embedding for semantic recall (best-effort)
+        let memEmbedding: number[] | null = null;
+        try {
+          const embedInput = `${args.key}\n${args.content}`.slice(0, 8000);
+          memEmbedding = await embedText(embedInput, {
+            functionName: "secretary-agent",
+            companyId,
+            userId,
+          });
+        } catch (e) {
+          console.warn("save_memory embedding failed (will save without):", (e as Error).message);
+        }
+
         const { data: existing } = await supabase
           .from("secretary_memory")
           .select("id")
@@ -1687,21 +1701,23 @@ Respond in Greek. Be thorough but concise.`;
           .maybeSingle();
 
         if (existing) {
+          const updatePayload: any = {
+            content: args.content,
+            category: args.category || "general",
+            metadata: args.metadata || {},
+            project_id: args.project_id || null,
+            client_id: args.client_id || null,
+            updated_at: new Date().toISOString(),
+          };
+          if (memEmbedding) updatePayload.embedding = memEmbedding;
           const { error } = await supabase
             .from("secretary_memory")
-            .update({
-              content: args.content,
-              category: args.category || "general",
-              metadata: args.metadata || {},
-              project_id: args.project_id || null,
-              client_id: args.client_id || null,
-              updated_at: new Date().toISOString(),
-            })
+            .update(updatePayload)
             .eq("id", existing.id);
           if (error) throw error;
-          return { success: true, action: "updated", key: args.key };
+          return { success: true, action: "updated", key: args.key, semantic: !!memEmbedding };
         } else {
-          const { error } = await supabase.from("secretary_memory").insert({
+          const insertPayload: any = {
             user_id: userId,
             company_id: companyId,
             category: args.category || "general",
@@ -1710,20 +1726,46 @@ Respond in Greek. Be thorough but concise.`;
             metadata: args.metadata || {},
             project_id: args.project_id || null,
             client_id: args.client_id || null,
-          });
+          };
+          if (memEmbedding) insertPayload.embedding = memEmbedding;
+          const { error } = await supabase.from("secretary_memory").insert(insertPayload);
           if (error) throw error;
-          return { success: true, action: "saved", key: args.key };
+          return { success: true, action: "saved", key: args.key, semantic: !!memEmbedding };
         }
       }
 
       case "recall_memory": {
+        const limit = args.limit || 10;
+        // Hybrid: try semantic first if query provided, fallback to lexical filter
+        if (args.query) {
+          try {
+            const qVec = await embedText(String(args.query).slice(0, 4000), {
+              functionName: "secretary-agent",
+              companyId,
+              userId,
+            });
+            const { data: semData, error: semErr } = await supabase.rpc("match_secretary_memories", {
+              query_embedding: qVec,
+              _user_id: userId,
+              match_count: limit,
+              similarity_threshold: 0.4,
+              _project_id: args.project_id || null,
+              _client_id: args.client_id || null,
+            });
+            if (!semErr && Array.isArray(semData) && semData.length > 0) {
+              return { memories: semData, count: semData.length, mode: "semantic" };
+            }
+          } catch (e) {
+            console.warn("recall_memory semantic failed, fallback:", (e as Error).message);
+          }
+        }
         let q = supabase
           .from("secretary_memory")
           .select("id, category, key, content, metadata, project_id, client_id, updated_at")
           .eq("user_id", userId)
           .eq("company_id", companyId)
           .order("updated_at", { ascending: false })
-          .limit(args.limit || 10);
+          .limit(limit);
         if (args.category) q = q.eq("category", args.category);
         if (args.project_id) q = q.eq("project_id", args.project_id);
         if (args.client_id) q = q.eq("client_id", args.client_id);
@@ -1731,13 +1773,13 @@ Respond in Greek. Be thorough but concise.`;
         if (error) throw error;
         let memories = data || [];
         if (args.query) {
-          const queryLower = args.query.toLowerCase();
+          const queryLower = String(args.query).toLowerCase();
           memories = memories.filter((m: any) =>
             m.key.toLowerCase().includes(queryLower) ||
             m.content.toLowerCase().includes(queryLower)
           );
         }
-        return { memories, count: memories.length };
+        return { memories, count: memories.length, mode: "lexical" };
       }
 
       case "search_past_chats": {
@@ -1784,12 +1826,61 @@ Respond in Greek. Be thorough but concise.`;
       // ── WIKI & FILES EXECUTORS ──
 
       case "search_wiki": {
+        const limit = args.limit || 10;
+        // Hybrid: semantic via kb chunks → group by article. Fallback to lexical.
+        if (args.query) {
+          try {
+            const qVec = await embedText(String(args.query).slice(0, 4000), {
+              functionName: "secretary-agent",
+              companyId,
+              userId,
+            });
+            const { data: chunks, error: semErr } = await supabase.rpc("match_kb_chunks", {
+              query_embedding: qVec,
+              _company_id: companyId,
+              match_count: limit * 3,
+              similarity_threshold: 0.4,
+            });
+            if (!semErr && Array.isArray(chunks) && chunks.length > 0) {
+              // Group by article_id, keep best chunk
+              const byArticle = new Map<string, any>();
+              for (const c of chunks) {
+                const cur = byArticle.get(c.article_id);
+                if (!cur || c.similarity > cur.similarity) byArticle.set(c.article_id, c);
+              }
+              const articleIds = Array.from(byArticle.keys()).slice(0, limit);
+              const { data: arts } = await supabase
+                .from("kb_articles")
+                .select("id, title, tags, article_type, status")
+                .in("id", articleIds);
+              return {
+                articles: (arts || []).map((a: any) => {
+                  const best = byArticle.get(a.id);
+                  return {
+                    id: a.id,
+                    title: a.title,
+                    excerpt: best?.content?.substring(0, 300),
+                    tags: a.tags,
+                    type: a.article_type,
+                    status: a.status,
+                    similarity: best?.similarity,
+                  };
+                }),
+                count: articleIds.length,
+                mode: "semantic",
+              };
+            }
+          } catch (e) {
+            console.warn("search_wiki semantic failed, fallback:", (e as Error).message);
+          }
+        }
+        // Fallback: lexical
         let q = supabase
           .from("kb_articles")
           .select("id, title, body, tags, article_type, status, updated_at")
           .eq("company_id", companyId)
           .order("updated_at", { ascending: false })
-          .limit(args.limit || 10);
+          .limit(limit);
         const { data, error } = await q;
         if (error) throw error;
         let articles = data || [];
@@ -1816,6 +1907,7 @@ Respond in Greek. Be thorough but concise.`;
             status: a.status,
           })),
           count: articles.length,
+          mode: "lexical",
         };
       }
 
@@ -2397,7 +2489,8 @@ ${contextParts.join("\n")}`;
             }
           } else {
             // ── Lovable AI Gateway (Gemini/GPT) ──
-            const gatewayModel = requestedModel || "google/gemini-2.5-pro";
+            // Use ai-router policy: secretary chat = reasoning task (defaults to gemini-2.5-pro)
+            const gatewayModel = requestedModel || pickModel("reasoning");
 
             // Tool calling loop (max 8 iterations)
             for (let i = 0; i < 8; i++) {

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { pickModel, logAICall } from "../_shared/ai-router.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -105,6 +106,8 @@ ${contextInfo}`;
         })),
     ];
 
+    const MODEL = pickModel("chat");
+    const start = Date.now();
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -112,13 +115,14 @@ ${contextInfo}`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: MODEL,
         messages: gatewayMessages,
         stream: true,
       }),
     });
 
     if (!response.ok) {
+      await logAICall({ function_name: "my-work-ai-chat", task_type: "chat", model: MODEL, start_ms: start, user_id: userId, success: false, error_text: `${response.status}` });
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Πολλά αιτήματα, δοκίμασε ξανά σε λίγο." }), {
           status: 429,
@@ -138,6 +142,9 @@ ${contextInfo}`;
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Best-effort log (streamed; tokens unknown)
+    logAICall({ function_name: "my-work-ai-chat", task_type: "chat", model: MODEL, start_ms: start, user_id: userId }).catch(() => {});
 
     // Gateway already returns OpenAI-compatible SSE — pass through directly
     return new Response(response.body, {

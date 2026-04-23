@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { pickModel, logAICall } from "../_shared/ai-router.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -116,6 +117,8 @@ serve(async (req) => {
         throw new Error(`Unknown action: ${action}`);
     }
 
+    const MODEL = pickModel("simple_extraction");
+    const start = Date.now();
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -123,7 +126,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: MODEL,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -138,12 +141,14 @@ serve(async (req) => {
 
     if (!aiResponse.ok) {
       const status = aiResponse.status;
+      await logAICall({ function_name: "notes-ai-action", task_type: "simple_extraction", model: MODEL, start_ms: start, company_id: companyId, success: false, error_text: `${status}` });
       if (status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded" }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       if (status === 402) return new Response(JSON.stringify({ error: "Credits exhausted" }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       throw new Error(`AI error: ${status}`);
     }
 
     const aiData = await aiResponse.json();
+    await logAICall({ function_name: "notes-ai-action", task_type: "simple_extraction", model: MODEL, start_ms: start, company_id: companyId, usage: aiData.usage });
     const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall) throw new Error("AI did not return structured data");
 

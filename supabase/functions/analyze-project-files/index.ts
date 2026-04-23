@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { pickModel, logAICall } from "../_shared/ai-router.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -95,6 +96,8 @@ ${processedFiles.map((f: any, i: number) => `=== Αρχείο ${i + 1}: ${f.file
       required: ["deliverables", "tasks", "invoices", "projectSummary"],
     };
 
+    const MODEL = pickModel("deep_analysis");
+    const start = Date.now();
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -102,7 +105,7 @@ ${processedFiles.map((f: any, i: number) => `=== Αρχείο ${i + 1}: ${f.file
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
+        model: MODEL,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -120,6 +123,7 @@ ${processedFiles.map((f: any, i: number) => `=== Αρχείο ${i + 1}: ${f.file
     });
 
     if (!response.ok) {
+      await logAICall({ function_name: "analyze-project-files", task_type: "deep_analysis", model: MODEL, start_ms: start, success: false, error_text: `${response.status}` });
       if (response.status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded." }), { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       if (response.status === 402) return new Response(JSON.stringify({ error: "Payment required." }), { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       const errorText = await response.text();
@@ -128,6 +132,7 @@ ${processedFiles.map((f: any, i: number) => `=== Αρχείο ${i + 1}: ${f.file
     }
 
     const aiResponse = await response.json();
+    await logAICall({ function_name: "analyze-project-files", task_type: "deep_analysis", model: MODEL, start_ms: start, usage: aiResponse.usage });
     const toolCall = aiResponse.choices?.[0]?.message?.tool_calls?.[0];
     
     let suggestions: ProjectSuggestion;

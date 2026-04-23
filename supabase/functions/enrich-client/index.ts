@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { pickModel, logAICall } from "../_shared/ai-router.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -190,6 +191,8 @@ async function aiExtract(context: string, currentClient: Record<string, any>) {
     },
   }];
 
+  const MODEL = pickModel('simple_extraction');
+  const start = Date.now();
   const r = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -197,7 +200,7 @@ async function aiExtract(context: string, currentClient: Record<string, any>) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'google/gemini-3-flash-preview',
+      model: MODEL,
       messages: [
         {
           role: 'system',
@@ -220,12 +223,14 @@ ALWAYS try to extract these high-value fields when any signal exists:
 
   if (!r.ok) {
     const text = await r.text();
+    await logAICall({ function_name: 'enrich-client', task_type: 'simple_extraction', model: MODEL, start_ms: start, success: false, error_text: `${r.status}` });
     if (r.status === 429) throw new Error('Rate limited. Try again in a few seconds.');
     if (r.status === 402) throw new Error('AI credits exhausted. Add credits in Settings → Workspace → Usage.');
     throw new Error(`AI gateway error: ${text}`);
   }
 
   const data = await r.json();
+  await logAICall({ function_name: 'enrich-client', task_type: 'simple_extraction', model: MODEL, start_ms: start, usage: data.usage });
   const tc = data?.choices?.[0]?.message?.tool_calls?.[0];
   if (!tc) return {};
   try {

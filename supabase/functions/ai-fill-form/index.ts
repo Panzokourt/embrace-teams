@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { pickModel, logAICall } from "../_shared/ai-router.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -114,6 +115,8 @@ serve(async (req) => {
         });
     }
 
+    const MODEL = pickModel("simple_extraction");
+    const start = Date.now();
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -121,7 +124,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: MODEL,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userInput },
@@ -132,6 +135,7 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
+      await logAICall({ function_name: "ai-fill-form", task_type: "simple_extraction", model: MODEL, start_ms: start, success: false, error_text: `${response.status}` });
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again later." }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -150,6 +154,7 @@ serve(async (req) => {
     }
 
     const result = await response.json();
+    await logAICall({ function_name: "ai-fill-form", task_type: "simple_extraction", model: MODEL, start_ms: start, usage: result.usage });
     const toolCall = result.choices?.[0]?.message?.tool_calls?.[0];
     
     if (!toolCall?.function?.arguments) {

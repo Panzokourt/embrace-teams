@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { pickModel, logAICall } from "../_shared/ai-router.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -51,6 +52,8 @@ serve(async (req) => {
       });
     }
 
+    const MODEL = pickModel("summarization");
+    const start = Date.now();
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -58,7 +61,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: MODEL,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userContent },
@@ -67,6 +70,7 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
+      await logAICall({ function_name: "chat-ai-assistant", task_type: "summarization", model: MODEL, start_ms: start, success: false, error_text: `${response.status}` });
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again later." }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -86,6 +90,7 @@ serve(async (req) => {
 
     const result = await response.json();
     const content = result.choices?.[0]?.message?.content || "No response";
+    await logAICall({ function_name: "chat-ai-assistant", task_type: "summarization", model: MODEL, start_ms: start, usage: result.usage });
 
     return new Response(JSON.stringify({ result: content }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

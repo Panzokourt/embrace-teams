@@ -58,6 +58,57 @@ export type Database = {
           },
         ]
       }
+      ai_call_logs: {
+        Row: {
+          company_id: string | null
+          completion_tokens: number | null
+          cost_estimate_usd: number | null
+          created_at: string
+          error_text: string | null
+          function_name: string
+          id: string
+          latency_ms: number | null
+          model_used: string
+          prompt_tokens: number | null
+          success: boolean
+          task_type: string | null
+          total_tokens: number | null
+          user_id: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          completion_tokens?: number | null
+          cost_estimate_usd?: number | null
+          created_at?: string
+          error_text?: string | null
+          function_name: string
+          id?: string
+          latency_ms?: number | null
+          model_used: string
+          prompt_tokens?: number | null
+          success?: boolean
+          task_type?: string | null
+          total_tokens?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          completion_tokens?: number | null
+          cost_estimate_usd?: number | null
+          created_at?: string
+          error_text?: string | null
+          function_name?: string
+          id?: string
+          latency_ms?: number | null
+          model_used?: string
+          prompt_tokens?: number | null
+          success?: boolean
+          task_type?: string | null
+          total_tokens?: number | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       api_keys: {
         Row: {
           company_id: string
@@ -3362,6 +3413,47 @@ export type Database = {
           },
         ]
       }
+      kb_article_chunks: {
+        Row: {
+          article_id: string
+          chunk_index: number
+          company_id: string
+          content: string
+          created_at: string
+          embedding: string | null
+          id: string
+          tokens: number | null
+        }
+        Insert: {
+          article_id: string
+          chunk_index: number
+          company_id: string
+          content: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          tokens?: number | null
+        }
+        Update: {
+          article_id?: string
+          chunk_index?: number
+          company_id?: string
+          content?: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          tokens?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kb_article_chunks_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "kb_articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kb_article_links: {
         Row: {
           company_id: string
@@ -3626,6 +3718,8 @@ export type Database = {
           compiled_at: string | null
           content: string
           created_at: string
+          embedded_at: string | null
+          embedding: string | null
           id: string
           source_type: string
           title: string
@@ -3638,6 +3732,8 @@ export type Database = {
           compiled_at?: string | null
           content?: string
           created_at?: string
+          embedded_at?: string | null
+          embedding?: string | null
           id?: string
           source_type?: string
           title: string
@@ -3650,6 +3746,8 @@ export type Database = {
           compiled_at?: string | null
           content?: string
           created_at?: string
+          embedded_at?: string | null
+          embedding?: string | null
           id?: string
           source_type?: string
           title?: string
@@ -5899,6 +5997,8 @@ export type Database = {
           company_id: string
           content: string
           created_at: string | null
+          embedded_at: string | null
+          embedding: string | null
           id: string
           key: string
           metadata: Json | null
@@ -5913,6 +6013,8 @@ export type Database = {
           company_id: string
           content: string
           created_at?: string | null
+          embedded_at?: string | null
+          embedding?: string | null
           id?: string
           key: string
           metadata?: Json | null
@@ -5927,6 +6029,8 @@ export type Database = {
           company_id?: string
           content?: string
           created_at?: string | null
+          embedded_at?: string | null
+          embedding?: string | null
           id?: string
           key?: string
           metadata?: Json | null
@@ -7690,6 +7794,39 @@ export type Database = {
       is_super_admin:
         | { Args: { _user_id: string }; Returns: boolean }
         | { Args: { _company_id: string; _user_id: string }; Returns: boolean }
+      match_kb_chunks: {
+        Args: {
+          _company_id: string
+          match_count?: number
+          query_embedding: string
+          similarity_threshold?: number
+        }
+        Returns: {
+          article_id: string
+          chunk_id: string
+          content: string
+          similarity: number
+        }[]
+      }
+      match_secretary_memories: {
+        Args: {
+          _client_id?: string
+          _project_id?: string
+          _user_id: string
+          match_count?: number
+          query_embedding: string
+          similarity_threshold?: number
+        }
+        Returns: {
+          category: string
+          client_id: string
+          content: string
+          key: string
+          memory_id: string
+          project_id: string
+          similarity: number
+        }[]
+      }
       move_to_dlq: {
         Args: {
           dlq_name: string

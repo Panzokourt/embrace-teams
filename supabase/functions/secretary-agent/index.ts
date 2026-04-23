@@ -1735,13 +1735,37 @@ Respond in Greek. Be thorough but concise.`;
       }
 
       case "recall_memory": {
+        const limit = args.limit || 10;
+        // Hybrid: try semantic first if query provided, fallback to lexical filter
+        if (args.query) {
+          try {
+            const qVec = await embedText(String(args.query).slice(0, 4000), {
+              functionName: "secretary-agent",
+              companyId,
+              userId,
+            });
+            const { data: semData, error: semErr } = await supabase.rpc("match_secretary_memories", {
+              query_embedding: qVec,
+              _user_id: userId,
+              match_count: limit,
+              similarity_threshold: 0.4,
+              _project_id: args.project_id || null,
+              _client_id: args.client_id || null,
+            });
+            if (!semErr && Array.isArray(semData) && semData.length > 0) {
+              return { memories: semData, count: semData.length, mode: "semantic" };
+            }
+          } catch (e) {
+            console.warn("recall_memory semantic failed, fallback:", (e as Error).message);
+          }
+        }
         let q = supabase
           .from("secretary_memory")
           .select("id, category, key, content, metadata, project_id, client_id, updated_at")
           .eq("user_id", userId)
           .eq("company_id", companyId)
           .order("updated_at", { ascending: false })
-          .limit(args.limit || 10);
+          .limit(limit);
         if (args.category) q = q.eq("category", args.category);
         if (args.project_id) q = q.eq("project_id", args.project_id);
         if (args.client_id) q = q.eq("client_id", args.client_id);
@@ -1749,13 +1773,13 @@ Respond in Greek. Be thorough but concise.`;
         if (error) throw error;
         let memories = data || [];
         if (args.query) {
-          const queryLower = args.query.toLowerCase();
+          const queryLower = String(args.query).toLowerCase();
           memories = memories.filter((m: any) =>
             m.key.toLowerCase().includes(queryLower) ||
             m.content.toLowerCase().includes(queryLower)
           );
         }
-        return { memories, count: memories.length };
+        return { memories, count: memories.length, mode: "lexical" };
       }
 
       case "search_past_chats": {

@@ -3651,6 +3651,11 @@ export type Database = {
           next_review_date: string | null
           owner_id: string | null
           project_id: string | null
+          review_notes: string | null
+          review_requested_at: string | null
+          review_status: string
+          reviewed_at: string | null
+          reviewer_id: string | null
           source_links: string[] | null
           status: string
           tags: string[] | null
@@ -3674,6 +3679,11 @@ export type Database = {
           next_review_date?: string | null
           owner_id?: string | null
           project_id?: string | null
+          review_notes?: string | null
+          review_requested_at?: string | null
+          review_status?: string
+          reviewed_at?: string | null
+          reviewer_id?: string | null
           source_links?: string[] | null
           status?: string
           tags?: string[] | null
@@ -3697,6 +3707,11 @@ export type Database = {
           next_review_date?: string | null
           owner_id?: string | null
           project_id?: string | null
+          review_notes?: string | null
+          review_requested_at?: string | null
+          review_status?: string
+          reviewed_at?: string | null
+          reviewer_id?: string | null
           source_links?: string[] | null
           status?: string
           tags?: string[] | null
@@ -3748,10 +3763,18 @@ export type Database = {
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "kb_articles_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       kb_categories: {
         Row: {
+          auto_synced: boolean
           company_id: string
           created_at: string
           id: string
@@ -3760,8 +3783,11 @@ export type Database = {
           parent_id: string | null
           slug: string
           sort_order: number
+          source_id: string | null
+          source_type: string | null
         }
         Insert: {
+          auto_synced?: boolean
           company_id: string
           created_at?: string
           id?: string
@@ -3770,8 +3796,11 @@ export type Database = {
           parent_id?: string | null
           slug: string
           sort_order?: number
+          source_id?: string | null
+          source_type?: string | null
         }
         Update: {
+          auto_synced?: boolean
           company_id?: string
           created_at?: string
           id?: string
@@ -3780,6 +3809,8 @@ export type Database = {
           parent_id?: string | null
           slug?: string
           sort_order?: number
+          source_id?: string | null
+          source_type?: string | null
         }
         Relationships: [
           {
@@ -3847,6 +3878,68 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kb_review_history: {
+        Row: {
+          action: string
+          actor_id: string | null
+          article_id: string
+          company_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          reviewer_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          article_id: string
+          company_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          reviewer_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          article_id?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          reviewer_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kb_review_history_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kb_review_history_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "kb_articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kb_review_history_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kb_review_history_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

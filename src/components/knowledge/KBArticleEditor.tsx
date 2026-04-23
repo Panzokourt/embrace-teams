@@ -5,6 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Sparkles } from 'lucide-react';
+import { KBReviewerSelector } from './KBReviewerSelector';
+import { KBAIComposeDialog } from './KBAIComposeDialog';
 import type { KBArticle, KBCategory } from '@/hooks/useKnowledgeBase';
 
 interface KBArticleEditorProps {
@@ -24,6 +27,8 @@ export function KBArticleEditor({ open, onOpenChange, article, categories, onSav
   const [visibility, setVisibility] = useState(article?.visibility || 'internal');
   const [tags, setTags] = useState(article?.tags?.join(', ') || '');
   const [nextReview, setNextReview] = useState(article?.next_review_date || '');
+  const [reviewerId, setReviewerId] = useState<string | null>(article?.reviewer_id || null);
+  const [aiOpen, setAiOpen] = useState(false);
 
   const handleSave = () => {
     onSave({
@@ -36,7 +41,8 @@ export function KBArticleEditor({ open, onOpenChange, article, categories, onSav
       visibility,
       tags: tags.split(',').map(t => t.trim()).filter(Boolean),
       next_review_date: nextReview || null,
-    });
+      reviewer_id: reviewerId,
+    } as Partial<KBArticle>);
     onOpenChange(false);
   };
 
@@ -104,19 +110,44 @@ export function KBArticleEditor({ open, onOpenChange, article, categories, onSav
             <Label>Tags (comma separated)</Label>
             <Input value={tags} onChange={e => setTags(e.target.value)} placeholder="onboarding, sop, quality" />
           </div>
-          <div>
-            <Label>Next Review Date</Label>
-            <Input type="date" value={nextReview} onChange={e => setNextReview(e.target.value)} />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Next Review Date</Label>
+              <Input type="date" value={nextReview} onChange={e => setNextReview(e.target.value)} />
+            </div>
+            <div>
+              <Label>Reviewer</Label>
+              <KBReviewerSelector value={reviewerId} onChange={setReviewerId} />
+            </div>
           </div>
           <div>
-            <Label>Περιεχόμενο (Markdown)</Label>
-            <Textarea value={body} onChange={e => setBody(e.target.value)} rows={12} placeholder="Γράψτε το περιεχόμενο εδώ..." />
+            <div className="flex items-center justify-between mb-1">
+              <Label>Περιεχόμενο (Markdown)</Label>
+              <Button type="button" size="sm" variant="outline" onClick={() => setAiOpen(true)} className="h-7 gap-1 text-xs">
+                <Sparkles className="h-3 w-3" /> Σύνταξη με AI
+              </Button>
+            </div>
+            <Textarea value={body} onChange={e => setBody(e.target.value)} rows={12} placeholder="Γράψτε το περιεχόμενο εδώ ή χρησιμοποιήστε AI..." />
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Ακύρωση</Button>
             <Button onClick={handleSave} disabled={!title.trim()}>Αποθήκευση</Button>
           </div>
         </div>
+        <KBAIComposeDialog
+          open={aiOpen}
+          onOpenChange={setAiOpen}
+          categories={categories}
+          defaultCategoryId={categoryId}
+          defaultTitle={title}
+          defaultType={articleType}
+          onAccept={(data) => {
+            if (data.title && !title) setTitle(data.title);
+            setBody(data.body);
+            if (data.tags.length) setTags(data.tags.join(', '));
+            if (data.categoryId) setCategoryId(data.categoryId);
+          }}
+        />
       </DialogContent>
     </Dialog>
   );

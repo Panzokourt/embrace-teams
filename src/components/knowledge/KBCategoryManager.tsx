@@ -49,10 +49,10 @@ export function KBCategoryManager({ categories, onCreate, onDelete }: KBCategory
             </div>
             <div>
               <Label>Parent (optional)</Label>
-              <Select value={parentId} onValueChange={setParentId}>
+              <Select value={parentId || '__root__'} onValueChange={(v) => setParentId(v === '__root__' ? '' : v)}>
                 <SelectTrigger><SelectValue placeholder="Root level" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Root</SelectItem>
+                  <SelectItem value="__root__">Root</SelectItem>
                   {categories.filter(c => c.level < 3).map(c => (
                     <SelectItem key={c.id} value={c.id}>{'─'.repeat(c.level - 1)} {c.name}</SelectItem>
                   ))}

@@ -65,10 +65,10 @@ export function WorkflowConnectionDialog({ open, onOpenChange, connectionId, lab
           <div className="space-y-1.5">
             <Label>Συνθήκη (προαιρετική)</Label>
             <div className="grid grid-cols-3 gap-2">
-              <Select value={field} onValueChange={setField}>
+              <Select value={field || '__none__'} onValueChange={(v) => setField(v === '__none__' ? '' : v)}>
                 <SelectTrigger className="text-xs"><SelectValue placeholder="Πεδίο" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Κανένα</SelectItem>
+                  <SelectItem value="__none__">Κανένα</SelectItem>
                   {FIELDS.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
                 </SelectContent>
               </Select>

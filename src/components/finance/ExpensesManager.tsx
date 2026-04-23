@@ -231,20 +231,20 @@ export default function ExpensesManager() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Έργο</Label>
-                    <Select value={form.project_id} onValueChange={v => setForm(p => ({ ...p, project_id: v }))}>
+                    <Select value={form.project_id || '__none__'} onValueChange={v => setForm(p => ({ ...p, project_id: v === '__none__' ? '' : v }))}>
                       <SelectTrigger><SelectValue placeholder="Κανένα" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Κανένα</SelectItem>
+                        <SelectItem value="__none__">Κανένα</SelectItem>
                         {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
                     <Label>Πελάτης</Label>
-                    <Select value={form.client_id} onValueChange={v => setForm(p => ({ ...p, client_id: v }))}>
+                    <Select value={form.client_id || '__none__'} onValueChange={v => setForm(p => ({ ...p, client_id: v === '__none__' ? '' : v }))}>
                       <SelectTrigger><SelectValue placeholder="Κανένας" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Κανένας</SelectItem>
+                        <SelectItem value="__none__">Κανένας</SelectItem>
                         {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                       </SelectContent>
                     </Select>

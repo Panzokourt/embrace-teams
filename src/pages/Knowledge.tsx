@@ -12,6 +12,7 @@ import { KBSourceUploader } from '@/components/knowledge/KBSourceUploader';
 import { KBSourceList } from '@/components/knowledge/KBSourceList';
 import { KBAskChat } from '@/components/knowledge/KBAskChat';
 import { KBHealthCheck } from '@/components/knowledge/KBHealthCheck';
+import { EmbeddingsBackfillButton } from '@/components/knowledge/EmbeddingsBackfillButton';
 import { ProjectTemplatesManager } from '@/components/settings/ProjectTemplatesManager';
 import { BriefsList } from '@/components/blueprints/BriefsList';
 import { Card, CardContent } from '@/components/ui/card';
@@ -338,6 +339,9 @@ export default function Knowledge() {
             >
               Health Check
             </Button>
+            <div className="ml-auto">
+              <EmbeddingsBackfillButton />
+            </div>
           </div>
 
           {manageSection === 'reviews' && (

@@ -1678,6 +1678,19 @@ Respond in Greek. Be thorough but concise.`;
       // ── MEMORY TOOL EXECUTORS ──
 
       case "save_memory": {
+        // Generate embedding for semantic recall (best-effort)
+        let memEmbedding: number[] | null = null;
+        try {
+          const embedInput = `${args.key}\n${args.content}`.slice(0, 8000);
+          memEmbedding = await embedText(embedInput, {
+            functionName: "secretary-agent",
+            companyId,
+            userId,
+          });
+        } catch (e) {
+          console.warn("save_memory embedding failed (will save without):", (e as Error).message);
+        }
+
         const { data: existing } = await supabase
           .from("secretary_memory")
           .select("id")
@@ -1688,21 +1701,23 @@ Respond in Greek. Be thorough but concise.`;
           .maybeSingle();
 
         if (existing) {
+          const updatePayload: any = {
+            content: args.content,
+            category: args.category || "general",
+            metadata: args.metadata || {},
+            project_id: args.project_id || null,
+            client_id: args.client_id || null,
+            updated_at: new Date().toISOString(),
+          };
+          if (memEmbedding) updatePayload.embedding = memEmbedding;
           const { error } = await supabase
             .from("secretary_memory")
-            .update({
-              content: args.content,
-              category: args.category || "general",
-              metadata: args.metadata || {},
-              project_id: args.project_id || null,
-              client_id: args.client_id || null,
-              updated_at: new Date().toISOString(),
-            })
+            .update(updatePayload)
             .eq("id", existing.id);
           if (error) throw error;
-          return { success: true, action: "updated", key: args.key };
+          return { success: true, action: "updated", key: args.key, semantic: !!memEmbedding };
         } else {
-          const { error } = await supabase.from("secretary_memory").insert({
+          const insertPayload: any = {
             user_id: userId,
             company_id: companyId,
             category: args.category || "general",
@@ -1711,9 +1726,11 @@ Respond in Greek. Be thorough but concise.`;
             metadata: args.metadata || {},
             project_id: args.project_id || null,
             client_id: args.client_id || null,
-          });
+          };
+          if (memEmbedding) insertPayload.embedding = memEmbedding;
+          const { error } = await supabase.from("secretary_memory").insert(insertPayload);
           if (error) throw error;
-          return { success: true, action: "saved", key: args.key };
+          return { success: true, action: "saved", key: args.key, semantic: !!memEmbedding };
         }
       }
 

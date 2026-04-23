@@ -91,14 +91,13 @@ Rules:
 - Keep pages concise but comprehensive
 - Write in the same language as the source content`;
 
-      const compileResponse = await fetch(GATEWAY_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-pro",
+      let compileResult;
+      try {
+        compileResult = await callAI({
+          task_type: "deep_analysis",
+          functionName: "kb-compiler",
+          companyId,
+          userId,
           messages: [{ role: "user", content: compilePrompt }],
           tools: [
             {
@@ -132,20 +131,14 @@ Rules:
             },
           ],
           tool_choice: { type: "function", function: { name: "compile_wiki" } },
-        }),
-      });
-
-      if (!compileResponse.ok) {
-        const status = compileResponse.status;
-        const text = await compileResponse.text();
-        console.error("AI error:", status, text);
-        if (status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded" }), { status: 429, headers: corsHeaders });
-        if (status === 402) return new Response(JSON.stringify({ error: "Credits exhausted" }), { status: 402, headers: corsHeaders });
-        return new Response(JSON.stringify({ error: "AI gateway error" }), { status: 500, headers: corsHeaders });
+        });
+      } catch (e) {
+        const msg = (e as Error).message;
+        const status = msg.includes("rate limit") ? 429 : msg.includes("credits") ? 402 : 500;
+        return new Response(JSON.stringify({ error: msg }), { status, headers: corsHeaders });
       }
 
-      const compileResult = await compileResponse.json();
-      const toolCall = compileResult.choices?.[0]?.message?.tool_calls?.[0];
+      const toolCall = compileResult.tool_calls?.[0];
       if (!toolCall) {
         return new Response(JSON.stringify({ error: "No tool call in response" }), { status: 500, headers: corsHeaders });
       }

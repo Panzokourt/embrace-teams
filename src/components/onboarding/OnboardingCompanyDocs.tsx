@@ -1,7 +1,7 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { FileText, ChevronLeft, ChevronRight, Loader2, Upload, X, FileIcon } from 'lucide-react';
+import { FileText, ChevronLeft, ChevronRight, Loader2, Upload, X, FileIcon, Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -13,11 +13,40 @@ interface Props {
   onSkip: () => void;
 }
 
+type DocCategory = 'sop' | 'brand' | 'contract' | 'policy' | 'other';
+
 interface UploadedFile {
   file: File;
   status: 'pending' | 'uploading' | 'done' | 'error';
   sourceId?: string;
+  category?: DocCategory;
 }
+
+// Heuristic, instant-categorization (free) — pre-fills before any AI compile.
+function guessCategory(name: string): DocCategory {
+  const n = name.toLowerCase();
+  if (/(sop|process|playbook|workflow|διαδικ)/.test(n)) return 'sop';
+  if (/(brand|logo|guideline|identity|visual)/.test(n)) return 'brand';
+  if (/(contract|agreement|nda|σύμβαση|συμβόλαιο)/.test(n)) return 'contract';
+  if (/(policy|πολιτικ|κανον)/.test(n)) return 'policy';
+  return 'other';
+}
+
+const CAT_LABEL: Record<DocCategory, string> = {
+  sop: 'SOP / Διαδικασία',
+  brand: 'Brand Guidelines',
+  contract: 'Contract / Template',
+  policy: 'Πολιτική',
+  other: 'Άλλο',
+};
+
+const CAT_COLOR: Record<DocCategory, string> = {
+  sop: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+  brand: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
+  contract: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+  policy: 'bg-green-500/10 text-green-600 border-green-500/20',
+  other: 'bg-muted text-muted-foreground border-border/60',
+};
 
 export default function OnboardingCompanyDocs({ userId, companyId, onNext, onBack, onSkip }: Props) {
   const [files, setFiles] = useState<UploadedFile[]>([]);

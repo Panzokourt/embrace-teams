@@ -57,10 +57,29 @@ serve(async (req) => {
       });
     }
 
+    // Optional action filter: 'all' (default), 'graph', 'wiki'
+    const url = new URL(req.url);
+    const reqBody = await req.json().catch(() => ({}));
+    const action: string = reqBody.action || url.searchParams.get("action") || "all";
+
     let articleChunks = 0;
     let sources = 0;
     let memories = 0;
+    let graphNodes = 0;
     const errors: string[] = [];
+
+    const doWiki = action === "all" || action === "wiki";
+    const doGraph = action === "all" || action === "graph";
+
+    if (!doWiki && !doGraph) {
+      return new Response(JSON.stringify({ error: `unknown action: ${action}` }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!doWiki) {
+      // Skip wiki/sources/memories sections entirely
+    }
 
     // ── Articles: re-embed any with no existing chunks ──
     const { data: articles } = await supa

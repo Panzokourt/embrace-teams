@@ -5,6 +5,7 @@ import { useKBCompiler } from '@/hooks/useKBCompiler';
 import { KBArticleEditor } from '@/components/knowledge/KBArticleEditor';
 import { KBVersionHistory } from '@/components/knowledge/KBVersionHistory';
 import { KBBacklinks } from '@/components/knowledge/KBBacklinks';
+import { KBReviewPanel } from '@/components/knowledge/KBReviewPanel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -155,6 +156,9 @@ export default function KnowledgeArticle() {
               )}
             </CardContent>
           </Card>
+
+          {/* Reviewer workflow */}
+          <KBReviewPanel article={article} />
 
           {/* Backlinks */}
           <KBBacklinks backlinks={backlinksQuery.data || []} isLoading={backlinksQuery.isLoading} />

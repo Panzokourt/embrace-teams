@@ -88,7 +88,7 @@ export const COACHING_REGISTRY: CoachEntry[] = [
     routeMatch: '/financials',
     title: 'Οικονομική επισκόπηση',
     body: 'Παρακολούθησε τιμολόγια, έξοδα και κερδοφορία ανά project/πελάτη. Η ομάδα σου βλέπει μόνο όσα έχει permission.',
-    requiredRoles: ['owner', 'super_admin', 'admin', 'manager'],
+    requiredRoles: ['owner', 'admin', 'manager'],
   },
   {
     key: 'page.hr',
@@ -96,7 +96,7 @@ export const COACHING_REGISTRY: CoachEntry[] = [
     routeMatch: '/hr',
     title: 'Διαχείριση Ομάδας',
     body: 'Πρόσκληση μελών, οργανόγραμμα, άδειες, στόχοι. Τα δικαιώματα προσαρμόζονται αυτόματα στον ρόλο τους.',
-    requiredRoles: ['owner', 'super_admin', 'admin', 'manager'],
+    requiredRoles: ['owner', 'admin', 'manager'],
   },
   {
     key: 'page.calendar',

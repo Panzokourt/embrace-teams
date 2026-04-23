@@ -36,6 +36,7 @@ import { ProjectAIAnalysisInline } from '@/components/projects/ProjectAIAnalysis
 import { format, differenceInDays } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { RelatedEntitiesCard } from '@/components/shared/RelatedEntitiesCard';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -760,6 +761,7 @@ export default function ProjectDetailPage() {
                 {/* Related Entities (Knowledge Graph) */}
                 <RelatedEntitiesCard entityType="project" entityId={project.id} hops={2} limit={15} />
               </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="deliverables">

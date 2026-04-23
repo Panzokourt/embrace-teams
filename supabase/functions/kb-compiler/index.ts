@@ -310,11 +310,53 @@ Rules:
           .join("\n\n");
       }
 
-      const askPrompt = `You are a helpful wiki assistant. Answer the user's question based ONLY on the wiki content below. Cite specific pages using [Page Title] format. If the wiki doesn't contain relevant information, say so clearly.
+      // ── Phase 5: graph-context augmentation when wiki signal is weak ──
+      let graphContext = "";
+      if (!usedSemantic || contextChunks.length < 3) {
+        try {
+          const SUPABASE_URL2 = Deno.env.get("SUPABASE_URL")!;
+          const SERVICE_KEY2 = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+          const svc2 = createClient(SUPABASE_URL2, SERVICE_KEY2, { auth: { persistSession: false } });
+          const qVec2 = await embedText(question, {
+            functionName: "kb-compiler",
+            companyId,
+            userId,
+          });
+          const { data: subgraph } = await svc2.rpc("graph_subgraph_for_query", {
+            query_embedding: vecLiteral(qVec2) as any,
+            _company_id: companyId,
+            _max_hops: 2,
+            _anchor_count: 5,
+          });
+          if (subgraph && subgraph.length > 0) {
+            const ids = Array.from(new Set(subgraph.map((r: any) => r.node_id)));
+            const { data: gnodes } = await svc2
+              .from("graph_nodes")
+              .select("id,node_type,label,properties")
+              .in("id", ids);
+            graphContext = (gnodes || [])
+              .slice(0, 25)
+              .map((n: any) => {
+                const p = n.properties || {};
+                const summary = Object.entries(p)
+                  .filter(([_, v]) => v != null && typeof v !== "object")
+                  .slice(0, 4)
+                  .map(([k, v]) => `${k}=${v}`)
+                  .join(", ");
+                return `- [${n.node_type}] ${n.label}${summary ? ` (${summary})` : ""}`;
+              })
+              .join("\n");
+          }
+        } catch (e) {
+          console.warn("graph context fallback failed:", (e as Error).message);
+        }
+      }
+
+      const askPrompt = `You are a helpful wiki + knowledge-graph assistant. Answer the user's question based ONLY on the content below. Cite specific pages using [Page Title] format. If neither the wiki nor the graph contains relevant information, say so clearly.
 
 WIKI CONTENT (${usedSemantic ? "semantic matches" : "full wiki"}):
 ${wikiContext || "(wiki is empty)"}
-
+${graphContext ? `\nRELATED ENTITIES FROM KNOWLEDGE GRAPH:\n${graphContext}\n` : ""}
 USER QUESTION: ${question}`;
 
       let askResponse: Response;

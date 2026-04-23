@@ -1,133 +1,175 @@
 
 
-# Knowledge Base · Smart Categories + AI Assist + Reviewer Workflow
+# Onboarding 2.0 · AI-Boosted Setup + Learn-as-you-Go
 
-## Σκοπός
-
-Τέσσερις στοχευμένες αναβαθμίσεις στη Βιβλιοθήκη:
-
-1. **Auto-sync κατηγοριών** με τα δεδομένα του χρήστη (Departments, Services, Clients).
-2. **AI Compose** σε editor & κατηγορίες — δημιουργεί άρθρα από context.
-3. **AI Suggestions** — προτείνει νέα άρθρα βάσει των δεδομένων/εγγράφων που υπάρχουν ήδη.
-4. **Reviewer workflow** — ορισμός reviewer, εκκρεμότητα στον σωστό χρήστη, ειδοποιήσεις.
+## Στόχος
+Να μετατραπεί το onboarding σε **AI-driven**, χαμηλής τριβής εμπειρία, και να προστεθεί ένα **persistent in-app coaching layer** που εξηγεί features σε κάθε χρήστη όταν επισκέπτεται μια σελίδα/ενέργεια για πρώτη φορά — προσαρμοσμένο στο role/access του.
 
 ---
 
-## Μέρος 1 · Έξυπνες Κατηγορίες (sync με Settings)
+## Μέρος 1 · AI Boost στο Onboarding Wizard (11 βήματα)
 
-**Σήμερα:** Οι κατηγορίες είναι hard-coded seed (Company, Departments, Clients, Templates) και δεν αντικατοπτρίζουν τα πραγματικά Departments/Services/Clients του χρήστη.
+Ενίσχυση **όλων** των βημάτων με AI assist χωρίς να αλλάζει η ροή:
 
-**Νέα συμπεριφορά:**
-- Στο `seedCategories` (πρώτη φορά) και σε ένα νέο **"Sync Categories"** action:
-  - Κάτω από **Departments** → auto-create κατηγορία ανά `departments.name` (π.χ. Creative, Digital, Λογιστήριο).
-  - Κάτω από **Clients** → auto-create κατηγορία ανά active client (`clients.name`).
-  - Νέο root **"Services"** → κατηγορία ανά `services.category` (project, retainer, …) ή ανά service name (configurable).
-- Idempotent: δεν δημιουργεί διπλά (match by `slug` + `parent_id`).
-- Auto-link: όταν δημιουργείται κατηγορία από department/client/service, αποθηκεύεται `external_ref` (νέα στήλη `kb_categories.source_type` + `source_id`) ώστε να μη διαγράφεται κατά λάθος και να μπορούμε να εμφανίζουμε τα σχετικά entities (π.χ. στην κατηγορία πελάτη Χ → όλα τα άρθρα + projects + invoices).
-- UI κουμπί **"Συγχρονισμός με Ρυθμίσεις"** στο `KBCategoryManager`.
-- Realtime subscription σε `departments`/`clients` ώστε νέες εγγραφές να εμφανίζονται αυτόματα στο tree (ή με toast prompt).
+### 1.1 Auto-discovery εταιρείας (`OnboardingCompany`)
+- Νέο edge function `enrich-company-from-domain` (paralleling υπάρχοντος `enrich-client`).
+- Όταν `isPersonalEmail === false`, αυτόματα τραβάει: legal name, industry, company size, logo από το domain (web search + Lovable AI tool-calling).
+- **"✨ Συμπλήρωσε αυτόματα από το web"** button — γεμίζει τα πεδία (name, industry, size, logo URL) με AI-fetched values. User κάνει review πριν δημιουργία.
+- Πέφτει σε rate limit log (`company_enrichment_log`).
 
----
+### 1.2 Smart Workspace Preset (`OnboardingWorkspacePreset`)
+- AI πρόταση preset βάσει του `industry` + `domain` που ήδη ξέρουμε.
+- Κορυφαίο card εμφανίζει "**🎯 Συνιστάται για εσάς**" στο πιθανότερο preset.
+- Ένα "Why this?" link που ανοίγει AI explanation.
 
-## Μέρος 2 · AI Compose (δημιουργία άρθρων με AI)
+### 1.3 AI Profile assist (`OnboardingProfile`)
+- Από email + LinkedIn-style heuristics, AI προτείνει `job_title`.
+- Mini "Συμπλήρωσε με AI" button (όπως το ai-fill standard).
 
-Νέο component `KBAIComposeButton` που εμφανίζεται:
-- Στο header του Library (δίπλα στο "Νέο Άρθρο").
-- Στον `KBArticleEditor` (κουμπί "✨ AI σύνταξη" πάνω από το textarea).
-- Στο `KBCategoryTree` (right-click ή hover button "+ AI άρθρο εδώ" με προ-επιλεγμένη κατηγορία).
+### 1.4 AI First Client (`OnboardingFirstClient`)
+- Ήδη υπάρχει `enrich-client`. Wire-up στο onboarding step: ο χρήστης πληκτρολογεί όνομα ή URL → AI γεμίζει sector, contact email, logo, description.
 
-**Πώς δουλεύει:**
-- Άνοιγμα dialog με: τίτλο/θέμα, κατηγορία (preselected), τύπο (SOP/guide/policy/meeting note), tone, μήκος.
-- Edge function `kb-ai-compose` (νέα) — παίρνει το brief + relevant company context:
-  - Τα τελευταία N άρθρα της ίδιας κατηγορίας (για style match).
-  - Σχετικά rows από `clients` / `services` / `departments` αν αναφέρονται.
-  - Top-K vector hits από `kb_article_chunks` + graph neighbors (`graph-query`).
-- Επιστρέφει markdown draft με αυτόματα suggested tags + next_review_date.
-- Streaming preview (τύπου ChatGPT) στον editor → ο χρήστης κάνει edit → Save ως `draft`.
+### 1.5 AI Docs upload (`OnboardingCompanyDocs`)
+- Μετά το upload, AI πρόταση: «Βρήκα 4 πιθανά SOPs, 2 brand guidelines, 1 contract template». Κατηγοριοποίηση προεπιλεγμένη πριν compilation.
 
-**AI fill στον editor** (επιπλέον): κουμπιά "Βελτίωσε", "Συντόμευσε", "Πρόσθεσε checklist", "Μετάφρασε" — inline AI actions.
+### 1.6 Personalized "Ready" screen (`OnboardingReady`)
+- AI generated checklist «Tα επόμενά σου 5 βήματα» βάσει role/preset/uploaded docs.
+- Π.χ. για **Marketing Agency + Owner**: «Καλεσε ομάδα → Στήσε πρώτο project → Σύνδεσε email → Δες AI Suggestions στη Library».
 
 ---
 
-## Μέρος 3 · AI Article Suggestions
+## Μέρος 2 · Learn-as-you-Go (In-app Coaching System)
 
-Νέο widget **"Προτάσεις AI"** στην κορυφή του Library (συμπτυσσόμενο card, κάτω από το pending sources strip).
+Κεντρική νέα υποδομή coaching tooltips/popovers/tours που εμφανίζονται **την πρώτη φορά** που ένας χρήστης φτάνει σε σελίδα ή κάνει action.
 
-**Λογική (edge function `kb-suggest-articles`):**
-- Σαρώνει `kb_raw_sources` (compiled & uncompiled), recent `projects`, `clients`, `briefs`, `email_messages`, `files` του χρήστη.
-- Συγκρίνει με υπάρχοντα `kb_articles` via vector similarity → εντοπίζει **gaps** (θέματα που εμφανίζονται συχνά αλλά δεν υπάρχει άρθρο).
-- Επιστρέφει 3-7 προτάσεις της μορφής:
-  - "Δημιούργησε SOP: Onboarding Πελάτη — βασισμένο σε 4 πρόσφατα projects".
-  - "Συμπτύξε σε guideline: 3 παρόμοιες πηγές για Meta Ads reporting".
-  - "Λείπει: Policy για approval invoices > 5.000€" (από brain insights).
-- Κάθε πρόταση έχει: τίτλο, reasoning, source links, **[Σύνταξε με AI]** button → ανοίγει το AI Compose με προ-συμπληρωμένα όλα.
-- Trigger: αυτόματα κάθε φορά που μπαίνει ο χρήστης στο Library (cached 24h) + manual refresh.
-
----
-
-## Μέρος 4 · Reviewer Workflow
-
-**Σήμερα:** Άρθρο έχει `owner_id` και `next_review_date`, αλλά κανέναν συγκεκριμένο reviewer — όλοι βλέπουν το ίδιο review queue.
-
-**Νέα schema (migration):**
+### 2.1 Schema (1 migration)
 ```text
-kb_articles:
-  + reviewer_id uuid (FK profiles, nullable)
-  + review_status text ('none'|'pending'|'approved'|'changes_requested')
-  + review_requested_at timestamptz
-  + reviewed_at timestamptz
-  + review_notes text
+user_coaching_state:
+  user_id uuid (FK profiles)
+  feature_key text (π.χ. 'page.knowledge', 'action.create_project', 'tab.kb_review')
+  seen_at timestamptz
+  dismissed boolean default false
+  PRIMARY KEY (user_id, feature_key)
+```
+Idempotent insert με `ON CONFLICT DO NOTHING`. RLS: μόνο own rows.
 
-kb_review_history (νέος πίνακας):
-  id, article_id, reviewer_id, action, notes, created_at
+### 2.2 Coaching Registry (`src/lib/coaching/registry.ts`)
+Single source of truth — ένα array από:
+```text
+{
+  key: 'page.knowledge',
+  type: 'tour' | 'popover' | 'tooltip' | 'banner',
+  trigger: 'route' | 'element-mount' | 'manual',
+  routeMatch?: '/knowledge',
+  elementSelector?: '[data-coach="kb-new"]',
+  title, body (markdown), 
+  steps?: [{ selector, title, body }],   // για tours
+  requiredRoles?: ['owner','admin','member'],
+  requiredPermissions?: [...],
+  priority: number,
+}
 ```
 
-**UI changes:**
-- **Editor**: dropdown "Reviewer" (επιλογή από users της εταιρείας) + "Request review" button (αλλάζει status σε `pending`, στέλνει notification).
-- **Article detail page**: badge "Awaiting review by {Reviewer}" + Approve/Request changes buttons (μόνο για τον assigned reviewer ή admin).
-- **Review Queue (Admin tab)**:
-  - Νέο tab/filter: **"Σε εμένα"** vs **"Όλα"** vs **"Ληγμένα"**.
-  - Στο My Work / dashboard: νέο card "Άρθρα προς review" όταν ο χρήστης είναι assigned reviewer.
-- **Notifications**: trigger function στο `kb_articles` UPDATE → όταν `review_status` γίνει `pending` & υπάρχει `reviewer_id`, εισάγει row στον `notifications` με link στο άρθρο.
-- **KPI card "Εκκρεμή Reviews"** → μετράει τα **assigned σε μένα** (όχι όλα), για να δίνει actionable σήμα.
+Παραδείγματα entries (initial seed):
+- `page.work` — Tour 4 βημάτων (Today, Calendar, Quick Notes, Pending Approvals).
+- `page.knowledge` — Tour Library/Categories/AI Compose/Review.
+- `page.work.projects` — popover "Δημιούργησε project ή χρησιμοποίησε template".
+- `page.financials` — banner για admins, hidden για members χωρίς finance permission.
+- `action.create_project` — tooltip πάνω από το dialog την πρώτη φορά.
+- `feature.ai_compose` — popover στο πρώτο click του "AI Σύνταξη".
 
-**Permissions:** Approve μπορεί να κάνει: ο reviewer, ο owner (αν self-approve allowed by company setting), ή admin/manager (`is_company_admin_or_manager`).
+### 2.3 `<CoachingProvider>` + `useCoach()`
+- Mounted στο `AppLayout`.
+- Listens σε route changes & registers MutationObserver για element-based triggers.
+- Φιλτράρει entries με βάση `companyRole` + permissions από `useRBAC`.
+- Δείχνει 1 coach τη φορά (queue), αποθηκεύει `seen_at` στο πάτημα "Got it" / dismiss.
+- Persistence: optimistic local cache + server sync (`user_coaching_state`).
+
+### 2.4 UI components
+- `<CoachPopover>` — anchored popover με σπινάκι, 1-2 CTAs.
+- `<CoachTour>` — multi-step spotlight overlay (cutout στο target element).
+- `<CoachBanner>` — top-of-page dismissible banner για page-level intros.
+- Όλα με `aria-live`, ESC dismiss, "Don't show again" link.
+
+### 2.5 Integration helpers
+- Στους κρίσιμους buttons προσθέτουμε `data-coach="..."` attributes (μη παρεμβατικό).
+- Σε pages: ένα `useEffect(() => triggerCoach('page.X'), [])`.
+- Δεν αγγίζουμε business logic.
+
+### 2.6 AI-Generated Coaching (Bonus)
+- Νέο edge function `coach-ai-suggest` που, βάσει της τρέχουσας σελίδας + role + recent actions του χρήστη, παράγει on-demand suggestion ("Φαίνεται ότι κοιτάς invoices — θες να σε καθοδηγήσω στο πώς να στείλεις πρώτο τιμολόγιο;").
+- Trigger: button "💡 AI Coach" στο TopBar (ή reused QuickChatBar action).
+- Καλείται με Lovable AI streaming, εμφανίζει response σε mini panel.
+
+---
+
+## Μέρος 3 · Setup Guide V2 (TopBar Popover)
+
+Επέκταση του υπάρχοντος `SetupGuide.tsx`:
+
+- **Role-aware steps**: ένας owner βλέπει "Καλέστε ομάδα", ένας member όχι.
+- **Per-step AI hint**: κάθε ημιτελές βήμα έχει εικονίδιο 💡 → tooltip με 1-line AI εξήγηση γιατί είναι σημαντικό για τον συγκεκριμένο user.
+- **"Δείξε μου"**: button δίπλα σε κάθε βήμα που ξεκινάει το αντίστοιχο coaching tour αντί για απλό navigation.
+- **Restart tours**: section στο popover footer "Επανέλαβε intro tours" (clears `user_coaching_state` selectively).
+- **First-time progress bar**: confetti animation + AI message όταν φτάσει το 100%.
+
+---
+
+## Μέρος 4 · Settings → Help & Tutorials Tab
+
+Νέο tab στο `/settings`:
+- Λίστα όλων των tours/coaching entries που έχει δει ο χρήστης.
+- "Restart" button ανά tour.
+- Toggle "Disable in-app coaching".
+- Link σε docs/changelog.
 
 ---
 
 ## Τεχνικές αλλαγές (συνοπτικά)
 
 **Migrations:**
-- `kb_categories`: + `source_type text`, + `source_id uuid` (για link σε departments/clients/services).
-- `kb_articles`: + `reviewer_id`, + `review_status`, + `review_requested_at`, + `reviewed_at`, + `review_notes`.
-- Νέος πίνακας `kb_review_history` με RLS.
-- Trigger `kb_article_review_notify` → εισάγει σε `notifications`.
+- `user_coaching_state` table + RLS.
+- Optional: `companies.workspace_type` ήδη υπάρχει.
+- Optional: `company_enrichment_log` table (mirror του `client_enrichment_log`).
 
 **Edge Functions (νέες):**
-- `kb-ai-compose` — streaming markdown generation με company context.
-- `kb-suggest-articles` — gap analysis, returns prioritized suggestions JSON.
-- (Επεκτείνουμε το `kb-compiler` με `action: 'sync_categories'` ή νέα util query στο client.)
+- `enrich-company-from-domain` — web lookup + AI extraction (logo, industry, size, legal name).
+- `coach-ai-suggest` — context-aware coaching messages.
+- `onboarding-personalize` — generates "next 5 steps" για το `OnboardingReady`.
 
-**UI components (νέα):**
-- `KBAIComposeDialog.tsx` — wizard για AI generation.
-- `KBSuggestionsPanel.tsx` — collapsible card στο Library.
-- `KBReviewerSelector.tsx` — user picker για editor.
-- Επέκταση `KBReviewQueue` με reviewer column + "assigned to me" filter.
-- Επέκταση `KBCategoryManager` με "Sync from Settings" button.
-- Επέκταση `KBArticleEditor` με reviewer field + AI inline actions.
+**Hooks (νέοι):**
+- `useCoach()` — trigger/dismiss/check-seen.
+- `useCoachingRegistry()` — filtered entries για current user.
+- `useEnrichCompany()` — wraps νέο edge function.
 
-**Hooks:**
-- Επέκταση `useKnowledgeBase`: `syncCategories`, `requestReview`, `approveReview`, `requestChanges`.
-- Νέος `useKBSuggestions` — query το `kb-suggest-articles` με 24h cache.
+**Components (νέοι):**
+- `src/components/coaching/CoachingProvider.tsx`
+- `src/components/coaching/CoachPopover.tsx`
+- `src/components/coaching/CoachTour.tsx`
+- `src/components/coaching/CoachBanner.tsx`
+- `src/lib/coaching/registry.ts` — initial 20–25 entries.
+
+**Files edited:**
+- `OnboardingCompany.tsx` — AI auto-fill button.
+- `OnboardingWorkspacePreset.tsx` — AI recommended highlight.
+- `OnboardingProfile.tsx` — AI job_title suggestion.
+- `OnboardingFirstClient.tsx` — wire-up `enrich-client`.
+- `OnboardingCompanyDocs.tsx` — AI categorization preview.
+- `OnboardingReady.tsx` — AI personalized next steps.
+- `SetupGuide.tsx` — V2 (role-aware + "Δείξε μου" + restart).
+- `AppLayout.tsx` — mount `<CoachingProvider>`.
+- Σε ~10 key pages: προσθήκη `data-coach` attrs + `useEffect` triggers.
+- `Settings.tsx` — νέο tab "Βοήθεια & Tutorials".
 
 ---
 
 ## Σειρά υλοποίησης
 
-1. Migration: schema additions (categories source link, reviewer fields, review history, notification trigger).
-2. Sync Categories logic + UI button.
-3. Reviewer workflow (editor field + review queue + notifications + KPI fix).
-4. `kb-ai-compose` edge function + `KBAIComposeDialog` (entry από Library header & editor).
-5. `kb-suggest-articles` edge function + `KBSuggestionsPanel` στο Library.
-6. AI inline actions στον editor (βελτίωσε/συντόμευσε/checklist).
+1. **Foundation**: Migration `user_coaching_state` + Coaching registry + Provider + 3 UI components (Popover/Tour/Banner).
+2. **Initial coaching content**: Tour entries για top-10 σελίδες (Work, Knowledge, Clients, Projects, Financials, HR, Files, Calendar, Inbox, Settings) + role filtering.
+3. **SetupGuide V2**: role-aware + "Δείξε μου" launches tours + AI hint tooltips.
+4. **Onboarding AI Boost**: `enrich-company-from-domain` + AI buttons σε Company/Profile/FirstClient/Docs.
+5. **Personalized Ready screen**: `onboarding-personalize` edge function + AI checklist.
+6. **AI Coach panel** (bonus): `coach-ai-suggest` + TopBar trigger.
+7. **Settings tab**: tutorials management.
 

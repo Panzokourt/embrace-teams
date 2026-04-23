@@ -1,163 +1,165 @@
 
 
-# Phase 1 + 3 · Vector Store/Semantic Search + Model Router
+# Phase 5 · GraphRAG · Knowledge Graph Layer
 
-Υλοποιούμε ταυτόχρονα δύο foundational layers που ξεκλειδώνουν όλες τις μετέπειτα φάσεις: **πραγματικό semantic retrieval** και **κεντρικό model routing για cost optimization**.
+**Στόχος:** Πάνω από τα ήδη relational δεδομένα (clients · projects · tasks · contacts · invoices · campaigns · kb_articles · secretary_memory) χτίζουμε ένα **knowledge graph** που επιτρέπει multi-hop ερωτήματα τύπου *"Δείξε όλες τις προτάσεις που σχετίζονται με πελάτες της κατηγορίας Retail που έχουν ληγμένο invoice"* — κάτι αδύνατο σήμερα με semantic search μόνο.
+
+Ο agent (Secretary, Brain, Quick Chat) θα έχει νέα tools για graph traversal **πάνω από** το ήδη υπάρχον vector retrieval (Phase 1) — hybrid GraphRAG.
 
 ---
 
 ## Τι θα παραδοθεί
 
-### Phase 1 · Vector store + Semantic Knowledge
+### 1. Graph schema (πάνω στη σχεσιακή βάση, χωρίς ETL χάος)
 
-- `pgvector` ενεργό στη βάση.
-- Embeddings σε `kb_articles`, `kb_raw_sources`, `secretary_memory` με proper chunking για τα articles/sources.
-- Hybrid retrieval (semantic + full‑text fallback) στο Wiki Q&A και στη μνήμη του Secretary.
-- One‑click backfill για όσα δεδομένα ήδη υπάρχουν.
+Δύο γενικοί πίνακες (entity-agnostic) με σαφές RLS ανά company:
 
-### Phase 3 · Model router
+- **`graph_nodes`**
+  - `id uuid pk`
+  - `company_id uuid` (RLS isolation)
+  - `node_type text` enum-like: `client`, `project`, `task`, `contact`, `invoice`, `campaign`, `kb_article`, `media_plan`, `service`, `expense`, `episode`, `fact`
+  - `entity_id uuid` (FK soft-link στον αντίστοιχο πίνακα)
+  - `label text` (canonical name για graph display)
+  - `properties jsonb` (κρίσιμα fields – status, value, dates – για filtering χωρίς joins)
+  - `embedding vector(768)` (canonical text representation, για semantic node lookup)
+  - `created_at, updated_at`
+  - `unique(company_id, node_type, entity_id)`
 
-- Κεντρικό «brain» που αποφασίζει ποιο μοντέλο κάθε task (lite / flash / pro / embeddings).
-- Όλα τα 12 AI edge functions να περνούν από αυτό αντί για hardcoded model.
-- Logging κάθε AI κλήσης + admin tab «AI Usage» με cost & latency.
+- **`graph_edges`**
+  - `id uuid pk`
+  - `company_id uuid`
+  - `source_node_id uuid fk`, `target_node_id uuid fk`
+  - `relation_type text`: `belongs_to`, `assigned_to`, `manages`, `uses_service`, `has_invoice`, `references_kb`, `derived_from`, `mentions`, `worked_on`, `parent_of`, `tagged_as`
+  - `weight numeric` (0-1, για ranking)
+  - `metadata jsonb` (π.χ. `{ since: ..., role: ... }`)
+  - `created_at`
+  - `unique(source_node_id, target_node_id, relation_type)`
+
+- **Indexes:** btree στα `(company_id, node_type)`, `(source_node_id, relation_type)`, `(target_node_id, relation_type)`, GIN στο `properties`, IVFFlat στο `embedding`.
+- **RLS:** Strict company isolation με τα ίδια helper functions που ήδη έχουμε.
+
+### 2. Sync layer · κρατάμε το graph "alive"
+
+- **DB triggers** σε ~12 βασικούς πίνακες (`projects`, `tasks`, `clients`, `contacts`, `invoices`, `campaigns`, `kb_articles`, `media_plans`, `services`, `expenses`, `client_user_access`, `project_user_access`):
+  - On `INSERT/UPDATE`: `upsert_graph_node()` (canonical label + properties).
+  - On `DELETE`: cascade αφαίρεση.
+- **Edge inference function** `rebuild_graph_edges_for_entity(node_id)`:
+  - Παράγει τα `graph_edges` βάσει FKs (π.χ. `task.project_id → project.client_id → client`) — όχι ad-hoc, αλλά declarative mapping.
+- **Embeddings backfill:** Νέο action `graph` στο υπάρχον `embed-backfill` που πιάνει nodes χωρίς embedding (canonical text = `label + key properties`).
+- **Initial seed migration:** One-time INSERT για όλα τα υπάρχοντα entities της εκάστοτε εταιρίας.
+
+### 3. Νέο edge function · `graph-query`
+
+Endpoint για graph traversal:
+
+```
+POST /functions/v1/graph-query
+{
+  action: 'neighbors' | 'shortest_path' | 'subgraph_for_query' | 'find_related',
+  start_entity?: { type, id },
+  query?: string,            // για semantic anchor
+  max_hops?: 1..3,
+  filters?: {
+    node_types?: string[],
+    relation_types?: string[],
+    properties?: Record<string, any>
+  },
+  limit?: number
+}
+```
+
+- **`subgraph_for_query`** (ο πραγματικά νέος hybrid mode):
+  1. Embed το query.
+  2. Top-k node lookup μέσω vector similarity (`match_graph_nodes` RPC) — anchors.
+  3. BFS traversal 1-3 hops από κάθε anchor με relation_type filtering.
+  4. Επιστρέφει subgraph + ranked nodes (score = vector_sim × hop_decay × edge_weight).
+- Όλα μέσω **PL/pgSQL recursive CTEs** για περιορισμό round-trips.
+
+### 4. Integration στους AI agents
+
+- **Νέα tools για `secretary-agent`:**
+  - `graph_neighbors({ entity_type, entity_id, hops, relation_types? })` — άμεσο context.
+  - `graph_search({ query, focus_types? })` — hybrid GraphRAG anchor + traversal.
+  - `graph_path({ from_entity, to_entity })` — π.χ. "πώς συνδέεται ο πελάτης Χ με το έργο Υ;".
+- **`brain-deep-analyze` refactor:** Πριν καλέσει το LLM, τραβάει subgraph γύρω από το target entity (3 hops) και το δίνει ως structured context στο prompt — αντικαθιστά τα current ad-hoc joins.
+- **`kb-compiler` (action `ask`):** Αν το hybrid retrieval (vector + FTS) επιστρέψει < N hits, fallback σε `subgraph_for_query` για να βρει σχετικά entities που δεν είναι αμιγώς "documents".
+
+### 5. UI · Graph Explorer (admin/power-user)
+
+- Νέα σελίδα **`/knowledge?tab=graph`** (νέο tab δίπλα στο Wiki/Blueprints/Ask/Manage) με:
+  - **Force-directed graph view** μέσω `react-force-graph-2d` (lightweight, ήδη γνωστό).
+  - Filters: node types, relation types, depth.
+  - Click σε node → detail panel με properties + neighbors + deep-link στο entity (π.χ. `/projects/:id`).
+  - Search bar που τρέχει `subgraph_for_query` και κεντράρει.
+- Mini graph widget στη σελίδα κάθε project/client (`ProjectDetail`, `ClientDetail`) — **"Related entities (graph)"** card.
+
+### 6. Observability
+
+- Logs στο `ai_call_logs` με `function_name='graph-query'`, `task_type='graph_traversal'`, latency tracking.
+- Νέο view `graph_health_summary`: counts ανά node_type, edges ανά relation_type, % nodes χωρίς embedding.
+- Health Check tab στο Knowledge → Manage να δείχνει graph stats.
 
 ---
 
 ## Database changes (migration)
 
 ```text
-extensions:
-  + vector  (pgvector)
+extensions: pgvector (already enabled)
 
-new table: kb_article_chunks
-  id uuid pk, article_id uuid fk → kb_articles, company_id uuid,
-  chunk_index int, content text, tokens int,
-  embedding vector(768), created_at timestamptz
-  index: ivfflat (embedding vector_cosine_ops) lists=100
-  index: btree (article_id, chunk_index)
-  RLS: company isolation (ίδιο pattern με kb_articles)
+new table: graph_nodes (RLS by company_id)
+new table: graph_edges (RLS by company_id)
 
-alter table kb_raw_sources
-  + embedding vector(768)
-  + embedded_at timestamptz
+new functions:
+  upsert_graph_node(_company_id, _node_type, _entity_id, _label, _props) → uuid
+  rebuild_graph_edges_for_entity(_node_id) → void
+  match_graph_nodes(query_embedding, _company_id, _node_types, match_count, threshold)
+    → table(node_id, node_type, entity_id, label, similarity)
+  graph_neighbors(_node_id, _hops, _relation_types, _max_results)
+    → table(node_id, distance, path)
+  graph_subgraph_for_query(query_embedding, _company_id, _max_hops, _anchor_count)
+    → table(node_id, anchor_id, distance, score)
 
-alter table secretary_memory
-  + embedding vector(768)
-  + embedded_at timestamptz
+new triggers:
+  trg_sync_graph_<table>_iud on projects, tasks, clients, contacts, invoices,
+  campaigns, kb_articles, media_plans, services, expenses
 
-new table: ai_call_logs
-  id uuid pk, company_id uuid, user_id uuid,
-  function_name text, task_type text, model_used text,
-  prompt_tokens int, completion_tokens int,
-  latency_ms int, cost_estimate_usd numeric(10,6),
-  success boolean, error_text text, created_at timestamptz
-  index: (company_id, created_at desc)
-  RLS: μόνο admins/owners της company βλέπουν
-
-new RPC: match_kb_chunks(query_embedding, _company_id, match_count, threshold)
-  → returns chunks ordered by 1 - (embedding <=> query_embedding) desc
-
-new RPC: match_secretary_memories(query_embedding, _user_id, match_count, threshold)
+initial backfill: INSERT INTO graph_nodes ... per company (idempotent)
 ```
 
 ---
 
-## Νέα edge functions
-
-### `embed-content`
-- Input: `{ kind: 'kb_article'|'kb_source'|'memory', id: uuid }`.
-- Φέρνει το text, chunk‑άρει αν χρειάζεται (~500 tokens με overlap 50), καλεί embeddings μέσω AI router → `google/text-embedding-004` (768d), upsert.
-- Idempotent: αν `embedded_at >= updated_at` skip.
-
-### `embed-backfill`
-- Σαρώνει `kb_articles`, `kb_raw_sources`, `secretary_memory` της εταιρίας του χρήστη και καλεί `embed-content` σε batches (10 παράλληλα, με rate limit pacing).
-- Επιστρέφει progress· καλείται από admin button.
-
-### `ai-router` (shared module + thin function)
-- Πραγματικό shared module: `supabase/functions/_shared/ai-router.ts` με:
-  - `pickModel({ task_type, complexity, expects_vision, expects_long_context }) → model_id`
-  - `callAI({ messages, task_type, ... })` wrapper που: επιλέγει μοντέλο, καλεί gateway, μετράει latency/tokens, γράφει `ai_call_logs`, χειρίζεται 429/402.
-- Policy table (in‑code, εύκολα tweakable):
-
-```text
-classification, tagging, simple_extraction → google/gemini-2.5-flash-lite
-generation, summarization, chat (default)  → google/gemini-3-flash-preview
-reasoning, planning, brain_deep, code      → google/gemini-2.5-pro
-multimodal_vision                          → google/gemini-2.5-pro
-embeddings                                 → google/text-embedding-004
-```
-
-- Thin edge function `ai-router` εκθέτει POST endpoint για χρήσεις από client όταν χρειάζεται (π.χ. quick chat).
-
----
-
-## Edge functions που τροποποιούνται
-
-| Function | Αλλαγή |
-|---|---|
-| `kb-compiler` | `ask` action: embedding του query → `match_kb_chunks` → fallback FTS αν similarity<0.6. Compile: μετά την παραγωγή/ενημέρωση άρθρων, καλεί `embed-content` για κάθε νέο/updated. |
-| `secretary-agent` | `recall_memory`: embedding του query → `match_secretary_memories` με fallback. `save_memory`: trigger embedding async. Wiki tools (`search_wiki`) → semantic. Όλες οι LLM κλήσεις περνούν από `callAI()`. |
-| `quick-chat-gemini`, `chat-ai-assistant`, `my-work-ai-chat`, `notes-ai-action`, `ai-fill-form`, `ai-suggest-mapping`, `enrich-client`, `analyze-document`, `analyze-media-plan-excel`, `analyze-project-files`, `brain-analyze`, `brain-deep-analyze`, `smart-reschedule`, `smart-time-suggest`, `suggest-package`, `generate-media-plan`, `email-to-project` | Refactor σε `callAI({ task_type })` αντί για hardcoded fetch στο gateway. |
-
-Όλα διατηρούν fallback path — αν ο router αποτύχει, default `gemini-3-flash-preview`.
-
----
-
-## Frontend
-
-- **Wiki Q&A (`useKBCompiler.askWiki`)** — δεν αλλάζει API surface, μόνο τα αποτελέσματα γίνονται πιο σχετικά. Προσθήκη badge «semantic match» στις πηγές.
-- **Knowledge → Sources tab** — νέο button «Επαναφόρτωση embeddings» (admin only) που τρέχει `embed-backfill`.
-- **`MemoryManager.tsx`** — μικρό indicator «✓ embedded» δίπλα σε κάθε εγγραφή.
-- **Νέα σελίδα/tab `Settings → AI Usage`** (admin only):
-  - Σύνολα requests / tokens / κόστος ανά μοντέλο, ανά function, ανά ημέρα (τελευταίες 30 ημέρες).
-  - Πίνακας πρόσφατων κλήσεων με latency & success.
-  - Charts με `recharts` (ήδη χρησιμοποιείται στο project).
-
----
-
-## Backwards compatibility & risk
-
-- Όλα additive. Παλιές κλήσεις χωρίς embeddings συνεχίζουν με FTS.
-- Embedding backfill είναι opt‑in, idempotent, σε batches → δεν θα στραγγαλίσει το gateway.
-- Αν `ai_call_logs` insert αποτύχει, δεν μπλοκάρει την κλήση (best‑effort).
-- Δεν χρειάζονται νέα secrets — μόνο το ήδη‑υπάρχον `LOVABLE_API_KEY`.
-
----
-
-## Σειρά εκτέλεσης
-
-```text
-1. Migration (pgvector + tables + RPCs + RLS)
-2. _shared/ai-router.ts module
-3. embed-content + embed-backfill edge functions
-4. Refactor kb-compiler & secretary-agent (αυτά έχουν το μεγαλύτερο impact)
-5. Refactor υπόλοιπων 15 edge functions να χρησιμοποιούν callAI
-6. UI: backfill button + AI Usage tab
-7. Smoke test: backfill σε υπάρχοντα data, Wiki query, Secretary recall
-```
-
----
-
-## Files (νέα/τροποποιημένα)
+## Νέα/Τροποποιημένα αρχεία
 
 **Νέα:**
-- `supabase/migrations/<timestamp>_phase1_phase3.sql`
-- `supabase/functions/_shared/ai-router.ts`
-- `supabase/functions/embed-content/index.ts`
-- `supabase/functions/embed-backfill/index.ts`
-- `supabase/functions/ai-router/index.ts`
-- `src/pages/AIUsage.tsx` + route
-- `src/hooks/useAIUsage.ts`
-- `src/components/knowledge/EmbeddingsBackfillButton.tsx`
+- `supabase/migrations/...phase5_graphrag.sql` (μεγάλο – schema + triggers + RPCs + initial backfill)
+- `supabase/functions/graph-query/index.ts`
+- `src/components/knowledge/GraphExplorer.tsx` (force-directed view + filters)
+- `src/components/knowledge/GraphNodeDetail.tsx` (side panel)
+- `src/components/shared/RelatedEntitiesCard.tsx` (mini widget για detail pages)
+- `src/hooks/useKnowledgeGraph.ts` (React Query wrapper)
 
-**Τροποποιημένα (refactor σε callAI):**
-- `supabase/functions/kb-compiler/index.ts`
-- `supabase/functions/secretary-agent/index.ts`
-- `supabase/functions/{quick-chat-gemini, chat-ai-assistant, my-work-ai-chat, notes-ai-action, ai-fill-form, ai-suggest-mapping, enrich-client, analyze-document, analyze-media-plan-excel, analyze-project-files, brain-analyze, brain-deep-analyze, smart-reschedule, smart-time-suggest, suggest-package, generate-media-plan, email-to-project}/index.ts`
-- `src/hooks/useKBCompiler.ts` (μικρό UI hint)
-- `src/components/secretary/MemoryManager.tsx`
+**Modified:**
+- `supabase/functions/_shared/ai-router.ts` (add `task_type: 'graph_reasoning'`)
+- `supabase/functions/secretary-agent/index.ts` (3 νέα tools)
+- `supabase/functions/brain-deep-analyze/index.ts` (subgraph context injection)
+- `supabase/functions/kb-compiler/index.ts` (fallback σε graph query)
+- `supabase/functions/embed-backfill/index.ts` (action `graph`)
+- `src/pages/Knowledge.tsx` (νέο tab `graph`)
+- `src/pages/ProjectDetail.tsx`, `src/pages/ClientDetail.tsx` (RelatedEntitiesCard)
+
+**Dependency:** `react-force-graph-2d` + `d3-force` (μικρά, ~80kb gzipped).
 
 ---
 
-Πες ✅ για να προχωρήσω σε implementation με την παραπάνω σειρά.
+## Σειρά υλοποίησης
+
+1. Migration: schema + RPCs + triggers + initial backfill (1 call, με approval).
+2. `graph-query` edge function + embedding του graph nodes μέσω `embed-backfill`.
+3. Refactor `secretary-agent` + `brain-deep-analyze` + `kb-compiler` για graph tools.
+4. UI: Graph Explorer tab στο Knowledge + RelatedEntitiesCard στα detail pages.
+5. Health stats integration.
+
+---
+
+Πες ✅ για να προχωρήσω σε implementation. Αν θέλεις να αφαιρέσουμε ή να συμπτύξουμε κάτι (π.χ. χωρίς force-directed UI για ταχύτητα), πες μου τώρα.
 

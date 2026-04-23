@@ -682,6 +682,58 @@ const toolDefinitions = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "graph_neighbors",
+      description: "Find entities directly or transitively related to a given entity (client, project, task, invoice, kb_article, etc.) via the knowledge graph. Use when the user asks 'what is connected to X' or 'show related entities'. Returns up to N neighbors within `hops` distance.",
+      parameters: {
+        type: "object",
+        properties: {
+          entity_type: { type: "string", enum: ["client", "project", "task", "contact", "invoice", "campaign", "kb_article", "media_plan", "service", "expense"] },
+          entity_id: { type: "string", description: "UUID of the entity" },
+          hops: { type: "number", description: "1-3, default 1" },
+          relation_types: { type: "array", items: { type: "string" }, description: "Optional filter (belongs_to, references, has_invoice, ...)" },
+          limit: { type: "number", description: "Max results, default 30" },
+        },
+        required: ["entity_type", "entity_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "graph_search",
+      description: "Hybrid GraphRAG search: given a free-form query, find the most relevant entities AND their surrounding subgraph. Use this for cross-cutting questions like 'show all retail clients with overdue invoices' or 'what projects relate to TikTok strategy'.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Natural language query (Greek or English)" },
+          max_hops: { type: "number", description: "1-3, default 2" },
+          anchor_count: { type: "number", description: "Top-K semantic anchors, default 5" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "graph_find_related",
+      description: "Find entities of specific types related to a given entity. Example: given a client, find all related kb_articles and projects.",
+      parameters: {
+        type: "object",
+        properties: {
+          entity_type: { type: "string" },
+          entity_id: { type: "string" },
+          target_types: { type: "array", items: { type: "string" }, description: "Types to keep, e.g. ['kb_article','project']" },
+          hops: { type: "number", description: "1-3, default 2" },
+          limit: { type: "number", description: "default 30" },
+        },
+        required: ["entity_type", "entity_id", "target_types"],
+      },
+    },
+  },
 ];
 
 // ── Helper: call Lovable AI Gateway (non-streaming) ──
@@ -1987,6 +2039,70 @@ Respond in Greek. Be thorough but concise.`;
         }
 
         return results;
+      }
+
+      case "graph_neighbors":
+      case "graph_search":
+      case "graph_find_related": {
+        try {
+          const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+          const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
+          const userAuth =
+            (supabase as any)?.headers?.Authorization ||
+            (supabase as any)?.rest?.headers?.Authorization;
+          const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+            apikey: ANON,
+          };
+          if (userAuth) headers.Authorization = userAuth as string;
+
+          let body: any;
+          if (toolName === "graph_neighbors") {
+            body = {
+              action: "neighbors",
+              entity: { type: args.entity_type, id: args.entity_id },
+              hops: args.hops,
+              relation_types: args.relation_types,
+              limit: args.limit,
+            };
+          } else if (toolName === "graph_search") {
+            body = {
+              action: "subgraph_for_query",
+              query: args.query,
+              max_hops: args.max_hops,
+              anchor_count: args.anchor_count,
+            };
+          } else {
+            body = {
+              action: "find_related",
+              entity: { type: args.entity_type, id: args.entity_id },
+              target_types: args.target_types,
+              hops: args.hops,
+              limit: args.limit,
+            };
+          }
+
+          const resp = await fetch(`${SUPABASE_URL}/functions/v1/graph-query`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(body),
+          });
+          const json = await resp.json();
+          if (!resp.ok) return { error: json?.error || "graph-query failed" };
+          return {
+            ok: true,
+            node_count: (json.nodes || []).length,
+            edge_count: (json.edges || []).length,
+            nodes: (json.nodes || []).slice(0, 50).map((n: any) => ({
+              id: n.id, type: n.node_type, entity_id: n.entity_id,
+              label: n.label, distance: n.distance, score: n.score,
+              via: n.via_relation,
+            })),
+            edges: (json.edges || []).slice(0, 100),
+          };
+        } catch (e: any) {
+          return { error: e?.message || "graph tool failed" };
+        }
       }
 
       default:

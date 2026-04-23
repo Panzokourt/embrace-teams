@@ -57,107 +57,166 @@ serve(async (req) => {
       });
     }
 
+    // Optional action filter: 'all' (default), 'graph', 'wiki'
+    const url = new URL(req.url);
+    const reqBody = await req.json().catch(() => ({}));
+    const action: string = reqBody.action || url.searchParams.get("action") || "all";
+
     let articleChunks = 0;
     let sources = 0;
     let memories = 0;
+    let graphNodes = 0;
     const errors: string[] = [];
 
-    // ── Articles: re-embed any with no existing chunks ──
-    const { data: articles } = await supa
-      .from("kb_articles")
-      .select("id, title, body, company_id")
-      .eq("company_id", companyId)
-      .neq("status", "deprecated")
-      .limit(500);
+    const doWiki = action === "all" || action === "wiki";
+    const doGraph = action === "all" || action === "graph";
 
-    for (const art of articles || []) {
-      const { count } = await supa
-        .from("kb_article_chunks")
-        .select("id", { count: "exact", head: true })
-        .eq("article_id", art.id);
-      if ((count ?? 0) > 0) continue;
+    if (!doWiki && !doGraph) {
+      return new Response(JSON.stringify({ error: `unknown action: ${action}` }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!doWiki) {
+      // Skip wiki/sources/memories sections entirely
+    }
 
-      const fullText = `${art.title}\n\n${art.body || ""}`;
-      const pieces = chunkText(fullText, 500, 50);
-      for (const piece of pieces) {
+    if (doWiki) {
+      // ── Articles: re-embed any with no existing chunks ──
+      const { data: articles } = await supa
+        .from("kb_articles")
+        .select("id, title, body, company_id")
+        .eq("company_id", companyId)
+        .neq("status", "deprecated")
+        .limit(500);
+
+      for (const art of articles || []) {
+        const { count } = await supa
+          .from("kb_article_chunks")
+          .select("id", { count: "exact", head: true })
+          .eq("article_id", art.id);
+        if ((count ?? 0) > 0) continue;
+
+        const fullText = `${art.title}\n\n${art.body || ""}`;
+        const pieces = chunkText(fullText, 500, 50);
+        for (const piece of pieces) {
+          try {
+            const vec = await embedText(piece.content, {
+              functionName: "embed-backfill",
+              companyId,
+              userId,
+            });
+            await supa.from("kb_article_chunks").insert({
+              article_id: art.id,
+              company_id: companyId,
+              chunk_index: piece.index,
+              content: piece.content,
+              tokens: piece.tokens,
+              embedding: vecLiteral(vec) as any,
+            });
+            articleChunks++;
+          } catch (e) {
+            errors.push(`article ${art.id}: ${(e as Error).message}`);
+          }
+        }
+      }
+
+      // ── Raw sources without embedding ──
+      const { data: srcs } = await supa
+        .from("kb_raw_sources")
+        .select("id, title, content, company_id")
+        .eq("company_id", companyId)
+        .is("embedded_at", null)
+        .limit(500);
+
+      for (const src of srcs || []) {
         try {
-          const vec = await embedText(piece.content, {
+          const text = `${src.title}\n\n${src.content || ""}`.slice(0, 8000);
+          const vec = await embedText(text, {
             functionName: "embed-backfill",
             companyId,
             userId,
           });
-          await supa.from("kb_article_chunks").insert({
-            article_id: art.id,
-            company_id: companyId,
-            chunk_index: piece.index,
-            content: piece.content,
-            tokens: piece.tokens,
-            embedding: vecLiteral(vec) as any,
-          });
-          articleChunks++;
+          await supa
+            .from("kb_raw_sources")
+            .update({ embedding: vecLiteral(vec) as any, embedded_at: new Date().toISOString() })
+            .eq("id", src.id);
+          sources++;
         } catch (e) {
-          errors.push(`article ${art.id}: ${(e as Error).message}`);
+          errors.push(`source ${src.id}: ${(e as Error).message}`);
+        }
+      }
+
+      // ── Memories without embedding ──
+      const { data: mems } = await supa
+        .from("secretary_memory")
+        .select("id, key, content")
+        .eq("user_id", userId)
+        .is("embedded_at", null)
+        .limit(1000);
+
+      for (const m of mems || []) {
+        try {
+          const text = `${m.key}: ${m.content}`.slice(0, 8000);
+          const vec = await embedText(text, {
+            functionName: "embed-backfill",
+            userId,
+          });
+          await supa
+            .from("secretary_memory")
+            .update({ embedding: vecLiteral(vec) as any, embedded_at: new Date().toISOString() })
+            .eq("id", m.id);
+          memories++;
+        } catch (e) {
+          errors.push(`memory ${m.id}: ${(e as Error).message}`);
         }
       }
     }
 
-    // ── Raw sources without embedding ──
-    const { data: srcs } = await supa
-      .from("kb_raw_sources")
-      .select("id, title, content, company_id")
-      .eq("company_id", companyId)
-      .is("embedded_at", null)
-      .limit(500);
+    if (doGraph) {
+      // ── Graph nodes without embedding (canonical text = label + key properties) ──
+      const { data: gnodes } = await supa
+        .from("graph_nodes")
+        .select("id, node_type, label, properties")
+        .eq("company_id", companyId)
+        .is("embedding", null)
+        .limit(2000);
 
-    for (const src of srcs || []) {
-      try {
-        const text = `${src.title}\n\n${src.content || ""}`.slice(0, 8000);
-        const vec = await embedText(text, {
-          functionName: "embed-backfill",
-          companyId,
-          userId,
-        });
-        await supa
-          .from("kb_raw_sources")
-          .update({ embedding: vecLiteral(vec) as any, embedded_at: new Date().toISOString() })
-          .eq("id", src.id);
-        sources++;
-      } catch (e) {
-        errors.push(`source ${src.id}: ${(e as Error).message}`);
-      }
-    }
-
-    // ── Memories without embedding (only this user's; memories are user-scoped) ──
-    const { data: mems } = await supa
-      .from("secretary_memory")
-      .select("id, key, content")
-      .eq("user_id", userId)
-      .is("embedded_at", null)
-      .limit(1000);
-
-    for (const m of mems || []) {
-      try {
-        const text = `${m.key}: ${m.content}`.slice(0, 8000);
-        const vec = await embedText(text, {
-          functionName: "embed-backfill",
-          userId,
-        });
-        await supa
-          .from("secretary_memory")
-          .update({ embedding: vecLiteral(vec) as any, embedded_at: new Date().toISOString() })
-          .eq("id", m.id);
-        memories++;
-      } catch (e) {
-        errors.push(`memory ${m.id}: ${(e as Error).message}`);
+      for (const n of gnodes || []) {
+        try {
+          const props = (n as any).properties || {};
+          const propPairs = Object.entries(props)
+            .filter(([k, v]) =>
+              v != null && typeof v !== "object" && k !== "id" && String(v).length < 200
+            )
+            .slice(0, 6)
+            .map(([k, v]) => `${k}: ${v}`)
+            .join(" · ");
+          const canonical = `[${n.node_type}] ${n.label || ""}${propPairs ? "\n" + propPairs : ""}`.slice(0, 4000);
+          const vec = await embedText(canonical, {
+            functionName: "embed-backfill",
+            companyId,
+            userId,
+          });
+          await supa
+            .from("graph_nodes")
+            .update({ embedding: vecLiteral(vec) as any })
+            .eq("id", n.id);
+          graphNodes++;
+        } catch (e) {
+          errors.push(`graph ${n.id}: ${(e as Error).message}`);
+        }
       }
     }
 
     return new Response(
       JSON.stringify({
         ok: true,
+        action,
         article_chunks: articleChunks,
         sources,
         memories,
+        graph_nodes: graphNodes,
         errors: errors.slice(0, 10),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

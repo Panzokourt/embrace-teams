@@ -13,6 +13,7 @@ import { KBSourceList } from '@/components/knowledge/KBSourceList';
 import { KBAskChat } from '@/components/knowledge/KBAskChat';
 import { KBHealthCheck } from '@/components/knowledge/KBHealthCheck';
 import { EmbeddingsBackfillButton } from '@/components/knowledge/EmbeddingsBackfillButton';
+import { GraphExplorer } from '@/components/knowledge/GraphExplorer';
 import { ProjectTemplatesManager } from '@/components/settings/ProjectTemplatesManager';
 import { BriefsList } from '@/components/blueprints/BriefsList';
 import { Card, CardContent } from '@/components/ui/card';
@@ -24,7 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Plus, BookOpen, FileText, AlertTriangle, Download, FileStack, MessageCircleQuestion, Settings2 } from 'lucide-react';
+import { Plus, BookOpen, FileText, AlertTriangle, Download, FileStack, MessageCircleQuestion, Settings2, Network } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { KBArticle } from '@/hooks/useKnowledgeBase';
@@ -201,6 +202,9 @@ export default function Knowledge() {
           <TabsTrigger value="ask" className="gap-1.5">
             <MessageCircleQuestion className="h-3.5 w-3.5" /> Ask AI
           </TabsTrigger>
+          <TabsTrigger value="graph" className="gap-1.5">
+            <Network className="h-3.5 w-3.5" /> Graph
+          </TabsTrigger>
           <TabsTrigger value="manage" className="gap-1.5">
             <Settings2 className="h-3.5 w-3.5" /> Manage
           </TabsTrigger>
@@ -315,7 +319,10 @@ export default function Knowledge() {
           </Card>
         </TabsContent>
 
-        {/* ===== Manage Tab (Reviews + Sources + Health) ===== */}
+        {/* ===== Graph Tab ===== */}
+        <TabsContent value="graph" className="mt-4">
+          <GraphExplorer />
+        </TabsContent>
         <TabsContent value="manage" className="space-y-4 mt-4">
           <div className="flex gap-2 border-b pb-2">
             <Button

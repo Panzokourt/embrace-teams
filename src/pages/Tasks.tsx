@@ -144,7 +144,19 @@ export default function TasksPage({ embedded = false, projectId }: { embedded?: 
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [viewMode, setViewMode] = usePersistedViewMode('tasks', 'table');
 
+  // Auto-open create dialog when ?new=1 is in URL
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setEditingTask(null);
+      setDialogOpen(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('new');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
   const [deliverables, setDeliverables] = useState<{ id: string; name: string }[]>([]);
+
 
   const [formData, setFormData] = useState({
     title: '',

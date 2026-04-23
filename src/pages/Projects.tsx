@@ -111,6 +111,18 @@ export default function ProjectsPage({ embedded = false }: { embedded?: boolean 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { applyTemplate, applying: applyingTemplate } = useProjectTemplates();
 
+  // Auto-open create dialog when ?new=1 is in URL
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setEditingProject(null);
+      setDialogOpen(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('new');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })

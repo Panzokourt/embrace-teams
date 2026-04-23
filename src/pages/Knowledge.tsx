@@ -139,17 +139,27 @@ export default function Knowledge() {
     [...articles].filter(a => a.status !== 'deprecated').sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 9),
     [articles]);
 
-  const stats = useMemo(() => ({
-    total: articles.length,
-    sourcesPending: sources.filter(s => !s.compiled).length,
-    pendingReview: articles.filter(a => {
+  const stats = useMemo(() => {
+    const myPending = articles.filter(a => {
       if (a.status === 'deprecated') return false;
+      if (a.review_status === 'pending' && a.reviewer_id === profile?.id) return true;
+      return false;
+    }).length;
+    const allPending = articles.filter(a => {
+      if (a.status === 'deprecated') return false;
+      if (a.review_status === 'pending') return true;
       if (a.status === 'draft') return true;
       if (a.next_review_date && new Date(a.next_review_date) <= new Date()) return true;
       return false;
-    }).length,
-    healthScore: healthReport?.overall_score ?? null,
-  }), [articles, sources, healthReport]);
+    }).length;
+    return {
+      total: articles.length,
+      sourcesPending: sources.filter(s => !s.compiled).length,
+      pendingReview: myPending > 0 ? myPending : allPending,
+      pendingReviewMine: myPending,
+      healthScore: healthReport?.overall_score ?? null,
+    };
+  }, [articles, sources, healthReport, profile?.id]);
 
   const setTab = (tab: string) => {
     setSearchParams({ tab });

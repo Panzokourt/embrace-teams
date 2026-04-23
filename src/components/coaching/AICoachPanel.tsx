@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
 import { Sparkles, X, Send, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -150,8 +151,8 @@ export default function AICoachPanel({ open, onClose }: Props) {
 
   if (!open) return null;
 
-  return (
-    <div className="fixed bottom-24 right-6 z-[60] w-[380px] max-w-[calc(100vw-2rem)] rounded-2xl border border-border/60 bg-card shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 fade-in">
+  return createPortal(
+    <div className="fixed bottom-24 right-6 z-[80] w-[380px] max-w-[calc(100vw-2rem)] rounded-2xl border border-border/60 bg-card shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 fade-in">
       <header className="flex items-center justify-between px-4 py-3 border-b border-border/40 bg-gradient-to-r from-primary/10 to-transparent">
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-primary" />
@@ -204,7 +205,8 @@ export default function AICoachPanel({ open, onClose }: Props) {
           <Send className="h-3.5 w-3.5" />
         </Button>
       </form>
-    </div>
+    </div>,
+    document.body
   );
 }
 

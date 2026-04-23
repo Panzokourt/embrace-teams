@@ -503,6 +503,17 @@ export default function Knowledge() {
       {/* Unified Import Dialog */}
       <KBImportDialog open={importOpen} onOpenChange={setImportOpen} />
 
+      {/* AI Compose Dialog (από header / suggestions) */}
+      <KBAIComposeDialog
+        open={composeOpen}
+        onOpenChange={(v) => { setComposeOpen(v); if (!v) setComposeSeed(null); }}
+        categories={categories}
+        defaultTitle={composeSeed?.title}
+        defaultBrief={composeSeed?.brief}
+        defaultType={composeSeed?.type}
+        onAccept={handleComposeAccept}
+      />
+
       {/* Document Template Creation Dialog */}
       <Dialog open={tplCreateOpen} onOpenChange={setTplCreateOpen}>
         <DialogContent className="max-w-md">

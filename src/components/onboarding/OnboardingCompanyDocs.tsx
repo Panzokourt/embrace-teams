@@ -193,18 +193,48 @@ export default function OnboardingCompanyDocs({ userId, companyId, onNext, onBac
         />
       </div>
 
+      {/* AI Categorization summary */}
+      {files.length > 0 && (
+        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs">
+          <div className="flex items-center gap-1.5 mb-2">
+            <Sparkles className="h-3 w-3 text-primary" />
+            <span className="text-foreground font-medium">AI κατηγοριοποίηση (preview)</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {(Object.keys(categorySummary) as DocCategory[])
+              .filter(k => categorySummary[k] > 0)
+              .map(k => (
+                <span key={k} className={`px-2 py-0.5 rounded border text-[11px] ${CAT_COLOR[k]}`}>
+                  {CAT_LABEL[k]} · {categorySummary[k]}
+                </span>
+              ))}
+          </div>
+        </div>
+      )}
+
       {/* File list */}
       {files.length > 0 && (
         <div className="space-y-2">
           <Label className="text-muted-foreground text-xs uppercase tracking-wider">Αρχεία ({files.length})</Label>
           {files.map((f, idx) => (
-            <div key={idx} className="flex items-center justify-between p-3 rounded-lg border border-border/40 text-sm">
+            <div key={idx} className="flex items-center justify-between p-3 rounded-lg border border-border/40 text-sm gap-2">
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <FileIcon className="h-4 w-4 text-muted-foreground shrink-0" />
                 <span className="truncate text-foreground">{f.file.name}</span>
                 <span className="text-muted-foreground text-xs shrink-0">{formatSize(f.file.size)}</span>
               </div>
               <div className="flex items-center gap-2 shrink-0">
+                {f.status === 'pending' && (
+                  <select
+                    value={f.category ?? 'other'}
+                    onChange={(e) => setCategory(idx, e.target.value as DocCategory)}
+                    className={`text-[11px] rounded border px-1.5 py-0.5 bg-transparent ${CAT_COLOR[f.category ?? 'other']}`}
+                  >
+                    {(Object.keys(CAT_LABEL) as DocCategory[]).map(c => (
+                      <option key={c} value={c}>{CAT_LABEL[c]}</option>
+                    ))}
+                  </select>
+                )}
                 {f.status === 'uploading' && <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />}
                 {f.status === 'done' && <span className="text-xs text-success">✓</span>}
                 {f.status === 'error' && <span className="text-xs text-destructive">✗</span>}

@@ -9,6 +9,7 @@ import { useLayout } from '@/contexts/LayoutContext';
 import SetupGuide from '@/components/onboarding/SetupGuide';
 import TopBarDateTime from './TopBarDateTime';
 import CompanySwitcher from './CompanySwitcher';
+import AICoachPanel, { AICoachTrigger } from '@/components/coaching/AICoachPanel';
 
 interface SearchResult {
   id: string;

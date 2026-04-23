@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
+import { pickModel, logAICall } from "../_shared/ai-router.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -129,7 +130,7 @@ serve(async (req) => {
       });
     } else {
       // ── Lovable AI Gateway ──
-      const gatewayModel = requestedModel || "google/gemini-2.5-pro";
+      const gatewayModel = requestedModel || pickModel("reasoning");
       response = await fetch(
         "https://ai.gateway.lovable.dev/v1/chat/completions",
         {

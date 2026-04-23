@@ -756,8 +756,10 @@ export default function ProjectDetailPage() {
                     />
                   </CardContent>
                 </Card>
+
+                {/* Related Entities (Knowledge Graph) */}
+                <RelatedEntitiesCard entityType="project" entityId={project.id} hops={2} limit={15} />
               </div>
-            </div>
           </TabsContent>
 
           <TabsContent value="deliverables">

@@ -1,86 +1,163 @@
 
-## Διορθώσεις centering + secretary auto-open
 
-### Στόχοι
-1. Το **bottom dock** να είναι πάντα κεντραρισμένο ως προς όλο το viewport/page, όχι ως προς τη μεσαία στήλη.
-2. Τα **στοιχεία του TopBar** να ακολουθούν την ίδια λογική κεντραρίσματος.
-3. Το **Secretary panel να μην ανοίγει ποτέ μόνο του στο refresh** και να ανοίγει μόνο από ρητή ενέργεια χρήστη.
+# Phase 1 + 3 · Vector Store/Semantic Search + Model Router
 
-### Τι θα αλλάξει
+Υλοποιούμε ταυτόχρονα δύο foundational layers που ξεκλειδώνουν όλες τις μετέπειτα φάσεις: **πραγματικό semantic retrieval** και **κεντρικό model routing για cost optimization**.
 
-#### 1) Bottom bar: πραγματικό page-centering
-Το σημερινό dock είναι `absolute` μέσα στη middle column (`AppLayout`), άρα μετατοπίζεται δεξιά όταν υπάρχει sidebar.
+---
 
-Θα το αλλάξω ώστε:
-- το dock να αποδίδεται σε **viewport-centered layer**
-- να χρησιμοποιεί `fixed` positioning
-- να κεντράρεται με βάση το **viewport** (`left-1/2 -translate-x-1/2`) και όχι το content column
+## Τι θα παραδοθεί
 
-Αυτό θα εφαρμοστεί σε:
-- `src/components/dock/FloatingDock.tsx`
-- `src/components/dock/FloatingDockPanel.tsx`
-- `src/components/quick-chat/QuickChatBar.tsx`
-- `src/components/layout/AppLayout.tsx`
+### Phase 1 · Vector store + Semantic Knowledge
 
-#### 2) Top bar: τα περιεχόμενα να κάθονται στο οπτικό κέντρο της σελίδας
-Το `TopBar` σήμερα είναι δεμένο στο πλάτος της middle column. Θα κρατήσω το υπάρχον layout shell, αλλά θα ξαναστήσω το εσωτερικό του TopBar ώστε:
-- το search + setup + quick actions να ζουν σε **κεντρικό inner wrapper**
-- αυτό το wrapper να είναι οπτικά κεντραρισμένο ως προς τη σελίδα
-- το hamburger/mobile controls να μένουν λειτουργικά χωρίς να σπάνε το centering
+- `pgvector` ενεργό στη βάση.
+- Embeddings σε `kb_articles`, `kb_raw_sources`, `secretary_memory` με proper chunking για τα articles/sources.
+- Hybrid retrieval (semantic + full‑text fallback) στο Wiki Q&A και στη μνήμη του Secretary.
+- One‑click backfill για όσα δεδομένα ήδη υπάρχουν.
 
-Πρακτικά:
-- εξωτερικό bar: παραμένει sticky
-- εσωτερικό content: `relative`
-- κεντρικό cluster: `absolute/flex` ή dedicated centered container ώστε το main group να μην σπρώχνεται από το sidebar
+### Phase 3 · Model router
 
-Αρχεία:
-- `src/components/layout/TopBar.tsx`
-- πιθανό μικρό support refactor στο `src/components/layout/AppLayout.tsx`
+- Κεντρικό «brain» που αποφασίζει ποιο μοντέλο κάθε task (lite / flash / pro / embeddings).
+- Όλα τα 12 AI edge functions να περνούν από αυτό αντί για hardcoded model.
+- Logging κάθε AI κλήσης + admin tab «AI Usage» με cost & latency.
 
-#### 3) Secretary: να μην ανοίγει μόνος του στο refresh
-Αυτό είναι bug συμπεριφοράς, όχι desired state. Από το διάβασμα του κώδικα, το άνοιγμα ελέγχεται από `DockContext` + `VoiceCommandProvider` + global custom events.
+---
 
-Θα το διορθώσω με πιο αυστηρή ροή:
-- `activePanel` θα ξεκινά πάντα ως `null`
-- δεν θα υπάρχει καμία mount-time λογική που ανοίγει `secretary`
-- θα αφαιρέσω/σφίξω το legacy event path που μπορεί να ανοίγει το panel χωρίς ρητή ενέργεια
-- το Secretary θα ανοίγει μόνο από:
-  - click στο dock icon
-  - `⌘/Ctrl + J`
-  - explicit voice action / command flow
-  - explicit secretary navigation action
+## Database changes (migration)
 
-Πιθανή κατεύθυνση υλοποίησης:
-- απλοποίηση του `open-secretary-panel` flow
-- μεταφορά στο direct callback path όπου γίνεται
-- hardening στο `VoiceCommandProvider` ώστε να μην πυροδοτεί open σε initial mount
-- διατήρηση του `secretary-navigate` μόνο για πραγματικές secretary actions
+```text
+extensions:
+  + vector  (pgvector)
 
-Αρχεία:
-- `src/contexts/DockContext.tsx`
-- `src/components/secretary/VoiceCommandProvider.tsx`
-- `src/components/layout/AppLayout.tsx`
+new table: kb_article_chunks
+  id uuid pk, article_id uuid fk → kb_articles, company_id uuid,
+  chunk_index int, content text, tokens int,
+  embedding vector(768), created_at timestamptz
+  index: ivfflat (embedding vector_cosine_ops) lists=100
+  index: btree (article_id, chunk_index)
+  RLS: company isolation (ίδιο pattern με kb_articles)
 
-### Σχεδιαστική προσαρμογή
-Για να δένει το UI:
-- dock, dock popover και quick chat θα ευθυγραμμίζονται στον ίδιο οριζόντιο άξονα
-- το TopBar central cluster θα ακολουθεί το ίδιο visual center
-- δεν θα αλλάξω το gradient/glass style που ήδη έβαλες, απλώς θα διορθωθεί η γεωμετρία/στοίχιση
+alter table kb_raw_sources
+  + embedding vector(768)
+  + embedded_at timestamptz
 
-### Build / verification
-Το reported build error που φαίνεται αυτή τη στιγμή είναι infra `503` sandbox issue, όχι code-level TypeScript error. Όταν περάσω σε implementation mode θα:
-- εφαρμόσω τις παραπάνω αλλαγές
-- κάνω build/type verification μόλις επανέλθει το sandbox
-- ελέγξω 3 cases:
-  1. refresh στο `/` → **Secretary κλειστό**
-  2. click Secretary icon / `⌘J` → **Secretary ανοίγει σωστά**
-  3. dock + top bar + quick chat → **όλα παραμένουν centered**
+alter table secretary_memory
+  + embedding vector(768)
+  + embedded_at timestamptz
 
-### Αρχεία που θα πειραχτούν
-- `src/components/layout/AppLayout.tsx`
-- `src/components/layout/TopBar.tsx`
-- `src/components/dock/FloatingDock.tsx`
-- `src/components/dock/FloatingDockPanel.tsx`
-- `src/components/quick-chat/QuickChatBar.tsx`
-- `src/contexts/DockContext.tsx`
-- `src/components/secretary/VoiceCommandProvider.tsx`
+new table: ai_call_logs
+  id uuid pk, company_id uuid, user_id uuid,
+  function_name text, task_type text, model_used text,
+  prompt_tokens int, completion_tokens int,
+  latency_ms int, cost_estimate_usd numeric(10,6),
+  success boolean, error_text text, created_at timestamptz
+  index: (company_id, created_at desc)
+  RLS: μόνο admins/owners της company βλέπουν
+
+new RPC: match_kb_chunks(query_embedding, _company_id, match_count, threshold)
+  → returns chunks ordered by 1 - (embedding <=> query_embedding) desc
+
+new RPC: match_secretary_memories(query_embedding, _user_id, match_count, threshold)
+```
+
+---
+
+## Νέα edge functions
+
+### `embed-content`
+- Input: `{ kind: 'kb_article'|'kb_source'|'memory', id: uuid }`.
+- Φέρνει το text, chunk‑άρει αν χρειάζεται (~500 tokens με overlap 50), καλεί embeddings μέσω AI router → `google/text-embedding-004` (768d), upsert.
+- Idempotent: αν `embedded_at >= updated_at` skip.
+
+### `embed-backfill`
+- Σαρώνει `kb_articles`, `kb_raw_sources`, `secretary_memory` της εταιρίας του χρήστη και καλεί `embed-content` σε batches (10 παράλληλα, με rate limit pacing).
+- Επιστρέφει progress· καλείται από admin button.
+
+### `ai-router` (shared module + thin function)
+- Πραγματικό shared module: `supabase/functions/_shared/ai-router.ts` με:
+  - `pickModel({ task_type, complexity, expects_vision, expects_long_context }) → model_id`
+  - `callAI({ messages, task_type, ... })` wrapper που: επιλέγει μοντέλο, καλεί gateway, μετράει latency/tokens, γράφει `ai_call_logs`, χειρίζεται 429/402.
+- Policy table (in‑code, εύκολα tweakable):
+
+```text
+classification, tagging, simple_extraction → google/gemini-2.5-flash-lite
+generation, summarization, chat (default)  → google/gemini-3-flash-preview
+reasoning, planning, brain_deep, code      → google/gemini-2.5-pro
+multimodal_vision                          → google/gemini-2.5-pro
+embeddings                                 → google/text-embedding-004
+```
+
+- Thin edge function `ai-router` εκθέτει POST endpoint για χρήσεις από client όταν χρειάζεται (π.χ. quick chat).
+
+---
+
+## Edge functions που τροποποιούνται
+
+| Function | Αλλαγή |
+|---|---|
+| `kb-compiler` | `ask` action: embedding του query → `match_kb_chunks` → fallback FTS αν similarity<0.6. Compile: μετά την παραγωγή/ενημέρωση άρθρων, καλεί `embed-content` για κάθε νέο/updated. |
+| `secretary-agent` | `recall_memory`: embedding του query → `match_secretary_memories` με fallback. `save_memory`: trigger embedding async. Wiki tools (`search_wiki`) → semantic. Όλες οι LLM κλήσεις περνούν από `callAI()`. |
+| `quick-chat-gemini`, `chat-ai-assistant`, `my-work-ai-chat`, `notes-ai-action`, `ai-fill-form`, `ai-suggest-mapping`, `enrich-client`, `analyze-document`, `analyze-media-plan-excel`, `analyze-project-files`, `brain-analyze`, `brain-deep-analyze`, `smart-reschedule`, `smart-time-suggest`, `suggest-package`, `generate-media-plan`, `email-to-project` | Refactor σε `callAI({ task_type })` αντί για hardcoded fetch στο gateway. |
+
+Όλα διατηρούν fallback path — αν ο router αποτύχει, default `gemini-3-flash-preview`.
+
+---
+
+## Frontend
+
+- **Wiki Q&A (`useKBCompiler.askWiki`)** — δεν αλλάζει API surface, μόνο τα αποτελέσματα γίνονται πιο σχετικά. Προσθήκη badge «semantic match» στις πηγές.
+- **Knowledge → Sources tab** — νέο button «Επαναφόρτωση embeddings» (admin only) που τρέχει `embed-backfill`.
+- **`MemoryManager.tsx`** — μικρό indicator «✓ embedded» δίπλα σε κάθε εγγραφή.
+- **Νέα σελίδα/tab `Settings → AI Usage`** (admin only):
+  - Σύνολα requests / tokens / κόστος ανά μοντέλο, ανά function, ανά ημέρα (τελευταίες 30 ημέρες).
+  - Πίνακας πρόσφατων κλήσεων με latency & success.
+  - Charts με `recharts` (ήδη χρησιμοποιείται στο project).
+
+---
+
+## Backwards compatibility & risk
+
+- Όλα additive. Παλιές κλήσεις χωρίς embeddings συνεχίζουν με FTS.
+- Embedding backfill είναι opt‑in, idempotent, σε batches → δεν θα στραγγαλίσει το gateway.
+- Αν `ai_call_logs` insert αποτύχει, δεν μπλοκάρει την κλήση (best‑effort).
+- Δεν χρειάζονται νέα secrets — μόνο το ήδη‑υπάρχον `LOVABLE_API_KEY`.
+
+---
+
+## Σειρά εκτέλεσης
+
+```text
+1. Migration (pgvector + tables + RPCs + RLS)
+2. _shared/ai-router.ts module
+3. embed-content + embed-backfill edge functions
+4. Refactor kb-compiler & secretary-agent (αυτά έχουν το μεγαλύτερο impact)
+5. Refactor υπόλοιπων 15 edge functions να χρησιμοποιούν callAI
+6. UI: backfill button + AI Usage tab
+7. Smoke test: backfill σε υπάρχοντα data, Wiki query, Secretary recall
+```
+
+---
+
+## Files (νέα/τροποποιημένα)
+
+**Νέα:**
+- `supabase/migrations/<timestamp>_phase1_phase3.sql`
+- `supabase/functions/_shared/ai-router.ts`
+- `supabase/functions/embed-content/index.ts`
+- `supabase/functions/embed-backfill/index.ts`
+- `supabase/functions/ai-router/index.ts`
+- `src/pages/AIUsage.tsx` + route
+- `src/hooks/useAIUsage.ts`
+- `src/components/knowledge/EmbeddingsBackfillButton.tsx`
+
+**Τροποποιημένα (refactor σε callAI):**
+- `supabase/functions/kb-compiler/index.ts`
+- `supabase/functions/secretary-agent/index.ts`
+- `supabase/functions/{quick-chat-gemini, chat-ai-assistant, my-work-ai-chat, notes-ai-action, ai-fill-form, ai-suggest-mapping, enrich-client, analyze-document, analyze-media-plan-excel, analyze-project-files, brain-analyze, brain-deep-analyze, smart-reschedule, smart-time-suggest, suggest-package, generate-media-plan, email-to-project}/index.ts`
+- `src/hooks/useKBCompiler.ts` (μικρό UI hint)
+- `src/components/secretary/MemoryManager.tsx`
+
+---
+
+Πες ✅ για να προχωρήσω σε implementation με την παραπάνω σειρά.
+

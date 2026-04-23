@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Briefcase, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Briefcase, ChevronLeft, ChevronRight, Loader2, Sparkles, Globe } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -21,9 +21,42 @@ const SECTORS = [
 
 export default function OnboardingFirstClient({ companyId, onNext, onBack, onSkip }: Props) {
   const [name, setName] = useState('');
+  const [website, setWebsite] = useState('');
   const [email, setEmail] = useState('');
   const [sector, setSector] = useState('');
   const [loading, setLoading] = useState(false);
+  const [enriching, setEnriching] = useState(false);
+
+  const handleAIFill = async () => {
+    if (!name.trim() && !website.trim()) {
+      toast.info('Συμπλήρωσε όνομα ή website για AI auto-fill');
+      return;
+    }
+    setEnriching(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('enrich-client', {
+        body: {
+          mode: 'preview',
+          input: { name: name.trim() || undefined, website: website.trim() || undefined },
+        },
+      });
+      if (error) throw error;
+      const suggestions = data?.suggestions ?? [];
+      let applied = 0;
+      for (const s of suggestions) {
+        if (s.field === 'contact_email' && s.value && !email) { setEmail(String(s.value)); applied++; }
+        if (s.field === 'sector' && s.value && !sector) { setSector(String(s.value)); applied++; }
+        if (s.field === 'website' && s.value && !website) { setWebsite(String(s.value)); applied++; }
+        if (s.field === 'name' && s.value && !name) { setName(String(s.value)); applied++; }
+      }
+      if (applied > 0) toast.success(`Συμπληρώθηκαν ${applied} πεδία από AI`);
+      else toast.info('Δεν βρέθηκαν επιπλέον στοιχεία.');
+    } catch (e: any) {
+      toast.error(e.message || 'AI auto-fill απέτυχε');
+    } finally {
+      setEnriching(false);
+    }
+  };
 
   const handleCreate = async () => {
     if (!name.trim() || !companyId) return;
@@ -32,6 +65,7 @@ export default function OnboardingFirstClient({ companyId, onNext, onBack, onSki
       const { error } = await supabase.from('clients').insert({
         name: name.trim(),
         contact_email: email.trim() || null,
+        website: website.trim() || null,
         sector: sector || null,
         company_id: companyId,
       });
@@ -59,6 +93,31 @@ export default function OnboardingFirstClient({ companyId, onNext, onBack, onSki
           <Input placeholder="π.χ. Acme Corp" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
         <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label>Website</Label>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleAIFill}
+              disabled={enriching}
+              className="h-7 px-2 text-xs gap-1.5"
+            >
+              {enriching ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3 text-primary" />}
+              AI auto-fill
+            </Button>
+          </div>
+          <div className="relative">
+            <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="https://acme.com"
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+        </div>
+        <div className="space-y-2">
           <Label>Email επικοινωνίας</Label>
           <Input placeholder="info@client.com" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
@@ -78,7 +137,7 @@ export default function OnboardingFirstClient({ companyId, onNext, onBack, onSki
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Μπορείτε να προσθέσετε περισσότερους πελάτες αργότερα.
+        Πάτα ✨ AI auto-fill για να βρει αυτόματα website, email, κλάδο από το όνομα.
       </p>
 
       <div className="flex gap-3">

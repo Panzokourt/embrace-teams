@@ -82,6 +82,7 @@ interface Profile {
 
 export default function ProjectsPage({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { isAdmin, isManager, company, user } = useAuth();
   const { logCreate, logUpdate, logDelete, logStatusChange } = useActivityLogger();
   const [projects, setProjects] = useState<Project[]>([]);

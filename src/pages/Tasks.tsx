@@ -126,6 +126,7 @@ const statusConfig: Record<TaskStatus, { icon: React.ReactNode; label: string; c
 
 export default function TasksPage({ embedded = false, projectId }: { embedded?: boolean; projectId?: string }) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { isAdmin, isManager } = useAuth();
   const { logCreate, logUpdate, logDelete, logStatusChange } = useActivityLogger();
   const [tasks, setTasks] = useState<Task[]>([]);

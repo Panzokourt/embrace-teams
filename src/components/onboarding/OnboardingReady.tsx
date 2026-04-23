@@ -1,6 +1,9 @@
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Rocket, ChevronLeft, Loader2, FolderOpen, MessageSquare } from 'lucide-react';
+import { Rocket, ChevronLeft, Loader2, FolderOpen, MessageSquare, Users, Mail, BookOpen, Sparkles, Briefcase, Settings } from 'lucide-react';
 import { Profile } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
 
 interface Props {
   profile: Profile | null;
@@ -11,7 +14,57 @@ interface Props {
   onBack: () => void;
 }
 
+interface NextStep {
+  title: string;
+  description: string;
+  href: string;
+  icon: 'users' | 'folder' | 'message' | 'book' | 'briefcase' | 'sparkles' | 'mail' | 'settings';
+}
+
+const ICONS: Record<NextStep['icon'], React.ComponentType<{ className?: string }>> = {
+  users: Users,
+  folder: FolderOpen,
+  message: MessageSquare,
+  book: BookOpen,
+  briefcase: Briefcase,
+  sparkles: Sparkles,
+  mail: Mail,
+  settings: Settings,
+};
+
+const FALLBACK: NextStep[] = [
+  { title: 'Καλέστε την ομάδα σας', description: 'Προσθέστε συναδέλφους με ρόλους.', href: '/hr', icon: 'users' },
+  { title: 'Δημιουργήστε πρώτο έργο', description: 'Ξεκινήστε από template ή κενό.', href: '/work/projects', icon: 'folder' },
+  { title: 'Συνδέστε email', description: 'Μετατρέψτε briefs σε projects.', href: '/inbox', icon: 'mail' },
+  { title: 'Εξερευνήστε τη Βιβλιοθήκη', description: 'AI suggestions για άρθρα.', href: '/knowledge', icon: 'book' },
+  { title: 'Ρωτήστε τον Secretary', description: 'AI βοηθός για κάθε ερώτηση.', href: '/', icon: 'sparkles' },
+];
+
 export default function OnboardingReady({ profile, jobTitle, phone, loading, onFinish, onBack }: Props) {
+  const navigate = useNavigate();
+  const [steps, setSteps] = useState<NextStep[]>([]);
+  const [stepsLoading, setStepsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('onboarding-personalize', { body: {} });
+        if (cancelled) return;
+        if (!error && Array.isArray(data?.steps) && data.steps.length > 0) {
+          setSteps(data.steps);
+        } else {
+          setSteps(FALLBACK);
+        }
+      } catch {
+        if (!cancelled) setSteps(FALLBACK);
+      } finally {
+        if (!cancelled) setStepsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   return (
     <div className="text-center space-y-6">
       <Rocket className="h-16 w-16 text-primary mx-auto" />
@@ -39,17 +92,39 @@ export default function OnboardingReady({ profile, jobTitle, phone, loading, onF
       </div>
 
       <div className="space-y-2 text-left">
-        <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Γρήγορες ενέργειες</p>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="flex items-center gap-2 p-3 rounded-xl border border-border/40 text-sm">
-            <FolderOpen className="h-4 w-4 text-primary shrink-0" />
-            <span className="text-muted-foreground">Δημιουργήστε project</span>
-          </div>
-          <div className="flex items-center gap-2 p-3 rounded-xl border border-border/40 text-sm">
-            <MessageSquare className="h-4 w-4 text-primary shrink-0" />
-            <span className="text-muted-foreground">Ρωτήστε τον Secretary</span>
-          </div>
+        <div className="flex items-center gap-1.5">
+          <Sparkles className="h-3.5 w-3.5 text-primary" />
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
+            AI πρόταση: Τα επόμενά σας 5 βήματα
+          </p>
         </div>
+        {stepsLoading ? (
+          <div className="flex items-center justify-center py-4 gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3 w-3 animate-spin" /> Προσαρμογή στον ρόλο σας...
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {steps.map((s, i) => {
+              const Icon = ICONS[s.icon] ?? Sparkles;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => { onFinish(); setTimeout(() => navigate(s.href), 50); }}
+                  className="w-full flex items-start gap-3 p-3 rounded-xl border border-border/40 hover:border-primary/40 hover:bg-muted/30 transition-colors text-left"
+                >
+                  <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <Icon className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground">{s.title}</p>
+                    <p className="text-xs text-muted-foreground truncate">{s.description}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="flex gap-3">

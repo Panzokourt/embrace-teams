@@ -46,6 +46,7 @@ import { DataManagementCard } from '@/components/settings/DataManagementCard';
 import { BulkImportCard } from '@/components/settings/BulkImportCard';
 import { PortalUserManager } from '@/components/portal/PortalUserManager';
 import { AIUsageCard } from '@/components/settings/AIUsageCard';
+import HelpTutorialsCard from '@/components/settings/HelpTutorialsCard';
 
 const DAY_LABELS = ['Δευτέρα', 'Τρίτη', 'Τετάρτη', 'Πέμπτη', 'Παρασκευή', 'Σάββατο', 'Κυριακή'];
 const DEFAULT_SCHEDULE = DAY_LABELS.map((_, i) => ({
@@ -504,6 +505,9 @@ export default function SettingsPage() {
 
       {/* Work Schedule */}
       <WorkScheduleCard />
+
+      {/* Help & Tutorials */}
+      <HelpTutorialsCard />
 
       {/* Bulk Import (Admin/Manager) */}
       {isAdmin && <BulkImportCard />}

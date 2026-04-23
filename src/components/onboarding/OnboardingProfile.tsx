@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { User, ChevronLeft, ChevronRight, Upload } from 'lucide-react';
+import { User, ChevronLeft, ChevronRight, Upload, Sparkles, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface Props {
   userId: string;
@@ -23,12 +24,39 @@ export default function OnboardingProfile({
 }: Props) {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setAvatarFile(file);
     setAvatarPreview(URL.createObjectURL(file));
+  };
+
+  const handleAISuggestJobTitle = async () => {
+    setAiLoading(true);
+    try {
+      // Reuse ai-fill-form: ask for a job title suggestion based on email/company
+      const { data, error } = await supabase.functions.invoke('ai-fill-form', {
+        body: {
+          entity: 'profile_job_title',
+          context: { user_id: userId, hint: 'Suggest a likely job title for the user based on their email/company' },
+          fields: [{ name: 'job_title', label: 'Job Title', type: 'text' }],
+        },
+      });
+      if (error) throw error;
+      const value = data?.suggestions?.[0]?.value || data?.fields?.job_title;
+      if (value) {
+        setJobTitle(String(value));
+        toast.success('AI πρόταση εφαρμόστηκε');
+      } else {
+        toast.info('Δεν βρέθηκε πρόταση — γράψε χειροκίνητα.');
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Πρόβλημα AI suggestion');
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   const handleNext = async () => {
@@ -79,7 +107,20 @@ export default function OnboardingProfile({
           <Input placeholder="+30 210 1234567" value={phone} onChange={(e) => setPhone(e.target.value)} />
         </div>
         <div className="space-y-2">
-          <Label>Θέση εργασίας</Label>
+          <div className="flex items-center justify-between">
+            <Label>Θέση εργασίας</Label>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleAISuggestJobTitle}
+              disabled={aiLoading}
+              className="h-7 px-2 text-xs gap-1.5"
+            >
+              {aiLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3 text-primary" />}
+              AI πρόταση
+            </Button>
+          </div>
           <Input placeholder="π.χ. Project Manager" value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} />
         </div>
       </div>

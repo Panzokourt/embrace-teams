@@ -9,6 +9,7 @@ import { useLayout } from '@/contexts/LayoutContext';
 import SetupGuide from '@/components/onboarding/SetupGuide';
 import TopBarDateTime from './TopBarDateTime';
 import CompanySwitcher from './CompanySwitcher';
+import AICoachPanel, { AICoachTrigger } from '@/components/coaching/AICoachPanel';
 
 interface SearchResult {
   id: string;
@@ -37,6 +38,7 @@ export default function TopBar({ onMobileMenuToggle, showHamburger, onQuickChatT
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [coachOpen, setCoachOpen] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
   const isNarrow = layoutState === 'narrow' || layoutState === 'mobile';
@@ -163,9 +165,12 @@ export default function TopBar({ onMobileMenuToggle, showHamburger, onQuickChatT
 
         {/* Right actions (centered cluster) */}
         <div className="flex items-center gap-2 shrink-0 pointer-events-auto">
+          <AICoachTrigger onClick={() => setCoachOpen((v) => !v)} />
           <SetupGuide />
         </div>
       </div>
+
+      <AICoachPanel open={coachOpen} onClose={() => setCoachOpen(false)} />
 
       {/* Far-right cluster — Company Switcher */}
       <div className="ml-auto flex items-center gap-2 shrink-0">

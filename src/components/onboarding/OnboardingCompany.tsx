@@ -44,18 +44,48 @@ export default function OnboardingCompany({
   suggestedCompanyName, onNext, onBack, onSkip, onPending, refreshUserData,
 }: Props) {
   const [loading, setLoading] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
   const [companyMode, setCompanyMode] = useState<'create' | 'join' | null>(null);
   const [companyName, setCompanyName] = useState(suggestedCompanyName);
   const [industry, setIndustry] = useState('');
   const [companySize, setCompanySize] = useState('');
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [aiLogoUrl, setAiLogoUrl] = useState<string | null>(null);
 
   const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setLogoFile(file);
     setLogoPreview(URL.createObjectURL(file));
+    setAiLogoUrl(null);
+  };
+
+  const handleAIAutoFill = async () => {
+    if (!emailDomain || isPersonalEmail) {
+      toast.error('Auto-fill διαθέσιμο μόνο για εταιρικά domains.');
+      return;
+    }
+    setAiLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('enrich-company-from-domain', {
+        body: { domain: emailDomain },
+      });
+      if (error) throw error;
+      const r = data?.data || {};
+      if (r.name && !companyName) setCompanyName(r.name);
+      if (r.industry) setIndustry(r.industry);
+      if (r.company_size) setCompanySize(r.company_size);
+      if (r.logo_url && !logoPreview) {
+        setAiLogoUrl(r.logo_url);
+        setLogoPreview(r.logo_url);
+      }
+      toast.success('Συμπληρώθηκαν αυτόματα από το web ✨');
+    } catch (e: any) {
+      toast.error(e.message || 'Αποτυχία AI auto-fill');
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   const handleCreateCompany = async () => {

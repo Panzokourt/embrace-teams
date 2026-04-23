@@ -1311,6 +1311,48 @@ export type Database = {
         }
         Relationships: []
       }
+      company_enrichment_log: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          domain: string | null
+          id: string
+          result: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          domain?: string | null
+          id?: string
+          result?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          domain?: string | null
+          id?: string
+          result?: Json | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_enrichment_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_enrichment_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_tags: {
         Row: {
           color: string | null
@@ -4964,6 +5006,7 @@ export type Database = {
           hire_date: string | null
           id: string
           job_title: string | null
+          last_coach_seen_at: string | null
           onboarding_completed: boolean
           phone: string | null
           reports_to: string | null
@@ -4981,6 +5024,7 @@ export type Database = {
           hire_date?: string | null
           id: string
           job_title?: string | null
+          last_coach_seen_at?: string | null
           onboarding_completed?: boolean
           phone?: string | null
           reports_to?: string | null
@@ -4998,6 +5042,7 @@ export type Database = {
           hire_date?: string | null
           id?: string
           job_title?: string | null
+          last_coach_seen_at?: string | null
           onboarding_completed?: boolean
           phone?: string | null
           reports_to?: string | null
@@ -7366,6 +7411,35 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_coaching_state: {
+        Row: {
+          dismissed: boolean
+          feature_key: string
+          seen_at: string
+          user_id: string
+        }
+        Insert: {
+          dismissed?: boolean
+          feature_key: string
+          seen_at?: string
+          user_id: string
+        }
+        Update: {
+          dismissed?: boolean
+          feature_key?: string
+          seen_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_coaching_state_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

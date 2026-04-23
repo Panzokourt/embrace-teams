@@ -119,6 +119,12 @@ export default function FloatingDock({ onQuickChatToggle, registerSendHandler }:
         {/* Divider */}
         <div className="w-px h-6 bg-white/20 mx-1" />
 
+        {/* Quick Actions (+) */}
+        <DockQuickActions />
+
+        {/* Divider */}
+        <div className="w-px h-6 bg-white/20 mx-1" />
+
         {items.map((item) => {
           const Icon = item.icon;
           const isActive = item.kind === 'panel' || item.kind === 'chat'

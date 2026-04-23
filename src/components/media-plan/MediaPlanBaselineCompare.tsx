@@ -122,10 +122,11 @@ export function MediaPlanBaselineCompare({
       {snapshots.length > 0 && (
         <>
           <Select
-            value={selectedSnapshotId || ''}
+            value={selectedSnapshotId || '__none__'}
             onValueChange={v => {
-              onSelectSnapshot(v || null);
-              onCompareModeChange(!!v);
+              const next = v === '__none__' ? null : v;
+              onSelectSnapshot(next);
+              onCompareModeChange(!!next);
             }}
           >
             <SelectTrigger className="h-8 w-48 text-xs">
@@ -133,7 +134,7 @@ export function MediaPlanBaselineCompare({
               <SelectValue placeholder="Compare with..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">No Comparison</SelectItem>
+              <SelectItem value="__none__">No Comparison</SelectItem>
               {snapshots.map((s: any) => (
                 <SelectItem key={s.id} value={s.id}>
                   {s.name} — {format(new Date(s.created_at), 'dd/MM HH:mm')}

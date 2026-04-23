@@ -12,6 +12,7 @@ import { FocusModeProvider } from '@/contexts/FocusContext';
 import FocusOverlay from '@/components/focus/FocusOverlay';
 import { LayoutProvider, useLayout } from '@/contexts/LayoutContext';
 import { DockProvider, useDock } from '@/contexts/DockContext';
+import { CoachingProvider } from '@/components/coaching/CoachingProvider';
 import FloatingDock from '@/components/dock/FloatingDock';
 import { cn } from '@/lib/utils';
 
@@ -237,7 +238,9 @@ export default function AppLayout() {
     <FocusModeProvider>
       <LayoutProvider>
         <DockProvider>
-          <AppLayoutWithVoice />
+          <CoachingProvider>
+            <AppLayoutWithVoice />
+          </CoachingProvider>
         </DockProvider>
       </LayoutProvider>
     </FocusModeProvider>

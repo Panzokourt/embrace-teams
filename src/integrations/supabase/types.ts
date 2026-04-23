@@ -2818,6 +2818,93 @@ export type Database = {
           },
         ]
       }
+      graph_edges: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          metadata: Json
+          relation_type: string
+          source_node_id: string
+          target_node_id: string
+          weight: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          relation_type: string
+          source_node_id: string
+          target_node_id: string
+          weight?: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          relation_type?: string
+          source_node_id?: string
+          target_node_id?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "graph_edges_source_node_id_fkey"
+            columns: ["source_node_id"]
+            isOneToOne: false
+            referencedRelation: "graph_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "graph_edges_target_node_id_fkey"
+            columns: ["target_node_id"]
+            isOneToOne: false
+            referencedRelation: "graph_nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      graph_nodes: {
+        Row: {
+          company_id: string
+          created_at: string
+          embedded_at: string | null
+          embedding: string | null
+          entity_id: string
+          id: string
+          label: string
+          node_type: string
+          properties: Json
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          embedded_at?: string | null
+          embedding?: string | null
+          entity_id: string
+          id?: string
+          label: string
+          node_type: string
+          properties?: Json
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          embedded_at?: string | null
+          embedding?: string | null
+          entity_id?: string
+          id?: string
+          label?: string
+          node_type?: string
+          properties?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       hr_documents: {
         Row: {
           company_id: string
@@ -7680,6 +7767,11 @@ export type Database = {
       }
     }
     Functions: {
+      _gr_company_for_client: { Args: { _client_id: string }; Returns: string }
+      _gr_company_for_project: {
+        Args: { _project_id: string }
+        Returns: string
+      }
       _hash_token: { Args: { _token: string }; Returns: string }
       accept_invitation: { Args: { _token: string }; Returns: Json }
       approve_join_request: {
@@ -7738,6 +7830,42 @@ export type Database = {
       }
       get_visible_projects: { Args: { p_user_id: string }; Returns: string[] }
       get_visible_tasks: { Args: { p_user_id: string }; Returns: string[] }
+      graph_neighbors: {
+        Args: {
+          _hops?: number
+          _max_results?: number
+          _node_id: string
+          _relation_types?: string[]
+        }
+        Returns: {
+          distance: number
+          entity_id: string
+          label: string
+          node_id: string
+          node_type: string
+          properties: Json
+          via_relation: string
+        }[]
+      }
+      graph_subgraph_for_query: {
+        Args: {
+          _anchor_count?: number
+          _company_id: string
+          _max_hops?: number
+          _node_types?: string[]
+          query_embedding: string
+        }
+        Returns: {
+          anchor_id: string
+          distance: number
+          entity_id: string
+          label: string
+          node_id: string
+          node_type: string
+          properties: Json
+          score: number
+        }[]
+      }
       has_client_access: {
         Args: { _client_id: string; _user_id: string }
         Returns: boolean
@@ -7794,6 +7922,23 @@ export type Database = {
       is_super_admin:
         | { Args: { _user_id: string }; Returns: boolean }
         | { Args: { _company_id: string; _user_id: string }; Returns: boolean }
+      match_graph_nodes: {
+        Args: {
+          _company_id: string
+          _node_types?: string[]
+          match_count?: number
+          query_embedding: string
+          similarity_threshold?: number
+        }
+        Returns: {
+          entity_id: string
+          label: string
+          node_id: string
+          node_type: string
+          properties: Json
+          similarity: number
+        }[]
+      }
       match_kb_chunks: {
         Args: {
           _company_id: string
@@ -7876,6 +8021,27 @@ export type Database = {
           sender_name: string
           user_id: string
         }[]
+      }
+      upsert_graph_edge: {
+        Args: {
+          _company_id: string
+          _metadata?: Json
+          _relation_type: string
+          _source_id: string
+          _target_id: string
+          _weight?: number
+        }
+        Returns: undefined
+      }
+      upsert_graph_node: {
+        Args: {
+          _company_id: string
+          _entity_id: string
+          _label: string
+          _node_type: string
+          _properties?: Json
+        }
+        Returns: string
       }
     }
     Enums: {

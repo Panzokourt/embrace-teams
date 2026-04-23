@@ -37,8 +37,8 @@ export function CoachingProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const filteredRegistry = useMemo(
-    () => filterCoachingForRole(COACHING_REGISTRY, companyRole),
-    [companyRole]
+    () => filterCoachingForRole(COACHING_REGISTRY, companyRole?.role ?? null),
+    [companyRole?.role]
   );
 
   // Route-driven trigger

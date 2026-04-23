@@ -15,7 +15,6 @@ import CCHeroZone from '@/components/command-center/CCHeroZone';
 import CCMissionCards from '@/components/command-center/CCMissionCards';
 import CCTeamRadar from '@/components/command-center/CCTeamRadar';
 import CCIntelFeed from '@/components/command-center/CCIntelFeed';
-import CCQuickActions from '@/components/command-center/CCQuickActions';
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
@@ -297,15 +296,6 @@ export default function MyWork() {
   return (
     <div className="flex-1 flex overflow-hidden h-full">
       <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-5 animate-fade-in">
-      {/* ── Quick Actions ── */}
-      {!isViewer && (
-        <CCQuickActions
-          isAdmin={isAdmin || isOwner}
-          isManager={isManager}
-          isMember={isMember}
-        />
-      )}
-
       {/* ── Hero Zone ── */}
       {!isViewer && (
         <CollapsibleSection id="cc-hero" title="Status" icon={<CheckSquare className="h-3.5 w-3.5 text-primary" />}>

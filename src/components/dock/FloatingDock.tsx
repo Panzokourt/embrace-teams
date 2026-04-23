@@ -15,6 +15,7 @@ import DockWorkDayClock from './DockWorkDayClock';
 import DockActiveTimer from './DockActiveTimer';
 import DockWorkMode from './DockWorkMode';
 import DockXPBadge from './DockXPBadge';
+import DockQuickActions from './DockQuickActions';
 
 interface DockItem {
   id: Exclude<DockPanelId, null> | 'quick-chat';
@@ -114,6 +115,12 @@ export default function FloatingDock({ onQuickChatToggle, registerSendHandler }:
         {/* XP + Work Mode */}
         <DockXPBadge userId={user?.id} />
         <DockWorkMode />
+
+        {/* Divider */}
+        <div className="w-px h-6 bg-white/20 mx-1" />
+
+        {/* Quick Actions (+) */}
+        <DockQuickActions />
 
         {/* Divider */}
         <div className="w-px h-6 bg-white/20 mx-1" />

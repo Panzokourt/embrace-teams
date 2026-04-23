@@ -360,48 +360,7 @@ export default function AppSidebar({
           <TooltipContent side="right" sideOffset={8}>AI Secretary</TooltipContent>
         </Tooltip>
 
-        {/* Quick Actions */}
-        <Popover open={quickOpen} onOpenChange={setQuickOpen}>
-          <Tooltip delayDuration={300}>
-            <TooltipTrigger asChild>
-              <PopoverTrigger asChild>
-                <button
-                className={cn("flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 border border-primary",
-
-                isMobile ?
-                "text-muted-foreground hover:text-foreground hover:bg-muted/60" :
-                "text-white/50 hover:text-white hover:bg-white/10",
-                quickOpen && "[&>svg]:rotate-45"
-                )}>
-                
-                  <Plus className="h-[18px] w-[18px] transition-transform duration-200 text-primary" />
-                </button>
-              </PopoverTrigger>
-            </TooltipTrigger>
-            {!quickOpen &&
-          <TooltipContent side="right" sideOffset={8}>Quick Actions</TooltipContent>
-          }
-          </Tooltip>
-          <PopoverContent side="right" align="end" className="w-56 p-2" sideOffset={8}>
-            <div className="space-y-1">
-              <button onClick={() => {navigate('/projects?new=true');setQuickOpen(false);handleNavClick();}} className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted transition-colors text-left">
-                <FolderKanban className="h-4 w-4 text-muted-foreground shrink-0" /> Νέο Έργο
-              </button>
-              <button onClick={() => {navigate('/tasks?new=true');setQuickOpen(false);handleNavClick();}} className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted transition-colors text-left">
-                <CheckSquare className="h-4 w-4 text-muted-foreground shrink-0" /> Νέο Task
-              </button>
-              <div className="h-px bg-border my-1" />
-              {briefDefinitions.map((def) => {
-              const Icon = briefIcons[def.icon] || FileText;
-              return (
-                <button key={def.type} onClick={() => {setSelectedBriefType(def.type);setQuickOpen(false);handleNavClick();}} className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted transition-colors text-left">
-                    <Icon className="h-4 w-4 text-muted-foreground shrink-0" /> {def.label}
-                  </button>);
-
-            })}
-            </div>
-          </PopoverContent>
-        </Popover>
+        {/* Quick Actions moved to FloatingDock */}
 
         {/* Theme toggle */}
         <Tooltip delayDuration={300}>

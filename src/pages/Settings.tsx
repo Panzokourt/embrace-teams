@@ -45,6 +45,7 @@ import { EmailAccountSetup } from '@/components/settings/EmailAccountSetup';
 import { DataManagementCard } from '@/components/settings/DataManagementCard';
 import { BulkImportCard } from '@/components/settings/BulkImportCard';
 import { PortalUserManager } from '@/components/portal/PortalUserManager';
+import { AIUsageCard } from '@/components/settings/AIUsageCard';
 
 const DAY_LABELS = ['Δευτέρα', 'Τρίτη', 'Τετάρτη', 'Πέμπτη', 'Παρασκευή', 'Σάββατο', 'Κυριακή'];
 const DEFAULT_SCHEDULE = DAY_LABELS.map((_, i) => ({

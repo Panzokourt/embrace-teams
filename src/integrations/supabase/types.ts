@@ -7767,6 +7767,11 @@ export type Database = {
       }
     }
     Functions: {
+      _gr_company_for_client: { Args: { _client_id: string }; Returns: string }
+      _gr_company_for_project: {
+        Args: { _project_id: string }
+        Returns: string
+      }
       _hash_token: { Args: { _token: string }; Returns: string }
       accept_invitation: { Args: { _token: string }; Returns: Json }
       approve_join_request: {

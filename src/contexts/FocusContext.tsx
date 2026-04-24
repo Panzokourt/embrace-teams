@@ -1,7 +1,7 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, startOfDay, endOfDay } from 'date-fns';
+import { format, endOfDay } from 'date-fns';
 
 interface FocusTask {
   id: string;
@@ -17,6 +17,10 @@ interface FocusTask {
   assigned_to: string | null;
   project_id: string;
   project_name?: string;
+  client_id?: string | null;
+  client_name?: string | null;
+  deliverable_id?: string | null;
+  deliverable_name?: string | null;
   task_category?: string | null;
 }
 
@@ -39,6 +43,8 @@ interface FocusContextValue {
   updateCurrentTask: (patch: Partial<FocusTask>) => Promise<void>;
   /** Re-fetch current task from DB and merge into queue. */
   refreshCurrentTask: () => Promise<void>;
+  /** Fetch any task by id and make it the current focus (used by smart search). */
+  injectAndFocusTask: (id: string) => Promise<void>;
 }
 
 const FocusContext = createContext<FocusContextValue | null>(null);
@@ -50,6 +56,7 @@ const NOOP_CONTEXT: FocusContextValue = {
   setCurrentTaskById: () => {}, skipToNext: () => {},
   completeCurrentTask: async () => {}, setIsPaused: () => {}, reorderTasks: () => {},
   updateCurrentTask: async () => {}, refreshCurrentTask: async () => {},
+  injectAndFocusTask: async () => {},
 };
 
 export function useFocusMode() {
@@ -57,15 +64,28 @@ export function useFocusMode() {
   return ctx ?? NOOP_CONTEXT;
 }
 
-const TASK_SELECT = 'id, title, description, status, priority, due_date, start_date, progress, estimated_hours, actual_hours, assigned_to, project_id, task_category, project:projects(name)';
+const TASK_SELECT = `
+  id, title, description, status, priority, due_date, start_date, progress,
+  estimated_hours, actual_hours, assigned_to, project_id, task_category,
+  deliverable_id,
+  deliverable:deliverables(id, name),
+  project:projects(name, client_id, client:clients(id, name))
+`;
 
 function mapTask(t: any): FocusTask {
+  const proj = t.project || {};
+  const client = proj.client || {};
+  const deliv = t.deliverable || {};
   return {
     id: t.id, title: t.title, description: t.description, status: t.status,
     priority: t.priority, due_date: t.due_date, start_date: t.start_date,
     progress: t.progress, estimated_hours: t.estimated_hours,
     actual_hours: t.actual_hours, assigned_to: t.assigned_to,
-    project_id: t.project_id, project_name: t.project?.name || '',
+    project_id: t.project_id, project_name: proj.name || '',
+    client_id: client.id ?? proj.client_id ?? null,
+    client_name: client.name ?? null,
+    deliverable_id: t.deliverable_id ?? null,
+    deliverable_name: deliv.name ?? null,
     task_category: t.task_category,
   };
 }
@@ -116,7 +136,6 @@ export function FocusModeProvider({ children }: { children: React.ReactNode }) {
       setTasks(fetched);
       setCurrentTaskId(taskId || fetched[0]?.id || null);
     }
-    // Start in paused state - timer only begins when user presses Play
     setSessionStartTime(null);
     setIsPaused(true);
     setIsActive(true);
@@ -151,7 +170,6 @@ export function FocusModeProvider({ children }: { children: React.ReactNode }) {
 
   const completeCurrentTask = useCallback(async () => {
     if (!currentTaskId) return;
-    // Remove current task from queue and advance (DB update handled by caller)
     const remaining = tasks.filter(t => t.id !== currentTaskId);
     setTasks(remaining);
     if (remaining.length > 0) {
@@ -172,21 +190,21 @@ export function FocusModeProvider({ children }: { children: React.ReactNode }) {
 
   const updateCurrentTask = useCallback(async (patch: Partial<FocusTask>) => {
     if (!currentTaskId) return;
-    // Optimistic local update
     setTasks(prev => prev.map(t => t.id === currentTaskId ? { ...t, ...patch } : t));
 
-    // Build DB-safe payload (strip read-only fields)
     const dbPatch: Record<string, any> = { ...patch };
     delete dbPatch.id;
     delete dbPatch.project_name;
-    delete dbPatch.project_id; // never move tasks across projects via inline edit
+    delete dbPatch.project_id;
+    delete dbPatch.client_id;
+    delete dbPatch.client_name;
+    delete dbPatch.deliverable_name;
 
     if (Object.keys(dbPatch).length === 0) return;
 
     const { error } = await supabase.from('tasks').update(dbPatch).eq('id', currentTaskId);
     if (error) {
       console.error('Failed to update task', error);
-      // Refetch on failure to restore truth
       const { data } = await supabase.from('tasks').select(TASK_SELECT).eq('id', currentTaskId).maybeSingle();
       if (data) {
         const fresh = mapTask(data);
@@ -204,12 +222,30 @@ export function FocusModeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [currentTaskId]);
 
+  const injectAndFocusTask = useCallback(async (id: string) => {
+    // If already in queue, just focus it
+    if (tasks.some(t => t.id === id)) {
+      setCurrentTaskId(id);
+      setSessionStartTime(null);
+      setIsPaused(true);
+      return;
+    }
+    const { data } = await supabase.from('tasks').select(TASK_SELECT).eq('id', id).maybeSingle();
+    if (data) {
+      const fresh = mapTask(data);
+      setTasks(prev => [fresh, ...prev]);
+      setCurrentTaskId(id);
+      setSessionStartTime(null);
+      setIsPaused(true);
+    }
+  }, [tasks]);
+
   return (
     <FocusContext.Provider value={{
       isActive, isPaused, currentTask, upNextTasks, pomodoroMinutes,
       sessionStartTime, enterFocus, exitFocus, startSession, setCurrentTaskById,
       skipToNext, completeCurrentTask, setIsPaused, reorderTasks,
-      updateCurrentTask, refreshCurrentTask,
+      updateCurrentTask, refreshCurrentTask, injectAndFocusTask,
     }}>
       {children}
     </FocusContext.Provider>

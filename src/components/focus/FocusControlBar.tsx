@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Play, Pause, SkipForward, ChevronDown, Sparkles } from 'lucide-react';
+import { Play, Pause, SkipForward, ChevronDown, Sparkles, CheckCircle2 } from 'lucide-react';
 import { useFocusMode } from '@/contexts/FocusContext';
 import { useTimeTracking } from '@/hooks/useTimeTracking';
 import FocusSuccessAnimation from './FocusSuccessAnimation';
@@ -144,6 +144,18 @@ export default function FocusControlBar({ onAskAI }: FocusControlBarProps = {}) 
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* Quick Complete — bold, glowing accent */}
+        {currentTask && currentTask.status !== 'completed' && (
+          <button
+            onClick={() => handleStatusChange('completed')}
+            className="h-10 px-5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-sm flex items-center gap-2 shadow-lg shadow-emerald-500/30 transition-all hover:scale-[1.03] active:scale-95"
+            title="Σήμανση ως ολοκληρωμένο (C)"
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            Ολοκλήρωση
+          </button>
+        )}
 
         {/* Play/Pause with Progress Ring */}
         <div className="relative flex items-center justify-center">

@@ -36,6 +36,19 @@ export default function ChatChannelView({ channel, compact, hideHeader }: ChatCh
     if (channel) markAsRead();
   }, [channel, markAsRead]);
 
+  // Register this channel as the active voice target while mounted.
+  // Global Cmd+Shift+V will then send the command here instead of the Secretary.
+  const { registerChatTarget } = useVoiceCommand();
+  useEffect(() => {
+    if (!channel) return;
+    const label = channel.type === 'direct'
+      ? `DM: ${channel.name}`
+      : `#${channel.name}`;
+    return registerChatTarget(`chat-channel-${channel.id}`, label, (text) => {
+      sendMessage(text);
+    });
+  }, [channel, registerChatTarget, sendMessage]);
+
   const handleSend = async (content: string, metadata?: Record<string, any>) => {
     await sendMessage(content, metadata, replyingTo?.id);
     setReplyingTo(null);

@@ -49,7 +49,7 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [dragging, setDragging] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<MentionTextareaHandle>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
@@ -404,12 +404,6 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
     setAttachedFiles([]);
   }, []);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
 
   const getDisplayText = (msg: ChatMessage): string => {
     if (msg.displayContent) return msg.displayContent;
@@ -540,15 +534,19 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
           >
             <Paperclip className="h-4 w-4" />
           </Button>
-          <input
-            ref={inputRef}
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ρώτα τον AI βοηθό..."
-            disabled={loading}
-            className="flex-1 bg-transparent border-none outline-none text-sm text-foreground placeholder:text-muted-foreground disabled:opacity-50"
-          />
+          <div className="flex-1 min-w-0">
+            <MentionTextarea
+              ref={inputRef}
+              value={input}
+              onChange={setInput}
+              onSubmit={() => sendMessage()}
+              enableSlash
+              placeholder="Ρώτα τον AI βοηθό... (@ για mention, / για εντολή)"
+              disabled={loading}
+              maxHeight={120}
+              className="py-1"
+            />
+          </div>
           {loading ? (
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
           ) : (

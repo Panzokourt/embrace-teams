@@ -1,171 +1,139 @@
-# Work Mode v2 — Πλήρης Αναβάθμιση
+
+# Work Mode v2 — 2-Column Layout & AI στο Control Bar
 
 ## Στόχος
-Μετατροπή του Focus/Work Mode από read-only προβολή σε πλήρες, διαδραστικό workspace όπου ο χρήστης μπορεί να βλέπει, επεξεργάζεται και διαχειρίζεται όλη την πληροφορία ενός task χωρίς να φύγει από το focus view.
+1. Να εκμεταλλευτούμε το πλάτος (1845px viewport) χωρίζοντας τα sections του τρέχοντος task σε **2 οργανωμένες στήλες**.
+2. Να μετακινήσουμε το **Ask AI** από floating button στο **bottom control bar** (δίπλα στο time tracking).
+3. Το **Up Next sidebar** δεξιά παραμένει ακριβώς όπως είναι (resizable).
 
 ---
 
-## 1. Inline Editing (click-to-edit)
+## 1. `src/components/focus/FocusOverlay.tsx` — Refactor σε 2 στήλες
 
-**Νέο component**: `src/components/focus/sections/FocusEditableField.tsx`
-- Generic wrapper για click-to-edit (text/textarea/select/date/number)
-- Optimistic update + auto-save στο `tasks` table μέσω `supabase.from('tasks').update()`
-- Invalidate React Query keys μετά το save
-- Esc = cancel, Enter / blur = save
+### Αλλαγή container (γραμμή 240–242)
+Από:
+```tsx
+<div className="flex-1 overflow-y-auto p-8 pb-32">
+  {currentTask ? (
+    <div className="max-w-3xl mx-auto space-y-6">
+```
+Σε:
+```tsx
+<div className="flex-1 overflow-y-auto px-8 py-8 pb-32">
+  {currentTask ? (
+    <div className="max-w-[1400px] mx-auto space-y-6">
+```
 
-**Πεδία που γίνονται editable στο FocusOverlay**:
-- Title (h1, click-to-edit)
-- Description (textarea)
-- Priority (select: low/medium/high/urgent)
-- Status (select)
-- Due date / Start date (date picker)
-- Estimated hours (number)
-- Progress (slider 0-100)
-- Assignee (user picker)
-- Task category
+### Header (παραμένει full-width στο top)
+- Project name + τίτλος + priority/status selectors **παραμένουν full-width** πάνω από τις 2 στήλες (γραμμές 244–305).
 
-**Νέο context method** στο `FocusContext.tsx`:
-- `updateCurrentTask(patch: Partial<FocusTask>)` → optimistic local + DB write + refresh.
+### Νέο 2-column grid κάτω από το header
+Αντικατάσταση των γραμμών 307–416 (όλα τα `<Section>` και sections) με:
 
----
+```tsx
+<div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] gap-6">
+  {/* LEFT — Core work content */}
+  <div className="space-y-6 min-w-0">
+    {/* Description */}
+    <Section icon={FileText} title="Περιγραφή"> ... </Section>
+    {/* Subtasks */}
+    <FocusSubtasksSection ... />
+    {/* Files */}
+    <FocusFilesSection ... />
+    {/* Comments (συζήτηση κοντά στο περιεχόμενο) */}
+    <FocusCommentsSection taskId={currentTask.id} />
+  </div>
 
-## 2. Νέα Sections στο κέντρο
+  {/* RIGHT — Metadata & tracking */}
+  <div className="space-y-6 min-w-0">
+    {/* Λεπτομέρειες (assignee, dates, hours, progress) */}
+    <Section icon={Clock} title="Λεπτομέρειες"> ... </Section>
+    {/* Time tracking */}
+    <FocusTimeTrackingSection ... />
+    {/* Dependencies */}
+    <FocusDependenciesSection taskId={currentTask.id} />
+  </div>
+</div>
+```
 
-### a) `FocusSubtasksSection.tsx`
-- Λίστα subtasks με checkbox toggle (status → completed/todo)
-- Inline add (Enter για create)
-- Inline rename, delete
-- Priority badge με dropdown
-- Realtime: subscribe σε `tasks` όπου `parent_task_id = currentTask.id`
+**Κατανομή — Λογική:**
+- **Αριστερή στήλη (1.15fr — λίγο πιο φαρδιά):** Περιγραφή, Subtasks, Files, Comments → ό,τι χρειάζεται περισσότερο πλάτος για ανάγνωση/γραφή/grids.
+- **Δεξιά στήλη (1fr):** Λεπτομέρειες task, Time tracking, Dependencies → metadata, μικρότερα στοιχεία.
 
-### b) `FocusFilesSection.tsx` (Quick Access)
-- Grid layout με thumbnails (image previews, icon για docs)
-- Click = άνοιγμα στο `FilePreviewDialog` (υπάρχει ήδη)
-- Drag-and-drop upload απευθείας στο task
-- Download / delete actions
-- Δείχνει size + type
+**Responsive:** σε `<xl` (κάτω από 1280px) πέφτει σε 1 στήλη (`grid-cols-1`).
 
-### c) `FocusCommentsSection.tsx`
-- Realtime feed comments (πίνακας `task_comments` ή αντίστοιχος — επιβεβαίωση schema)
-- Inline composer με @ mentions
-- Edit/delete own comments
-
-### d) `FocusActivitySection.tsx` (collapsed by default)
-- Audit trail: status changes, reassignments, due date changes
-- Read από `tasks_history` ή derived από `updated_at` deltas
-
-### e) `FocusTimeTrackingSection.tsx`
-- Start/Stop timer button (συνδεδεμένο με Global Active Timer)
-- Δείχνει σύνολο χρόνου & breakdown ανά session
-- Quick "log time" inline form
-
----
-
-## 3. Task-Aware AI Quick Chat
-
-**Νέο component**: `src/components/focus/FocusAIChat.tsx`
-- Floating panel (bottom-right) ή expandable drawer
-- Καλεί τo υπάρχον `secretary-agent` Edge Function με injected context:
-  ```typescript
-  systemContext: {
-    page: 'focus_mode',
-    current_task: { id, title, description, status, priority, due_date, project_name, subtasks, files }
-  }
-  ```
-- Streaming responses
-- Quick action buttons: "Σύνοψη", "Πρότεινε υποβήματα", "Έλεγξε για blockers", "Γράψε update στο team"
-- Voice input (επαναχρησιμοποίηση `VoiceInputButton`)
-- Markdown rendering με `react-markdown`
-
-**Edge function update**: `supabase/functions/secretary-agent/index.ts`
-- Αναγνώριση `page === 'focus_mode'` → προσθήκη task context στο system prompt
-- Νέο tool: `update_current_task(patch)` ώστε ο AI να μπορεί να επιβεβαιώσει αλλαγές
+### Τα grid του "Λεπτομέρειες" παραμένουν 2-col εσωτερικά
+Το `grid-cols-2` (γραμμή 324) μέσα στο Λεπτομέρειες δουλεύει μια χαρά και στη μικρότερη δεξιά στήλη.
 
 ---
 
-## 4. Up Next Sidebar — Readability + Resize
+## 2. `src/components/focus/FocusControlBar.tsx` — Προσθήκη "Ask AI" button
 
-**Updates στο `FocusOverlay.tsx`**:
-- Αφαίρεση `opacity-40` από τα sidebar tasks → χρήση `text-white/80` για κανονικά, `text-white/50` για secondary info
-- Hover state πιο έντονο (bg-white/10)
-- Current task highlighted με indicator (μπλε bar αριστερά)
-- Priority dot indicator δίπλα στο title
-- Δείχνει assignee avatar αν διαφορετικό από current user
+### Νέο prop
+```tsx
+interface Props {
+  onAskAI?: () => void;
+}
+export default function FocusControlBar({ onAskAI }: Props) { ... }
+```
 
-**Νέο component**: `src/components/focus/FocusSidebarResizer.tsx`
-- Drag handle (κάθετη γραμμή 4px) στο αριστερό edge του sidebar
-- Range: 240px – 480px
-- Persistence: `localStorage.setItem('focus-sidebar-width', px)`
-- Cursor: `col-resize`
-- Visual feedback κατά το drag (highlight)
+### Νέο button (μετά το Skip button, πριν τα time displays)
+```tsx
+{onAskAI && (
+  <button
+    onClick={onAskAI}
+    className="h-10 px-4 rounded-full bg-[#3b82f6]/15 hover:bg-[#3b82f6]/25 border border-[#3b82f6]/30 text-[#3b82f6] flex items-center gap-2 transition-all hover:scale-105"
+    title="Ask AI για αυτό το task (/)"
+  >
+    <Sparkles className="h-4 w-4" />
+    <span className="text-xs font-medium">Ask AI</span>
+  </button>
+)}
+```
 
----
-
-## 5. Πρόσθετες Πληροφορίες (suggestions που εγκρίνονται)
-
-### Στο header/properties:
-- **Project link** (clickable → πλοήγηση στο project)
-- **Client name** (αν υπάρχει)
-- **Tags / labels**
-- **Created by + created at**
-- **Last updated** (relative time)
-
-### Νέα section: **Dependencies**
-- Blocks: tasks που εξαρτώνται από αυτό
-- Blocked by: tasks που μπλοκάρουν αυτό
-- Από `task_dependencies` table (αν υπάρχει — επιβεβαίωση)
-
-### Νέα section: **Review Workflow** (αν `requires_review = true`)
-- Reviewer info
-- Approve / Request changes buttons
-- Review history
-
-### Keyboard shortcuts panel (`?` για άνοιγμα):
-- `J` / `K` → next/prev task στο Up Next
-- `E` → focus title για edit
-- `D` → focus description
-- `Space` → start/pause timer
-- `C` → complete current task
-- `S` → skip to next
-- `/` → focus AI chat
-- `Esc` → exit focus mode
+Import `Sparkles` από `lucide-react`.
 
 ---
 
-## 6. Αρχιτεκτονική αλλαγών
+## 3. `src/components/focus/FocusAIChat.tsx` — Reposition + κρύψιμο του floating button
 
-### Νέα αρχεία (10):
-1. `src/components/focus/sections/FocusEditableField.tsx`
-2. `src/components/focus/sections/FocusTaskHeader.tsx` (μετατροπή του header σε editable)
-3. `src/components/focus/sections/FocusSubtasksSection.tsx`
-4. `src/components/focus/sections/FocusFilesSection.tsx`
-5. `src/components/focus/sections/FocusCommentsSection.tsx`
-6. `src/components/focus/sections/FocusTimeTrackingSection.tsx`
-7. `src/components/focus/sections/FocusDependenciesSection.tsx`
-8. `src/components/focus/FocusAIChat.tsx`
-9. `src/components/focus/FocusSidebarResizer.tsx`
-10. `src/components/focus/FocusKeyboardShortcuts.tsx`
-
-### Edited:
-- `src/components/focus/FocusOverlay.tsx` — composition των νέων sections, resizable sidebar, νέα readability
-- `src/contexts/FocusContext.tsx` — `updateCurrentTask`, `refreshCurrentTask` methods
-- `supabase/functions/secretary-agent/index.ts` — focus_mode context awareness + `update_current_task` tool
+### Αλλαγές
+1. **Αφαίρεση του floating launcher** (γραμμές 152–164: το `if (!open) return <button …>`):
+   - Όταν `!open` → return `null`. Το άνοιγμα γίνεται αποκλειστικά μέσω του imperative ref (`open()` / `focusInput()`) από το control bar.
+2. **Reposition του chat panel** (γραμμή 167):
+   ```tsx
+   // Από:
+   <div className="fixed bottom-6 right-6 z-[58] w-[400px] h-[560px] ...">
+   // Σε:
+   <div className="fixed bottom-28 left-1/2 -translate-x-1/2 z-[58] w-[440px] h-[560px] bg-[#161b25] border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden backdrop-blur-xl animate-fade-in">
+   ```
+   → εμφανίζεται κεντραρισμένο πάνω από το bottom control bar (που είναι σε `bottom-8`, οπότε `bottom-28` αφήνει αέρα).
 
 ---
 
-## 7. Επιβεβαιώσεις πριν υλοποίηση
-- Schema check για `task_comments`, `task_dependencies`, `tasks_history` (αν λείπουν, θα τα παραλείψω ή προτείνω migration)
-- RLS policies ήδη επιτρέπουν UPDATE από assignee/team — επιβεβαίωση μέσω `read_query`
+## 4. `src/components/focus/FocusOverlay.tsx` — Wiring του Ask AI
+
+### Αλλαγή στη render του `<FocusControlBar />` (γραμμή 467)
+```tsx
+<FocusControlBar onAskAI={() => aiChatRef.current?.open()} />
+```
+
+Το `aiChatRef` ήδη υπάρχει (γραμμή 145) και χρησιμοποιείται και από το keyboard shortcut `/`.
 
 ---
 
-## Υλοποίηση
-Ξεκινάω με τη σειρά:
-1. FocusContext extension + EditableField primitive
-2. Editable header & properties
-3. Subtasks & Files sections (high impact)
-4. Sidebar readability + Resizer
-5. AI Chat
-6. Comments / Activity / Dependencies / Time Tracking
-7. Keyboard shortcuts
-8. Edge function context update
+## Files to be Edited
+- `src/components/focus/FocusOverlay.tsx` — 2-column layout, max-width 1400px, wiring `onAskAI`.
+- `src/components/focus/FocusControlBar.tsx` — νέο `Ask AI` button + `onAskAI` prop.
+- `src/components/focus/FocusAIChat.tsx` — αφαίρεση floating launcher, reposition του panel πάνω από το control bar.
+
+## Files NOT Touched
+- `FocusSidebarResizer.tsx`, `FocusKeyboardShortcuts.tsx`, όλα τα sections (`FocusSubtasksSection`, `FocusFilesSection`, κλπ) — δουλεύουν χωρίς αλλαγή στο νέο grid.
+- `FocusContext.tsx` — όλη η business logic παραμένει.
+
+## Επαληθεύσεις μετά την υλοποίηση
+1. Στα 1845px viewport: 2 στήλες ορατές, `Up Next` sidebar δεξιά, αέρας 6 (24px) μεταξύ στηλών.
+2. Στα <1280px: collapse σε 1 στήλη όπως πριν.
+3. Click στο `Ask AI` button στο control bar → ανοίγει το chat panel πάνω από το bar.
+4. Πατώντας `/` (keyboard shortcut) → ίδια συμπεριφορά.
+5. Δεν υπάρχει πλέον το floating "Ask AI" button κάτω-δεξιά.

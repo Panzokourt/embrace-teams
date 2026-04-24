@@ -734,6 +734,20 @@ const toolDefinitions = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "web_search",
+      description: "Search the internet for up-to-date information. Use this when the user asks about current events, market trends, external companies, recent news, or any information that requires real-time web data. Returns a grounded answer with source citations.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "The search query in natural language" },
+        },
+        required: ["query"],
+      },
+    },
+  },
 ];
 
 // ── Helper: call Lovable AI Gateway (non-streaming) ──
@@ -2102,6 +2116,33 @@ Respond in Greek. Be thorough but concise.`;
           };
         } catch (e: any) {
           return { error: e?.message || "graph tool failed" };
+        }
+      }
+
+      case "web_search": {
+        try {
+          const apiKey = Deno.env.get("LOVABLE_API_KEY");
+          if (!apiKey) return { error: "LOVABLE_API_KEY not configured" };
+          const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: "google/gemini-2.5-flash",
+              messages: [
+                { role: "system", content: "You are a web search assistant. Search the internet and provide a concise, factual answer with source URLs. Always include citations." },
+                { role: "user", content: args.query },
+              ],
+            }),
+          });
+          if (!resp.ok) {
+            const t = await resp.text();
+            return { error: `Web search failed (${resp.status}): ${t.slice(0, 200)}` };
+          }
+          const data = await resp.json();
+          const answer = data.choices?.[0]?.message?.content || "Δεν βρέθηκαν αποτελέσματα.";
+          return { query: args.query, answer };
+        } catch (e: any) {
+          return { error: `Web search error: ${e.message}` };
         }
       }
 

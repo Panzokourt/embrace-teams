@@ -9,9 +9,10 @@ interface VoiceCommandPopupProps {
   open: boolean;
   onClose: () => void;
   onSend: (text: string) => void;
+  targetLabel?: string;
 }
 
-export default function VoiceCommandPopup({ open, onClose, onSend }: VoiceCommandPopupProps) {
+export default function VoiceCommandPopup({ open, onClose, onSend, targetLabel }: VoiceCommandPopupProps) {
   const { isListening, fullTranscript, error, isSupported, start, stop, abort } = useVoiceRecognition();
 
   // Auto-start listening when popup opens
@@ -57,6 +58,16 @@ export default function VoiceCommandPopup({ open, onClose, onSend }: VoiceComman
           </div>
         ) : (
           <>
+            {/* Target indicator */}
+            {targetLabel && (
+              <div className="text-center -mt-1">
+                <span className="text-[11px] text-muted-foreground">
+                  → Αποστολή σε:{" "}
+                  <span className="font-medium text-foreground">{targetLabel}</span>
+                </span>
+              </div>
+            )}
+
             {/* Mic button with pulse */}
             <div className="flex flex-col items-center gap-4 pt-2">
               <button

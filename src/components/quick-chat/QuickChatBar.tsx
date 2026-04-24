@@ -10,6 +10,7 @@ import { parseAndRenderContent } from '@/components/secretary/ActionRenderer';
 import { useLocation } from 'react-router-dom';
 import { useDocumentParser } from '@/hooks/useDocumentParser';
 import { MentionTextarea, type MentionTextareaHandle } from '@/components/mentions/MentionTextarea';
+import VoiceInputButton from '@/components/voice/VoiceInputButton';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -547,6 +548,12 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
               className="py-1"
             />
           </div>
+          <VoiceInputButton
+            size="sm"
+            baseText={input}
+            onTranscript={(text) => setInput(text)}
+            disabled={loading}
+          />
           {loading ? (
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
           ) : (

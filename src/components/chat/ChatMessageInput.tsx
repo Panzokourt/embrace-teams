@@ -3,6 +3,7 @@ import { Send, Paperclip, Smile, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import MentionInput, { type MentionSuggestion } from './MentionInput';
+import VoiceInputButton from '@/components/voice/VoiceInputButton';
 
 interface ChatMessageInputProps {
   onSend: (content: string, metadata?: Record<string, any>) => void;

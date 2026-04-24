@@ -9,9 +9,10 @@ interface VoiceCommandPopupProps {
   open: boolean;
   onClose: () => void;
   onSend: (text: string) => void;
+  targetLabel?: string;
 }
 
-export default function VoiceCommandPopup({ open, onClose, onSend }: VoiceCommandPopupProps) {
+export default function VoiceCommandPopup({ open, onClose, onSend, targetLabel }: VoiceCommandPopupProps) {
   const { isListening, fullTranscript, error, isSupported, start, stop, abort } = useVoiceRecognition();
 
   // Auto-start listening when popup opens

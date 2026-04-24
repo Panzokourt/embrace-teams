@@ -1,11 +1,23 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import VoiceCommandPopup from "./VoiceCommandPopup";
+
+type ChatTargetHandler = (text: string) => void;
+
+interface ChatTarget {
+  id: string;
+  label: string;
+  handler: ChatTargetHandler;
+}
 
 interface VoiceCommandContextValue {
   openVoicePopup: () => void;
   sendToSecretary: (text: string) => void;
   registerSendHandler: (handler: (text: string) => void) => void;
+  /**
+   * Register an active chat as a possible voice target. Returns an unregister function.
+   * Call this in a `useEffect` so the chat target is removed on unmount.
+   */
+  registerChatTarget: (id: string, label: string, handler: ChatTargetHandler) => () => void;
 }
 
 const VoiceCommandContext = createContext<VoiceCommandContextValue | null>(null);
@@ -24,8 +36,9 @@ interface Props {
 export default function VoiceCommandProvider({ children, onOpenSecretaryPanel }: Props) {
   const [popupOpen, setPopupOpen] = useState(false);
   const [sendHandler, setSendHandler] = useState<((text: string) => void) | null>(null);
-  const navigate = useNavigate();
-  const location = useLocation();
+  // Use a ref + state for chat targets so handlers remain referentially stable
+  const targetsRef = useRef<ChatTarget[]>([]);
+  const [activeTarget, setActiveTarget] = useState<{ id: string; label: string } | null>(null);
 
   const openVoicePopup = useCallback(() => setPopupOpen(true), []);
 
@@ -33,21 +46,46 @@ export default function VoiceCommandProvider({ children, onOpenSecretaryPanel }:
     setSendHandler(() => handler);
   }, []);
 
-  const sendToSecretary = useCallback((text: string) => {
-    if (!text.trim()) return;
+  const refreshActiveTarget = useCallback(() => {
+    const last = targetsRef.current[targetsRef.current.length - 1];
+    setActiveTarget(last ? { id: last.id, label: last.label } : null);
+  }, []);
 
-    // Only act if Secretary is mounted (handler registered).
-    // Never dispatch a global open event — that caused auto-open on refresh.
-    if (sendHandler) {
-      sendHandler(text);
-      if (onOpenSecretaryPanel) {
+  const registerChatTarget = useCallback(
+    (id: string, label: string, handler: ChatTargetHandler) => {
+      // Replace any existing entry with the same id, then push to end (newest = active)
+      targetsRef.current = targetsRef.current.filter((t) => t.id !== id);
+      targetsRef.current.push({ id, label, handler });
+      refreshActiveTarget();
+      return () => {
+        targetsRef.current = targetsRef.current.filter((t) => t.id !== id);
+        refreshActiveTarget();
+      };
+    },
+    [refreshActiveTarget],
+  );
+
+  const sendToSecretary = useCallback(
+    (text: string) => {
+      if (!text.trim()) return;
+
+      // Priority 1: an active chat target (e.g. open channel chat)
+      const last = targetsRef.current[targetsRef.current.length - 1];
+      if (last) {
+        last.handler(text);
+        return;
+      }
+
+      // Priority 2: Secretary if mounted
+      if (sendHandler) {
+        sendHandler(text);
+        if (onOpenSecretaryPanel) onOpenSecretaryPanel();
+      } else if (onOpenSecretaryPanel) {
         onOpenSecretaryPanel();
       }
-    } else if (onOpenSecretaryPanel) {
-      // Open panel so user can type manually
-      onOpenSecretaryPanel();
-    }
-  }, [sendHandler, onOpenSecretaryPanel]);
+    },
+    [sendHandler, onOpenSecretaryPanel],
+  );
 
   // Global shortcut: Cmd/Ctrl + Shift + V
   useEffect(() => {
@@ -62,7 +100,9 @@ export default function VoiceCommandProvider({ children, onOpenSecretaryPanel }:
   }, []);
 
   return (
-    <VoiceCommandContext.Provider value={{ openVoicePopup, sendToSecretary, registerSendHandler }}>
+    <VoiceCommandContext.Provider
+      value={{ openVoicePopup, sendToSecretary, registerSendHandler, registerChatTarget }}
+    >
       {children}
       <VoiceCommandPopup
         open={popupOpen}
@@ -71,6 +111,7 @@ export default function VoiceCommandProvider({ children, onOpenSecretaryPanel }:
           setPopupOpen(false);
           sendToSecretary(text);
         }}
+        targetLabel={activeTarget?.label ?? "Secretary"}
       />
     </VoiceCommandContext.Provider>
   );

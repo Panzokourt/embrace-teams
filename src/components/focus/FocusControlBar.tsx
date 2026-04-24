@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Play, Pause, SkipForward, ChevronDown } from 'lucide-react';
+import { Play, Pause, SkipForward, ChevronDown, Sparkles } from 'lucide-react';
 import { useFocusMode } from '@/contexts/FocusContext';
 import { useTimeTracking } from '@/hooks/useTimeTracking';
 import FocusSuccessAnimation from './FocusSuccessAnimation';
@@ -19,7 +19,12 @@ const STATUS_OPTIONS: { value: string; label: string; color: string }[] = [
   { value: 'completed', label: 'Completed', color: 'bg-emerald-500' },
 ];
 
-export default function FocusControlBar() {
+interface FocusControlBarProps {
+  /** When provided, renders an "Ask AI" button in the bar that calls this handler. */
+  onAskAI?: () => void;
+}
+
+export default function FocusControlBar({ onAskAI }: FocusControlBarProps = {}) {
   const {
     currentTask, isPaused, setIsPaused, pomodoroMinutes,
     sessionStartTime, startSession, skipToNext, completeCurrentTask, upNextTasks,
@@ -175,6 +180,18 @@ export default function FocusControlBar() {
         >
           <SkipForward className="h-4 w-4" />
         </button>
+
+        {/* Ask AI */}
+        {onAskAI && (
+          <button
+            onClick={onAskAI}
+            className="h-10 px-4 rounded-full bg-[#3b82f6]/15 hover:bg-[#3b82f6]/25 border border-[#3b82f6]/30 text-[#3b82f6] flex items-center gap-2 transition-all hover:scale-105"
+            title="Ask AI για αυτό το task ( / )"
+          >
+            <Sparkles className="h-4 w-4" />
+            <span className="text-xs font-medium">Ask AI</span>
+          </button>
+        )}
 
         {/* Time displays */}
         <div className="flex flex-col items-center ml-2 min-w-[80px]">

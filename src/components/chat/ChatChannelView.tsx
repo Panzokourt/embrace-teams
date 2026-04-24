@@ -7,6 +7,7 @@ import ChatChannelHeader from './ChatChannelHeader';
 import ChatThread from './ChatThread';
 import type { ChatChannel } from '@/hooks/useChatChannels';
 import { toast } from 'sonner';
+import { useVoiceCommand } from '@/components/secretary/VoiceCommandProvider';
 
 interface ChatChannelViewProps {
   channel: ChatChannel | null;

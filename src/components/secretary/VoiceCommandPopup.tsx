@@ -58,6 +58,16 @@ export default function VoiceCommandPopup({ open, onClose, onSend, targetLabel }
           </div>
         ) : (
           <>
+            {/* Target indicator */}
+            {targetLabel && (
+              <div className="text-center -mt-1">
+                <span className="text-[11px] text-muted-foreground">
+                  → Αποστολή σε:{" "}
+                  <span className="font-medium text-foreground">{targetLabel}</span>
+                </span>
+              </div>
+            )}
+
             {/* Mic button with pulse */}
             <div className="flex flex-col items-center gap-4 pt-2">
               <button

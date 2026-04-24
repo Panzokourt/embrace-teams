@@ -13,6 +13,7 @@ import { useDocumentParser } from "@/hooks/useDocumentParser";
 import { usePageContext } from "@/hooks/usePageContext";
 import MentionTextarea from "@/components/mentions/MentionTextarea";
 import { MentionRenderer } from "@/components/mentions/MentionRenderer";
+import VoiceInputButton from "@/components/voice/VoiceInputButton";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -636,6 +637,13 @@ export default function SecretaryChat({ mode, registerSendHandler, onOpenMemory 
                   disabled={loading}
                   className="flex-1 px-1 py-1 text-sm"
                   maxHeight={200}
+                />
+
+                <VoiceInputButton
+                  size="md"
+                  baseText={input}
+                  onTranscript={(text) => setInput(text)}
+                  disabled={loading}
                 />
 
                 <button

@@ -35,6 +35,10 @@ interface FocusContextValue {
   completeCurrentTask: () => Promise<void>;
   setIsPaused: (v: boolean) => void;
   reorderTasks: (taskIds: string[]) => void;
+  /** Optimistically patch + persist current task to DB. */
+  updateCurrentTask: (patch: Partial<FocusTask>) => Promise<void>;
+  /** Re-fetch current task from DB and merge into queue. */
+  refreshCurrentTask: () => Promise<void>;
 }
 
 const FocusContext = createContext<FocusContextValue | null>(null);
@@ -45,6 +49,7 @@ const NOOP_CONTEXT: FocusContextValue = {
   enterFocus: async () => {}, exitFocus: () => {}, startSession: () => {},
   setCurrentTaskById: () => {}, skipToNext: () => {},
   completeCurrentTask: async () => {}, setIsPaused: () => {}, reorderTasks: () => {},
+  updateCurrentTask: async () => {}, refreshCurrentTask: async () => {},
 };
 
 export function useFocusMode() {
@@ -165,11 +170,46 @@ export function FocusModeProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const updateCurrentTask = useCallback(async (patch: Partial<FocusTask>) => {
+    if (!currentTaskId) return;
+    // Optimistic local update
+    setTasks(prev => prev.map(t => t.id === currentTaskId ? { ...t, ...patch } : t));
+
+    // Build DB-safe payload (strip read-only fields)
+    const dbPatch: Record<string, any> = { ...patch };
+    delete dbPatch.id;
+    delete dbPatch.project_name;
+    delete dbPatch.project_id; // never move tasks across projects via inline edit
+
+    if (Object.keys(dbPatch).length === 0) return;
+
+    const { error } = await supabase.from('tasks').update(dbPatch).eq('id', currentTaskId);
+    if (error) {
+      console.error('Failed to update task', error);
+      // Refetch on failure to restore truth
+      const { data } = await supabase.from('tasks').select(TASK_SELECT).eq('id', currentTaskId).maybeSingle();
+      if (data) {
+        const fresh = mapTask(data);
+        setTasks(prev => prev.map(t => t.id === currentTaskId ? fresh : t));
+      }
+    }
+  }, [currentTaskId]);
+
+  const refreshCurrentTask = useCallback(async () => {
+    if (!currentTaskId) return;
+    const { data } = await supabase.from('tasks').select(TASK_SELECT).eq('id', currentTaskId).maybeSingle();
+    if (data) {
+      const fresh = mapTask(data);
+      setTasks(prev => prev.map(t => t.id === currentTaskId ? fresh : t));
+    }
+  }, [currentTaskId]);
+
   return (
     <FocusContext.Provider value={{
       isActive, isPaused, currentTask, upNextTasks, pomodoroMinutes,
       sessionStartTime, enterFocus, exitFocus, startSession, setCurrentTaskById,
       skipToNext, completeCurrentTask, setIsPaused, reorderTasks,
+      updateCurrentTask, refreshCurrentTask,
     }}>
       {children}
     </FocusContext.Provider>

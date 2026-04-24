@@ -734,6 +734,20 @@ const toolDefinitions = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "web_search",
+      description: "Search the internet for up-to-date information. Use this when the user asks about current events, market trends, external companies, recent news, or any information that requires real-time web data. Returns a grounded answer with source citations.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "The search query in natural language" },
+        },
+        required: ["query"],
+      },
+    },
+  },
 ];
 
 // ── Helper: call Lovable AI Gateway (non-streaming) ──

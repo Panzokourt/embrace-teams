@@ -9,6 +9,7 @@ import ReactMarkdown from 'react-markdown';
 import { parseAndRenderContent } from '@/components/secretary/ActionRenderer';
 import { useLocation } from 'react-router-dom';
 import { useDocumentParser } from '@/hooks/useDocumentParser';
+import { MentionTextarea, type MentionTextareaHandle } from '@/components/mentions/MentionTextarea';
 
 interface ChatMessage {
   role: 'user' | 'assistant';

@@ -150,21 +150,12 @@ const FocusAIChat = forwardRef(function FocusAIChat(
     }
   }, [loading, user, msgs, task]);
 
-  if (!open) {
-    return (
-      <button
-        onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 100); }}
-        className="fixed bottom-24 right-6 z-[58] h-12 px-4 rounded-full bg-[#3b82f6] hover:bg-[#3b82f6]/85 text-white shadow-lg shadow-[#3b82f6]/30 flex items-center gap-2 transition-all hover:scale-105"
-        title="AI Assistant για αυτό το task"
-      >
-        <Sparkles className="h-4 w-4" />
-        <span className="text-sm font-medium">Ask AI</span>
-      </button>
-    );
-  }
+  // Closed state: render nothing — opening is controlled imperatively via the
+  // ref handle exposed to the parent (Ask AI button in FocusControlBar, or `/` shortcut).
+  if (!open) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-[58] w-[400px] h-[560px] bg-[#161b25] border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden backdrop-blur-xl">
+    <div className="fixed bottom-28 left-1/2 -translate-x-1/2 z-[58] w-[440px] h-[min(60vh,580px)] bg-[#161b25] border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-200">
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-[#3b82f6]/20 flex items-center justify-center">

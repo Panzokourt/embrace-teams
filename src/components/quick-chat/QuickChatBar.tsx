@@ -512,7 +512,7 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
         />
 
         {/* Input area */}
-        <div className="flex items-center gap-2 px-3 py-2.5">
+        <div className="flex items-end gap-2 px-3 py-2.5">
           {messages.length > 0 && (
             <Button
               variant="ghost"

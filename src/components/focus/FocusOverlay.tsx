@@ -472,8 +472,8 @@ export default function FocusOverlay() {
         </div>
       </div>
 
-      {/* Control Bar */}
-      <FocusControlBar />
+      {/* Control Bar (with Ask AI trigger) */}
+      <FocusControlBar onAskAI={() => aiChatRef.current?.open()} />
 
       {/* AI Chat */}
       {currentTask && (

@@ -237,10 +237,10 @@ export default function FocusOverlay() {
       {/* Main */}
       <div className="flex-1 flex overflow-hidden">
         {/* Workspace */}
-        <div className="flex-1 overflow-y-auto p-8 pb-32">
+        <div className="flex-1 overflow-y-auto px-8 py-8 pb-32">
           {currentTask ? (
-            <div className="max-w-3xl mx-auto space-y-6">
-              {/* Header */}
+            <div className="max-w-[1400px] mx-auto space-y-6">
+              {/* Header — full-width above the 2 columns */}
               <div className="space-y-3">
                 {currentTask.project_name && (
                   <p className="text-xs text-white/45 uppercase tracking-widest font-medium">
@@ -304,116 +304,125 @@ export default function FocusOverlay() {
                 </div>
               </div>
 
-              {/* Description (inline edit) */}
-              <Section icon={FileText} title="Περιγραφή">
-                <FocusEditableField
-                  value={currentTask.description || ''}
-                  onSave={(v) => updateCurrentTask({ description: v || null })}
-                  type="textarea"
-                  multiline
-                  placeholder="Πρόσθεσε περιγραφή για αυτό το task…"
-                  displayClassName="!px-0 !mx-0"
-                  renderDisplay={(v) => (
-                    <p className="text-white/75 text-sm leading-relaxed whitespace-pre-wrap">{v}</p>
-                  )}
-                />
-              </Section>
-
-              {/* Properties */}
-              <Section icon={Clock} title="Λεπτομέρειες">
-                <div className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
-                  <div className="space-y-1">
-                    <span className="text-white/45 text-xs">Ανατέθηκε σε</span>
-                    <div className="flex items-center gap-2 text-white/80">
-                      <User className="h-3.5 w-3.5 text-white/50" />
-                      <span>{assigneeName || <span className="text-white/40 italic">—</span>}</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <span className="text-white/45 text-xs">Ημ. Έναρξης</span>
-                    <input
-                      type="date"
-                      value={currentTask.start_date || ''}
-                      onChange={(e) => updateCurrentTask({ start_date: e.target.value || null })}
-                      className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-white/80 text-sm focus:border-[#3b82f6] outline-none"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <span className="text-white/45 text-xs">Προθεσμία</span>
-                    <input
-                      type="date"
-                      value={currentTask.due_date || ''}
-                      onChange={(e) => updateCurrentTask({ due_date: e.target.value || null })}
-                      className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-white/80 text-sm focus:border-[#3b82f6] outline-none"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <span className="text-white/45 text-xs">Εκτίμηση (h)</span>
+              {/* Two-column grid for sections */}
+              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] gap-6">
+                {/* LEFT — Core work content */}
+                <div className="space-y-6 min-w-0">
+                  {/* Description (inline edit) */}
+                  <Section icon={FileText} title="Περιγραφή">
                     <FocusEditableField
-                      value={currentTask.estimated_hours ?? ''}
-                      onSave={(v) => updateCurrentTask({ estimated_hours: v ? Number(v) : null })}
-                      type="number"
-                      min={0}
-                      step={0.25}
-                      placeholder="0"
+                      value={currentTask.description || ''}
+                      onSave={(v) => updateCurrentTask({ description: v || null })}
+                      type="textarea"
+                      multiline
+                      placeholder="Πρόσθεσε περιγραφή για αυτό το task…"
                       displayClassName="!px-0 !mx-0"
                       renderDisplay={(v) => (
-                        <span className="inline-flex items-center gap-1.5 text-white/80">
-                          <Clock className="h-3.5 w-3.5 text-white/50" />
-                          {v}h
-                          {currentTask.actual_hours != null && (
-                            <span className="text-white/45 text-xs">/ {currentTask.actual_hours}h πραγμ.</span>
-                          )}
-                        </span>
+                        <p className="text-white/75 text-sm leading-relaxed whitespace-pre-wrap">{v}</p>
                       )}
                     />
-                  </div>
-                </div>
+                  </Section>
 
-                {/* Progress */}
-                <div className="mt-5 space-y-1.5">
-                  <div className="flex justify-between text-xs text-white/45">
-                    <span>Πρόοδος</span>
-                    <span>{currentTask.progress ?? 0}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    step={5}
-                    value={currentTask.progress ?? 0}
-                    onChange={(e) => updateCurrentTask({ progress: Number(e.target.value) })}
-                    className="w-full accent-[#3b82f6]"
+                  {/* Subtasks */}
+                  <FocusSubtasksSection
+                    taskId={currentTask.id}
+                    projectId={currentTask.project_id}
                   />
+
+                  {/* Files */}
+                  <FocusFilesSection
+                    taskId={currentTask.id}
+                    projectId={currentTask.project_id}
+                  />
+
+                  {/* Comments */}
+                  <FocusCommentsSection taskId={currentTask.id} />
                 </div>
-              </Section>
 
-              {/* Time tracking */}
-              <FocusTimeTrackingSection
-                taskId={currentTask.id}
-                projectId={currentTask.project_id}
-              />
+                {/* RIGHT — Metadata & tracking */}
+                <div className="space-y-6 min-w-0">
+                  {/* Properties */}
+                  <Section icon={Clock} title="Λεπτομέρειες">
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
+                      <div className="space-y-1">
+                        <span className="text-white/45 text-xs">Ανατέθηκε σε</span>
+                        <div className="flex items-center gap-2 text-white/80">
+                          <User className="h-3.5 w-3.5 text-white/50" />
+                          <span>{assigneeName || <span className="text-white/40 italic">—</span>}</span>
+                        </div>
+                      </div>
 
-              {/* Subtasks */}
-              <FocusSubtasksSection
-                taskId={currentTask.id}
-                projectId={currentTask.project_id}
-              />
+                      <div className="space-y-1">
+                        <span className="text-white/45 text-xs">Ημ. Έναρξης</span>
+                        <input
+                          type="date"
+                          value={currentTask.start_date || ''}
+                          onChange={(e) => updateCurrentTask({ start_date: e.target.value || null })}
+                          className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-white/80 text-sm focus:border-[#3b82f6] outline-none"
+                        />
+                      </div>
 
-              {/* Files */}
-              <FocusFilesSection
-                taskId={currentTask.id}
-                projectId={currentTask.project_id}
-              />
+                      <div className="space-y-1">
+                        <span className="text-white/45 text-xs">Προθεσμία</span>
+                        <input
+                          type="date"
+                          value={currentTask.due_date || ''}
+                          onChange={(e) => updateCurrentTask({ due_date: e.target.value || null })}
+                          className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-white/80 text-sm focus:border-[#3b82f6] outline-none"
+                        />
+                      </div>
 
-              {/* Dependencies */}
-              <FocusDependenciesSection taskId={currentTask.id} />
+                      <div className="space-y-1">
+                        <span className="text-white/45 text-xs">Εκτίμηση (h)</span>
+                        <FocusEditableField
+                          value={currentTask.estimated_hours ?? ''}
+                          onSave={(v) => updateCurrentTask({ estimated_hours: v ? Number(v) : null })}
+                          type="number"
+                          min={0}
+                          step={0.25}
+                          placeholder="0"
+                          displayClassName="!px-0 !mx-0"
+                          renderDisplay={(v) => (
+                            <span className="inline-flex items-center gap-1.5 text-white/80">
+                              <Clock className="h-3.5 w-3.5 text-white/50" />
+                              {v}h
+                              {currentTask.actual_hours != null && (
+                                <span className="text-white/45 text-xs">/ {currentTask.actual_hours}h πραγμ.</span>
+                              )}
+                            </span>
+                          )}
+                        />
+                      </div>
+                    </div>
 
-              {/* Comments */}
-              <FocusCommentsSection taskId={currentTask.id} />
+                    {/* Progress */}
+                    <div className="mt-5 space-y-1.5">
+                      <div className="flex justify-between text-xs text-white/45">
+                        <span>Πρόοδος</span>
+                        <span>{currentTask.progress ?? 0}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        step={5}
+                        value={currentTask.progress ?? 0}
+                        onChange={(e) => updateCurrentTask({ progress: Number(e.target.value) })}
+                        className="w-full accent-[#3b82f6]"
+                      />
+                    </div>
+                  </Section>
+
+                  {/* Time tracking */}
+                  <FocusTimeTrackingSection
+                    taskId={currentTask.id}
+                    projectId={currentTask.project_id}
+                  />
+
+                  {/* Dependencies */}
+                  <FocusDependenciesSection taskId={currentTask.id} />
+                </div>
+              </div>
             </div>
           ) : (
             <div className="flex-1 flex items-center justify-center h-full">

@@ -22,9 +22,23 @@ interface VoiceCommandContextValue {
 
 const VoiceCommandContext = createContext<VoiceCommandContextValue | null>(null);
 
+const NOOP_VOICE_CONTEXT: VoiceCommandContextValue = {
+  openVoicePopup: () => {},
+  sendToSecretary: () => {},
+  registerSendHandler: () => {},
+  registerChatTarget: () => () => {},
+};
+
 export function useVoiceCommand() {
   const ctx = useContext(VoiceCommandContext);
-  if (!ctx) throw new Error("useVoiceCommand must be used inside VoiceCommandProvider");
+  // Safe fallback (e.g. during HMR or when used outside provider) to avoid
+  // crashing the whole app with a blank screen.
+  if (!ctx) {
+    if (typeof console !== "undefined") {
+      console.warn("useVoiceCommand used outside VoiceCommandProvider — returning no-op fallback");
+    }
+    return NOOP_VOICE_CONTEXT;
+  }
   return ctx;
 }
 

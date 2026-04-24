@@ -10,7 +10,7 @@ interface TimeEntry {
   id: string;
   start_time: string;
   end_time: string | null;
-  duration_seconds: number | null;
+  duration_minutes: number | null;
   description: string | null;
 }
 
@@ -31,7 +31,7 @@ export default function FocusTimeTrackingSection({ taskId, projectId }: Props) {
     if (!user) return;
     const { data } = await supabase
       .from('time_entries')
-      .select('id, start_time, end_time, duration_seconds, description')
+      .select('id, start_time, end_time, duration_minutes, description')
       .eq('task_id', taskId)
       .eq('user_id', user.id)
       .order('start_time', { ascending: false })
@@ -41,7 +41,7 @@ export default function FocusTimeTrackingSection({ taskId, projectId }: Props) {
 
   useEffect(() => { fetchEntries(); }, [fetchEntries, isRunning]);
 
-  const totalSeconds = entries.reduce((sum, e) => sum + (e.duration_seconds || 0), 0)
+  const totalSeconds = entries.reduce((sum, e) => sum + ((e.duration_minutes || 0) * 60), 0)
     + (isRunning ? elapsed : 0);
 
   const fmt = (s: number) => {
@@ -100,7 +100,7 @@ export default function FocusTimeTrackingSection({ taskId, projectId }: Props) {
                   {format(new Date(e.start_time), 'd MMM, HH:mm', { locale: el })}
                 </span>
                 <span className="text-white/85 font-mono">
-                  {e.duration_seconds ? fmt(e.duration_seconds) : '—'}
+                  {e.duration_minutes ? fmt(e.duration_minutes * 60) : '—'}
                 </span>
               </div>
             ))}

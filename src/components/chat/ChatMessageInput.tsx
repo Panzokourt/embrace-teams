@@ -172,6 +172,13 @@ export default function ChatMessageInput({
           )}
         </div>
 
+        <VoiceInputButton
+          size={compact ? "xs" : "sm"}
+          baseText={content}
+          onTranscript={(text) => setContent(text)}
+          disabled={disabled}
+        />
+
         <Button
           variant="ghost"
           size="icon"

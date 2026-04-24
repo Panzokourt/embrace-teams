@@ -35,6 +35,10 @@ interface FocusContextValue {
   completeCurrentTask: () => Promise<void>;
   setIsPaused: (v: boolean) => void;
   reorderTasks: (taskIds: string[]) => void;
+  /** Optimistically patch + persist current task to DB. */
+  updateCurrentTask: (patch: Partial<FocusTask>) => Promise<void>;
+  /** Re-fetch current task from DB and merge into queue. */
+  refreshCurrentTask: () => Promise<void>;
 }
 
 const FocusContext = createContext<FocusContextValue | null>(null);
@@ -45,6 +49,7 @@ const NOOP_CONTEXT: FocusContextValue = {
   enterFocus: async () => {}, exitFocus: () => {}, startSession: () => {},
   setCurrentTaskById: () => {}, skipToNext: () => {},
   completeCurrentTask: async () => {}, setIsPaused: () => {}, reorderTasks: () => {},
+  updateCurrentTask: async () => {}, refreshCurrentTask: async () => {},
 };
 
 export function useFocusMode() {

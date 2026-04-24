@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { X, Shield, Calendar, ChevronRight, FileText, Clock, User, Flag, GripVertical } from 'lucide-react';
+import { X, Shield, ChevronRight, FileText, ListChecks, User, Flag, GripVertical, Building2, Package, ChevronsRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
@@ -13,10 +13,10 @@ import FocusEditableField from './sections/FocusEditableField';
 import FocusSubtasksSection from './sections/FocusSubtasksSection';
 import FocusFilesSection from './sections/FocusFilesSection';
 import FocusCommentsSection from './sections/FocusCommentsSection';
-import FocusTimeTrackingSection from './sections/FocusTimeTrackingSection';
 import FocusDependenciesSection from './sections/FocusDependenciesSection';
+import FocusEntityDrawer, { type EntityDrawerPayload } from './FocusEntityDrawer';
+import FocusSidebarSearch from './FocusSidebarSearch';
 import { format } from 'date-fns';
-import { el } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import {
@@ -89,16 +89,16 @@ function SortableSidebarTask({
       <div className="flex-1 min-w-0">
         <p className={cn(
           'text-sm font-medium truncate',
-          isCurrent ? 'text-white' : 'text-white/85',
+          isCurrent ? 'text-white' : 'text-white/90',
         )}>
           {task.title}
         </p>
         <div className="flex items-center gap-2 mt-0.5">
           {task.project_name && (
-            <span className="text-[11px] text-white/55 truncate">{task.project_name}</span>
+            <span className="text-[11px] text-white/65 truncate">{task.project_name}</span>
           )}
           {task.due_date && (
-            <span className="text-[11px] text-white/40">· {format(new Date(task.due_date), 'd/MM')}</span>
+            <span className="text-[11px] text-white/50">· {format(new Date(task.due_date), 'd/MM')}</span>
           )}
         </div>
       </div>
@@ -108,19 +108,22 @@ function SortableSidebarTask({
 }
 
 // ---------- Section wrapper ----------
-function Section({ icon: Icon, title, children, action }: {
+function Section({ icon: Icon, title, children, action, contentClassName }: {
   icon: any; title: string; children: React.ReactNode; action?: React.ReactNode;
+  contentClassName?: string;
 }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-white/45">
+        <div className="flex items-center gap-2 text-white/70">
           <Icon className="h-4 w-4" />
-          <h3 className="text-xs font-semibold uppercase tracking-widest">{title}</h3>
+          <h3 className="text-[13px] font-semibold uppercase tracking-widest">{title}</h3>
         </div>
         {action}
       </div>
-      <div className="bg-white/[0.04] border border-white/10 rounded-xl p-4">{children}</div>
+      <div className={cn('bg-white/[0.04] border border-white/10 rounded-xl p-4', contentClassName)}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -136,6 +139,8 @@ export default function FocusOverlay() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [fadeIn, setFadeIn] = useState(false);
   const [assigneeName, setAssigneeName] = useState<string | null>(null);
+  const [drawerPayload, setDrawerPayload] = useState<EntityDrawerPayload>(null);
+  const [searchActive, setSearchActive] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
     if (typeof window === 'undefined') return DEFAULT_WIDTH;
     const stored = parseInt(localStorage.getItem(SIDEBAR_KEY) || '', 10);
@@ -145,24 +150,20 @@ export default function FocusOverlay() {
   const aiChatRef = useRef<FocusAIChatHandle>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  // Persist sidebar width
   useEffect(() => {
     localStorage.setItem(SIDEBAR_KEY, String(sidebarWidth));
   }, [sidebarWidth]);
 
-  // Fade in
   useEffect(() => {
     if (isActive) requestAnimationFrame(() => setFadeIn(true));
     else setFadeIn(false);
   }, [isActive]);
 
-  // Clock
   useEffect(() => {
     const id = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
 
-  // Fetch assignee
   useEffect(() => {
     if (!currentTask?.assigned_to) { setAssigneeName(null); return; }
     supabase.from('profiles').select('full_name').eq('id', currentTask.assigned_to).single()
@@ -191,7 +192,6 @@ export default function FocusOverlay() {
 
   const currentPriority = PRIORITIES.find(p => p.value === currentTask?.priority) || PRIORITIES[3];
 
-  // Keyboard shortcut handlers
   const handleNext = () => {
     if (!currentTask) return;
     const idx = allTaskIds.indexOf(currentTask.id);
@@ -218,18 +218,18 @@ export default function FocusOverlay() {
       <div className="flex items-center justify-between px-6 py-3 border-b border-white/5">
         <div className="flex items-center gap-2">
           <Shield className="h-4 w-4 text-[#3b82f6]" />
-          <span className="text-xs text-white/55 font-medium tracking-wide uppercase">
+          <span className="text-xs text-white/65 font-medium tracking-wide uppercase">
             Shield Active · Notifications Muted
           </span>
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-white/50 font-mono">{format(currentTime, 'HH:mm')}</span>
+          <span className="text-sm text-white/65 font-mono">{format(currentTime, 'HH:mm')}</span>
           <button
             onClick={exitFocus}
             className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
             title="Έξοδος Focus Mode (Esc)"
           >
-            <X className="h-4 w-4 text-white/70" />
+            <X className="h-4 w-4 text-white/80" />
           </button>
         </div>
       </div>
@@ -239,14 +239,39 @@ export default function FocusOverlay() {
         {/* Workspace */}
         <div className="flex-1 overflow-y-auto px-8 py-8 pb-32">
           {currentTask ? (
-            <div className="max-w-[1400px] mx-auto space-y-6">
-              {/* Header — full-width above the 2 columns */}
+            <div className="max-w-[1500px] mx-auto space-y-6">
+              {/* Header — full-width */}
               <div className="space-y-3">
-                {currentTask.project_name && (
-                  <p className="text-xs text-white/45 uppercase tracking-widest font-medium">
-                    {currentTask.project_name}
-                  </p>
-                )}
+                {/* Project name + breadcrumb chips */}
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[13px]">
+                  {currentTask.project_name && (
+                    <span className="text-white/65 uppercase tracking-widest font-medium">
+                      {currentTask.project_name}
+                    </span>
+                  )}
+                  {(currentTask.client_name || currentTask.deliverable_name) && (
+                    <ChevronsRight className="h-3.5 w-3.5 text-white/30" />
+                  )}
+                  {currentTask.client_name && currentTask.client_id && (
+                    <button
+                      onClick={() => setDrawerPayload({ type: 'client', id: currentTask.client_id! })}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 hover:border-white/20 text-white/85 hover:text-white transition-colors"
+                    >
+                      <Building2 className="h-3 w-3 text-[#3b82f6]" />
+                      <span>{currentTask.client_name}</span>
+                    </button>
+                  )}
+                  {currentTask.deliverable_name && currentTask.deliverable_id && (
+                    <button
+                      onClick={() => setDrawerPayload({ type: 'deliverable', id: currentTask.deliverable_id! })}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 hover:border-white/20 text-white/85 hover:text-white transition-colors"
+                    >
+                      <Package className="h-3 w-3 text-[#3b82f6]" />
+                      <span>{currentTask.deliverable_name}</span>
+                    </button>
+                  )}
+                </div>
+
                 <FocusEditableField
                   value={currentTask.title}
                   onSave={(v) => updateCurrentTask({ title: v })}
@@ -254,15 +279,15 @@ export default function FocusOverlay() {
                   placeholder="Task title…"
                   ariaLabel="Edit task title"
                   displayClassName="!px-0 !mx-0"
-                  inputClassName="text-2xl md:text-3xl font-bold !py-2"
+                  inputClassName="text-3xl font-bold !py-2"
                   renderDisplay={(v) => (
-                    <span className="text-2xl md:text-3xl font-bold text-white tracking-tight leading-tight">
+                    <span className="text-3xl font-bold text-white tracking-tight leading-tight">
                       {v}
                     </span>
                   )}
                 />
 
-                {/* Priority + Status quick selectors */}
+                {/* Priority + Status */}
                 <div className="flex items-center gap-2 flex-wrap">
                   <Select
                     value={currentTask.priority}
@@ -286,7 +311,7 @@ export default function FocusOverlay() {
                     value={currentTask.status}
                     onValueChange={(v) => updateCurrentTask({ status: v })}
                   >
-                    <SelectTrigger className="h-7 w-auto px-2.5 text-xs bg-white/10 border-white/15 text-white/80">
+                    <SelectTrigger className="h-7 w-auto px-2.5 text-xs bg-white/10 border-white/15 text-white/90">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -297,18 +322,71 @@ export default function FocusOverlay() {
                   </Select>
 
                   {currentTask.task_category && (
-                    <Badge className="bg-white/10 text-white/70 border-0 text-xs">
+                    <Badge className="bg-white/10 text-white/80 border-0 text-xs">
                       {currentTask.task_category}
                     </Badge>
                   )}
                 </div>
               </div>
 
-              {/* Two-column grid for sections */}
-              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] gap-6">
-                {/* LEFT — Core work content */}
+              {/* Two-column grid */}
+              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] gap-6 items-start">
+                {/* LEFT — Details + Description + Subtasks + Files */}
                 <div className="space-y-6 min-w-0">
-                  {/* Description (inline edit) */}
+                  {/* Details (μετακινήθηκε αριστερά κάτω από τίτλο) */}
+                  <Section icon={User} title="Λεπτομέρειες">
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-5 text-[15px]">
+                      <DetailItem label="Ανατέθηκε σε">
+                        <span className="inline-flex items-center gap-2 text-white">
+                          <User className="h-4 w-4 text-white/55" />
+                          <span>{assigneeName || <span className="text-white/50 italic">—</span>}</span>
+                        </span>
+                      </DetailItem>
+
+                      <DetailItem label="Ημ. Έναρξης">
+                        <input
+                          type="date"
+                          value={currentTask.start_date ? currentTask.start_date.slice(0, 10) : ''}
+                          onChange={(e) => updateCurrentTask({ start_date: e.target.value || null })}
+                          className="bg-white/[0.06] border border-white/15 rounded-lg px-3 py-1.5 text-white text-[15px] focus:border-[#3b82f6] outline-none w-full max-w-[200px]"
+                        />
+                      </DetailItem>
+
+                      <DetailItem label="Προθεσμία">
+                        <input
+                          type="date"
+                          value={currentTask.due_date ? currentTask.due_date.slice(0, 10) : ''}
+                          onChange={(e) => updateCurrentTask({ due_date: e.target.value || null })}
+                          className="bg-white/[0.06] border border-white/15 rounded-lg px-3 py-1.5 text-white text-[15px] focus:border-[#3b82f6] outline-none w-full max-w-[200px]"
+                        />
+                      </DetailItem>
+
+                      <DetailItem label="Εκτίμηση (h)">
+                        <FocusEditableField
+                          value={currentTask.estimated_hours ?? ''}
+                          onSave={(v) => updateCurrentTask({ estimated_hours: v ? Number(v) : null })}
+                          type="number"
+                          min={0}
+                          step={0.25}
+                          placeholder="0"
+                          displayClassName="!px-0 !mx-0"
+                          renderDisplay={(v) => (
+                            <span className="inline-flex items-center gap-2 text-white">
+                              <span className="font-medium">{v}h</span>
+                              {currentTask.actual_hours != null && Number(currentTask.actual_hours) > 0 && (
+                                <span className="text-white/55 text-[13px]">/ {currentTask.actual_hours}h πραγμ.</span>
+                              )}
+                            </span>
+                          )}
+                        />
+                      </DetailItem>
+                    </div>
+                  </Section>
+
+                  {/* Dependencies (compact, only renders if any) */}
+                  <FocusDependenciesSection taskId={currentTask.id} />
+
+                  {/* Description */}
                   <Section icon={FileText} title="Περιγραφή">
                     <FocusEditableField
                       value={currentTask.description || ''}
@@ -318,7 +396,7 @@ export default function FocusOverlay() {
                       placeholder="Πρόσθεσε περιγραφή για αυτό το task…"
                       displayClassName="!px-0 !mx-0"
                       renderDisplay={(v) => (
-                        <p className="text-white/75 text-sm leading-relaxed whitespace-pre-wrap">{v}</p>
+                        <p className="text-white/85 text-[15px] leading-relaxed whitespace-pre-wrap">{v}</p>
                       )}
                     />
                   </Section>
@@ -334,107 +412,27 @@ export default function FocusOverlay() {
                     taskId={currentTask.id}
                     projectId={currentTask.project_id}
                   />
-
-                  {/* Comments */}
-                  <FocusCommentsSection taskId={currentTask.id} />
                 </div>
 
-                {/* RIGHT — Metadata & tracking */}
-                <div className="space-y-6 min-w-0">
-                  {/* Properties */}
-                  <Section icon={Clock} title="Λεπτομέρειες">
-                    <div className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
-                      <div className="space-y-1">
-                        <span className="text-white/45 text-xs">Ανατέθηκε σε</span>
-                        <div className="flex items-center gap-2 text-white/80">
-                          <User className="h-3.5 w-3.5 text-white/50" />
-                          <span>{assigneeName || <span className="text-white/40 italic">—</span>}</span>
-                        </div>
-                      </div>
-
-                      <div className="space-y-1">
-                        <span className="text-white/45 text-xs">Ημ. Έναρξης</span>
-                        <input
-                          type="date"
-                          value={currentTask.start_date || ''}
-                          onChange={(e) => updateCurrentTask({ start_date: e.target.value || null })}
-                          className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-white/80 text-sm focus:border-[#3b82f6] outline-none"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <span className="text-white/45 text-xs">Προθεσμία</span>
-                        <input
-                          type="date"
-                          value={currentTask.due_date || ''}
-                          onChange={(e) => updateCurrentTask({ due_date: e.target.value || null })}
-                          className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-white/80 text-sm focus:border-[#3b82f6] outline-none"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <span className="text-white/45 text-xs">Εκτίμηση (h)</span>
-                        <FocusEditableField
-                          value={currentTask.estimated_hours ?? ''}
-                          onSave={(v) => updateCurrentTask({ estimated_hours: v ? Number(v) : null })}
-                          type="number"
-                          min={0}
-                          step={0.25}
-                          placeholder="0"
-                          displayClassName="!px-0 !mx-0"
-                          renderDisplay={(v) => (
-                            <span className="inline-flex items-center gap-1.5 text-white/80">
-                              <Clock className="h-3.5 w-3.5 text-white/50" />
-                              {v}h
-                              {currentTask.actual_hours != null && (
-                                <span className="text-white/45 text-xs">/ {currentTask.actual_hours}h πραγμ.</span>
-                              )}
-                            </span>
-                          )}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Progress */}
-                    <div className="mt-5 space-y-1.5">
-                      <div className="flex justify-between text-xs text-white/45">
-                        <span>Πρόοδος</span>
-                        <span>{currentTask.progress ?? 0}%</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        step={5}
-                        value={currentTask.progress ?? 0}
-                        onChange={(e) => updateCurrentTask({ progress: Number(e.target.value) })}
-                        className="w-full accent-[#3b82f6]"
-                      />
-                    </div>
-                  </Section>
-
-                  {/* Time tracking */}
-                  <FocusTimeTrackingSection
-                    taskId={currentTask.id}
-                    projectId={currentTask.project_id}
-                  />
-
-                  {/* Dependencies */}
-                  <FocusDependenciesSection taskId={currentTask.id} />
+                {/* RIGHT — Comments only, full-height */}
+                <div className="min-w-0 xl:sticky xl:top-2">
+                  <div className="min-h-[700px]">
+                    <FocusCommentsSection taskId={currentTask.id} />
+                  </div>
                 </div>
               </div>
             </div>
           ) : (
             <div className="flex-1 flex items-center justify-center h-full">
               <div className="text-center space-y-4">
-                <h2 className="text-2xl font-bold text-white/70">Δεν υπάρχουν tasks</h2>
-                <p className="text-white/40">Προσθέστε tasks για να ξεκινήσετε το Focus Mode</p>
+                <h2 className="text-2xl font-bold text-white/80">Δεν υπάρχουν tasks</h2>
+                <p className="text-white/55">Προσθέστε tasks για να ξεκινήσετε το Focus Mode</p>
               </div>
             </div>
           )}
         </div>
 
-        {/* Up Next sidebar (resizable) */}
+        {/* Up Next sidebar */}
         <div
           className="relative border-l border-white/10 bg-white/[0.025] backdrop-blur-xl flex flex-col shrink-0"
           style={{ width: sidebarWidth }}
@@ -445,30 +443,33 @@ export default function FocusOverlay() {
             min={MIN_W}
             max={MAX_W}
           />
-          <div className="px-4 py-4 border-b border-white/5">
-            <h3 className="text-xs font-semibold text-white/55 uppercase tracking-widest">
-              Up Next ({upNextTasks.length})
-            </h3>
-          </div>
-          <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {upNextTasks.length > 0 ? (
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <SortableContext items={upNextTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-                  {upNextTasks.map(task => (
-                    <SortableSidebarTask
-                      key={task.id}
-                      task={task}
-                      onSelect={() => setCurrentTaskById(task.id)}
-                    />
-                  ))}
-                </SortableContext>
-              </DndContext>
-            ) : (
-              <div className="flex items-center justify-center h-32 text-white/30 text-sm">
-                Δεν υπάρχουν άλλα tasks
-              </div>
-            )}
-          </div>
+
+          {/* Smart search header (replaces simple title) */}
+          <FocusSidebarSearch onActiveChange={setSearchActive} />
+
+          {/* Up Next list (hidden when search has a query active) */}
+          {!searchActive && (
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              {upNextTasks.length > 0 ? (
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext items={upNextTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                    {upNextTasks.map(task => (
+                      <SortableSidebarTask
+                        key={task.id}
+                        task={task}
+                        onSelect={() => setCurrentTaskById(task.id)}
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
+              ) : (
+                <div className="flex items-center justify-center h-32 text-white/45 text-sm">
+                  Δεν υπάρχουν άλλα tasks
+                </div>
+              )}
+            </div>
+          )}
+          {searchActive && <div className="flex-1" />}
         </div>
       </div>
 
@@ -501,6 +502,19 @@ export default function FocusOverlay() {
         onSkip={skipToNext}
         onFocusChat={() => aiChatRef.current?.focusInput()}
       />
+
+      {/* Entity drawer for client/deliverable */}
+      <FocusEntityDrawer payload={drawerPayload} onClose={() => setDrawerPayload(null)} />
+    </div>
+  );
+}
+
+// ---------- Helpers ----------
+function DetailItem({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5 min-h-[44px]">
+      <span className="block text-white/65 text-[13px]">{label}</span>
+      <div className="text-white">{children}</div>
     </div>
   );
 }

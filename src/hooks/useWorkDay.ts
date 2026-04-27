@@ -232,7 +232,9 @@ export function useWorkDay() {
   const clockIn = async (auto = false) => {
     if (!user || !company) return;
     if (hasActiveLeave) {
-      toast.info('Είσαι σε άδεια σήμερα');
+      toast.info('Είσαι σε άδεια σήμερα', {
+        action: { label: 'Άδειες', onClick: () => window.location.assign('/hr/leaves') },
+      });
       return;
     }
     const today = new Date().toISOString().split('T')[0];

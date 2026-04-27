@@ -479,41 +479,8 @@ export default function AppSidebar({
           </TooltipContent>
         </Tooltip>
 
-        {/* User Avatar with dropdown */}
-        <DropdownMenu>
-          <Tooltip delayDuration={300}>
-            <TooltipTrigger asChild>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center justify-center rounded-lg p-1">
-                  <Avatar className={cn("h-7 w-7", isMobile ? "ring-2 ring-border/50" : "ring-2 ring-white/20")}>
-                    <AvatarImage src={profile?.avatar_url || undefined} />
-                    <AvatarFallback className={cn(
-                    "text-[10px] font-medium",
-                    isMobile ? "bg-primary/10 text-primary" : "bg-white/15 text-white"
-                  )}>
-                      {getInitials(profile?.full_name)}
-                    </AvatarFallback>
-                  </Avatar>
-                </button>
-              </DropdownMenuTrigger>
-            </TooltipTrigger>
-            <TooltipContent side="right" sideOffset={8}>
-              {profile?.full_name || 'User'}
-            </TooltipContent>
-          </Tooltip>
-          <DropdownMenuContent align="end" side="right" className="w-56 rounded-xl border-border/50 shadow-soft-lg">
-            <DropdownMenuLabel className="font-normal">
-              <div className="flex flex-col space-y-1">
-                <span className="text-sm font-medium truncate">{profile?.full_name || 'User'}</span>
-                <span className="text-xs text-muted-foreground truncate">{profile?.email}</span>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator className="bg-border/50" />
-            <DropdownMenuItem onClick={() => signOut()} className="text-destructive focus:text-destructive focus:bg-destructive/10 rounded-lg mx-1 cursor-pointer">
-              <LogOut className="mr-2 h-4 w-4" /> Αποσύνδεση
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* User Avatar with rich dropdown menu */}
+        <UserAvatarMenu isMobile={isMobile} />
       </div>
     </div>;
 

@@ -265,7 +265,9 @@ export function useWorkDay() {
 
     const name = profile?.full_name?.split(' ')[0] || '';
     const time = new Date().toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' });
-    toast.success(`Καλημέρα${name ? ' ' + name : ''}! Ώρα έναρξης: ${time}`);
+    toast.success(`Καλημέρα${name ? ' ' + name : ''}! Ώρα έναρξης: ${time}`, {
+      action: { label: 'Σήμερα', onClick: () => window.location.assign('/') },
+    });
   };
 
   const clockOut = async () => {

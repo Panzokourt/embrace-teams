@@ -174,6 +174,9 @@ export default function AppSidebar({
   const { resolvedTheme, setTheme } = useTheme();
   const [quickOpen, setQuickOpen] = useState(false);
   const [selectedBriefType, setSelectedBriefType] = useState<string | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [visibleCount, setVisibleCount] = useState<number>(categories.length);
+  const categoriesAreaRef = useRef<HTMLDivElement>(null);
 
   // Flyout state for collapsed/rail mode
   const [flyoutCategory, setFlyoutCategory] = useState<CategoryId | null>(null);

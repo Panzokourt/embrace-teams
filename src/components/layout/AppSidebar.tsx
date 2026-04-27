@@ -351,7 +351,7 @@ export default function AppSidebar({
       <div className="w-10 h-px bg-white/10 my-1" />
 
       {/* Category icons */}
-      <div ref={categoriesAreaRef} className="flex-1 min-h-0 flex flex-col items-center gap-0.5 w-full px-1 overflow-hidden">
+      <div ref={categoriesAreaRef} className="flex-1 basis-0 min-h-0 flex flex-col items-center gap-0.5 w-full px-1 overflow-hidden">
         {(() => {
           const currentActive = flyoutCategory || activeCategory;
           let visible = categories.slice(0, visibleCount);

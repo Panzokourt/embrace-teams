@@ -246,6 +246,7 @@ function AttachmentChip({
 // ── Main Component ────────────────────────────────────────────────────────────
 export function CommentsSection({ projectId, taskId, deliverableId }: CommentsSectionProps) {
   const { user } = useAuth();
+  const { awardCommentXP } = useXPEngine();
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(true);
@@ -364,6 +365,10 @@ export function CommentsSection({ projectId, taskId, deliverableId }: CommentsSe
       setPendingFiles([]);
       toast.success('Το σχόλιο προστέθηκε!');
       await fetchComments();
+
+      if (inserted?.id) {
+        awardCommentXP(user.id, inserted.id).catch(() => {});
+      }
     } catch (error) {
       console.error('Error adding comment:', error);
       toast.error('Σφάλμα κατά την προσθήκη σχολίου');

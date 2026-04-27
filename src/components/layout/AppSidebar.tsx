@@ -426,8 +426,8 @@ export default function AppSidebar({
         })()}
       </div>
 
-      {/* Bottom actions */}
-      <div className="flex flex-col items-center gap-1 mt-auto">
+      {/* Bottom actions — always visible */}
+      <div className="flex flex-col items-center gap-1 mt-auto shrink-0 pt-1">
         {/* Secretary AI */}
         <Tooltip delayDuration={300}>
           <TooltipTrigger asChild>

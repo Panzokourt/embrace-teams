@@ -29,7 +29,7 @@ import {
   Moon, Sun, CalendarDays, FileArchive, Timer, FileStack, BarChart3,
   Plus, Palette, Monitor, Globe, Calendar, MessageSquare, BookUser,
   Briefcase, Mail, Trophy, ShieldCheck, BookOpen, GitBranch, MonitorPlay,
-  Megaphone, Code2, Paintbrush, TrendingUp, Shield } from
+  Megaphone, Code2, Paintbrush, TrendingUp, Shield, MoreHorizontal } from
 'lucide-react';
 import { briefDefinitions, getBriefDefinition } from '@/components/blueprints/briefDefinitions';
 import { BriefFormDialog } from '@/components/blueprints/BriefFormDialog';
@@ -174,6 +174,9 @@ export default function AppSidebar({
   const { resolvedTheme, setTheme } = useTheme();
   const [quickOpen, setQuickOpen] = useState(false);
   const [selectedBriefType, setSelectedBriefType] = useState<string | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [visibleCount, setVisibleCount] = useState<number>(categories.length);
+  const categoriesAreaRef = useRef<HTMLDivElement>(null);
 
   // Flyout state for collapsed/rail mode
   const [flyoutCategory, setFlyoutCategory] = useState<CategoryId | null>(null);
@@ -191,6 +194,30 @@ export default function AppSidebar({
       onToggleCollapse();
     }
   }, [location.pathname]);
+
+  // Measure available height for category icons and decide how many fit
+  useEffect(() => {
+    const node = categoriesAreaRef.current;
+    if (!node) return;
+    const ITEM_HEIGHT = 44; // ~py-1.5 + icon + label + gap
+    const compute = () => {
+      const h = node.clientHeight;
+      if (h <= 0) return;
+      const total = categories.length;
+      const fitsAll = Math.floor(h / ITEM_HEIGHT);
+      if (fitsAll >= total) {
+        setVisibleCount(total);
+      } else {
+        // Reserve space for the More button (same height)
+        const fitsWithMore = Math.max(1, Math.floor(h / ITEM_HEIGHT) - 1);
+        setVisibleCount(fitsWithMore);
+      }
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(node);
+    return () => ro.disconnect();
+  }, [categories.length]);
 
   const selectedDef = selectedBriefType ? getBriefDefinition(selectedBriefType) : null;
   const isEffectivelyCollapsed = collapsed || forceCollapsed;
@@ -250,7 +277,7 @@ export default function AppSidebar({
   const IconRail = ({ isMobile = false }: {isMobile?: boolean;}) =>
   <div
     className={cn(
-      "flex flex-col items-center py-3 gap-1 shrink-0 w-20 shadow-none",
+      "flex flex-col items-center py-3 gap-1 shrink-0 w-20 shadow-none min-h-0",
       isMobile ?
       "bg-card border-r border-border/30" :
       "my-2 ml-2 rounded-2xl bg-[#1A1A1A] shadow-lg"
@@ -313,35 +340,94 @@ export default function AppSidebar({
       <div className="w-10 h-px bg-white/10 my-1" />
 
       {/* Category icons */}
-      <div className="flex-1 flex flex-col items-center gap-0.5 w-full px-1">
-        {categories.map((cat) => {
-        const isActive = (isEffectivelyCollapsed ? flyoutCategory === cat.id : activeCategory === cat.id) ||
-        !flyoutCategory && activeCategory === cat.id;
-        return (
-          <button
-            key={cat.id}
-            onClick={() => handleCategoryClick(cat.id)}
-            className={cn(
-              "relative flex flex-col items-center justify-center gap-1 w-[68px] py-1.5 rounded-lg transition-all duration-200",
-              isMobile ?
-              isActive ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/60" :
-              isActive ? "bg-white/15 text-white" : "text-white/60 hover:text-white hover:bg-white/10"
-            )}>
-            {isActive && !isMobile &&
-              <span className="absolute left-0.5 top-1/2 -translate-y-1/2 w-[3px] h-3 rounded-full bg-primary" />
-            }
-            {isActive && isMobile &&
-              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-full bg-primary" />
-            }
-            <cat.icon className="h-[18px] w-[18px]" />
-            <span className="text-[9px] font-medium leading-tight truncate max-w-full px-1">{cat.label}</span>
-          </button>);
-
-      })}
+      <div ref={categoriesAreaRef} className="flex-1 min-h-0 flex flex-col items-center gap-0.5 w-full px-1 overflow-hidden">
+        {(() => {
+          const currentActive = flyoutCategory || activeCategory;
+          let visible = categories.slice(0, visibleCount);
+          let overflow = categories.slice(visibleCount);
+          // Promote active category into visible list if it's hidden
+          if (currentActive && overflow.some(c => c.id === currentActive) && visible.length > 0) {
+            const activeCat = overflow.find(c => c.id === currentActive)!;
+            overflow = overflow.filter(c => c.id !== currentActive);
+            // Replace last visible with active
+            const dropped = visible[visible.length - 1];
+            visible = [...visible.slice(0, -1), activeCat];
+            overflow = [dropped, ...overflow];
+          }
+          const renderCatButton = (cat: Category) => {
+            const isActive = (isEffectivelyCollapsed ? flyoutCategory === cat.id : activeCategory === cat.id) ||
+              !flyoutCategory && activeCategory === cat.id;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => handleCategoryClick(cat.id)}
+                className={cn(
+                  "relative flex flex-col items-center justify-center gap-1 w-[68px] py-1.5 rounded-lg transition-all duration-200 shrink-0",
+                  isMobile ?
+                  isActive ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/60" :
+                  isActive ? "bg-white/15 text-white" : "text-white/60 hover:text-white hover:bg-white/10"
+                )}>
+                {isActive && !isMobile &&
+                  <span className="absolute left-0.5 top-1/2 -translate-y-1/2 w-[3px] h-3 rounded-full bg-primary" />
+                }
+                {isActive && isMobile &&
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-full bg-primary" />
+                }
+                <cat.icon className="h-[18px] w-[18px]" />
+                <span className="text-[9px] font-medium leading-tight truncate max-w-full px-1">{cat.label}</span>
+              </button>
+            );
+          };
+          const overflowHasActive = currentActive && overflow.some(c => c.id === currentActive);
+          return (
+            <>
+              {visible.map(renderCatButton)}
+              {overflow.length > 0 && (
+                <Popover open={moreOpen} onOpenChange={setMoreOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      className={cn(
+                        "relative flex flex-col items-center justify-center gap-1 w-[68px] py-1.5 rounded-lg transition-all duration-200 shrink-0",
+                        isMobile
+                          ? "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                          : "text-white/60 hover:text-white hover:bg-white/10",
+                        moreOpen && (isMobile ? "bg-accent text-foreground" : "bg-white/15 text-white")
+                      )}>
+                      {overflowHasActive && (
+                        <span className="absolute top-1 right-2 h-1.5 w-1.5 rounded-full bg-primary" />
+                      )}
+                      <MoreHorizontal className="h-[18px] w-[18px]" />
+                      <span className="text-[9px] font-medium leading-tight">More</span>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent side="right" sideOffset={12} align="end" className="w-64 p-2 rounded-xl">
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {overflow.map((cat) => {
+                        const isActive = currentActive === cat.id;
+                        return (
+                          <button
+                            key={cat.id}
+                            onClick={() => { handleCategoryClick(cat.id); setMoreOpen(false); }}
+                            className={cn(
+                              "flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg transition-colors",
+                              isActive ? "bg-accent text-foreground" : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                            )}>
+                            <cat.icon className="h-5 w-5" />
+                            <span className="text-xs font-medium">{cat.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+            </>
+          );
+        })()}
       </div>
 
-      {/* Bottom actions */}
-      <div className="flex flex-col items-center gap-1 mt-auto">
+      {/* Bottom actions — always visible */}
+      <div className="flex flex-col items-center gap-1 mt-auto shrink-0 pt-1">
         {/* Secretary AI */}
         <Tooltip delayDuration={300}>
           <TooltipTrigger asChild>

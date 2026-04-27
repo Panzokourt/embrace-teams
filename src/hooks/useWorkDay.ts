@@ -202,12 +202,16 @@ export function useWorkDay() {
 
     if (isNearEnd && !nearEndNotifiedRef.current) {
       nearEndNotifiedRef.current = true;
-      toast.info('Το ωράριό σου λήγει σε 30 λεπτά');
+      toast.info('Το ωράριό σου λήγει σε 30 λεπτά', {
+        action: { label: 'Άνοιγμα', onClick: () => window.location.assign('/timesheets') },
+      });
     }
     if (isOvertime && !overtimeNotifiedRef.current) {
       overtimeNotifiedRef.current = true;
       const overMin = elapsedMinutes - scheduledMinutes;
-      toast.warning(`Υπερωρία! Ξεπέρασες τις κανονικές ώρες κατά ${overMin} λεπτά`);
+      toast.warning(`Υπερωρία! Ξεπέρασες τις κανονικές ώρες κατά ${overMin} λεπτά`, {
+        action: { label: 'Δες ώρες', onClick: () => window.location.assign('/timesheets') },
+      });
     }
   }, [elapsedMinutes, isNearEnd, isOvertime, scheduledMinutes, todayLog]);
 
@@ -228,7 +232,9 @@ export function useWorkDay() {
   const clockIn = async (auto = false) => {
     if (!user || !company) return;
     if (hasActiveLeave) {
-      toast.info('Είσαι σε άδεια σήμερα');
+      toast.info('Είσαι σε άδεια σήμερα', {
+        action: { label: 'Άδειες', onClick: () => window.location.assign('/hr/leaves') },
+      });
       return;
     }
     const today = new Date().toISOString().split('T')[0];
@@ -259,7 +265,9 @@ export function useWorkDay() {
 
     const name = profile?.full_name?.split(' ')[0] || '';
     const time = new Date().toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' });
-    toast.success(`Καλημέρα${name ? ' ' + name : ''}! Ώρα έναρξης: ${time}`);
+    toast.success(`Καλημέρα${name ? ' ' + name : ''}! Ώρα έναρξης: ${time}`, {
+      action: { label: 'Σήμερα', onClick: () => window.location.assign('/') },
+    });
   };
 
   const clockOut = async () => {
@@ -287,7 +295,9 @@ export function useWorkDay() {
 
     const hours = Math.floor(actualMin / 60);
     const mins = actualMin % 60;
-    toast.success(`Καλό απόγευμα! Συνολικές ώρες σήμερα: ${hours}ω ${mins}λ`);
+    toast.success(`Καλό απόγευμα! Συνολικές ώρες σήμερα: ${hours}ω ${mins}λ`, {
+      action: { label: 'Timesheet', onClick: () => window.location.assign('/timesheets') },
+    });
   };
 
   const updateWorkStatus = async (status: WorkStatus) => {

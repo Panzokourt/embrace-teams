@@ -42,7 +42,7 @@ export default function FloatingDock({ onQuickChatToggle, registerSendHandler }:
   const { activePanel, togglePanel, closePanel } = useDock();
   const { floatingWindows } = useChat();
   const { user } = useAuth();
-  const { mode, setMode, isExpanded, onHoverEnter, onHoverLeave } = useDockVisibility();
+  const { mode, setMode, isExpanded, onHoverEnter, onHoverLeave, setLocked } = useDockVisibility();
 
   const items: DockItem[] = [
     { id: 'inbox', label: 'Ειδοποιήσεις & Activity', icon: Bell, kind: 'panel' },

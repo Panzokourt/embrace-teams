@@ -1,6 +1,6 @@
-import { useLeaderboard } from '@/hooks/useLeaderboard';
+import { useLeaderboard, type LeaderboardEntry } from '@/hooks/useLeaderboard';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Trophy, Medal, Award, Zap, Flame, Heart } from 'lucide-react';
 import { getLevelColor, getLevelTitle } from '@/hooks/useUserXP';
@@ -14,8 +14,16 @@ const rankIcons = [
   <Award className="h-5 w-5 text-amber-700" />,
 ];
 
-export function LeaderboardTable() {
-  const { entries, loading } = useLeaderboard();
+interface Props {
+  entries?: LeaderboardEntry[];
+  loading?: boolean;
+  startRank?: number;
+}
+
+export function LeaderboardTable({ entries: entriesProp, loading: loadingProp, startRank = 1 }: Props = {}) {
+  const fallback = useLeaderboard();
+  const entries = entriesProp ?? fallback.entries;
+  const loading = loadingProp ?? fallback.loading;
   const navigate = useNavigate();
 
   if (loading) {
@@ -36,11 +44,13 @@ export function LeaderboardTable() {
     );
   }
 
+  const visible = entries.filter((e) => e.rank >= startRank);
+
   return (
     <div className="space-y-3">
-      {entries.map((entry, i) => {
+      {visible.map((entry) => {
         const colorClass = getLevelColor(entry.level);
-        const isTop3 = i < 3;
+        const isTop3 = entry.rank <= 3;
 
         return (
           <div
@@ -55,7 +65,7 @@ export function LeaderboardTable() {
           >
             {/* Rank */}
             <div className="w-8 flex justify-center">
-              {isTop3 ? rankIcons[i] : (
+              {isTop3 ? rankIcons[entry.rank - 1] : (
                 <span className="text-sm font-bold text-muted-foreground">#{entry.rank}</span>
               )}
             </div>

@@ -21,9 +21,13 @@ import { LeaveRequestsList } from '@/components/hr/LeaveRequestsList';
 import { HRDocuments } from '@/components/hr/HRDocuments';
 import { useLeaveManagement } from '@/hooks/useLeaveManagement';
 import { toast } from 'sonner';
-import { LevelProgressBar } from '@/components/gamification/LevelProgressBar';
 import { SkillRadar } from '@/components/gamification/SkillRadar';
 import { XPActivityFeed } from '@/components/gamification/XPActivityFeed';
+import { ScoreHeroCard } from '@/components/gamification/score/ScoreHeroCard';
+import { XPBreakdownChart } from '@/components/gamification/score/XPBreakdownChart';
+import { LevelPathCard } from '@/components/gamification/score/LevelPathCard';
+import { AchievementsGrid } from '@/components/gamification/score/AchievementsGrid';
+import { MotivationCard } from '@/components/gamification/score/MotivationCard';
 import { PermissionModuleSelector } from '@/components/users/PermissionModuleSelector';
 import { useRBAC } from '@/hooks/useRBAC';
 import { PermissionType } from '@/contexts/AuthContext';
@@ -561,7 +565,13 @@ export default function EmployeeProfile() {
 
         <TabsContent value="gamification">
           <div className="space-y-6">
-            <LevelProgressBar userId={id} />
+            <ScoreHeroCard userId={id} />
+            <MotivationCard userId={id} />
+            <div className="grid gap-6 lg:grid-cols-2">
+              <XPBreakdownChart userId={id!} />
+              <LevelPathCard userId={id} />
+            </div>
+            <AchievementsGrid userId={id!} />
             <div className="grid gap-6 lg:grid-cols-2">
               <SkillRadar userId={id!} />
               <XPActivityFeed userId={id!} />

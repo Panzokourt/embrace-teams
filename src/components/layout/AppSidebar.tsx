@@ -39,6 +39,7 @@ import { ActiveTimerIndicator } from '@/components/time-tracking/ActiveTimerIndi
 import { SidebarNavGroup, SidebarSubLink } from '@/components/layout/SidebarNavGroup';
 import { SidebarProjectTree } from '@/components/layout/SidebarProjectTree';
 import CompanySwitcher from './CompanySwitcher';
+import UserAvatarMenu from './UserAvatarMenu';
 
 interface NavItem {
   title: string;

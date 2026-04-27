@@ -48,9 +48,9 @@ export function LeaderboardTable({ entries: entriesProp, loading: loadingProp, s
 
   return (
     <div className="space-y-3">
-      {entries.map((entry, i) => {
+      {visible.map((entry) => {
         const colorClass = getLevelColor(entry.level);
-        const isTop3 = i < 3;
+        const isTop3 = entry.rank <= 3;
 
         return (
           <div
@@ -65,7 +65,7 @@ export function LeaderboardTable({ entries: entriesProp, loading: loadingProp, s
           >
             {/* Rank */}
             <div className="w-8 flex justify-center">
-              {isTop3 ? rankIcons[i] : (
+              {isTop3 ? rankIcons[entry.rank - 1] : (
                 <span className="text-sm font-bold text-muted-foreground">#{entry.rank}</span>
               )}
             </div>

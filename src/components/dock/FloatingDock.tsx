@@ -1,15 +1,14 @@
-import { Bot, Bell, Activity, MessageSquare, Sparkles, type LucideIcon } from 'lucide-react';
+import { Bell, MessageSquare, Sparkles, type LucideIcon } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useDock, type DockPanelId } from '@/contexts/DockContext';
 import { useChat } from '@/contexts/ChatContext';
 import { useAuth } from '@/contexts/AuthContext';
 
-import SecretaryChat from '@/components/secretary/SecretaryChat';
 import { NotificationList } from '@/components/notifications/NotificationList';
-import { ActivityFeedContent } from '@/components/activity/ActivityFeedContent';
 import FloatingDockPanel from './FloatingDockPanel';
 import DockChatPicker from './DockChatPicker';
+import DockInboxPanel from './DockInboxPanel';
 import DockWorkDayClock from './DockWorkDayClock';
 import DockActiveTimer from './DockActiveTimer';
 import DockWorkMode from './DockWorkMode';
@@ -35,9 +34,7 @@ export default function FloatingDock({ onQuickChatToggle, registerSendHandler }:
   const { user } = useAuth();
 
   const items: DockItem[] = [
-    { id: 'secretary', label: 'Secretary', icon: Bot, kind: 'panel' },
-    { id: 'notifications', label: 'Ειδοποιήσεις', icon: Bell, kind: 'panel' },
-    { id: 'activity', label: 'Activity', icon: Activity, kind: 'panel' },
+    { id: 'inbox', label: 'Ειδοποιήσεις & Activity', icon: Bell, kind: 'panel' },
     { id: 'chat-picker', label: 'Chat', icon: MessageSquare, kind: 'chat', badge: floatingWindows.length > 0 },
     { id: 'quick-chat', label: 'Quick AI (⌘I)', icon: Sparkles, kind: 'quick-chat' },
   ];
@@ -52,22 +49,10 @@ export default function FloatingDock({ onQuickChatToggle, registerSendHandler }:
 
   const renderPanelContent = () => {
     switch (activePanel) {
-      case 'secretary':
+      case 'inbox':
         return (
-          <FloatingDockPanel title="Secretary" icon={<Bot className="h-4 w-4 text-primary" />} onClose={closePanel}>
-            <SecretaryChat mode="panel" registerSendHandler={registerSendHandler} />
-          </FloatingDockPanel>
-        );
-      case 'notifications':
-        return (
-          <FloatingDockPanel title="Ειδοποιήσεις" icon={<Bell className="h-4 w-4 text-primary" />} onClose={closePanel}>
-            <NotificationList active />
-          </FloatingDockPanel>
-        );
-      case 'activity':
-        return (
-          <FloatingDockPanel title="Activity" icon={<Activity className="h-4 w-4 text-primary" />} onClose={closePanel}>
-            <ActivityFeedContent active />
+          <FloatingDockPanel title="Inbox" icon={<Bell className="h-4 w-4 text-primary" />} onClose={closePanel}>
+            <DockInboxPanel />
           </FloatingDockPanel>
         );
       case 'chat-picker':

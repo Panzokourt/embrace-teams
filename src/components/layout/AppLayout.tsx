@@ -76,20 +76,19 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
       const detail = (e as CustomEvent).detail;
       if (detail?.path) {
         navigateRef.current(detail.path);
-        openPanel('secretary');
       }
     };
     window.addEventListener('secretary-navigate', handler);
     return () => window.removeEventListener('secretary-navigate', handler);
-  }, [openPanel]);
+  }, []);
 
-  // Register open panel for voice command
+  // Register open panel for voice command — now navigates to /secretary page
   useEffect(() => {
     if (onRegisterOpenPanel) {
-      onRegisterOpenPanel(() => () => openPanel('secretary'));
+      onRegisterOpenPanel(() => () => navigateRef.current('/secretary'));
     }
     return () => onRegisterOpenPanel?.(null);
-  }, [onRegisterOpenPanel, openPanel]);
+  }, [onRegisterOpenPanel]);
 
   // Close mobile sidebar on layout change
   useEffect(() => {

@@ -195,6 +195,30 @@ export default function AppSidebar({
     }
   }, [location.pathname]);
 
+  // Measure available height for category icons and decide how many fit
+  useEffect(() => {
+    const node = categoriesAreaRef.current;
+    if (!node) return;
+    const ITEM_HEIGHT = 44; // ~py-1.5 + icon + label + gap
+    const compute = () => {
+      const h = node.clientHeight;
+      if (h <= 0) return;
+      const total = categories.length;
+      const fitsAll = Math.floor(h / ITEM_HEIGHT);
+      if (fitsAll >= total) {
+        setVisibleCount(total);
+      } else {
+        // Reserve space for the More button (same height)
+        const fitsWithMore = Math.max(1, Math.floor(h / ITEM_HEIGHT) - 1);
+        setVisibleCount(fitsWithMore);
+      }
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(node);
+    return () => ro.disconnect();
+  }, [categories.length]);
+
   const selectedDef = selectedBriefType ? getBriefDefinition(selectedBriefType) : null;
   const isEffectivelyCollapsed = collapsed || forceCollapsed;
 

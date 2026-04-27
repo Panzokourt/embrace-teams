@@ -192,7 +192,7 @@ export default function FloatingDock({ onQuickChatToggle, registerSendHandler }:
             <div className="w-px h-6 bg-white/20 mx-1" />
 
             {/* Visibility menu — minimize / auto-hide */}
-            <DropdownMenu>
+            <DropdownMenu onOpenChange={(open) => setLocked(open)}>
               <Tooltip delayDuration={200}>
                 <TooltipTrigger asChild>
                   <DropdownMenuTrigger asChild>
@@ -212,7 +212,14 @@ export default function FloatingDock({ onQuickChatToggle, registerSendHandler }:
                   Εμφάνιση dock
                 </TooltipContent>
               </Tooltip>
-              <DropdownMenuContent align="end" side="top" sideOffset={12} className="w-56">
+              <DropdownMenuContent
+                align="end"
+                side="top"
+                sideOffset={12}
+                className="w-60"
+                onMouseEnter={() => setLocked(true)}
+                onMouseLeave={() => setLocked(false)}
+              >
                 <DropdownMenuLabel className="text-xs text-muted-foreground">
                   Εμφάνιση dock
                 </DropdownMenuLabel>

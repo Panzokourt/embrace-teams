@@ -202,12 +202,16 @@ export function useWorkDay() {
 
     if (isNearEnd && !nearEndNotifiedRef.current) {
       nearEndNotifiedRef.current = true;
-      toast.info('Το ωράριό σου λήγει σε 30 λεπτά');
+      toast.info('Το ωράριό σου λήγει σε 30 λεπτά', {
+        action: { label: 'Άνοιγμα', onClick: () => window.location.assign('/timesheets') },
+      });
     }
     if (isOvertime && !overtimeNotifiedRef.current) {
       overtimeNotifiedRef.current = true;
       const overMin = elapsedMinutes - scheduledMinutes;
-      toast.warning(`Υπερωρία! Ξεπέρασες τις κανονικές ώρες κατά ${overMin} λεπτά`);
+      toast.warning(`Υπερωρία! Ξεπέρασες τις κανονικές ώρες κατά ${overMin} λεπτά`, {
+        action: { label: 'Δες ώρες', onClick: () => window.location.assign('/timesheets') },
+      });
     }
   }, [elapsedMinutes, isNearEnd, isOvertime, scheduledMinutes, todayLog]);
 

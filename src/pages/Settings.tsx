@@ -46,6 +46,7 @@ import { DataManagementCard } from '@/components/settings/DataManagementCard';
 import { BulkImportCard } from '@/components/settings/BulkImportCard';
 import { PortalUserManager } from '@/components/portal/PortalUserManager';
 import { AIUsageCard } from '@/components/settings/AIUsageCard';
+import AIMemoryCard from '@/components/settings/AIMemoryCard';
 import HelpTutorialsCard from '@/components/settings/HelpTutorialsCard';
 
 const DAY_LABELS = ['Δευτέρα', 'Τρίτη', 'Τετάρτη', 'Πέμπτη', 'Παρασκευή', 'Σάββατο', 'Κυριακή'];
@@ -517,6 +518,9 @@ export default function SettingsPage() {
 
       {/* AI Usage (Admin only) */}
       {isAdmin && <AIUsageCard />}
+
+      {/* AI Memory (per-user) */}
+      <AIMemoryCard />
 
       {/* Client Portal (Admin only) */}
       {isAdmin && <PortalUserManager />}

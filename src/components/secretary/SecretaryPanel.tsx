@@ -1,15 +1,14 @@
-import { useEffect, useCallback } from "react";
-import { Bot, Activity, Bell, MessageSquare, Brain, X } from "lucide-react";
+import { useEffect } from "react";
+import { Bot, Activity, Bell, MessageSquare, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import SecretaryChat from "./SecretaryChat";
-import MemoryManager from "./MemoryManager";
 import { ActivityFeedContent } from "@/components/activity/ActivityFeedContent";
 import { NotificationList } from "@/components/notifications/NotificationList";
 import ChatPanelView from "@/components/chat/ChatPanelView";
 
-export type RightPanelTab = "secretary" | "activity" | "notifications" | "chat" | "memory";
+export type RightPanelTab = "secretary" | "activity" | "notifications" | "chat";
 
 interface SecretaryPanelProps {
   activeTab: RightPanelTab;
@@ -23,7 +22,6 @@ const tabs = [
   { id: "activity" as const, label: "Activity", icon: Activity },
   { id: "notifications" as const, label: "Ειδοποιήσεις", icon: Bell },
   { id: "chat" as const, label: "Chat", icon: MessageSquare },
-  { id: "memory" as const, label: "AI Μνήμη", icon: Brain },
 ];
 
 export default function SecretaryPanel({ activeTab, onTabChange, onClose, registerSendHandler }: SecretaryPanelProps) {
@@ -73,7 +71,6 @@ export default function SecretaryPanel({ activeTab, onTabChange, onClose, regist
         {activeTab === "activity" && <ActivityFeedContent active />}
         {activeTab === "notifications" && <NotificationList active />}
         {activeTab === "chat" && <ChatPanelView />}
-        {activeTab === "memory" && <MemoryManager onClose={() => onTabChange("secretary")} />}
       </div>
     </div>
   );

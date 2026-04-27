@@ -1,84 +1,63 @@
+## Στόχος
 
-# Quick Chat — Mention UX fixes
+Απόκρυψη της "AI Μνήμης" από όλα τα σημεία του UI όπου είναι εμφανής στον χρήστη, διατηρώντας πλήρως την backend λειτουργία (auto save/recall μέσω secretary-agent & quick-chat-gemini). Το μόνο σημείο όπου ο χρήστης θα μπορεί να την δει και να την διαχειριστεί θα είναι μέσα στις **Ρυθμίσεις**, ως κάρτα διαφάνειας/διαχείρισης.
 
-Δύο διορθώσεις, και τα δύο εστιασμένα στην εμπειρία του quick chat (`⌘+I`).
+## Αλλαγές
 
----
+### 1. Αφαίρεση από το Floating Dock
+**`src/components/dock/FloatingDock.tsx`**
+- Αφαίρεση του item `{ id: 'memory', label: 'AI Μνήμη', icon: Brain, ... }` από τη λίστα `items`.
+- Αφαίρεση του `case 'memory'` από το `renderPanelContent`.
+- Αφαίρεση του import `MemoryManager` και του `Brain` (αν δεν χρησιμοποιείται αλλού στο αρχείο).
 
-## 1. Το chat να μην κλείνει όταν επιλέγεις mention
+### 2. Αφαίρεση από το Secretary Panel (right dock tabs)
+**`src/components/secretary/SecretaryPanel.tsx`**
+- Αφαίρεση του tab `{ id: "memory", label: "AI Μνήμη", icon: Brain }`.
+- Αφαίρεση του render `{activeTab === "memory" && <MemoryManager ... />}`.
+- Αφαίρεση του τύπου `"memory"` από το `RightPanelTab` union (ή κράτημα για συμβατότητα — προτείνεται αφαίρεση).
+- Αφαίρεση imports `MemoryManager`, `Brain`.
 
-**Αιτία:** Το `QuickChatBar.tsx` έχει "click outside to close" handler (γραμμές 95–104) που ακούει σε `mousedown` σε όλο το document. Όταν κάνεις click σε ένα mention suggestion, το `MentionPopover` περιέχεται μέσα σε Radix portal **έξω** από το `containerRef` του chat → ανιχνεύεται ως "outside click" → το chat κλείνει.
+### 3. Αφαίρεση από το ConversationSidebar (Secretary full mode)
+**`src/components/secretary/ConversationSidebar.tsx`**
+- Αφαίρεση του κουμπιού "AI Μνήμη" στο footer (το `{onOpenMemory && ...}` block).
+- Αφαίρεση του prop `onOpenMemory` από το interface και τη signature.
 
-**Διόρθωση** στο `src/components/quick-chat/QuickChatBar.tsx`:
-Στον outside-click handler, να αγνοούμε clicks που έγιναν μέσα σε Radix popper content (mention/slash popovers, tooltips, dropdowns). Το Radix βάζει το attribute `data-radix-popper-content-wrapper` στο wrapper του portal.
+**`src/components/secretary/SecretaryChat.tsx`**
+- Αφαίρεση του prop `onOpenMemory` και του pass-through στο `<ConversationSidebar onOpenMemory={...} />`.
 
-```ts
-const handler = (e: MouseEvent) => {
-  const target = e.target as HTMLElement | null;
-  if (!target) return;
-  // Ignore clicks inside any Radix popper portal (mention popover, tooltips, dropdowns)
-  if (target.closest('[data-radix-popper-content-wrapper]')) return;
-  if (target.closest('[data-sonner-toaster]')) return;
-  if (containerRef.current && !containerRef.current.contains(target)) {
-    onToggle();
-  }
-};
-```
+**`src/pages/Secretary.tsx`**
+- Αφαίρεση του `memoryOpen` state, του `Dialog` με τον `MemoryManager`, του prop `onOpenMemory` που δίνεται στο `SecretaryChat`.
+- Αφαίρεση imports `MemoryManager`, `Dialog`, `useState` (αν δεν χρησιμοποιούνται αλλού).
 
-Αυτό λύνει επίσης μελλοντικά παρόμοια προβλήματα με tooltips/dropdowns που εμφανίζονται μέσα από το quick chat.
+### 4. Προσθήκη στις Ρυθμίσεις
+**`src/components/settings/AIMemoryCard.tsx`** (νέο)
+- Νέο card component με τίτλο "AI Μνήμη" + περιγραφή ("Τα δεδομένα που θυμάται ο AI Assistant για να σου παρέχει συνέχεια στις συνομιλίες").
+- Κουμπί "Διαχείριση μνήμης" που ανοίγει `Dialog` με τον υπάρχον `MemoryManager` μέσα.
+- Optional: μικρό count των μνημών (από `secretary_memory` count για τον user).
 
----
+**`src/pages/Settings.tsx`**
+- Import του `AIMemoryCard`.
+- Τοποθέτηση κάτω από το `AIUsageCard` (γραμμή ~519), έτσι ώστε όλες οι AI-related ρυθμίσεις να είναι μαζί.
 
-## 2. Τα mentions να εμφανίζονται σαν χρωματιστά chips ενώ πληκτρολογείς
+### 5. Backend — καμία αλλαγή
+Τα tools `save_memory` / `recall_memory` στο `secretary-agent` και η αυτόματη αποθήκευση στο `quick-chat-gemini` παραμένουν ως έχουν. Ο πίνακας `secretary_memory` και τα RLS policies δεν αλλάζουν. Έτσι, όλα τα secretary chats (Floating Dock Secretary, full Secretary page, QuickChatBar, FocusAIChat) συνεχίζουν να έχουν persistent memory σιωπηλά.
 
-**Αιτία:** Το `MentionTextarea` χρησιμοποιεί ένα απλό `<textarea>`. Ένα native `<textarea>` δεν μπορεί να ζωγραφίσει inline chips — δείχνει μόνο plain text. Γι' αυτό βλέπεις το serialized format `@[Όνομα](client:uuid…)`.
+## Τεχνικές σημειώσεις
 
-**Λύση:** Overlay-rendering pattern (το ίδιο που χρησιμοποιεί π.χ. το GitHub mention input):
-- Το `<textarea>` παραμένει ως ο πραγματικός editor (caret, selection, IME, accessibility) — αλλά γίνεται **transparent text** (`color: transparent` με `caret-color: foreground`).
-- Από πάνω/πίσω του τοποθετείται ένα styled `<div>` (highlight layer) που έχει **ακριβώς το ίδιο layout**: ίδιο `font`, `padding`, `line-height`, `letter-spacing`, `white-space: pre-wrap`, `word-break`. Ζωγραφίζει το ίδιο κείμενο, αλλά αντικαθιστά τα `@[label](type:id)` και `/[cmd](payload)` segments με χρωματιστά `<span>` chips.
-- Συγχρονίζεται το scroll ώστε τα chips να μένουν στοιχισμένα όταν το textarea κάνει scroll.
-
-Έτοιμα εργαλεία που ήδη υπάρχουν και θα τα χρησιμοποιήσουμε:
-- `splitForRender(text)` από `src/components/mentions/parseMentions.ts` — γυρίζει `[{kind:'text'|'mention'|'slash', …}]`.
-- `MENTION_TYPES[type]` από `src/components/mentions/mentionRegistry.ts` — έχει `colorClass`, `icon`, `label` ανά τύπο.
-
-### Αλλαγές στο `src/components/mentions/MentionTextarea.tsx`
-
-Χωρίς να αλλάξει το external API:
-
-1. Wrap το `<textarea>` σε ένα `relative` container.
-2. Προσθήκη `<div aria-hidden="true">` highlight layer (απόλυτα τοποθετημένο, ίδιο styling), που χρησιμοποιεί `splitForRender(value)` για να ζωγραφίσει:
-   - text segments → `<span>{text}</span>` (διατηρώντας τα newlines)
-   - mention segments → small inline chip:
-     ```tsx
-     <span className="inline-flex items-center gap-0.5 rounded px-1 py-0 align-baseline
-                      bg-foreground/10 text-foreground">
-       <Icon className={cn('h-3 w-3', cfg.colorClass)} />
-       @{label}
-     </span>
-     ```
-   - slash segments → αντίστοιχο chip σε `bg-primary/10 text-primary`.
-3. Το `<textarea>` παίρνει `color: transparent`, `caret-color: hsl(var(--foreground))`, `position: relative`, `z-10` ώστε ο χρήστης να μπορεί να επιλέγει/επεξεργάζεται κανονικά. Η selection παραμένει εμφανής (browsers ζωγραφίζουν selection overlay πριν το text).
-4. Sync scroll: σε `onScroll` του textarea, το highlight layer scrollάρει αντίστοιχα.
-5. Πρόσθετο utility `mention-input-base` class με τα κοινά typography tokens που μοιράζονται textarea + overlay για να μένουν pixel-perfect aligned.
-
-### Συμπεριφορά διαγραφής
-Η σειριακή μορφή `@[label](type:id)` παραμένει ως storage format (όπως είναι σήμερα), οπότε το backend, parsing, mention context, persistence, MentionRenderer για τα τελικά μηνύματα — **δεν αλλάζουν καθόλου**. Backspace διαγράφει χαρακτήρα-χαρακτήρα από το serialized string (όπως τώρα). Δεν αλλάζουμε σε "atomic chip delete" — είναι μεγαλύτερη αλλαγή και δεν ήταν στο αίτημα.
-
-### Συνεκτικότητα σε άλλους consumers
-Το `MentionTextarea` χρησιμοποιείται σε:
-- `QuickChatBar.tsx` ✅
-- `SecretaryChat.tsx` ✅
-- `CommentsSection.tsx` ✅
-
-Επειδή η αλλαγή είναι εσωτερική και δε σπάει το API/styling ή τις κλάσεις που περνιούνται, **όλοι θα δουν chips αυτόματα** — σταθερό UX σε όλη την εφαρμογή.
-
----
+- Καμία database migration δεν απαιτείται.
+- Το component `MemoryManager.tsx` παραμένει ως έχει — απλώς αλλάζει το σημείο όπου mount-άρεται (μόνο μέσω Settings).
+- Δεν χρειάζεται αλλαγή στο `DockContext` (αν το `'memory'` panel id υπάρχει, δεν θα ενεργοποιείται από κάπου, οπότε είναι ασφαλές να μείνει).
 
 ## Αρχεία που τροποποιούνται
 
-- `src/components/quick-chat/QuickChatBar.tsx` — outside-click handler ignore-list για Radix poppers.
-- `src/components/mentions/MentionTextarea.tsx` — overlay highlight layer + transparent textarea.
+- `src/components/dock/FloatingDock.tsx` (αφαίρεση memory entry)
+- `src/components/secretary/SecretaryPanel.tsx` (αφαίρεση memory tab)
+- `src/components/secretary/SecretaryChat.tsx` (αφαίρεση onOpenMemory prop)
+- `src/components/secretary/ConversationSidebar.tsx` (αφαίρεση κουμπιού)
+- `src/pages/Secretary.tsx` (αφαίρεση Dialog)
+- `src/pages/Settings.tsx` (προσθήκη AIMemoryCard)
+- `src/components/settings/AIMemoryCard.tsx` (νέο)
 
-## Δεν αλλάζουν
-- `parseMentions.ts`, `mentionRegistry.ts`, `MentionRenderer.tsx`, `MentionPopover.tsx`, edge functions / serialization format, οποιοσδήποτε άλλος consumer.
+## Αποτέλεσμα
+
+Ο χρήστης δεν βλέπει πλέον την "AI Μνήμη" στο dock, στο secretary sidebar ή στα tabs — η λειτουργία γίνεται εντελώς αόρατη και αυτόματη σε όλα τα secretary chats. Μόνο όποιος θέλει να την επιθεωρήσει/καθαρίσει μπορεί να το κάνει από τις **Ρυθμίσεις → AI Μνήμη**.

@@ -1,4 +1,4 @@
-import { Bot, Bell, Activity, MessageSquare, Brain, Sparkles, type LucideIcon } from 'lucide-react';
+import { Bot, Bell, Activity, MessageSquare, Sparkles, type LucideIcon } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useDock, type DockPanelId } from '@/contexts/DockContext';
@@ -8,7 +8,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import SecretaryChat from '@/components/secretary/SecretaryChat';
 import { NotificationList } from '@/components/notifications/NotificationList';
 import { ActivityFeedContent } from '@/components/activity/ActivityFeedContent';
-import MemoryManager from '@/components/secretary/MemoryManager';
 import FloatingDockPanel from './FloatingDockPanel';
 import DockChatPicker from './DockChatPicker';
 import DockWorkDayClock from './DockWorkDayClock';
@@ -40,7 +39,6 @@ export default function FloatingDock({ onQuickChatToggle, registerSendHandler }:
     { id: 'notifications', label: 'Ειδοποιήσεις', icon: Bell, kind: 'panel' },
     { id: 'activity', label: 'Activity', icon: Activity, kind: 'panel' },
     { id: 'chat-picker', label: 'Chat', icon: MessageSquare, kind: 'chat', badge: floatingWindows.length > 0 },
-    { id: 'memory', label: 'AI Μνήμη', icon: Brain, kind: 'panel' },
     { id: 'quick-chat', label: 'Quick AI (⌘I)', icon: Sparkles, kind: 'quick-chat' },
   ];
 
@@ -70,12 +68,6 @@ export default function FloatingDock({ onQuickChatToggle, registerSendHandler }:
         return (
           <FloatingDockPanel title="Activity" icon={<Activity className="h-4 w-4 text-primary" />} onClose={closePanel}>
             <ActivityFeedContent active />
-          </FloatingDockPanel>
-        );
-      case 'memory':
-        return (
-          <FloatingDockPanel title="AI Μνήμη" icon={<Brain className="h-4 w-4 text-primary" />} onClose={closePanel}>
-            <MemoryManager onClose={closePanel} />
           </FloatingDockPanel>
         );
       case 'chat-picker':

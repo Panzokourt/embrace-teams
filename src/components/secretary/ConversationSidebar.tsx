@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, MessageSquare, Trash2, Loader2, Brain } from "lucide-react";
+import { Plus, MessageSquare, Trash2, Loader2 } from "lucide-react";
 import { format, isToday, isYesterday } from "date-fns";
 import { el } from "date-fns/locale";
 
@@ -19,7 +19,6 @@ interface ConversationSidebarProps {
   activeConversationId: string | null;
   onSelectConversation: (id: string) => void;
   onNewConversation: () => void;
-  onOpenMemory?: () => void;
   collapsed?: boolean;
 }
 
@@ -27,7 +26,6 @@ export default function ConversationSidebar({
   activeConversationId,
   onSelectConversation,
   onNewConversation,
-  onOpenMemory,
   collapsed = false,
 }: ConversationSidebarProps) {
   const { user } = useAuth();
@@ -131,21 +129,6 @@ export default function ConversationSidebar({
           )}
         </div>
       </ScrollArea>
-
-      {/* Memory button */}
-      {onOpenMemory && (
-        <div className="p-3 border-t border-sidebar-border">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full gap-2 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-            onClick={onOpenMemory}
-          >
-            <Brain className="h-4 w-4" />
-            AI Μνήμη
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

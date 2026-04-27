@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useXPEngine } from '@/hooks/useXPEngine';
 import { toast } from 'sonner';
 
 export interface TimeEntry {
@@ -22,6 +23,7 @@ export interface TimeEntry {
 
 export function useTimeTracking() {
   const { user } = useAuth();
+  const { awardTimeXP } = useXPEngine();
   const [activeTimer, setActiveTimer] = useState<TimeEntry | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -124,7 +126,12 @@ export function useTimeTracking() {
 
     setActiveTimer(null);
     toast.success(`Timer σταμάτησε (${durationMinutes} λεπτά)`);
-  }, [activeTimer]);
+
+    // Award XP for time logged (caps applied inside engine)
+    if (user) {
+      awardTimeXP(user.id, durationMinutes, activeTimer.task_id || undefined).catch(() => {});
+    }
+  }, [activeTimer, awardTimeXP, user]);
 
   const addManualEntry = useCallback(async (entry: {
     task_id: string | null;
@@ -175,7 +182,11 @@ export function useTimeTracking() {
     }
 
     toast.success('Καταχώρηση χρόνου αποθηκεύτηκε');
-  }, [user]);
+
+    if (user) {
+      awardTimeXP(user.id, durationMinutes, entry.task_id || undefined).catch(() => {});
+    }
+  }, [user, awardTimeXP]);
 
   const deleteEntry = useCallback(async (entryId: string) => {
     const { error } = await supabase

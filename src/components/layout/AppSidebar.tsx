@@ -175,7 +175,8 @@ export default function AppSidebar({
   const [quickOpen, setQuickOpen] = useState(false);
   const [selectedBriefType, setSelectedBriefType] = useState<string | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [visibleCount, setVisibleCount] = useState<number>(categories.length);
+  // Start at 0 so we never overflow on first paint; ResizeObserver fills it in.
+  const [visibleCount, setVisibleCount] = useState<number>(0);
   const categoriesAreaRef = useRef<HTMLDivElement>(null);
 
   // Flyout state for collapsed/rail mode

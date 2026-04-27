@@ -295,7 +295,9 @@ export function useWorkDay() {
 
     const hours = Math.floor(actualMin / 60);
     const mins = actualMin % 60;
-    toast.success(`Καλό απόγευμα! Συνολικές ώρες σήμερα: ${hours}ω ${mins}λ`);
+    toast.success(`Καλό απόγευμα! Συνολικές ώρες σήμερα: ${hours}ω ${mins}λ`, {
+      action: { label: 'Timesheet', onClick: () => window.location.assign('/timesheets') },
+    });
   };
 
   const updateWorkStatus = async (status: WorkStatus) => {

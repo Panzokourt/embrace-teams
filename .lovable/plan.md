@@ -1,63 +1,67 @@
-## Στόχος
+## Πρόβλημα
 
-Απόκρυψη της "AI Μνήμης" από όλα τα σημεία του UI όπου είναι εμφανής στον χρήστη, διατηρώντας πλήρως την backend λειτουργία (auto save/recall μέσω secretary-agent & quick-chat-gemini). Το μόνο σημείο όπου ο χρήστης θα μπορεί να την δει και να την διαχειριστεί θα είναι μέσα στις **Ρυθμίσεις**, ως κάρτα διαφάνειας/διαχείρισης.
+Στο rail sidebar (αριστερή στήλη με τα εικονίδια), οι 10 κατηγορίες (Work, Clients, Marketing, Creative, Development, Finance, Operations, Intelligence, Communication, Settings) μαζί με τα standalone items (Logo, My Work, Files) γεμίζουν όλο το ύψος σε μικρές οθόνες (~743px ή χαμηλότερες) και τα bottom actions (Secretary AI ⚡, Theme toggle 🌗, User Avatar 👤) **κόβονται κάτω και δεν φαίνονται**.
 
-## Αλλαγές
+Σήμερα η μεσαία λίστα κατηγοριών έχει `flex-1` χωρίς `overflow`, οπότε σπρώχνει τα bottom actions εκτός viewport αντί να scrollάρει.
 
-### 1. Αφαίρεση από το Floating Dock
-**`src/components/dock/FloatingDock.tsx`**
-- Αφαίρεση του item `{ id: 'memory', label: 'AI Μνήμη', icon: Brain, ... }` από τη λίστα `items`.
-- Αφαίρεση του `case 'memory'` από το `renderPanelContent`.
-- Αφαίρεση του import `MemoryManager` και του `Brain` (αν δεν χρησιμοποιείται αλλού στο αρχείο).
+## Πρόταση λύσης (συνδυασμός)
 
-### 2. Αφαίρεση από το Secretary Panel (right dock tabs)
-**`src/components/secretary/SecretaryPanel.tsx`**
-- Αφαίρεση του tab `{ id: "memory", label: "AI Μνήμη", icon: Brain }`.
-- Αφαίρεση του render `{activeTab === "memory" && <MemoryManager ... />}`.
-- Αφαίρεση του τύπου `"memory"` από το `RightPanelTab` union (ή κράτημα για συμβατότητα — προτείνεται αφαίρεση).
-- Αφαίρεση imports `MemoryManager`, `Brain`.
+**A. Πάντα ορατά bottom actions** — Τα Secretary / Theme / Avatar είναι κρίσιμα και πρέπει να μένουν “κολλημένα” στο κάτω μέρος του rail σε κάθε ύψος οθόνης.
 
-### 3. Αφαίρεση από το ConversationSidebar (Secretary full mode)
-**`src/components/secretary/ConversationSidebar.tsx`**
-- Αφαίρεση του κουμπιού "AI Μνήμη" στο footer (το `{onOpenMemory && ...}` block).
-- Αφαίρεση του prop `onOpenMemory` από το interface και τη signature.
+**B. “More” overflow menu για κατηγορίες** — Όταν το διαθέσιμο ύψος δεν χωράει όλες τις κατηγορίες, εμφανίζονται όσες χωρούν και οι υπόλοιπες μπαίνουν σε ένα **κουμπί “More” (⋯)** στο τέλος της λίστας. Με κλικ ανοίγει popover (όπως η εικόνα ClickUp που στείλατε) με grid από τα υπόλοιπα εικονίδια κατηγοριών — με tooltip-style labels και κανονική συμπεριφορά κλικ (άνοιγμα flyout κατηγορίας).
 
-**`src/components/secretary/SecretaryChat.tsx`**
-- Αφαίρεση του prop `onOpenMemory` και του pass-through στο `<ConversationSidebar onOpenMemory={...} />`.
+**Γιατί συνδυασμός και όχι απλό scroll:** Καθαρό scroll στις κατηγορίες είναι λιγότερο ανακαλύψιμο (ο χρήστης δεν βλέπει ότι υπάρχουν κι άλλα), ενώ το “More” popover είναι πιο εμφανές pattern και δίνει γρήγορη πρόσβαση σε όλα τα modules με ένα κλικ.
 
-**`src/pages/Secretary.tsx`**
-- Αφαίρεση του `memoryOpen` state, του `Dialog` με τον `MemoryManager`, του prop `onOpenMemory` που δίνεται στο `SecretaryChat`.
-- Αφαίρεση imports `MemoryManager`, `Dialog`, `useState` (αν δεν χρησιμοποιούνται αλλού).
+## Τεχνικό σχέδιο
 
-### 4. Προσθήκη στις Ρυθμίσεις
-**`src/components/settings/AIMemoryCard.tsx`** (νέο)
-- Νέο card component με τίτλο "AI Μνήμη" + περιγραφή ("Τα δεδομένα που θυμάται ο AI Assistant για να σου παρέχει συνέχεια στις συνομιλίες").
-- Κουμπί "Διαχείριση μνήμης" που ανοίγει `Dialog` με τον υπάρχον `MemoryManager` μέσα.
-- Optional: μικρό count των μνημών (από `secretary_memory` count για τον user).
+**Αρχείο που αλλάζει:** `src/components/layout/AppSidebar.tsx` (μόνο το `IconRail` component, ~γραμμές 250–421).
 
-**`src/pages/Settings.tsx`**
-- Import του `AIMemoryCard`.
-- Τοποθέτηση κάτω από το `AIUsageCard` (γραμμή ~519), έτσι ώστε όλες οι AI-related ρυθμίσεις να είναι μαζί.
+1. **Νέο hook μέτρησης χώρου** μέσα στο `IconRail`:
+   - `useRef` στο container των κατηγοριών (`categoriesRef`).
+   - `ResizeObserver` που υπολογίζει πόσες κατηγορίες χωράνε:
+     ```ts
+     const ITEM_HEIGHT = 44;   // py-1.5 + icon + label
+     const MORE_BTN_HEIGHT = 44;
+     const visibleCount = Math.floor(containerHeight / ITEM_HEIGHT);
+     ```
+   - State: `visibleCategories` & `overflowCategories`.
 
-### 5. Backend — καμία αλλαγή
-Τα tools `save_memory` / `recall_memory` στο `secretary-agent` και η αυτόματη αποθήκευση στο `quick-chat-gemini` παραμένουν ως έχουν. Ο πίνακας `secretary_memory` και τα RLS policies δεν αλλάζουν. Έτσι, όλα τα secretary chats (Floating Dock Secretary, full Secretary page, QuickChatBar, FocusAIChat) συνεχίζουν να έχουν persistent memory σιωπηλά.
+2. **Layout fix στο rail container** (γρ. 251–260):
+   - Προσθήκη `min-h-0` στο root flex.
+   - Το div των κατηγοριών (γρ. 316) γίνεται `flex-1 min-h-0` (χωρίς overflow), και η λογική κόβει τη λίστα στις `visibleCount` items.
+   - Τα bottom actions (γρ. 344) μένουν `mt-auto shrink-0` ώστε να πατάνε πάντα στο τέλος.
 
-## Τεχνικές σημειώσεις
+3. **More button (όταν `overflowCategories.length > 0`):**
+   - Νέο button κάτω από τις ορατές κατηγορίες με icon `MoreHorizontal` (lucide) + label "More".
+   - Wrapped σε `Popover` (`@/components/ui/popover` — ήδη imported).
+   - `PopoverContent` side="right" με grid 2 ή 3 στηλών:
+     ```tsx
+     <div className="grid grid-cols-2 gap-2 p-2">
+       {overflowCategories.map(cat => (
+         <button onClick={() => { handleCategoryClick(cat.id); setMoreOpen(false); }}
+                 className="flex flex-col items-center gap-1 p-3 rounded-lg hover:bg-accent">
+           <cat.icon className="h-5 w-5" />
+           <span className="text-xs">{cat.label}</span>
+         </button>
+       ))}
+     </div>
+     ```
+   - Αν η ενεργή κατηγορία είναι μέσα στο overflow, εμφανίζουμε ένα μικρό dot indicator πάνω στο More button.
 
-- Καμία database migration δεν απαιτείται.
-- Το component `MemoryManager.tsx` παραμένει ως έχει — απλώς αλλάζει το σημείο όπου mount-άρεται (μόνο μέσω Settings).
-- Δεν χρειάζεται αλλαγή στο `DockContext` (αν το `'memory'` panel id υπάρχει, δεν θα ενεργοποιείται από κάπου, οπότε είναι ασφαλές να μείνει).
+4. **Ευφυής σειρά κατηγοριών:** Δεν αλλάζει η σειρά του `categories` array. Απλά οι τελευταίες (πχ Settings, Communication) θα μπαίνουν συνήθως στο More. Αν η ενεργή κατηγορία πέφτει στο overflow, την προωθούμε αυτόματα στις ορατές (swap) ώστε να φαίνεται πάντα active state.
 
-## Αρχεία που τροποποιούνται
+5. **Mobile sheet (`isMobileSheet`):** Παραμένει η υπάρχουσα συμπεριφορά (full-height drawer χωρίς overflow πρόβλημα). Το More button ενεργοποιείται μόνο όταν χρειάζεται (έλεγχος μέσω ResizeObserver — δουλεύει και στις δύο περιπτώσεις).
 
-- `src/components/dock/FloatingDock.tsx` (αφαίρεση memory entry)
-- `src/components/secretary/SecretaryPanel.tsx` (αφαίρεση memory tab)
-- `src/components/secretary/SecretaryChat.tsx` (αφαίρεση onOpenMemory prop)
-- `src/components/secretary/ConversationSidebar.tsx` (αφαίρεση κουμπιού)
-- `src/pages/Secretary.tsx` (αφαίρεση Dialog)
-- `src/pages/Settings.tsx` (προσθήκη AIMemoryCard)
-- `src/components/settings/AIMemoryCard.tsx` (νέο)
+## Τι μένει ίδιο
+
+- Όλα τα styles/χρώματα του dark rail.
+- Logo, My Work, Files standalone buttons πάνω-πάνω.
+- Flyout panel που ανοίγει δίπλα στο rail κατά το κλικ κατηγορίας.
+- Bottom actions: Secretary, Theme, Avatar — απλά τώρα **εγγυημένα ορατά**.
 
 ## Αποτέλεσμα
 
-Ο χρήστης δεν βλέπει πλέον την "AI Μνήμη" στο dock, στο secretary sidebar ή στα tabs — η λειτουργία γίνεται εντελώς αόρατη και αυτόματη σε όλα τα secretary chats. Μόνο όποιος θέλει να την επιθεωρήσει/καθαρίσει μπορεί να το κάνει από τις **Ρυθμίσεις → AI Μνήμη**.
+- Σε ψηλές οθόνες (>900px): φαίνονται όλες οι 10 κατηγορίες, κανένα More button (no visual change).
+- Σε μεσαίες (~700–800px): εμφανίζονται 6–8 κατηγορίες + “More” με τις υπόλοιπες.
+- Σε μικρές (<700px): εμφανίζονται 4–5 + “More” popover για τα υπόλοιπα.
+- Τα Secretary / Theme / Avatar **πάντα ορατά**.

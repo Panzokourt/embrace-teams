@@ -29,7 +29,7 @@ import {
   Moon, Sun, CalendarDays, FileArchive, Timer, FileStack, BarChart3,
   Plus, Palette, Monitor, Globe, Calendar, MessageSquare, BookUser,
   Briefcase, Mail, Trophy, ShieldCheck, BookOpen, GitBranch, MonitorPlay,
-  Megaphone, Code2, Paintbrush, TrendingUp, Shield } from
+  Megaphone, Code2, Paintbrush, TrendingUp, Shield, MoreHorizontal } from
 'lucide-react';
 import { briefDefinitions, getBriefDefinition } from '@/components/blueprints/briefDefinitions';
 import { BriefFormDialog } from '@/components/blueprints/BriefFormDialog';

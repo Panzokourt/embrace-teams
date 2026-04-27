@@ -248,6 +248,7 @@ export default function AppLayout() {
           <CoachingProvider>
             <XPNotificationsProvider>
               <AppLayoutWithVoice />
+              <NewVersionToast />
             </XPNotificationsProvider>
           </CoachingProvider>
         </DockProvider>

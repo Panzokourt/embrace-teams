@@ -18,6 +18,7 @@ import { XPNotificationsProvider } from '@/contexts/XPNotificationsContext';
 import XPGainStack from '@/components/gamification/XPGainStack';
 import AchievementToastStack from '@/components/gamification/AchievementToastStack';
 import LevelUpModal from '@/components/gamification/LevelUpModal';
+import { NewVersionToast } from '@/components/system/NewVersionToast';
 import { cn } from '@/lib/utils';
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed';

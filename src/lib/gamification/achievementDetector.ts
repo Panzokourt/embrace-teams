@@ -133,7 +133,7 @@ export async function findUnlockedAchievements(userId: string): Promise<Achievem
     (existing || []).filter((r: any) => r.unlocked_at).map((r: any) => r.achievement_id)
   );
 
-  const candidates = (catalog as AchievementRow[]).filter((a) => !unlockedIds.has(a.id));
+  const candidates = (catalog as unknown as AchievementRow[]).filter((a) => !unlockedIds.has(a.id));
   // Cache metric values per type to avoid redundant queries
   const metricCache = new Map<string, number>();
   const result: AchievementRow[] = [];

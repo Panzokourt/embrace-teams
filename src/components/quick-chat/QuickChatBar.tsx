@@ -91,11 +91,16 @@ export default function QuickChatBar({ isOpen, onToggle }: QuickChatBarProps) {
     return () => window.removeEventListener('keydown', handler);
   }, [isOpen, onToggle]);
 
-  // Click outside to close
+  // Click outside to close — but ignore clicks inside Radix portals (mention popover, tooltips, dropdowns) and toasts
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (target.closest('[data-radix-popper-content-wrapper]')) return;
+      if (target.closest('[data-radix-portal]')) return;
+      if (target.closest('[data-sonner-toaster]')) return;
+      if (containerRef.current && !containerRef.current.contains(target)) {
         onToggle();
       }
     };

@@ -1,135 +1,84 @@
 
-# Work Mode v3 — Layout Refinement & Smart Navigation
+# Quick Chat — Mention UX fixes
 
-## 1. Νέα διάταξη του `FocusOverlay.tsx`
-
-### Header (full width, πάνω)
-- Project name (uppercase, μικρό caption) — **παραμένει**
-- **Νέα γραμμή breadcrumb κάτω από project**: `Πελάτης · Παραδοτέο` και τα **δύο clickable** (chip-style με hover underline). Άνοιγμα animated right-side drawer με τις λεπτομέρειες.
-- Editable τίτλος (μεγαλύτερο, πιο φωτεινό: `text-3xl text-white`)
-- Priority + Status pills
-
-### Layout 2 στηλών (κάτω από header)
-**ΑΡΙΣΤΕΡΗ στήλη** (στοιβαγμένη, αριστερά κάτω από τίτλο):
-1. **Λεπτομέρειες** (μετακινείται από δεξιά → αριστερά). Grid 2 cols σε σταθερό alignment:
-   - Ανατέθηκε σε
-   - Ημ. Έναρξης
-   - Προθεσμία
-   - Εκτίμηση (h)
-   - **Αφαιρείται η μπάρα προόδου** εντελώς
-2. Περιγραφή (inline-edit textarea)
-3. Subtasks
-4. Αρχεία
-
-**ΔΕΞΙΑ στήλη**:
-- **Σχόλια** μόνο, με `min-h-[700px]` ώστε να γεμίζει το ύψος των αριστερών sections (chat-style με sticky composer στο κάτω μέρος)
-
-### Καταργούνται
-- Το `Section icon={Clock} title="Χρόνος"` (FocusTimeTrackingSection) — υπάρχει ήδη το timer στο bottom bar
-- Η μπάρα προόδου από το panel "Λεπτομέρειες"
-- Το `FocusDependenciesSection` μεταφέρεται **κάτω από Λεπτομέρειες** (παραμένει αλλά compact, αφού ήταν στο time tracking κενό)
-
-### Typography upgrade (καθ' όλη τη σελίδα)
-- Section labels: `text-white/70` (ήταν `/45`), `text-[13px]` (ήταν `text-xs`)
-- Field labels (Ανατέθηκε σε, Προθεσμία…): `text-white/65 text-sm`
-- Field values: `text-white text-[15px]`
-- Όλα τα input/date borders: `border-white/15` και values με `text-white`
-- Empty placeholders: `text-white/50` (ήταν `/30`)
-
-### Alignment
-- Όλα τα fields στο "Λεπτομέρειες" χρησιμοποιούν grid `grid-cols-2 gap-x-8 gap-y-5` με σταθερό `min-h-[40px]` ανά cell
-- Ίδιο vertical rhythm μεταξύ label και input (`space-y-1.5` παντού)
+Δύο διορθώσεις, και τα δύο εστιασμένα στην εμπειρία του quick chat (`⌘+I`).
 
 ---
 
-## 2. Νέο `FocusEntityDrawer.tsx` (animated right-side sheet)
+## 1. Το chat να μην κλείνει όταν επιλέγεις mention
 
-Ένα reusable component που γίνεται mount πάνω από όλα (z-60) και ολισθαίνει από δεξιά:
-- **Mode "client"**: fetch `clients` + recent projects + contact info, KPIs, λογότυπο
-- **Mode "deliverable"**: fetch `deliverables` + tasks count, due date, status, progress
+**Αιτία:** Το `QuickChatBar.tsx` έχει "click outside to close" handler (γραμμές 95–104) που ακούει σε `mousedown` σε όλο το document. Όταν κάνεις click σε ένα mention suggestion, το `MentionPopover` περιέχεται μέσα σε Radix portal **έξω** από το `containerRef` του chat → ανιχνεύεται ως "outside click" → το chat κλείνει.
 
-Triggered από τα clickable chips στο header. Animation με `transform translate-x-full → 0` (300ms ease-out) και backdrop blur fade.
+**Διόρθωση** στο `src/components/quick-chat/QuickChatBar.tsx`:
+Στον outside-click handler, να αγνοούμε clicks που έγιναν μέσα σε Radix popper content (mention/slash popovers, tooltips, dropdowns). Το Radix βάζει το attribute `data-radix-popper-content-wrapper` στο wrapper του portal.
 
-State: `const [drawer, setDrawer] = useState<{type:'client'|'deliverable', id:string}|null>(null)`
-
----
-
-## 3. Bottom bar — κουμπί ολοκλήρωσης
-
-Στο `FocusControlBar.tsx`, **αμέσως δίπλα στο Status dropdown (αριστερά)** προστίθεται:
-
-```tsx
-<button
-  onClick={() => handleStatusChange('completed')}
-  className="h-10 px-5 rounded-full bg-emerald-500 hover:bg-emerald-400 
-             text-white font-bold text-sm flex items-center gap-2 
-             shadow-lg shadow-emerald-500/30 transition-all hover:scale-105"
->
-  <CheckCircle2 className="h-4 w-4" />
-  Ολοκλήρωση
-</button>
+```ts
+const handler = (e: MouseEvent) => {
+  const target = e.target as HTMLElement | null;
+  if (!target) return;
+  // Ignore clicks inside any Radix popper portal (mention popover, tooltips, dropdowns)
+  if (target.closest('[data-radix-popper-content-wrapper]')) return;
+  if (target.closest('[data-sonner-toaster]')) return;
+  if (containerRef.current && !containerRef.current.contains(target)) {
+    onToggle();
+  }
+};
 ```
 
-Έντονο πράσινο, bold, με glow shadow ώστε να ξεχωρίζει.
+Αυτό λύνει επίσης μελλοντικά παρόμοια προβλήματα με tooltips/dropdowns που εμφανίζονται μέσα από το quick chat.
 
 ---
 
-## 4. Smart Search στο "Up Next" sidebar
+## 2. Τα mentions να εμφανίζονται σαν χρωματιστά chips ενώ πληκτρολογείς
 
-Στο header του sidebar, **δίπλα στον τίτλο "UP NEXT"**:
-- Toggle search icon → animated expand σε input full-width
-- Input με placeholder "Αναζήτηση σε όλα τα tasks…"
+**Αιτία:** Το `MentionTextarea` χρησιμοποιεί ένα απλό `<textarea>`. Ένα native `<textarea>` δεν μπορεί να ζωγραφίσει inline chips — δείχνει μόνο plain text. Γι' αυτό βλέπεις το serialized format `@[Όνομα](client:uuid…)`.
 
-### Λογική αναζήτησης
-- Όταν query είναι κενό → εμφανίζει το παλιό upNext list (όπως τώρα)
-- Όταν query > 0 chars → debounced (250ms) query στο `tasks`:
-  ```ts
-  supabase.from('tasks')
-    .select('id, title, status, due_date, priority, project:projects(name)')
-    .eq('assigned_to', user.id)
-    .or(`title.ilike.%${q}%,description.ilike.%${q}%`)
-    .limit(50)
-  ```
-- **Sorting** δυναμικά: 
-  1. Overdue πρώτα (due_date < today AND status != completed) ταξινομημένα κατά πιο "καθυστερημένα" πρώτα
-  2. Σήμερα due
-  3. Future due
-  4. No due date
-  5. Completed στο τέλος
-- Visual badge δίπλα σε κάθε αποτέλεσμα: 🔴 "Άργησες +Xd" / 🟡 "Σήμερα" / ⚪ ημερομηνία / ✅ ολοκληρωμένο
-- Click σε αποτέλεσμα → `setCurrentTaskById(id)` (αν δεν είναι στο queue, fetch και inject)
+**Λύση:** Overlay-rendering pattern (το ίδιο που χρησιμοποιεί π.χ. το GitHub mention input):
+- Το `<textarea>` παραμένει ως ο πραγματικός editor (caret, selection, IME, accessibility) — αλλά γίνεται **transparent text** (`color: transparent` με `caret-color: foreground`).
+- Από πάνω/πίσω του τοποθετείται ένα styled `<div>` (highlight layer) που έχει **ακριβώς το ίδιο layout**: ίδιο `font`, `padding`, `line-height`, `letter-spacing`, `white-space: pre-wrap`, `word-break`. Ζωγραφίζει το ίδιο κείμενο, αλλά αντικαθιστά τα `@[label](type:id)` και `/[cmd](payload)` segments με χρωματιστά `<span>` chips.
+- Συγχρονίζεται το scroll ώστε τα chips να μένουν στοιχισμένα όταν το textarea κάνει scroll.
 
-Νέο component: `src/components/focus/FocusSidebarSearch.tsx`
+Έτοιμα εργαλεία που ήδη υπάρχουν και θα τα χρησιμοποιήσουμε:
+- `splitForRender(text)` από `src/components/mentions/parseMentions.ts` — γυρίζει `[{kind:'text'|'mention'|'slash', …}]`.
+- `MENTION_TYPES[type]` από `src/components/mentions/mentionRegistry.ts` — έχει `colorClass`, `icon`, `label` ανά τύπο.
 
----
+### Αλλαγές στο `src/components/mentions/MentionTextarea.tsx`
 
-## 5. Επεκτάσεις στο `FocusContext.tsx`
+Χωρίς να αλλάξει το external API:
 
-- Επέκταση του `FocusTask` interface με `client_id?`, `client_name?`, `deliverable_id?`, `deliverable_name?`
-- TASK_SELECT γίνεται:
-  ```
-  …, deliverable_id, deliverable:deliverables(id, name),
-  project:projects(name, client_id, client:clients(id, name, logo_url))
-  ```
-- mapTask εξάγει client/deliverable info
-- Νέο action `injectAndFocusTask(id)` για το search (fetch αν δεν υπάρχει, set as current)
+1. Wrap το `<textarea>` σε ένα `relative` container.
+2. Προσθήκη `<div aria-hidden="true">` highlight layer (απόλυτα τοποθετημένο, ίδιο styling), που χρησιμοποιεί `splitForRender(value)` για να ζωγραφίσει:
+   - text segments → `<span>{text}</span>` (διατηρώντας τα newlines)
+   - mention segments → small inline chip:
+     ```tsx
+     <span className="inline-flex items-center gap-0.5 rounded px-1 py-0 align-baseline
+                      bg-foreground/10 text-foreground">
+       <Icon className={cn('h-3 w-3', cfg.colorClass)} />
+       @{label}
+     </span>
+     ```
+   - slash segments → αντίστοιχο chip σε `bg-primary/10 text-primary`.
+3. Το `<textarea>` παίρνει `color: transparent`, `caret-color: hsl(var(--foreground))`, `position: relative`, `z-10` ώστε ο χρήστης να μπορεί να επιλέγει/επεξεργάζεται κανονικά. Η selection παραμένει εμφανής (browsers ζωγραφίζουν selection overlay πριν το text).
+4. Sync scroll: σε `onScroll` του textarea, το highlight layer scrollάρει αντίστοιχα.
+5. Πρόσθετο utility `mention-input-base` class με τα κοινά typography tokens που μοιράζονται textarea + overlay για να μένουν pixel-perfect aligned.
 
----
+### Συμπεριφορά διαγραφής
+Η σειριακή μορφή `@[label](type:id)` παραμένει ως storage format (όπως είναι σήμερα), οπότε το backend, parsing, mention context, persistence, MentionRenderer για τα τελικά μηνύματα — **δεν αλλάζουν καθόλου**. Backspace διαγράφει χαρακτήρα-χαρακτήρα από το serialized string (όπως τώρα). Δεν αλλάζουμε σε "atomic chip delete" — είναι μεγαλύτερη αλλαγή και δεν ήταν στο αίτημα.
 
-## Αρχεία προς δημιουργία/τροποποίηση
+### Συνεκτικότητα σε άλλους consumers
+Το `MentionTextarea` χρησιμοποιείται σε:
+- `QuickChatBar.tsx` ✅
+- `SecretaryChat.tsx` ✅
+- `CommentsSection.tsx` ✅
 
-**Νέα:**
-- `src/components/focus/FocusEntityDrawer.tsx`
-- `src/components/focus/FocusSidebarSearch.tsx`
-
-**Τροποποιούνται:**
-- `src/components/focus/FocusOverlay.tsx` — νέο layout, breadcrumb chips, drawer mounting, αφαίρεση progress bar & time section
-- `src/components/focus/FocusControlBar.tsx` — προσθήκη "Ολοκλήρωση" button
-- `src/contexts/FocusContext.tsx` — επέκταση schema με client/deliverable + injectAndFocusTask
-
-**Παραμένουν αναλλοίωτα:**
-- Όλα τα υπόλοιπα section components, το AI chat, ο resizer, τα keyboard shortcuts.
+Επειδή η αλλαγή είναι εσωτερική και δε σπάει το API/styling ή τις κλάσεις που περνιούνται, **όλοι θα δουν chips αυτόματα** — σταθερό UX σε όλη την εφαρμογή.
 
 ---
 
-Έγκριση για να προχωρήσω στην υλοποίηση όλων των 10 σημείων;
+## Αρχεία που τροποποιούνται
+
+- `src/components/quick-chat/QuickChatBar.tsx` — outside-click handler ignore-list για Radix poppers.
+- `src/components/mentions/MentionTextarea.tsx` — overlay highlight layer + transparent textarea.
+
+## Δεν αλλάζουν
+- `parseMentions.ts`, `mentionRegistry.ts`, `MentionRenderer.tsx`, `MentionPopover.tsx`, edge functions / serialization format, οποιοσδήποτε άλλος consumer.

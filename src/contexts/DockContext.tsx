@@ -1,6 +1,6 @@
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 
-export type DockPanelId = 'secretary' | 'notifications' | 'activity' | 'memory' | 'chat-picker' | null;
+export type DockPanelId = 'inbox' | 'chat-picker' | null;
 
 interface DockContextType {
   activePanel: DockPanelId;
@@ -18,7 +18,6 @@ export function DockProvider({ children }: { children: ReactNode }) {
 
   const openPanel = useCallback((panel: Exclude<DockPanelId, null>) => {
     setActivePanel(panel);
-    // Notify QuickChatBar to close
     window.dispatchEvent(new CustomEvent('dock-panel-opened'));
   }, []);
 
@@ -33,18 +32,6 @@ export function DockProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const notifyQuickChatOpened = useCallback(() => setActivePanel(null), []);
-
-  // ⌘+J → toggle secretary
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'j') {
-        e.preventDefault();
-        togglePanel('secretary');
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [togglePanel]);
 
   return (
     <DockContext.Provider value={{ activePanel, openPanel, closePanel, togglePanel, notifyQuickChatOpened }}>

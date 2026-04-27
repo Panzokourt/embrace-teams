@@ -200,24 +200,34 @@ export default function AppSidebar({
   useEffect(() => {
     const node = categoriesAreaRef.current;
     if (!node) return;
-    const ITEM_HEIGHT = 44; // ~py-1.5 + icon + label + gap
+    const ITEM_HEIGHT = 48; // py-1.5 + icon + label + gap-0.5 between items
     const compute = () => {
       const h = node.clientHeight;
-      if (h <= 0) return;
       const total = categories.length;
+      if (h <= 0) {
+        // Container not yet sized — fall back to a safe minimum so we never overflow.
+        setVisibleCount((prev) => (prev === 0 ? Math.min(total, 4) : prev));
+        return;
+      }
       const fitsAll = Math.floor(h / ITEM_HEIGHT);
       if (fitsAll >= total) {
         setVisibleCount(total);
       } else {
         // Reserve space for the More button (same height)
-        const fitsWithMore = Math.max(1, Math.floor(h / ITEM_HEIGHT) - 1);
+        const fitsWithMore = Math.max(1, fitsAll - 1);
         setVisibleCount(fitsWithMore);
       }
     };
     compute();
     const ro = new ResizeObserver(compute);
     ro.observe(node);
-    return () => ro.disconnect();
+    // Also observe the rail parent so we react to outer resizes (sidebar mode changes).
+    if (node.parentElement) ro.observe(node.parentElement);
+    window.addEventListener('resize', compute);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', compute);
+    };
   }, [categories.length]);
 
   const selectedDef = selectedBriefType ? getBriefDefinition(selectedBriefType) : null;

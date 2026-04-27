@@ -12,6 +12,8 @@ interface DockVisibilityState {
   /** Hover handlers for the trigger zone / dock itself */
   onHoverEnter: () => void;
   onHoverLeave: () => void;
+  /** Lock the dock open (e.g. while a popover/dropdown is open). Returns an unlock fn. */
+  setLocked: (locked: boolean) => void;
 }
 
 export function useDockVisibility(): DockVisibilityState {
@@ -21,6 +23,7 @@ export function useDockVisibility(): DockVisibilityState {
     return stored ?? 'visible';
   });
   const [isHovering, setIsHovering] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
   const hideTimerRef = useRef<number | null>(null);
 
   const setMode = useCallback((next: DockMode) => {
@@ -43,7 +46,15 @@ export function useDockVisibility(): DockVisibilityState {
     hideTimerRef.current = window.setTimeout(() => {
       setIsHovering(false);
       hideTimerRef.current = null;
-    }, 400);
+    }, 600);
+  }, []);
+
+  const setLocked = useCallback((locked: boolean) => {
+    setIsLocked(locked);
+    if (locked && hideTimerRef.current) {
+      window.clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
   }, []);
 
   useEffect(() => {
@@ -53,7 +64,11 @@ export function useDockVisibility(): DockVisibilityState {
   }, []);
 
   const isExpanded =
-    mode === 'visible' ? true : mode === 'auto-hide' ? isHovering : false;
+    mode === 'visible'
+      ? true
+      : mode === 'auto-hide'
+        ? isHovering || isLocked
+        : isLocked;
 
-  return { mode, setMode, isExpanded, onHoverEnter, onHoverLeave };
+  return { mode, setMode, isExpanded, onHoverEnter, onHoverLeave, setLocked };
 }

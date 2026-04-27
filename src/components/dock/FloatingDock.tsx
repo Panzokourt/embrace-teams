@@ -42,7 +42,7 @@ export default function FloatingDock({ onQuickChatToggle, registerSendHandler }:
   const { activePanel, togglePanel, closePanel } = useDock();
   const { floatingWindows } = useChat();
   const { user } = useAuth();
-  const { mode, setMode, isExpanded, onHoverEnter, onHoverLeave } = useDockVisibility();
+  const { mode, setMode, isExpanded, onHoverEnter, onHoverLeave, setLocked } = useDockVisibility();
 
   const items: DockItem[] = [
     { id: 'inbox', label: 'Ειδοποιήσεις & Activity', icon: Bell, kind: 'panel' },
@@ -98,7 +98,7 @@ export default function FloatingDock({ onQuickChatToggle, registerSendHandler }:
         className={cn(
           'fixed left-1/2 z-50 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]',
           isCollapsed
-            ? '-translate-x-1/2 translate-y-[calc(100%-14px)] bottom-0 opacity-70 hover:opacity-100 hover:translate-y-0'
+            ? '-translate-x-1/2 translate-y-0 bottom-0 opacity-100'
             : '-translate-x-1/2 translate-y-0 bottom-4 opacity-100'
         )}
       >
@@ -108,16 +108,16 @@ export default function FloatingDock({ onQuickChatToggle, registerSendHandler }:
             onClick={() => setMode('visible')}
             onMouseEnter={mode === 'auto-hide' ? onHoverEnter : undefined}
             className={cn(
-              'group flex items-center gap-1.5 px-4 py-1.5',
-              'rounded-t-full border border-b-0 border-white/10',
+              'group flex items-center gap-2 px-5 py-2',
+              'rounded-t-2xl border border-b-0 border-white/15',
               'bg-gradient-to-r from-violet-600 via-fuchsia-600 to-indigo-600',
-              'shadow-[0_-4px_16px_-4px_rgba(139,92,246,0.4)]',
-              'backdrop-blur-xl transition-transform hover:scale-105'
+              'shadow-[0_-6px_20px_-4px_rgba(139,92,246,0.55)]',
+              'backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:shadow-[0_-10px_28px_-4px_rgba(139,92,246,0.7)]'
             )}
             aria-label="Επαναφορά dock"
           >
-            <ChevronDown className="h-3 w-3 text-white rotate-180 transition-transform group-hover:-translate-y-0.5" />
-            <span className="text-[10px] font-semibold tracking-wide text-white/90 uppercase">Dock</span>
+            <ChevronDown className="h-3.5 w-3.5 text-white rotate-180 transition-transform group-hover:-translate-y-0.5" />
+            <span className="text-[11px] font-bold tracking-[0.12em] text-white uppercase drop-shadow-sm">Dock</span>
           </button>
         ) : (
           <div
@@ -192,7 +192,7 @@ export default function FloatingDock({ onQuickChatToggle, registerSendHandler }:
             <div className="w-px h-6 bg-white/20 mx-1" />
 
             {/* Visibility menu — minimize / auto-hide */}
-            <DropdownMenu>
+            <DropdownMenu onOpenChange={(open) => setLocked(open)}>
               <Tooltip delayDuration={200}>
                 <TooltipTrigger asChild>
                   <DropdownMenuTrigger asChild>
@@ -212,7 +212,14 @@ export default function FloatingDock({ onQuickChatToggle, registerSendHandler }:
                   Εμφάνιση dock
                 </TooltipContent>
               </Tooltip>
-              <DropdownMenuContent align="end" side="top" sideOffset={12} className="w-56">
+              <DropdownMenuContent
+                align="end"
+                side="top"
+                sideOffset={12}
+                className="w-60"
+                onMouseEnter={() => setLocked(true)}
+                onMouseLeave={() => setLocked(false)}
+              >
                 <DropdownMenuLabel className="text-xs text-muted-foreground">
                   Εμφάνιση dock
                 </DropdownMenuLabel>

@@ -14,6 +14,10 @@ import { LayoutProvider, useLayout } from '@/contexts/LayoutContext';
 import { DockProvider, useDock } from '@/contexts/DockContext';
 import { CoachingProvider } from '@/components/coaching/CoachingProvider';
 import FloatingDock from '@/components/dock/FloatingDock';
+import { XPNotificationsProvider } from '@/contexts/XPNotificationsContext';
+import XPGainStack from '@/components/gamification/XPGainStack';
+import AchievementToastStack from '@/components/gamification/AchievementToastStack';
+import LevelUpModal from '@/components/gamification/LevelUpModal';
 import { cn } from '@/lib/utils';
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed';
@@ -214,6 +218,9 @@ function AppLayoutInner({ onRegisterOpenPanel }: { onRegisterOpenPanel?: (fn: ((
 
       <ChatFloatingBubbles />
       <FocusOverlay />
+      <XPGainStack />
+      <AchievementToastStack />
+      <LevelUpModal />
     </div>
   );
 }
@@ -238,7 +245,9 @@ export default function AppLayout() {
       <LayoutProvider>
         <DockProvider>
           <CoachingProvider>
-            <AppLayoutWithVoice />
+            <XPNotificationsProvider>
+              <AppLayoutWithVoice />
+            </XPNotificationsProvider>
           </CoachingProvider>
         </DockProvider>
       </LayoutProvider>

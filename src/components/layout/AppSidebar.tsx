@@ -175,7 +175,8 @@ export default function AppSidebar({
   const [quickOpen, setQuickOpen] = useState(false);
   const [selectedBriefType, setSelectedBriefType] = useState<string | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [visibleCount, setVisibleCount] = useState<number>(categories.length);
+  // Start at 0 so we never overflow on first paint; ResizeObserver fills it in.
+  const [visibleCount, setVisibleCount] = useState<number>(0);
   const categoriesAreaRef = useRef<HTMLDivElement>(null);
 
   // Flyout state for collapsed/rail mode
@@ -199,24 +200,34 @@ export default function AppSidebar({
   useEffect(() => {
     const node = categoriesAreaRef.current;
     if (!node) return;
-    const ITEM_HEIGHT = 44; // ~py-1.5 + icon + label + gap
+    const ITEM_HEIGHT = 48; // py-1.5 + icon + label + gap-0.5 between items
     const compute = () => {
       const h = node.clientHeight;
-      if (h <= 0) return;
       const total = categories.length;
+      if (h <= 0) {
+        // Container not yet sized — fall back to a safe minimum so we never overflow.
+        setVisibleCount((prev) => (prev === 0 ? Math.min(total, 4) : prev));
+        return;
+      }
       const fitsAll = Math.floor(h / ITEM_HEIGHT);
       if (fitsAll >= total) {
         setVisibleCount(total);
       } else {
         // Reserve space for the More button (same height)
-        const fitsWithMore = Math.max(1, Math.floor(h / ITEM_HEIGHT) - 1);
+        const fitsWithMore = Math.max(1, fitsAll - 1);
         setVisibleCount(fitsWithMore);
       }
     };
     compute();
     const ro = new ResizeObserver(compute);
     ro.observe(node);
-    return () => ro.disconnect();
+    // Also observe the rail parent so we react to outer resizes (sidebar mode changes).
+    if (node.parentElement) ro.observe(node.parentElement);
+    window.addEventListener('resize', compute);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', compute);
+    };
   }, [categories.length]);
 
   const selectedDef = selectedBriefType ? getBriefDefinition(selectedBriefType) : null;
@@ -340,7 +351,7 @@ export default function AppSidebar({
       <div className="w-10 h-px bg-white/10 my-1" />
 
       {/* Category icons */}
-      <div ref={categoriesAreaRef} className="flex-1 min-h-0 flex flex-col items-center gap-0.5 w-full px-1 overflow-hidden">
+      <div ref={categoriesAreaRef} className="flex-1 basis-0 min-h-0 flex flex-col items-center gap-0.5 w-full px-1 overflow-hidden">
         {(() => {
           const currentActive = flyoutCategory || activeCategory;
           let visible = categories.slice(0, visibleCount);

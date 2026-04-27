@@ -1,67 +1,112 @@
+# Αναδιοργάνωση Σελίδας Ρυθμίσεων
+
 ## Πρόβλημα
+Η `/settings` έχει 13 cards στη σειρά (Προφίλ, Εμφάνιση, Ειδοποιήσεις, Ασφάλεια, Project Categories, Project Folder Templates, Email, Ωράριο, Help, Bulk Import, Data Management, AI Usage, AI Memory, Client Portal). Ο χρήστης χάνεται και κάνει πολύ scroll. Παράλληλα υπάρχουν και 3 ξεχωριστές σελίδες (`/settings/organization`, `/settings/billing`, `/settings/security`) που δεν είναι ανακαλύψιμες από εδώ.
 
-Στο rail sidebar (αριστερή στήλη με τα εικονίδια), οι 10 κατηγορίες (Work, Clients, Marketing, Creative, Development, Finance, Operations, Intelligence, Communication, Settings) μαζί με τα standalone items (Logo, My Work, Files) γεμίζουν όλο το ύψος σε μικρές οθόνες (~743px ή χαμηλότερες) και τα bottom actions (Secretary AI ⚡, Theme toggle 🌗, User Avatar 👤) **κόβονται κάτω και δεν φαίνονται**.
+## Πρόταση: Two-pane Settings Hub
 
-Σήμερα η μεσαία λίστα κατηγοριών έχει `flex-1` χωρίς `overflow`, οπότε σπρώχνει τα bottom actions εκτός viewport αντί να scrollάρει.
+Ενοποιημένη σελίδα `/settings/*` με αριστερή κάθετη πλοήγηση (sticky) και δεξί panel που εμφανίζει την ενεργή ενότητα. Δεν χάνεται τίποτα από scroll, ο χρήστης βλέπει αμέσως όλες τις διαθέσιμες ομάδες, και κάθε section φορτώνει μόνο το δικό του περιεχόμενο.
 
-## Πρόταση λύσης (συνδυασμός)
+```text
+┌─────────────────────────────────────────────────────┐
+│ Ρυθμίσεις                                           │
+├──────────────────┬──────────────────────────────────┤
+│ ΛΟΓΑΡΙΑΣΜΟΣ      │                                  │
+│ • Προφίλ      ●  │   [Active section content]       │
+│ • Ασφάλεια       │                                  │
+│ • Ειδοποιήσεις   │                                  │
+│ • Ωράριο         │                                  │
+│                  │                                  │
+│ ΠΡΟΣΩΠΟΠΟΙΗΣΗ    │                                  │
+│ • Εμφάνιση       │                                  │
+│ • Sidebar        │                                  │
+│ • AI Μνήμη       │                                  │
+│                  │                                  │
+│ ΕΤΑΙΡΕΙΑ (Admin) │                                  │
+│ • Γενικά         │                                  │
+│ • Μέλη & Ρόλοι   │                                  │
+│ • Ασφάλεια Org   │                                  │
+│ • Activity Log   │                                  │
+│ • Billing        │                                  │
+│                  │                                  │
+│ ΔΕΔΟΜΕΝΑ (Admin) │                                  │
+│ • Categories     │                                  │
+│ • Folder Tmpls   │                                  │
+│ • Email/Inbox    │                                  │
+│ • Import         │                                  │
+│ • Διαγραφή       │                                  │
+│ • AI Usage       │                                  │
+│ • Client Portal  │                                  │
+│                  │                                  │
+│ ΒΟΗΘΕΙΑ          │                                  │
+│ • Tutorials      │                                  │
+└──────────────────┴──────────────────────────────────┘
+```
 
-**A. Πάντα ορατά bottom actions** — Τα Secretary / Theme / Avatar είναι κρίσιμα και πρέπει να μένουν “κολλημένα” στο κάτω μέρος του rail σε κάθε ύψος οθόνης.
+## Ομαδοποίηση (5 sections)
 
-**B. “More” overflow menu για κατηγορίες** — Όταν το διαθέσιμο ύψος δεν χωράει όλες τις κατηγορίες, εμφανίζονται όσες χωρούν και οι υπόλοιπες μπαίνουν σε ένα **κουμπί “More” (⋯)** στο τέλος της λίστας. Με κλικ ανοίγει popover (όπως η εικόνα ClickUp που στείλατε) με grid από τα υπόλοιπα εικονίδια κατηγοριών — με tooltip-style labels και κανονική συμπεριφορά κλικ (άνοιγμα flyout κατηγορίας).
+**1. Λογαριασμός** (κάθε χρήστης)
+- Προφίλ (όνομα, email, status, αλλαγή κωδικού inline)
+- Ειδοποιήσεις (email/tasks/projects switches)
+- Ωράριο εργασίας
 
-**Γιατί συνδυασμός και όχι απλό scroll:** Καθαρό scroll στις κατηγορίες είναι λιγότερο ανακαλύψιμο (ο χρήστης δεν βλέπει ότι υπάρχουν κι άλλα), ενώ το “More” popover είναι πιο εμφανές pattern και δίνει γρήγορη πρόσβαση σε όλα τα modules με ένα κλικ.
+**2. Προσωποποίηση** (κάθε χρήστης)
+- Εμφάνιση (theme light/dark/system)
+- Sidebar (auto/manual organization)
+- AI Μνήμη (διαχείριση memories)
 
-## Τεχνικό σχέδιο
+**3. Εταιρεία** (admin/owner only) — ενσωματώνει το `/settings/organization` και `/settings/billing`
+- Γενικά (στοιχεία εταιρείας — από `OrgGeneralTab`)
+- Μέλη & Ρόλοι (users table + invitations + join requests)
+- Ασφάλεια Εταιρείας (`OrgSecurityTab`)
+- Activity Log (`OrgActivityTab`)
+- Billing (πλάνο, χρήση)
 
-**Αρχείο που αλλάζει:** `src/components/layout/AppSidebar.tsx` (μόνο το `IconRail` component, ~γραμμές 250–421).
+**4. Δεδομένα & Ενσωματώσεις** (admin)
+- Project Categories
+- Project Folder Templates
+- Email / Inbox setup
+- Bulk Import
+- Διαχείριση Δεδομένων (mass delete)
+- AI Usage
+- Client Portal Users
 
-1. **Νέο hook μέτρησης χώρου** μέσα στο `IconRail`:
-   - `useRef` στο container των κατηγοριών (`categoriesRef`).
-   - `ResizeObserver` που υπολογίζει πόσες κατηγορίες χωράνε:
-     ```ts
-     const ITEM_HEIGHT = 44;   // py-1.5 + icon + label
-     const MORE_BTN_HEIGHT = 44;
-     const visibleCount = Math.floor(containerHeight / ITEM_HEIGHT);
-     ```
-   - State: `visibleCategories` & `overflowCategories`.
+**5. Βοήθεια**
+- Tutorials & Help
 
-2. **Layout fix στο rail container** (γρ. 251–260):
-   - Προσθήκη `min-h-0` στο root flex.
-   - Το div των κατηγοριών (γρ. 316) γίνεται `flex-1 min-h-0` (χωρίς overflow), και η λογική κόβει τη λίστα στις `visibleCount` items.
-   - Τα bottom actions (γρ. 344) μένουν `mt-auto shrink-0` ώστε να πατάνε πάντα στο τέλος.
+## Τεχνική Υλοποίηση
 
-3. **More button (όταν `overflowCategories.length > 0`):**
-   - Νέο button κάτω από τις ορατές κατηγορίες με icon `MoreHorizontal` (lucide) + label "More".
-   - Wrapped σε `Popover` (`@/components/ui/popover` — ήδη imported).
-   - `PopoverContent` side="right" με grid 2 ή 3 στηλών:
-     ```tsx
-     <div className="grid grid-cols-2 gap-2 p-2">
-       {overflowCategories.map(cat => (
-         <button onClick={() => { handleCategoryClick(cat.id); setMoreOpen(false); }}
-                 className="flex flex-col items-center gap-1 p-3 rounded-lg hover:bg-accent">
-           <cat.icon className="h-5 w-5" />
-           <span className="text-xs">{cat.label}</span>
-         </button>
-       ))}
-     </div>
-     ```
-   - Αν η ενεργή κατηγορία είναι μέσα στο overflow, εμφανίζουμε ένα μικρό dot indicator πάνω στο More button.
+**Νέο layout component:** `src/pages/Settings.tsx` ξαναγράφεται ως shell με:
+- `useSearchParams` για `?section=profile` (deep-linking, browser back/forward)
+- Αριστερό sidebar (`w-64`, sticky top, scrollable αν ξεπεράσει το viewport)
+- Δεξί panel με `max-w-3xl`, μόνο το ενεργό section renders
+- Mobile (<768px): collapse σε `Select` dropdown στην κορυφή αντί για sidebar
 
-4. **Ευφυής σειρά κατηγοριών:** Δεν αλλάζει η σειρά του `categories` array. Απλά οι τελευταίες (πχ Settings, Communication) θα μπαίνουν συνήθως στο More. Αν η ενεργή κατηγορία πέφτει στο overflow, την προωθούμε αυτόματα στις ορατές (swap) ώστε να φαίνεται πάντα active state.
+**Section registry** (array of `{ id, label, icon, group, adminOnly?, component }`) ώστε να φιλτράρεται εύκολα ανά role και να προστίθενται νέα sections.
 
-5. **Mobile sheet (`isMobileSheet`):** Παραμένει η υπάρχουσα συμπεριφορά (full-height drawer χωρίς overflow πρόβλημα). Το More button ενεργοποιείται μόνο όταν χρειάζεται (έλεγχος μέσω ResizeObserver — δουλεύει και στις δύο περιπτώσεις).
+**Routing consolidation:**
+- `/settings/organization`, `/settings/billing`, `/settings/security` παραμένουν για backward compatibility αλλά κάνουν redirect στο `/settings?section=org-general` κ.λπ.
+- Όλο το περιεχόμενο των `OrganizationSettings.tsx` και `BillingSettings.tsx` σπάει σε μικρότερα section components που καταναλώνονται από τη νέα Settings shell.
 
-## Τι μένει ίδιο
+**Αρχεία που δημιουργούνται:**
+- `src/components/settings/SettingsLayout.tsx` — two-pane shell + nav
+- `src/components/settings/sections/AccountProfileSection.tsx`
+- `src/components/settings/sections/NotificationsSection.tsx`
+- `src/components/settings/sections/AppearanceSection.tsx`
+- `src/components/settings/sections/SidebarPrefsSection.tsx`
+- `src/components/settings/sections/OrgMembersSection.tsx` (extracted από OrganizationSettings)
+- `src/components/settings/sections/OrgBillingSection.tsx` (από BillingSettings)
+- `src/components/settings/sectionsRegistry.ts`
 
-- Όλα τα styles/χρώματα του dark rail.
-- Logo, My Work, Files standalone buttons πάνω-πάνω.
-- Flyout panel που ανοίγει δίπλα στο rail κατά το κλικ κατηγορίας.
-- Bottom actions: Secretary, Theme, Avatar — απλά τώρα **εγγυημένα ορατά**.
+**Αρχεία που τροποποιούνται:**
+- `src/pages/Settings.tsx` — γίνεται shell που καταναλώνει το registry
+- `src/pages/OrganizationSettings.tsx`, `BillingSettings.tsx`, `SecuritySettings.tsx` — γίνονται thin redirects
+- `src/App.tsx` — διατηρεί τα παλιά routes ως redirects
 
-## Αποτέλεσμα
-
-- Σε ψηλές οθόνες (>900px): φαίνονται όλες οι 10 κατηγορίες, κανένα More button (no visual change).
-- Σε μεσαίες (~700–800px): εμφανίζονται 6–8 κατηγορίες + “More” με τις υπόλοιπες.
-- Σε μικρές (<700px): εμφανίζονται 4–5 + “More” popover για τα υπόλοιπα.
-- Τα Secretary / Theme / Avatar **πάντα ορατά**.
+## Τι πετυχαίνουμε
+- Καθόλου scroll για να βρεις μια ρύθμιση — αριστερό nav δείχνει τα πάντα
+- Λογική ομαδοποίηση: τι αφορά εμένα vs την εταιρεία vs τα δεδομένα
+- Deep-linkable (`/settings?section=billing`)
+- Ενοποίηση των 4 σήμερα-σκόρπιων settings σελίδων σε ένα μέρος
+- Mobile-friendly (dropdown nav)
+- Επεκτάσιμο: νέες ρυθμίσεις = προσθήκη μιας εγγραφής στο registry

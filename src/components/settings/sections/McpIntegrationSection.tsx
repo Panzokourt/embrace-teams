@@ -73,13 +73,29 @@ export function McpIntegrationSection() {
             {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
           </Button>
         </div>
+        <details className="text-xs" open>
+          <summary className="cursor-pointer text-muted-foreground hover:text-foreground font-medium">
+            Claude.ai (web) & Cursor — Remote MCP
+          </summary>
+          <p className="mt-2 text-muted-foreground">
+            Επικολλήστε απευθείας το URL ως «Custom MCP Server». Η πιστοποίηση γίνεται αυτόματα μέσω OAuth.
+          </p>
+          <pre className="mt-2 bg-muted p-3 rounded-md overflow-x-auto">{SERVER_URL}</pre>
+        </details>
+
         <details className="text-xs">
-          <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Οδηγίες για Claude Desktop</summary>
+          <summary className="cursor-pointer text-muted-foreground hover:text-foreground font-medium">
+            Claude Desktop — μέσω <code>mcp-remote</code> bridge
+          </summary>
+          <p className="mt-2 text-muted-foreground">
+            Το Claude Desktop δεν υποστηρίζει ακόμα remote MCP servers απευθείας. Χρησιμοποιήστε το <code>mcp-remote</code> npm package ως bridge (απαιτείται Node.js).
+          </p>
           <pre className="mt-2 bg-muted p-3 rounded-md overflow-x-auto">{`// claude_desktop_config.json
 {
   "mcpServers": {
     "olseny": {
-      "url": "${SERVER_URL}"
+      "command": "npx",
+      "args": ["mcp-remote", "${SERVER_URL}"]
     }
   }
 }`}</pre>

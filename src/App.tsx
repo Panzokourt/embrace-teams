@@ -59,6 +59,7 @@ import PortalProjects from "@/pages/portal/PortalProjects";
 import PortalInvoices from "@/pages/portal/PortalInvoices";
 import PortalFiles from "@/pages/portal/PortalFiles";
 import PortalAccess from "@/pages/portal/PortalAccess";
+import McpConsent from "@/pages/McpConsent";
 import { isPortalHost } from "@/lib/portalHost";
 
 function RedirectUserToEmployee() {
@@ -110,6 +111,7 @@ const App = () => (
                 <Route path="/accept-invite" element={<AcceptInvite />} />
                 <Route path="/welcome" element={<WelcomeWizard />} />
                 <Route path="/platform-admin" element={<PlatformAdmin />} />
+                <Route path="/mcp/consent" element={<McpConsent />} />
                 {/* Client Portal */}
                 <Route path="/portal/access" element={<PortalAccess />} />
                 <Route path="/portal" element={<ClientPortalLayout />}>

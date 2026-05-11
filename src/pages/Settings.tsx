@@ -2,7 +2,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   Settings as SettingsIcon, User, Bell, Palette, Building2, Clock, FolderTree,
   LayoutGrid, Mail, Upload, Trash2, Brain, Sparkles, GraduationCap, Users, Shield,
-  Activity, CreditCard, Briefcase, Database,
+  Activity, CreditCard, Briefcase, Database, Plug,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SettingsLayout, SettingsSection } from '@/components/settings/SettingsLayout';
@@ -25,6 +25,7 @@ import { PortalUserManager } from '@/components/portal/PortalUserManager';
 import { AIUsageCard } from '@/components/settings/AIUsageCard';
 import AIMemoryCard from '@/components/settings/AIMemoryCard';
 import HelpTutorialsCard from '@/components/settings/HelpTutorialsCard';
+import { McpIntegrationSection } from '@/components/settings/sections/McpIntegrationSection';
 
 const G = {
   ACCOUNT: 'Λογαριασμός',
@@ -134,6 +135,11 @@ export default function SettingsPage() {
       id: 'portal-users', label: 'Client Portal', icon: Database, group: G.DATA, visible: isAdmin,
       description: 'Χρήστες με πρόσβαση στο client portal',
       render: () => <PortalUserManager />,
+    },
+    {
+      id: 'mcp', label: 'MCP Integration', icon: Plug, group: G.DATA, visible: isAdmin,
+      description: 'Συνδέστε εξωτερικά AI εργαλεία (Claude, Cursor) μέσω MCP / OAuth',
+      render: () => <McpIntegrationSection />,
     },
 
     // Βοήθεια

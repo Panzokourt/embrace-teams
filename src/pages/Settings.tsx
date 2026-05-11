@@ -25,6 +25,7 @@ import { PortalUserManager } from '@/components/portal/PortalUserManager';
 import { AIUsageCard } from '@/components/settings/AIUsageCard';
 import AIMemoryCard from '@/components/settings/AIMemoryCard';
 import HelpTutorialsCard from '@/components/settings/HelpTutorialsCard';
+import { McpIntegrationSection } from '@/components/settings/sections/McpIntegrationSection';
 
 const G = {
   ACCOUNT: 'Λογαριασμός',

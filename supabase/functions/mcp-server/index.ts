@@ -52,9 +52,7 @@ Deno.serve(async (req) => {
   }
 
   if (req.method === "GET") {
-    return new Response("MCP server. POST JSON-RPC requests here.", {
-      headers: { ...mcpCorsHeaders, "Content-Type": "text/plain" },
-    });
+    return unauthorized();
   }
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405, headers: mcpCorsHeaders });

@@ -6,7 +6,7 @@ export const mcpCorsHeaders = {
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, mcp-session-id, mcp-protocol-version",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE",
-  "Access-Control-Expose-Headers": "mcp-session-id",
+  "Access-Control-Expose-Headers": "mcp-session-id, www-authenticate",
 };
 
 export function adminClient(): SupabaseClient {

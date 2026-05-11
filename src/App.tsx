@@ -59,6 +59,7 @@ import PortalProjects from "@/pages/portal/PortalProjects";
 import PortalInvoices from "@/pages/portal/PortalInvoices";
 import PortalFiles from "@/pages/portal/PortalFiles";
 import PortalAccess from "@/pages/portal/PortalAccess";
+import McpConsent from "@/pages/McpConsent";
 import { isPortalHost } from "@/lib/portalHost";
 
 function RedirectUserToEmployee() {

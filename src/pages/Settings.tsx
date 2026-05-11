@@ -2,7 +2,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   Settings as SettingsIcon, User, Bell, Palette, Building2, Clock, FolderTree,
   LayoutGrid, Mail, Upload, Trash2, Brain, Sparkles, GraduationCap, Users, Shield,
-  Activity, CreditCard, Briefcase, Database,
+  Activity, CreditCard, Briefcase, Database, Plug,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SettingsLayout, SettingsSection } from '@/components/settings/SettingsLayout';

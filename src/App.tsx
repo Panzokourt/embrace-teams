@@ -111,6 +111,7 @@ const App = () => (
                 <Route path="/accept-invite" element={<AcceptInvite />} />
                 <Route path="/welcome" element={<WelcomeWizard />} />
                 <Route path="/platform-admin" element={<PlatformAdmin />} />
+                <Route path="/mcp/consent" element={<McpConsent />} />
                 {/* Client Portal */}
                 <Route path="/portal/access" element={<PortalAccess />} />
                 <Route path="/portal" element={<ClientPortalLayout />}>

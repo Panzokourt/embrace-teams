@@ -20,14 +20,20 @@ Deno.serve(async (req) => {
   if (url.pathname.endsWith("/.well-known/oauth-authorization-server") ||
       url.pathname.endsWith("/.well-known/oauth-protected-resource")) {
     const base = publicBaseUrl();
+    const resourceUrl = `${base}/mcp-server`;
     const meta = url.pathname.endsWith("oauth-protected-resource")
       ? {
-          resource: `${base}/mcp-server`,
-          authorization_servers: [base],
+          resource: resourceUrl,
+          // The same /mcp-server URL also serves /.well-known/oauth-authorization-server
+          authorization_servers: [resourceUrl],
           bearer_methods_supported: ["header"],
+          scopes_supported: [
+            "tasks:read","tasks:write","projects:read","clients:read",
+            "time:read","time:write","kb:read",
+          ],
         }
       : {
-          issuer: base,
+          issuer: resourceUrl,
           authorization_endpoint: `${base}/mcp-oauth-authorize`,
           token_endpoint: `${base}/mcp-oauth-token`,
           registration_endpoint: `${base}/mcp-oauth-register`,

@@ -1,85 +1,119 @@
-## Στόχος
+# MCP Server για το Olseny Workspace
 
-Να μετατρέψουμε το μικρό avatar dropdown κάτω-αριστερά σε ένα πλήρες "user hub" menu, εμπνευσμένο από το ClickUp screenshot, με τις πιο χρήσιμες λειτουργίες ένα κλικ μακριά.
+Δημιουργία ενός full-featured **Model Context Protocol (MCP) Server** που εκθέτει τα δεδομένα και τις λειτουργίες της εφαρμογής σε:
+- **Εξωτερικούς AI clients** (Claude Desktop, ChatGPT Desktop, Cursor, Windsurf, κλπ.)
+- **Τον εσωτερικό Secretary agent** (μέσω του ίδιου protocol για consistency)
 
-## 1) Κλικ στο όνομα → Προφίλ χρήστη
-
-Στο header του dropdown (avatar + όνομα + email) θα γίνει clickable button που κάνει navigate στο `/hr/employee/{user.id}`. Hover state για να φαίνεται ότι είναι clickable, και ένα μικρό chevron δεξιά.
-
-## 2) Νέα δομή του μενού
-
-Οργανωμένο σε 4 ομάδες με separators:
+## Αρχιτεκτονική
 
 ```text
-┌─────────────────────────────────────┐
-│ [Avatar] Pantelis Kourtidis      ›  │  ← κλικ → Profile
-│          koupant@gmail.com          │
-│          ● Online                   │
-├─────────────────────────────────────┤
-│ 😊  Set status                      │  ← presence + custom emoji status
-│ 🔕  Mute notifications          ›   │  ← submenu (15min/1h/Today/Always)
-├─────────────────────────────────────┤
-│ ⚙️   Ρυθμίσεις                      │  → /settings
-│ 🎨  Themes                       ›  │  ← submenu (Light/Dark/System)
-│ ⌨️   Keyboard shortcuts             │  ← άνοιγμα shortcut cheatsheet dialog
-│ ❓  Βοήθεια & Feedback              │
-├─────────────────────────────────────┤
-│ Personal Tools                      │  ← group label
-│ ✓+  Νέο task                        │  ← άνοιγμα του υπάρχοντος TaskSidePanel
-│ 💼  My Work                         │  → /
-│ ⏱️   Track time                     │  → /timesheets
-│ 📝  Notepad / Quick notes           │  → /  (quick notes section)
-│ 🔔  Νέα υπενθύμιση                  │
-│ 📅  Calendar                        │  → /calendar
-│ 👥  Ομάδα                            │  → /users
-├─────────────────────────────────────┤
-│ 🏢  Εναλλαγή workspace          ›   │  ← (αν υπάρχουν >1 companies)
-│ [→  Αποσύνδεση                      │  ← παραμένει destructive style
-└─────────────────────────────────────┘
+┌─────────────────────┐         ┌──────────────────────┐
+│  External Client    │  HTTPS  │   Edge Function      │
+│  (Claude Desktop)   │ ──────► │   /mcp-server        │
+└─────────────────────┘         │   (Streamable HTTP)  │
+                                │                      │
+┌─────────────────────┐         │   - OAuth 2.0        │
+│  Secretary Agent    │ ──────► │   - Tool registry    │
+│  (in-app)           │         │   - Company-scoped   │
+└─────────────────────┘         └──────────┬───────────┘
+                                           │
+                                ┌──────────▼───────────┐
+                                │  Supabase (RLS +     │
+                                │  service-role calls) │
+                                └──────────────────────┘
 ```
 
-### Λεπτομέρειες ανά item
+## Τι θα φτιάξουμε
 
-- **Set status**: Inline picker με 5 emoji presets (🟢 Available, 🍔 Lunch, 🎯 Focus, 🤒 Sick, 🏖️ OOO) + "Clear status". Αποθηκεύεται στο `profiles.work_status` / νέο `status_text` (χρησιμοποιούμε το υπάρχον `work_status` field που ήδη ενημερώνεται στο signOut).
-- **Mute notifications**: Submenu με χρονικά διαστήματα. Αποθηκεύεται σε localStorage (`notifications.mutedUntil`) — μη-destructive προσθήκη, χωρίς νέο migration.
-- **Themes**: Light / Dark / System (χρησιμοποιεί το υπάρχον `useTheme`).
-- **Keyboard shortcuts**: Ανοίγει dialog με τα ήδη υπάρχοντα shortcuts (⌘K, ⌘I, ⌘J κλπ.) — μία στατική λίστα.
-- **Workspace switcher**: Εμφανίζεται μόνο αν `allCompanies.length > 1`, με checkmark στο active.
-- **Quick actions** (Νέο task / Reminder κλπ.): Reuse υπάρχοντα dialogs/sheets όπου υπάρχουν, αλλιώς απλό navigation.
+### 1. Database (νέα tables)
+- `mcp_oauth_clients` — registered MCP clients (client_id, client_secret_hash, redirect_uris, name, owner)
+- `mcp_oauth_codes` — short-lived authorization codes (PKCE)
+- `mcp_oauth_tokens` — access + refresh tokens, scoped σε `user_id` + `company_id` + `scopes[]`
+- `mcp_audit_log` — κάθε tool call (user, tool, args summary, result status, timestamp)
 
-## 3) Visual & UX
+Όλα company-scoped με RLS και αυστηρό `SET search_path = public`.
 
-- Πλάτος dropdown: από `w-56` → `w-72` για περισσότερο χώρο.
-- Group labels (`Personal Tools`) με `text-xs uppercase text-muted-foreground`.
-- Κάθε item με icon 16px αριστερά, label, και προαιρετικό shortcut hint δεξιά (π.χ. `⌘,` για Settings).
-- Hover στο header: ελαφρύ background highlight + cursor pointer.
-- Online indicator (πράσινη κουκίδα) πάνω στο avatar του header βασισμένο στο `work_status`.
-- Διατηρείται το ίδιο rounded/shadow style με τα υπόλοιπα dropdowns της εφαρμογής.
+### 2. Edge Functions
+Νέες functions στο `supabase/functions/`:
 
-## 4) Τι ΔΕΝ προσθέτουμε (από το ClickUp)
+| Function | Σκοπός |
+|---|---|
+| `mcp-server` | Κύριο endpoint — Streamable HTTP MCP transport (mcp-lite + Hono). `verify_jwt = false` (κάνει δικό του token validation). |
+| `mcp-oauth-authorize` | OAuth authorize endpoint — δείχνει consent screen, redirect στον δικό μας UI |
+| `mcp-oauth-token` | OAuth token endpoint — exchange code → tokens, refresh |
+| `mcp-oauth-register` | Dynamic Client Registration (RFC 7591) — έτσι Claude Desktop κλπ συνδέονται αυτόματα |
+| `.well-known/oauth-authorization-server` | Discovery metadata (μέσω rewrite στο `mcp-server`) |
 
-- "Download app" / "Record clip" / "AI Notetaker" / "Whiteboard" — δεν υπάρχουν στην εφαρμογή.
-- "Trash" — δεν έχουμε global trash module ακόμα.
+### 3. MCP Tools (αρχικό set)
 
-## Τεχνικές αλλαγές
+**Tasks**
+- `list_tasks` (filters: status, priority, assigned_to_me, due_within_days)
+- `get_task` (id)
+- `create_task` (title, project_id, priority, due_date, description)
+- `update_task` (id, status, priority, due_date, etc.)
+- `complete_task` (id)
 
-- **Νέο component**: `src/components/layout/UserAvatarMenu.tsx` — encapsulates όλο το dropdown για καθαρότητα (το `AppSidebar.tsx` είναι ήδη μεγάλο).
-- **Νέο component**: `src/components/layout/KeyboardShortcutsDialog.tsx` — απλός static cheatsheet.
-- **Edit**: `src/components/layout/AppSidebar.tsx` lines 482-516 → αντικατάσταση του inline DropdownMenu με `<UserAvatarMenu />`.
-- **State**: Status picker → update `profiles.work_status` μέσω supabase. Mute → localStorage key.
-- **Routing**: `useNavigate` για profile (`/hr/employee/${user.id}`), settings, calendar, etc.
+**Projects & Clients (read)**
+- `list_projects` (filters: status, client_id)
+- `get_project` (id, includes basic stats)
+- `list_clients`
+- `get_client` (id, με contacts)
 
-## Παραδοτέα
+**Time tracking**
+- `start_timer` (task_id, description)
+- `stop_timer` (επιστρέφει duration)
+- `get_active_timer`
+- `log_time_entry` (task_id, started_at, duration_minutes, description)
 
-1. Κλικ στο header του menu → πάει στο profile του χρήστη.
-2. Set status με emoji presets + clear.
-3. Mute notifications submenu.
-4. Themes submenu (Light/Dark/System) — αντικαθιστά το standalone moon button (προαιρετικά: το αφήνουμε και εκεί για ταχύτητα, ή το αφαιρούμε για να μην διπλασιάζεται).
-5. Settings, Keyboard shortcuts, Help.
-6. Personal Tools group με quick navigation.
-7. Workspace switcher (conditional).
-8. Logout (αμετάβλητο).
+**Knowledge Base**
+- `search_kb` (query) — semantic search μέσω του υπάρχοντος `match_kb_chunks`
+- `get_kb_article` (id)
+- `list_blueprints`
 
-## Ερώτηση πριν προχωρήσουμε
+Κάθε tool εκτελείται με τα δικαιώματα του `user_id` του token (μέσω `auth.uid()` simulation με service role + manual scoping στις queries — όχι παράκαμψη RLS).
 
-Το standalone **Moon (theme toggle) button** στο rail πάνω από το avatar — να το **αφαιρέσουμε** τώρα που το theme μπαίνει στο menu, ή να **παραμείνει** για one-click toggle; (Default πρόταση: να παραμείνει — είναι πιο γρήγορο.)
+### 4. UI: Σελίδα διαχείρισης MCP
+Νέο route `/settings/integrations/mcp`:
+- Λίστα συνδεδεμένων MCP clients ανά χρήστη
+- Κουμπί "Revoke access"
+- Οδηγίες σύνδεσης για Claude Desktop / Cursor (με το server URL: `https://qsykyiqplslvmxdfudxq.supabase.co/functions/v1/mcp-server`)
+- Audit log viewer (πρόσφατες κλήσεις)
+
+### 5. Internal usage
+Ο `secretary-agent` Edge Function θα μπορεί να καλεί τα ίδια tools απευθείας (in-process import), ώστε ο Secretary και οι external clients να μοιράζονται την ίδια λογική.
+
+## OAuth Flow (περίληψη)
+
+1. Claude Desktop κάνει discovery στο `/.well-known/oauth-authorization-server`
+2. Dynamic Client Registration → επιστρέφει `client_id`
+3. Browser ανοίγει στον authorize endpoint → ο χρήστης κάνει login (αν χρειάζεται) → consent screen
+4. Code + PKCE → exchange στο token endpoint → access + refresh token
+5. Όλες οι MCP requests έρχονται με `Authorization: Bearer <access_token>`
+
+## Τεχνικές επιλογές
+- **Library**: `mcp-lite` (npm) σε Deno Edge Function με Hono routing
+- **Token format**: opaque random tokens (όχι JWT) — αποθηκεύονται hashed στη DB για άμεσο revocation
+- **Scopes**: `tasks:read`, `tasks:write`, `projects:read`, `clients:read`, `time:write`, `kb:read` — ο χρήστης τα επιλέγει στο consent screen
+- **Rate limiting**: per-token (π.χ. 60 req/min) μέσω in-memory map ή `mcp_audit_log` count
+- **Audit**: κάθε call γράφεται στο `mcp_audit_log` για compliance
+
+## Ασφάλεια
+- Tokens hashed με sha256 πριν αποθηκευτούν (όπως ήδη κάνεις στα portal tokens με `_hash_token`)
+- Όλες οι queries scoped σε `user_id` + `company_id` του token — ποτέ cross-tenant
+- PKCE υποχρεωτικό (RFC 7636)
+- Refresh token rotation
+- Tools που γράφουν δεδομένα (create_task, log_time_entry) απαιτούν explicit `*:write` scope
+
+## Παραδοτέα μετά την υλοποίηση
+1. 4 νέες tables + RLS policies
+2. 4 νέες Edge Functions
+3. Σελίδα διαχείρισης στο Settings με connection instructions
+4. Documentation block μέσα στη σελίδα για copy-paste config σε Claude/Cursor
+5. Refactor του `secretary-agent` ώστε να καλεί τα MCP tools (optional follow-up)
+
+## Σημειώσεις
+- **Δεν χρειάζεται κανένα API key/secret** από εσένα — όλα τρέχουν στο Lovable Cloud
+- Το MCP server URL θα είναι σταθερό και δημόσια προσβάσιμο, αλλά κάθε call απαιτεί valid OAuth token
+- Αρχικά **δεν** ενσωματώνουμε στον Secretary (κρατάμε το ως follow-up step) για να περιορίσουμε το scope της πρώτης υλοποίησης
+
+Θες να προχωρήσουμε; Αν ναι, πάτα **Implement plan**.

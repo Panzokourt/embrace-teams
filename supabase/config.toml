@@ -45,3 +45,13 @@ project_id = "qsykyiqplslvmxdfudxq"
     verify_jwt = false
   [functions.send-invitation]
     verify_jwt = false
+  [functions.mcp-server]
+    verify_jwt = false
+  [functions.mcp-oauth-register]
+    verify_jwt = false
+  [functions.mcp-oauth-authorize]
+    verify_jwt = false
+  [functions.mcp-oauth-token]
+    verify_jwt = false
+  [functions.mcp-oauth-metadata]
+    verify_jwt = false

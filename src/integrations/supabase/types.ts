@@ -4345,6 +4345,199 @@ export type Database = {
           },
         ]
       }
+      mcp_audit_log: {
+        Row: {
+          args_summary: Json | null
+          client_id: string | null
+          company_id: string
+          created_at: string
+          duration_ms: number | null
+          error_message: string | null
+          id: string
+          status: string
+          token_id: string | null
+          tool_name: string
+          user_id: string
+        }
+        Insert: {
+          args_summary?: Json | null
+          client_id?: string | null
+          company_id: string
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          status?: string
+          token_id?: string | null
+          tool_name: string
+          user_id: string
+        }
+        Update: {
+          args_summary?: Json | null
+          client_id?: string | null
+          company_id?: string
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          status?: string
+          token_id?: string | null
+          tool_name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      mcp_oauth_clients: {
+        Row: {
+          client_id: string
+          client_name: string
+          client_uri: string | null
+          created_at: string
+          grant_types: string[]
+          id: string
+          logo_uri: string | null
+          redirect_uris: string[]
+          registered_by: string | null
+          response_types: string[]
+          scope: string
+          token_endpoint_auth_method: string
+        }
+        Insert: {
+          client_id: string
+          client_name: string
+          client_uri?: string | null
+          created_at?: string
+          grant_types?: string[]
+          id?: string
+          logo_uri?: string | null
+          redirect_uris?: string[]
+          registered_by?: string | null
+          response_types?: string[]
+          scope?: string
+          token_endpoint_auth_method?: string
+        }
+        Update: {
+          client_id?: string
+          client_name?: string
+          client_uri?: string | null
+          created_at?: string
+          grant_types?: string[]
+          id?: string
+          logo_uri?: string | null
+          redirect_uris?: string[]
+          registered_by?: string | null
+          response_types?: string[]
+          scope?: string
+          token_endpoint_auth_method?: string
+        }
+        Relationships: []
+      }
+      mcp_oauth_codes: {
+        Row: {
+          client_id: string
+          code_challenge: string
+          code_challenge_method: string
+          code_hash: string
+          company_id: string
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          redirect_uri: string
+          scopes: string[]
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          code_challenge: string
+          code_challenge_method?: string
+          code_hash: string
+          company_id: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          redirect_uri: string
+          scopes?: string[]
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          code_challenge?: string
+          code_challenge_method?: string
+          code_hash?: string
+          company_id?: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          redirect_uri?: string
+          scopes?: string[]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_oauth_codes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "mcp_oauth_clients"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      mcp_oauth_tokens: {
+        Row: {
+          access_token_expires_at: string
+          access_token_hash: string
+          client_id: string
+          company_id: string
+          created_at: string
+          id: string
+          last_used_at: string | null
+          refresh_token_expires_at: string | null
+          refresh_token_hash: string | null
+          revoked_at: string | null
+          scopes: string[]
+          user_id: string
+        }
+        Insert: {
+          access_token_expires_at: string
+          access_token_hash: string
+          client_id: string
+          company_id: string
+          created_at?: string
+          id?: string
+          last_used_at?: string | null
+          refresh_token_expires_at?: string | null
+          refresh_token_hash?: string | null
+          revoked_at?: string | null
+          scopes?: string[]
+          user_id: string
+        }
+        Update: {
+          access_token_expires_at?: string
+          access_token_hash?: string
+          client_id?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          last_used_at?: string | null
+          refresh_token_expires_at?: string | null
+          refresh_token_hash?: string | null
+          revoked_at?: string | null
+          scopes?: string[]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_oauth_tokens_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "mcp_oauth_clients"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       media_channels: {
         Row: {
           channel_name: string
@@ -8233,6 +8426,8 @@ export type Database = {
           similarity: number
         }[]
       }
+      mcp_cleanup_expired: { Args: never; Returns: undefined }
+      mcp_hash: { Args: { _input: string }; Returns: string }
       move_to_dlq: {
         Args: {
           dlq_name: string

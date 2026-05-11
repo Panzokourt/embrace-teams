@@ -136,6 +136,11 @@ export default function SettingsPage() {
       description: 'Χρήστες με πρόσβαση στο client portal',
       render: () => <PortalUserManager />,
     },
+    {
+      id: 'mcp', label: 'MCP Integration', icon: Plug, group: G.DATA, visible: isAdmin,
+      description: 'Συνδέστε εξωτερικά AI εργαλεία (Claude, Cursor) μέσω MCP / OAuth',
+      render: () => <McpIntegrationSection />,
+    },
 
     // Βοήθεια
     {

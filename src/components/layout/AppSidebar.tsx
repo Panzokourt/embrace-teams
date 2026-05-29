@@ -79,7 +79,7 @@ const allCategories: Category[] = [
   { id: 'operations', icon: Users, label: 'Operations', routePrefixes: ['/hr', '/timesheets', '/knowledge', '/operations', '/leaderboard'] },
   { id: 'intelligence', icon: BarChart3, label: 'Intelligence', routePrefixes: ['/reports', '/brain'] },
   { id: 'communication', icon: MessageSquare, label: 'Communication', routePrefixes: ['/chat', '/inbox'] },
-  { id: 'settings', icon: Settings, label: 'Settings', routePrefixes: ['/settings', '/workflows'] },
+  { id: 'settings', icon: Settings, label: 'Settings', routePrefixes: ['/settings'] },
 ];
 
 
@@ -118,20 +118,14 @@ const categoryNavItems: Record<CategoryId, NavItem[]> = {
     { title: 'Chat', href: '/chat', icon: MessageSquare },
     { title: 'Inbox', href: '/inbox', icon: Mail },
   ],
-  settings: [
-    { title: 'General', href: '/settings', icon: Settings, permission: 'settings.company' },
-    { title: 'Organization', href: '/settings/organization', icon: Building2, permission: 'settings.company' },
-    { title: 'Workflows', href: '/workflows', icon: GitBranch },
-    { title: 'Integrations', href: '/settings/integrations', icon: Globe, permission: 'settings.integrations' },
-    { title: 'Billing', href: '/settings/billing', icon: DollarSign, permission: 'settings.billing' },
-    { title: 'Security', href: '/settings/security', icon: Shield, permission: 'settings.security' },
-  ],
+  settings: [],
 };
 
 function detectCategory(pathname: string): CategoryIdOrNull {
   if (pathname === '/' || pathname === '/my-work') return null;
   if (pathname === '/files') return null; // standalone rail item
   if (pathname.startsWith('/workflows')) return 'settings';
+
   if (pathname.startsWith('/work') || pathname.startsWith('/projects') || pathname.startsWith('/tasks') || pathname.startsWith('/calendar')) return 'work';
   if (pathname.startsWith('/clients') || pathname.startsWith('/contacts')) return 'clients';
   if (pathname.startsWith('/campaigns') || pathname.startsWith('/media-planning')) return 'marketing';

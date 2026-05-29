@@ -245,13 +245,24 @@ export default function AppSidebar({
   };
 
   const handleCategoryClick = useCallback((catId: CategoryId) => {
+    // If category has no submenu items, navigate directly to its primary route
+    if (categoryNavItems[catId].length === 0) {
+      const cat = allCategories.find((c) => c.id === catId);
+      const target = cat?.routePrefixes?.[0];
+      if (target) {
+        navigate(target);
+        setFlyoutCategory(null);
+        setActiveCategory(catId);
+        return;
+      }
+    }
     if (isEffectivelyCollapsed && !isMobileSheet) {
       setFlyoutCategory((prev) => prev === catId ? null : catId);
       setActiveCategory(catId);
     } else {
       setActiveCategory(catId);
     }
-  }, [isEffectivelyCollapsed, isMobileSheet]);
+  }, [isEffectivelyCollapsed, isMobileSheet, navigate]);
 
   const handleFlyoutEnter = useCallback(() => {
     if (flyoutTimeoutRef.current) {

@@ -21,6 +21,14 @@ project_id = "qsykyiqplslvmxdfudxq"
     verify_jwt = false
   [functions.email-send]
     verify_jwt = false
+  [functions.email-imap-test]
+    verify_jwt = false
+  [functions.email-imap-save]
+    verify_jwt = false
+  [functions.email-imap-fetch]
+    verify_jwt = false
+  [functions.email-imap-send]
+    verify_jwt = false
   [functions.generate-media-plan]
     verify_jwt = false
   [functions.gmail-auth-callback]

@@ -48,7 +48,7 @@ import PricingPage from "@/pages/PricingPage";
 import ServiceDetailPage from "@/pages/ServiceDetailPage";
 import Brain from "@/pages/Brain";
 import Secretary from "@/pages/Secretary";
-import Workflows from "@/pages/Workflows";
+
 import ResetPassword from "@/pages/ResetPassword";
 import PlatformAdmin from "@/pages/PlatformAdmin";
 import MediaPlanning from "@/pages/MediaPlanning";

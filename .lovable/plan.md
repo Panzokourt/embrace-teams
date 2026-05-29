@@ -1,119 +1,57 @@
-# MCP Server για το Olseny Workspace
+## Στόχος
 
-Δημιουργία ενός full-featured **Model Context Protocol (MCP) Server** που εκθέτει τα δεδομένα και τις λειτουργίες της εφαρμογής σε:
-- **Εξωτερικούς AI clients** (Claude Desktop, ChatGPT Desktop, Cursor, Windsurf, κλπ.)
-- **Τον εσωτερικό Secretary agent** (μέσω του ίδιου protocol για consistency)
+Να μπορεί ο χρήστης να συνδέσει email account και με manual IMAP/SMTP (όχι μόνο Gmail OAuth) — π.χ. εταιρικά mailboxes, cPanel, Outlook on-prem, Yahoo App Password κ.λπ.
 
-## Αρχιτεκτονική
+## Τρέχουσα κατάσταση
 
-```text
-┌─────────────────────┐         ┌──────────────────────┐
-│  External Client    │  HTTPS  │   Edge Function      │
-│  (Claude Desktop)   │ ──────► │   /mcp-server        │
-└─────────────────────┘         │   (Streamable HTTP)  │
-                                │                      │
-┌─────────────────────┐         │   - OAuth 2.0        │
-│  Secretary Agent    │ ──────► │   - Tool registry    │
-│  (in-app)           │         │   - Company-scoped   │
-└─────────────────────┘         └──────────┬───────────┘
-                                           │
-                                ┌──────────▼───────────┐
-                                │  Supabase (RLS +     │
-                                │  service-role calls) │
-                                └──────────────────────┘
-```
+- Ο πίνακας `email_accounts` ήδη έχει τα πεδία IMAP/SMTP (`imap_host/port`, `smtp_host/port`, `username`, `use_tls`) και υπάρχει το hook `useEmailAccount` με presets (Gmail/Outlook/Yahoo).
+- Όμως το UI Settings δείχνει μόνο το `EmailAccountSetup` (Gmail OAuth μέσω `useGmailAccount` + `gmail-auth-start/callback` + `email-fetch/send`).
+- Δεν υπάρχει αποθήκευση password ούτε edge function που να μιλάει IMAP/SMTP.
 
-## Τι θα φτιάξουμε
+## Σχέδιο
 
-### 1. Database (νέα tables)
-- `mcp_oauth_clients` — registered MCP clients (client_id, client_secret_hash, redirect_uris, name, owner)
-- `mcp_oauth_codes` — short-lived authorization codes (PKCE)
-- `mcp_oauth_tokens` — access + refresh tokens, scoped σε `user_id` + `company_id` + `scopes[]`
-- `mcp_audit_log` — κάθε tool call (user, tool, args summary, result status, timestamp)
+### 1. Database (migration)
+- Νέος πίνακας `email_account_credentials` (ξεχωριστά από `email_accounts` για security):
+  - `account_id` (FK), `encrypted_password` (text), `created_at`, `updated_at`.
+  - RLS: μόνο ο owner του account μπορεί να βλέπει/γράφει. Service role full access.
+  - Το password κρυπτογραφείται με `pgsosp`/`pgcrypto` χρησιμοποιώντας secret από Vault (`EMAIL_CREDENTIALS_KEY`).
+- Προσθήκη `provider_type` στο `email_accounts` ('gmail_oauth' | 'imap_smtp') για να ξεχωρίζουμε τα δύο.
 
-Όλα company-scoped με RLS και αυστηρό `SET search_path = public`.
+### 2. Νέα Edge Functions
+- `email-imap-test` — δέχεται credentials, κάνει IMAP login + SMTP verify, επιστρέφει success/error. Χρησιμοποιείται και πριν την αποθήκευση.
+- `email-imap-fetch` — fetch latest N messages από IMAP INBOX, parse, αποθήκευση στον υπάρχοντα πίνακα `emails` (ίδιο schema με Gmail flow).
+- `email-imap-send` — αποστολή μέσω SMTP, με ίδιο contract με `email-send`.
+- Library: `npm:imapflow` για IMAP, `npm:nodemailer` για SMTP (τρέχουν σε Deno edge).
 
-### 2. Edge Functions
-Νέες functions στο `supabase/functions/`:
+### 3. UI — νέα ενότητα στο Settings → Email/Inbox
+Refactor του `EmailAccountSetup.tsx`:
+- Tabs ή radio: **Gmail (OAuth)** | **Manual (IMAP/SMTP)**.
+- Manual form με πεδία: email, display name, IMAP host/port, SMTP host/port, username, password, TLS toggle, provider preset dropdown (Gmail/Outlook/Yahoo/Custom για auto-fill).
+- Κουμπί "Δοκιμή Σύνδεσης" → καλεί `email-imap-test` πριν την αποθήκευση.
+- Μετά save: εμφανίζει το ίδιο connected state με badge "IMAP" αντί για "Gmail".
 
-| Function | Σκοπός |
-|---|---|
-| `mcp-server` | Κύριο endpoint — Streamable HTTP MCP transport (mcp-lite + Hono). `verify_jwt = false` (κάνει δικό του token validation). |
-| `mcp-oauth-authorize` | OAuth authorize endpoint — δείχνει consent screen, redirect στον δικό μας UI |
-| `mcp-oauth-token` | OAuth token endpoint — exchange code → tokens, refresh |
-| `mcp-oauth-register` | Dynamic Client Registration (RFC 7591) — έτσι Claude Desktop κλπ συνδέονται αυτόματα |
-| `.well-known/oauth-authorization-server` | Discovery metadata (μέσω rewrite στο `mcp-server`) |
+### 4. Routing fetch/send με βάση `provider_type`
+- Το υπάρχον `useEmailMessages` / σημεία που καλούν `email-fetch`/`email-send` θα ελέγχουν το `provider_type` και θα δρομολογούν στο σωστό function.
+- Εναλλακτικά: wrapper functions `email-fetch-router` / `email-send-router` που διαλέγουν.
 
-### 3. MCP Tools (αρχικό set)
+### 5. Secret
+- Νέο secret `EMAIL_CREDENTIALS_KEY` (encryption key 32 bytes) — θα ζητηθεί από τον χρήστη πριν τη μετάβαση σε build.
 
-**Tasks**
-- `list_tasks` (filters: status, priority, assigned_to_me, due_within_days)
-- `get_task` (id)
-- `create_task` (title, project_id, priority, due_date, description)
-- `update_task` (id, status, priority, due_date, etc.)
-- `complete_task` (id)
+## Τεχνικές σημειώσεις
 
-**Projects & Clients (read)**
-- `list_projects` (filters: status, client_id)
-- `get_project` (id, includes basic stats)
-- `list_clients`
-- `get_client` (id, με contacts)
+- IMAP/SMTP από edge functions: το Supabase Edge Runtime υποστηρίζει outbound TCP, οπότε `imapflow` + `nodemailer` δουλεύουν (έχουν χρησιμοποιηθεί σε production Deno deployments).
+- Δεν αποθηκεύουμε plaintext passwords. Encryption at rest με AES-GCM μέσω `crypto.subtle` στα edge functions, key από Vault.
+- Για Gmail manual: ο χρήστης πρέπει να χρησιμοποιήσει App Password (όχι κανονικό password) — θα το αναφέρουμε στο UI.
 
-**Time tracking**
-- `start_timer` (task_id, description)
-- `stop_timer` (επιστρέφει duration)
-- `get_active_timer`
-- `log_time_entry` (task_id, started_at, duration_minutes, description)
+## Σειρά εκτέλεσης
 
-**Knowledge Base**
-- `search_kb` (query) — semantic search μέσω του υπάρχοντος `match_kb_chunks`
-- `get_kb_article` (id)
-- `list_blueprints`
+1. Migration για `email_account_credentials` + `provider_type`.
+2. Add secret `EMAIL_CREDENTIALS_KEY`.
+3. Edge functions `email-imap-test`, `email-imap-fetch`, `email-imap-send`.
+4. UI refactor `EmailAccountSetup` με tabs.
+5. Routing στα κλήσεις fetch/send.
 
-Κάθε tool εκτελείται με τα δικαιώματα του `user_id` του token (μέσω `auth.uid()` simulation με service role + manual scoping στις queries — όχι παράκαμψη RLS).
+## Εκτός scope
 
-### 4. UI: Σελίδα διαχείρισης MCP
-Νέο route `/settings/integrations/mcp`:
-- Λίστα συνδεδεμένων MCP clients ανά χρήστη
-- Κουμπί "Revoke access"
-- Οδηγίες σύνδεσης για Claude Desktop / Cursor (με το server URL: `https://qsykyiqplslvmxdfudxq.supabase.co/functions/v1/mcp-server`)
-- Audit log viewer (πρόσφατες κλήσεις)
-
-### 5. Internal usage
-Ο `secretary-agent` Edge Function θα μπορεί να καλεί τα ίδια tools απευθείας (in-process import), ώστε ο Secretary και οι external clients να μοιράζονται την ίδια λογική.
-
-## OAuth Flow (περίληψη)
-
-1. Claude Desktop κάνει discovery στο `/.well-known/oauth-authorization-server`
-2. Dynamic Client Registration → επιστρέφει `client_id`
-3. Browser ανοίγει στον authorize endpoint → ο χρήστης κάνει login (αν χρειάζεται) → consent screen
-4. Code + PKCE → exchange στο token endpoint → access + refresh token
-5. Όλες οι MCP requests έρχονται με `Authorization: Bearer <access_token>`
-
-## Τεχνικές επιλογές
-- **Library**: `mcp-lite` (npm) σε Deno Edge Function με Hono routing
-- **Token format**: opaque random tokens (όχι JWT) — αποθηκεύονται hashed στη DB για άμεσο revocation
-- **Scopes**: `tasks:read`, `tasks:write`, `projects:read`, `clients:read`, `time:write`, `kb:read` — ο χρήστης τα επιλέγει στο consent screen
-- **Rate limiting**: per-token (π.χ. 60 req/min) μέσω in-memory map ή `mcp_audit_log` count
-- **Audit**: κάθε call γράφεται στο `mcp_audit_log` για compliance
-
-## Ασφάλεια
-- Tokens hashed με sha256 πριν αποθηκευτούν (όπως ήδη κάνεις στα portal tokens με `_hash_token`)
-- Όλες οι queries scoped σε `user_id` + `company_id` του token — ποτέ cross-tenant
-- PKCE υποχρεωτικό (RFC 7636)
-- Refresh token rotation
-- Tools που γράφουν δεδομένα (create_task, log_time_entry) απαιτούν explicit `*:write` scope
-
-## Παραδοτέα μετά την υλοποίηση
-1. 4 νέες tables + RLS policies
-2. 4 νέες Edge Functions
-3. Σελίδα διαχείρισης στο Settings με connection instructions
-4. Documentation block μέσα στη σελίδα για copy-paste config σε Claude/Cursor
-5. Refactor του `secretary-agent` ώστε να καλεί τα MCP tools (optional follow-up)
-
-## Σημειώσεις
-- **Δεν χρειάζεται κανένα API key/secret** από εσένα — όλα τρέχουν στο Lovable Cloud
-- Το MCP server URL θα είναι σταθερό και δημόσια προσβάσιμο, αλλά κάθε call απαιτεί valid OAuth token
-- Αρχικά **δεν** ενσωματώνουμε στον Secretary (κρατάμε το ως follow-up step) για να περιορίσουμε το scope της πρώτης υλοποίησης
-
-Θες να προχωρήσουμε; Αν ναι, πάτα **Implement plan**.
+- Auto-sync cron για IMAP (μπορεί να μπει σε επόμενο iteration — προς το παρόν manual refresh).
+- OAuth για άλλους providers (Outlook/Yahoo OAuth).

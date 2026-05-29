@@ -48,7 +48,7 @@ import PricingPage from "@/pages/PricingPage";
 import ServiceDetailPage from "@/pages/ServiceDetailPage";
 import Brain from "@/pages/Brain";
 import Secretary from "@/pages/Secretary";
-import Workflows from "@/pages/Workflows";
+
 import ResetPassword from "@/pages/ResetPassword";
 import PlatformAdmin from "@/pages/PlatformAdmin";
 import MediaPlanning from "@/pages/MediaPlanning";
@@ -165,7 +165,7 @@ const App = () => (
                   <Route path="/intelligence/ai-insights" element={<Navigate to="/brain" replace />} />
                   {/* Redirects from removed placeholder pages */}
                   <Route path="/secretary" element={<Secretary />} />
-                  <Route path="/workflows" element={<Workflows />} />
+                  <Route path="/workflows" element={<Navigate to="/settings?section=workflows" replace />} />
                   <Route path="/media-planning" element={<MediaPlanning />} />
                   <Route path="/media-planning/:id" element={<MediaPlanWorkspace />} />
                   <Route path="/campaigns" element={<Campaigns />} />

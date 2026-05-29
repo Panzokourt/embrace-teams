@@ -1,46 +1,40 @@
-## Manual IMAP/SMTP Email Connection
+## Στόχος
 
-Επέκταση του email integration ώστε εκτός από Gmail OAuth, να μπορεί ο χρήστης να συνδέσει οποιοδήποτε mailbox με χειροκίνητες ρυθμίσεις (IMAP για receive, SMTP για send).
+Όταν ο χρήστης πατάει **Settings** στο rail sidebar, να μην εμφανίζεται flyout/submenu (General, Organization, Workflows, Integrations, Billing, Security). Αντί αυτού, να φορτώνεται απευθείας η ενοποιημένη σελίδα `/settings`, που ήδη έχει όλες τις υποκατηγορίες οργανωμένες σε ομάδες (Λογαριασμός, Προσωποποίηση, Εταιρεία, Δεδομένα & Ενσωματώσεις, Βοήθεια). Τα Workflows θα προστεθούν ως νέα υποκατηγορία μέσα στο Settings page.
 
-### 1. Database migration
+## Αλλαγές
 
-- Προσθήκη `provider_type TEXT NOT NULL DEFAULT 'gmail_oauth'` στο `email_accounts` (values: `gmail_oauth` | `imap_smtp`).
-- Backfill: existing rows → `gmail_oauth`.
-- Επιβεβαίωση ότι τα ήδη υπάρχοντα fields (`imap_host`, `imap_port`, `smtp_host`, `smtp_port`, `username`, `encrypted_password`, `use_tls`) επαρκούν — δεν χρειάζονται νέα.
+### 1. `src/components/layout/AppSidebar.tsx`
+- Άδειασμα του `categoryNavItems.settings` (γίνεται `[]`), ώστε το Settings να συμπεριφέρεται σαν standalone rail item — όπως το Files.
+- Αφαίρεση του `/workflows` από το `routePrefixes` του Settings category (μένει μόνο `/settings`), και αντίστοιχη αφαίρεση από το `detectCategory`.
+- Click στο Settings rail icon → navigate απευθείας στο `/settings`, χωρίς flyout. (Το auto-collapse logic ήδη χειρίζεται κενές κατηγορίες.)
 
-### 2. Edge functions (νέες, με `verify_jwt = false` + in-code JWT validation)
+### 2. `src/pages/Settings.tsx`
+- Προσθήκη νέου section `workflows` στο group **Δεδομένα & Ενσωματώσεις** (ή νέο group αν προτιμάς), με icon `GitBranch`.
+- Το section θα φορτώνει ένα νέο component wrapper (βλ. #3) που εμβολιάζει το υπάρχον περιεχόμενο του `/workflows`.
 
-- **`email-imap-test`** — δέχεται host/port/user/password, κάνει IMAP login + SMTP `verify()`, επιστρέφει `{ ok, imap, smtp, error? }`. Δεν αποθηκεύει τίποτα.
-- **`email-imap-save`** — κρυπτογραφεί το password με `EMAIL_CREDENTIALS_KEY` (AES-GCM), κάνει upsert στο `email_accounts` με `provider_type='imap_smtp'`.
-- **`email-imap-fetch`** — fetch των N πιο πρόσφατων messages από INBOX, parse (subject/from/to/date/body/attachments), insert στο `email_messages` με dedup σε `message_id`.
-- **`email-imap-send`** — ίδιο contract με το `email-send` (to, subject, html/text, cc, bcc, reply-to), αποστολή μέσω SMTP.
+### 3. `src/components/settings/sections/WorkflowsSection.tsx` (νέο)
+- Λεπτό wrapper που κάνει render το ίδιο περιεχόμενο που σήμερα ζει στο `src/pages/Workflows.tsx`, χωρίς το `PageHeader` (γιατί το Settings layout έχει δικό του header).
 
-Libraries: `npm:imapflow`, `npm:nodemailer`, `npm:mailparser`.
+### 4. Routing (`src/App.tsx`)
+- Η route `/workflows` παραμένει για backward-compatibility αλλά γίνεται **redirect** στο `/settings?section=workflows` (όπως ήδη γίνεται για org/billing/security σύμφωνα με το memory "Settings Hub Architecture").
 
-### 3. Routing layer
+## Τι ΔΕΝ αλλάζει
 
-Σε `useEmailMessages` / send hooks: διαβάζουμε `provider_type` του ενεργού account και καλούμε:
-- `gmail_oauth` → `email-fetch` / `email-send` (όπως τώρα)
-- `imap_smtp` → `email-imap-fetch` / `email-imap-send`
+- Το ίδιο το Settings page UI (sections, layout, content).
+- Οι existing redirect routes `/settings/organization`, `/settings/billing`, `/settings/security`, `/settings/integrations`.
+- Permissions και RBAC για κάθε section.
+- Άλλα rail categories.
 
-### 4. UI — `EmailAccountSetup.tsx`
+## Αποτέλεσμα
 
-Refactor σε Tabs:
-- **Tab "Gmail" (OAuth)** — existing flow αμετάβλητο.
-- **Tab "Manual (IMAP/SMTP)"** — νέα φόρμα:
-  - Preset dropdown (Gmail / Outlook / Yahoo / Custom) που προσυμπληρώνει hosts/ports.
-  - Fields: Email, Display Name, IMAP host/port, SMTP host/port, Username, Password, TLS toggle.
-  - **"Test Connection"** button → καλεί `email-imap-test`, δείχνει inline success/error.
-  - **"Save"** button (ενεργοποιείται μόνο μετά από επιτυχές test) → καλεί `email-imap-save`.
-
-### 5. Out of scope (να γίνει σε επόμενο iteration αν χρειαστεί)
-
-- Cron auto-sync για IMAP accounts (προς το παρόν manual refresh button).
-- OAuth για Outlook/Yahoo.
-- IDLE / push για realtime IMAP.
-
-### Technical notes
-
-- Κρυπτογράφηση: AES-GCM 256, key από `EMAIL_CREDENTIALS_KEY` (base64 → 32 bytes), random IV per record, αποθήκευση `iv:ciphertext:tag` σε base64 στο `encrypted_password`.
-- Validation: Zod schemas σε όλες τις edge functions, host/port checks, RLS παραμένει το ίδιο (`company_id` scoped).
-- Error mapping: invalid_credentials, connection_refused, tls_error, timeout → user-friendly Greek messages.
+```text
+ΠΡΙΝ:                              ΜΕΤΑ:
+[Settings rail] → flyout panel     [Settings rail] → /settings (direct)
+  ├ General                          └ Sidebar του Settings page
+  ├ Organization                       με όλες τις υποκατηγορίες
+  ├ Workflows                          + νέα: Workflows
+  ├ Integrations
+  ├ Billing
+  └ Security
+```

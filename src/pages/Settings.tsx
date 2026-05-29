@@ -2,8 +2,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   Settings as SettingsIcon, User, Bell, Palette, Building2, Clock, FolderTree,
   LayoutGrid, Mail, Upload, Trash2, Brain, Sparkles, GraduationCap, Users, Shield,
-  Activity, CreditCard, Briefcase, Database, Plug,
+  Activity, CreditCard, Briefcase, Database, Plug, GitBranch,
 } from 'lucide-react';
+import Workflows from '@/pages/Workflows';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SettingsLayout, SettingsSection } from '@/components/settings/SettingsLayout';
 
@@ -140,6 +141,11 @@ export default function SettingsPage() {
       id: 'mcp', label: 'MCP Integration', icon: Plug, group: G.DATA, visible: isAdmin,
       description: 'Συνδέστε εξωτερικά AI εργαλεία (Claude, Cursor) μέσω MCP / OAuth',
       render: () => <McpIntegrationSection />,
+    },
+    {
+      id: 'workflows', label: 'Ροές Εργασίας', icon: GitBranch, group: G.DATA, visible: isAdmin,
+      description: 'Διαχείριση workflows και αιτημάτων',
+      render: () => <Workflows embedded />,
     },
 
     // Βοήθεια

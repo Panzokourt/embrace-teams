@@ -16,7 +16,7 @@ import { IntakeRequestsList } from '@/components/workflows/IntakeRequestsList';
 import { IntakeRequestDetail } from '@/components/workflows/IntakeRequestDetail';
 import { PageHeader } from '@/components/shared/PageHeader';
 
-export default function Workflows() {
+export default function Workflows({ embedded = false }: { embedded?: boolean } = {}) {
   const { workflows, loading, createWorkflow, updateWorkflow, deleteWorkflow } = useIntakeWorkflows();
   const { requests, loading: reqLoading, fetchRequests } = useIntakeRequests();
   const [activeTab, setActiveTab] = useState('workflows');
@@ -63,12 +63,22 @@ export default function Workflows() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <PageHeader icon={GitBranch} title="Ροές Εργασίας" subtitle="Διαχείριση workflows και αιτημάτων">
-        <Button onClick={() => setRequestDialogOpen(true)} className="gap-1.5">
-          <Inbox className="h-4 w-4" /> Νέο Αίτημα
-        </Button>
-      </PageHeader>
+    <div className={embedded ? "space-y-6" : "p-6 max-w-6xl mx-auto space-y-6"}>
+      {!embedded && (
+        <PageHeader icon={GitBranch} title="Ροές Εργασίας" subtitle="Διαχείριση workflows και αιτημάτων">
+          <Button onClick={() => setRequestDialogOpen(true)} className="gap-1.5">
+            <Inbox className="h-4 w-4" /> Νέο Αίτημα
+          </Button>
+        </PageHeader>
+      )}
+      {embedded && (
+        <div className="flex justify-end">
+          <Button onClick={() => setRequestDialogOpen(true)} className="gap-1.5">
+            <Inbox className="h-4 w-4" /> Νέο Αίτημα
+          </Button>
+        </div>
+      )}
+
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>

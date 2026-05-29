@@ -1,57 +1,46 @@
-## Στόχος
+## Manual IMAP/SMTP Email Connection
 
-Να μπορεί ο χρήστης να συνδέσει email account και με manual IMAP/SMTP (όχι μόνο Gmail OAuth) — π.χ. εταιρικά mailboxes, cPanel, Outlook on-prem, Yahoo App Password κ.λπ.
+Επέκταση του email integration ώστε εκτός από Gmail OAuth, να μπορεί ο χρήστης να συνδέσει οποιοδήποτε mailbox με χειροκίνητες ρυθμίσεις (IMAP για receive, SMTP για send).
 
-## Τρέχουσα κατάσταση
+### 1. Database migration
 
-- Ο πίνακας `email_accounts` ήδη έχει τα πεδία IMAP/SMTP (`imap_host/port`, `smtp_host/port`, `username`, `use_tls`) και υπάρχει το hook `useEmailAccount` με presets (Gmail/Outlook/Yahoo).
-- Όμως το UI Settings δείχνει μόνο το `EmailAccountSetup` (Gmail OAuth μέσω `useGmailAccount` + `gmail-auth-start/callback` + `email-fetch/send`).
-- Δεν υπάρχει αποθήκευση password ούτε edge function που να μιλάει IMAP/SMTP.
+- Προσθήκη `provider_type TEXT NOT NULL DEFAULT 'gmail_oauth'` στο `email_accounts` (values: `gmail_oauth` | `imap_smtp`).
+- Backfill: existing rows → `gmail_oauth`.
+- Επιβεβαίωση ότι τα ήδη υπάρχοντα fields (`imap_host`, `imap_port`, `smtp_host`, `smtp_port`, `username`, `encrypted_password`, `use_tls`) επαρκούν — δεν χρειάζονται νέα.
 
-## Σχέδιο
+### 2. Edge functions (νέες, με `verify_jwt = false` + in-code JWT validation)
 
-### 1. Database (migration)
-- Νέος πίνακας `email_account_credentials` (ξεχωριστά από `email_accounts` για security):
-  - `account_id` (FK), `encrypted_password` (text), `created_at`, `updated_at`.
-  - RLS: μόνο ο owner του account μπορεί να βλέπει/γράφει. Service role full access.
-  - Το password κρυπτογραφείται με `pgsosp`/`pgcrypto` χρησιμοποιώντας secret από Vault (`EMAIL_CREDENTIALS_KEY`).
-- Προσθήκη `provider_type` στο `email_accounts` ('gmail_oauth' | 'imap_smtp') για να ξεχωρίζουμε τα δύο.
+- **`email-imap-test`** — δέχεται host/port/user/password, κάνει IMAP login + SMTP `verify()`, επιστρέφει `{ ok, imap, smtp, error? }`. Δεν αποθηκεύει τίποτα.
+- **`email-imap-save`** — κρυπτογραφεί το password με `EMAIL_CREDENTIALS_KEY` (AES-GCM), κάνει upsert στο `email_accounts` με `provider_type='imap_smtp'`.
+- **`email-imap-fetch`** — fetch των N πιο πρόσφατων messages από INBOX, parse (subject/from/to/date/body/attachments), insert στο `email_messages` με dedup σε `message_id`.
+- **`email-imap-send`** — ίδιο contract με το `email-send` (to, subject, html/text, cc, bcc, reply-to), αποστολή μέσω SMTP.
 
-### 2. Νέα Edge Functions
-- `email-imap-test` — δέχεται credentials, κάνει IMAP login + SMTP verify, επιστρέφει success/error. Χρησιμοποιείται και πριν την αποθήκευση.
-- `email-imap-fetch` — fetch latest N messages από IMAP INBOX, parse, αποθήκευση στον υπάρχοντα πίνακα `emails` (ίδιο schema με Gmail flow).
-- `email-imap-send` — αποστολή μέσω SMTP, με ίδιο contract με `email-send`.
-- Library: `npm:imapflow` για IMAP, `npm:nodemailer` για SMTP (τρέχουν σε Deno edge).
+Libraries: `npm:imapflow`, `npm:nodemailer`, `npm:mailparser`.
 
-### 3. UI — νέα ενότητα στο Settings → Email/Inbox
-Refactor του `EmailAccountSetup.tsx`:
-- Tabs ή radio: **Gmail (OAuth)** | **Manual (IMAP/SMTP)**.
-- Manual form με πεδία: email, display name, IMAP host/port, SMTP host/port, username, password, TLS toggle, provider preset dropdown (Gmail/Outlook/Yahoo/Custom για auto-fill).
-- Κουμπί "Δοκιμή Σύνδεσης" → καλεί `email-imap-test` πριν την αποθήκευση.
-- Μετά save: εμφανίζει το ίδιο connected state με badge "IMAP" αντί για "Gmail".
+### 3. Routing layer
 
-### 4. Routing fetch/send με βάση `provider_type`
-- Το υπάρχον `useEmailMessages` / σημεία που καλούν `email-fetch`/`email-send` θα ελέγχουν το `provider_type` και θα δρομολογούν στο σωστό function.
-- Εναλλακτικά: wrapper functions `email-fetch-router` / `email-send-router` που διαλέγουν.
+Σε `useEmailMessages` / send hooks: διαβάζουμε `provider_type` του ενεργού account και καλούμε:
+- `gmail_oauth` → `email-fetch` / `email-send` (όπως τώρα)
+- `imap_smtp` → `email-imap-fetch` / `email-imap-send`
 
-### 5. Secret
-- Νέο secret `EMAIL_CREDENTIALS_KEY` (encryption key 32 bytes) — θα ζητηθεί από τον χρήστη πριν τη μετάβαση σε build.
+### 4. UI — `EmailAccountSetup.tsx`
 
-## Τεχνικές σημειώσεις
+Refactor σε Tabs:
+- **Tab "Gmail" (OAuth)** — existing flow αμετάβλητο.
+- **Tab "Manual (IMAP/SMTP)"** — νέα φόρμα:
+  - Preset dropdown (Gmail / Outlook / Yahoo / Custom) που προσυμπληρώνει hosts/ports.
+  - Fields: Email, Display Name, IMAP host/port, SMTP host/port, Username, Password, TLS toggle.
+  - **"Test Connection"** button → καλεί `email-imap-test`, δείχνει inline success/error.
+  - **"Save"** button (ενεργοποιείται μόνο μετά από επιτυχές test) → καλεί `email-imap-save`.
 
-- IMAP/SMTP από edge functions: το Supabase Edge Runtime υποστηρίζει outbound TCP, οπότε `imapflow` + `nodemailer` δουλεύουν (έχουν χρησιμοποιηθεί σε production Deno deployments).
-- Δεν αποθηκεύουμε plaintext passwords. Encryption at rest με AES-GCM μέσω `crypto.subtle` στα edge functions, key από Vault.
-- Για Gmail manual: ο χρήστης πρέπει να χρησιμοποιήσει App Password (όχι κανονικό password) — θα το αναφέρουμε στο UI.
+### 5. Out of scope (να γίνει σε επόμενο iteration αν χρειαστεί)
 
-## Σειρά εκτέλεσης
+- Cron auto-sync για IMAP accounts (προς το παρόν manual refresh button).
+- OAuth για Outlook/Yahoo.
+- IDLE / push για realtime IMAP.
 
-1. Migration για `email_account_credentials` + `provider_type`.
-2. Add secret `EMAIL_CREDENTIALS_KEY`.
-3. Edge functions `email-imap-test`, `email-imap-fetch`, `email-imap-send`.
-4. UI refactor `EmailAccountSetup` με tabs.
-5. Routing στα κλήσεις fetch/send.
+### Technical notes
 
-## Εκτός scope
-
-- Auto-sync cron για IMAP (μπορεί να μπει σε επόμενο iteration — προς το παρόν manual refresh).
-- OAuth για άλλους providers (Outlook/Yahoo OAuth).
+- Κρυπτογράφηση: AES-GCM 256, key από `EMAIL_CREDENTIALS_KEY` (base64 → 32 bytes), random IV per record, αποθήκευση `iv:ciphertext:tag` σε base64 στο `encrypted_password`.
+- Validation: Zod schemas σε όλες τις edge functions, host/port checks, RLS παραμένει το ίδιο (`company_id` scoped).
+- Error mapping: invalid_credentials, connection_refused, tls_error, timeout → user-friendly Greek messages.

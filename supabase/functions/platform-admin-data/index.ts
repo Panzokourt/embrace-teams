@@ -262,7 +262,8 @@ Deno.serve(async (req) => {
       headers: securityHeaders,
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error('platform-admin-data error:', error);
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
       headers: securityHeaders,
     });

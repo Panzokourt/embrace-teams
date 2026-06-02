@@ -1,46 +1,64 @@
-## Μαζική Εξαγωγή (Bulk Export)
+## Πρόβλημα
 
-Νέα ενότητα στις Ρυθμίσεις, ακριβώς κάτω από τη Μαζική Εισαγωγή, που επιτρέπει εξαγωγή πελατών / έργων / tasks σε αρχεία Excel/CSV με την ίδια δομή με τα import templates.
+Ο επίσημος `@modelcontextprotocol/sdk` (που χρησιμοποιεί το `mcp-remote` και ο native connector του Claude.ai/Desktop) **αγνοεί** τα explicit endpoints (`registration_endpoint`, `authorization_endpoint`, `token_endpoint`) του OAuth metadata και κατασκευάζει τα URLs ως `{issuer}/register`, `{issuer}/authorize`, `{issuer}/token`.
 
-### UX flow
+Σήμερα ο issuer μας είναι `https://…/functions/v1/mcp-server`, οπότε ο SDK πάει:
+- `POST .../mcp-server/register` → **401 unauthorized** (το mcp-server function δεν ξέρει αυτό το path)
+- `GET .../mcp-server/authorize` → 401
+- `POST .../mcp-server/token` → 401
 
-1. Ο χρήστης μπαίνει στο `/settings` → section **«Μαζική Εξαγωγή»** (group: Δεδομένα & Ενσωματώσεις, ακριβώς μετά το Import).
-2. Επιλέγει με checkboxes ποιες οντότητες θέλει: Πελάτες / Έργα / Tasks.
-3. **Φίλτρο πελατών (προαιρετικό)**: multi-select πελατών (searchable). Αν επιλεγούν συγκεκριμένοι πελάτες:
-   - Πελάτες → μόνο οι επιλεγμένοι
-   - Έργα → μόνο όσα ανήκουν στους επιλεγμένους πελάτες
-   - Tasks → μόνο όσα ανήκουν σε έργα των επιλεγμένων πελατών
-   - Αν δεν επιλεγεί κανείς → όλα τα δεδομένα της εταιρείας
-4. Επιλογή format: **Excel (.xlsx)** ή **CSV**.
-5. Κουμπί **«Λήψη»** → παράγει και κατεβάζει ξεχωριστό αρχείο για κάθε επιλεγμένη οντότητα (π.χ. αν διαλέξει πελάτες+έργα → 2 αρχεία).
+Γι' αυτό το `mcp-remote` πεθαίνει με `Connection error: ServerError` στο `registerClient` (το `Discovered authorization server: …/mcp-server` δείχνει ότι το SDK θεωρεί ότι όλο το OAuth flow είναι κάτω από αυτό το base URL).
 
-### Δομή αρχείων
+## Λύση
 
-Τα αρχεία ακολουθούν **ακριβώς** τα ίδια headers/πεδία με τα import templates (`clientSchema`, `projectSchema`, `taskSchema`) ώστε να είναι round-trip συμβατά (export → edit → re-import). Επαναχρησιμοποιείται το `buildTemplate` pattern από `src/components/import/utils/templateBuilder.ts`, με δεύτερο sheet «Οδηγίες» όπως και στα templates.
+Στο `mcp-server/index.ts` προσθέτω routing για 3 sub-paths που εκτελούν την ίδια λογική με τα ξεχωριστά OAuth functions:
 
-Mapping ειδικών πεδίων:
-- `client_name` (στα projects): από join με `clients.name`
-- `project_name` + `assigned_to_email` (στα tasks): από joins με projects + profiles
-- `tags`: array → comma-separated string
-- Enums: αποθηκεύονται με το raw value (π.χ. `active`, `todo`) όπως στο import
+- `POST /mcp-server/register` → Dynamic Client Registration (αντιγραφή λογικής `mcp-oauth-register`)
+- `GET /mcp-server/authorize` → redirect στη `/mcp-consent` σελίδα (αντιγραφή λογικής `mcp-oauth-authorize`)
+- `POST /mcp-server/token` → token exchange & refresh (αντιγραφή λογικής `mcp-oauth-token`)
 
-### Τεχνικές αλλαγές
+Τα standalone functions (`mcp-oauth-register`, `mcp-oauth-authorize`, `mcp-oauth-token`) παραμένουν για backwards compat με τους custom clients που σέβονται το metadata.
 
-**Νέα αρχεία:**
-- `src/components/settings/sections/BulkExportSection.tsx` — UI με checkboxes οντοτήτων, ClientSelector (multi), format toggle, progress state, κουμπί Export.
-- `src/components/export/utils/exportBuilder.ts` — fetch από Supabase με βάση επιλεγμένα `client_ids`, μετατροπή σε rows που ταιριάζουν στα schemas, παραγωγή `.xlsx` (μέσω `xlsx`) ή `.csv`. Reuse `SCHEMAS` από `src/components/import/schemas/index.ts`.
-- `src/components/export/utils/downloadAll.ts` — sequential download (μικρό delay) για >1 αρχεία.
+## Τεχνικές αλλαγές
 
-**Edits:**
-- `src/pages/Settings.tsx`: προσθήκη rail item `bulk-export` ακριβώς μετά το `bulk-import` στο ίδιο group (Δεδομένα & Ενσωματώσεις), icon `Download`, label «Μαζική Εξαγωγή».
+### 1. `supabase/functions/_shared/mcp-oauth-handlers.ts` (νέο)
 
-**Queries:**
-- `clients`: `SELECT name, sector, website, contact_email, contact_phone, secondary_phone, address, tax_id, tags, notes WHERE company_id = ?` (+ optional `id IN (...)`)
-- `projects`: join με `clients(name)`, scoped σε `company_id` (+ optional `client_id IN (...)`)
-- `tasks`: join με `projects(name, client_id)` + `profiles(email)` για assignee, scoped σε `company_id` (+ optional `project.client_id IN (...)`)
+Εξάγει τις πραγματικές handler functions (`handleRegister(req)`, `handleAuthorize(req)`, `handleToken(req)`) από τα 3 υπάρχοντα oauth functions, ώστε να καλούνται και από τα ξεχωριστά functions και από το mcp-server.
 
-Όλα μέσω του υπάρχοντος `supabase` client, με σεβασμό στις υπάρχουσες RLS policies (company-scoped).
+### 2. `supabase/functions/mcp-server/index.ts` (επεξεργασία)
 
-### Τι **δεν** αλλάζει
-- Το import flow, schemas, templates, rail sidebar logic, RLS/permissions.
-- Δεν προστίθενται νέοι πίνακες ή edge functions — όλα client-side με τα ίδια queries του React Query.
+Στην αρχή του request handler, parse `new URL(req.url).pathname` και route:
+
+```ts
+const path = new URL(req.url).pathname;
+if (path.endsWith("/register")) return handleRegister(req);
+if (path.endsWith("/authorize")) return handleAuthorize(req);
+if (path.endsWith("/token")) return handleToken(req);
+// (αφήνουμε και το /.well-known/* όπως είναι σήμερα)
+// fall through στο υπάρχον MCP JSON-RPC handling
+```
+
+### 3. `supabase/functions/mcp-oauth-register/index.ts`, `mcp-oauth-authorize/index.ts`, `mcp-oauth-token/index.ts` (refactor)
+
+Κάθε ένα γίνεται thin wrapper:
+```ts
+import { handleRegister } from "../_shared/mcp-oauth-handlers.ts";
+Deno.serve(handleRegister);
+```
+
+### 4. Ενημέρωση `mcp-oauth-metadata` & 401 responses (προαιρετικό)
+
+Δεν χρειάζεται αλλαγή – τα URLs που επιστρέφονται παραμένουν σωστά για όσους τα σέβονται. Το νέο routing είναι απλώς fallback για τους SDKs που αγνοούν το metadata.
+
+## Επαλήθευση
+
+Μετά το deploy:
+1. `curl -X POST .../mcp-server/register -d '{"redirect_uris":["http://127.0.0.1/cb"]}'` → 201 με `client_id`
+2. Restart Claude Desktop με την ίδια config → πρέπει να ολοκληρωθεί OAuth flow
+3. Δοκιμή και του native "Add custom connector" στο Claude.ai web – θα δουλέψει για τον ίδιο λόγο
+
+## Εκτός scope
+
+- Δεν αλλάζει τίποτα στο frontend (Settings → MCP Integration).
+- Δεν χρειάζεται Cloudflare Worker ή νέο subdomain.
+- Δεν αλλάζει η `claude_desktop_config.json` που έχεις ήδη.

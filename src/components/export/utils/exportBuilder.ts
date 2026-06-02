@@ -91,7 +91,7 @@ async function fetchTasks(companyId: string, clientIds?: string[]) {
   const userIds = Array.from(new Set(rows.map((r: any) => r.assigned_to).filter(Boolean)));
   let emailMap = new Map<string, string>();
   if (userIds.length) {
-    const { data: profs } = await supabase
+    const { data: profs } = await (supabase as any)
       .from('profiles')
       .select('user_id, email')
       .in('user_id', userIds);

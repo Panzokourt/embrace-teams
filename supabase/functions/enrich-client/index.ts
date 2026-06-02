@@ -536,7 +536,7 @@ Deno.serve(async (req) => {
         company_id: client.company_id,
         user_id: user.id,
         suggestion_count: suggestions.length,
-        sources: { firecrawl: !!targetWebsite, perplexity: !!targetTax || !targetWebsite },
+        sources: { firecrawl: !!targetWebsite, claude_web: !!targetTax || !targetWebsite },
       });
     }
 

@@ -137,7 +137,7 @@ Budget: ${projectContext.budget || 'N/A'}`;
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
+          model: "claude-sonnet-4-6",
           max_tokens: 4096,
           system: systemPrompt,
           messages: [
@@ -192,7 +192,7 @@ Budget: ${projectContext.budget || 'N/A'}`;
         console.error("Update error:", updateError);
       }
 
-      return new Response(JSON.stringify({ analysis: extractedData, document_type: docType, model_used: "claude-sonnet-4-20250514" }), {
+      return new Response(JSON.stringify({ analysis: extractedData, document_type: docType, model_used: "claude-sonnet-4-6" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     } catch (modelErr) {

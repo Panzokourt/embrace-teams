@@ -25,8 +25,15 @@ Deno.serve(async (req) => {
   if (url.pathname.endsWith("/authorize")) return handleAuthorize(req);
   if (url.pathname.endsWith("/token")) return handleToken(req);
 
-  // ---- OAuth metadata discovery (RFC 9728 + 8414) ----
+  // ---- OAuth metadata discovery (RFC 9728 + 8414 + OIDC fallback) ----
+  // mcp-remote@0.1.38 tries these URLs for an issuer with a path:
+  //   /.well-known/oauth-authorization-server/functions/v1/mcp-server
+  //   /.well-known/openid-configuration/functions/v1/mcp-server
+  //   /functions/v1/mcp-server/.well-known/openid-configuration
+  // Lovable Cloud/Supabase only routes the third one to this function, so we
+  // serve an OIDC-compatible document there as a compatibility fallback.
   if (url.pathname.endsWith("/.well-known/oauth-authorization-server") ||
+      url.pathname.endsWith("/.well-known/openid-configuration") ||
       url.pathname.endsWith("/.well-known/oauth-protected-resource")) {
     const base = publicBaseUrl();
     const resourceUrl = `${base}/mcp-server`;
@@ -51,12 +58,21 @@ Deno.serve(async (req) => {
           grant_types_supported: ["authorization_code", "refresh_token"],
           code_challenge_methods_supported: ["S256"],
           token_endpoint_auth_methods_supported: ["none"],
+          jwks_uri: `${resourceUrl}/jwks`,
+          subject_types_supported: ["public"],
+          id_token_signing_alg_values_supported: ["RS256"],
           scopes_supported: [
             "tasks:read","tasks:write","projects:read","clients:read",
             "time:read","time:write","kb:read",
           ],
         };
     return new Response(JSON.stringify(meta), {
+      headers: { ...mcpCorsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  if (url.pathname.endsWith("/jwks")) {
+    return new Response(JSON.stringify({ keys: [] }), {
       headers: { ...mcpCorsHeaders, "Content-Type": "application/json" },
     });
   }

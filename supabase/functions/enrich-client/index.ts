@@ -109,33 +109,59 @@ function googleFaviconUrl(siteUrl: string): string | null {
 }
 
 async function perplexityLookup(query: string): Promise<{ content: string; citations: string[] } | null> {
-  if (!PERPLEXITY_API_KEY) return null;
+  // Replaced Perplexity with Anthropic Claude + native web_search tool.
+  // Name kept for minimal diff at call site.
+  if (!ANTHROPIC_API_KEY) {
+    console.warn('ANTHROPIC_API_KEY missing — skipping web lookup');
+    return null;
+  }
   try {
-    const r = await fetch('https://api.perplexity.ai/chat/completions', {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${PERPLEXITY_API_KEY}`,
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'sonar',
-        messages: [
-          { role: 'system', content: 'You return concise, factual company information based on web search. Use Greek when applicable.' },
-          { role: 'user', content: query },
+        model: 'claude-sonnet-4-5',
+        max_tokens: 1500,
+        system: 'You return concise, factual company information based on web search. Use Greek when applicable. Always cite sources.',
+        tools: [
+          { type: 'web_search_20250305', name: 'web_search', max_uses: 5 },
         ],
+        messages: [{ role: 'user', content: query }],
       }),
     });
     if (!r.ok) {
-      console.error('Perplexity error', r.status, await r.text());
+      console.error('Anthropic error', r.status, await r.text());
       return null;
     }
     const data = await r.json();
-    return {
-      content: data?.choices?.[0]?.message?.content || '',
-      citations: data?.citations || [],
-    };
+    const blocks: any[] = Array.isArray(data?.content) ? data.content : [];
+    const content = blocks
+      .filter((b) => b?.type === 'text' && typeof b.text === 'string')
+      .map((b) => b.text)
+      .join('\n')
+      .trim();
+    const citations = new Set<string>();
+    for (const b of blocks) {
+      // Inline text citations
+      if (Array.isArray(b?.citations)) {
+        for (const c of b.citations) {
+          if (c?.url) citations.add(c.url);
+        }
+      }
+      // web_search_tool_result blocks
+      if (b?.type === 'web_search_tool_result' && Array.isArray(b.content)) {
+        for (const item of b.content) {
+          if (item?.url) citations.add(item.url);
+        }
+      }
+    }
+    return { content, citations: Array.from(citations) };
   } catch (e) {
-    console.error('Perplexity exception', e);
+    console.error('Anthropic exception', e);
     return null;
   }
 }

@@ -486,7 +486,7 @@ Deno.serve(async (req) => {
       if (px) {
         context += `=== Web Search ===\n${px.content}\n\nSources:\n${(px.citations || []).join('\n')}\n`;
         if (!primarySource) {
-          primarySource = 'perplexity';
+          primarySource = 'claude-web';
           primarySourceUrl = px.citations?.[0] || '';
         }
       }

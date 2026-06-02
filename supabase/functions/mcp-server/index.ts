@@ -8,6 +8,7 @@
 
 import { mcpCorsHeaders, adminClient, validateAccessToken, hasScope, publicBaseUrl, type McpTokenContext } from "../_shared/mcp-auth.ts";
 import { ALL_TOOLS } from "../_shared/mcp-tools.ts";
+import { handleRegister, handleAuthorize, handleToken } from "../_shared/mcp-oauth-handlers.ts";
 
 const PROTOCOL_VERSION = "2025-03-26";
 const SERVER_INFO = { name: "olseny-mcp-server", version: "1.0.0" };
@@ -15,6 +16,14 @@ const SERVER_INFO = { name: "olseny-mcp-server", version: "1.0.0" };
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: mcpCorsHeaders });
   const url = new URL(req.url);
+
+  // ---- OAuth sub-paths (for SDK clients that derive URLs from {issuer}/<path>) ----
+  // The official @modelcontextprotocol/sdk ignores the metadata's *_endpoint fields
+  // and constructs OAuth URLs relative to the issuer. Since our issuer is the
+  // mcp-server URL, we must serve /register, /authorize, /token here too.
+  if (url.pathname.endsWith("/register")) return handleRegister(req);
+  if (url.pathname.endsWith("/authorize")) return handleAuthorize(req);
+  if (url.pathname.endsWith("/token")) return handleToken(req);
 
   // ---- OAuth metadata discovery (RFC 9728 + 8414) ----
   if (url.pathname.endsWith("/.well-known/oauth-authorization-server") ||
@@ -24,7 +33,6 @@ Deno.serve(async (req) => {
     const meta = url.pathname.endsWith("oauth-protected-resource")
       ? {
           resource: resourceUrl,
-          // The same /mcp-server URL also serves /.well-known/oauth-authorization-server
           authorization_servers: [resourceUrl],
           bearer_methods_supported: ["header"],
           scopes_supported: [
@@ -34,9 +42,11 @@ Deno.serve(async (req) => {
         }
       : {
           issuer: resourceUrl,
-          authorization_endpoint: `${base}/mcp-oauth-authorize`,
-          token_endpoint: `${base}/mcp-oauth-token`,
-          registration_endpoint: `${base}/mcp-oauth-register`,
+          // Endpoints are served by mcp-server sub-paths so SDK clients that
+          // ignore these fields and derive URLs from {issuer}/<path> still work.
+          authorization_endpoint: `${resourceUrl}/authorize`,
+          token_endpoint: `${resourceUrl}/token`,
+          registration_endpoint: `${resourceUrl}/register`,
           response_types_supported: ["code"],
           grant_types_supported: ["authorization_code", "refresh_token"],
           code_challenge_methods_supported: ["S256"],

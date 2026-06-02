@@ -31,7 +31,21 @@ export function AIEnrichButton({ clientId, website, taxId, clientName, size = 'i
       const { data, error } = await supabase.functions.invoke('enrich-client', {
         body: { clientId, website, taxId, clientName },
       });
-      if (error) throw error;
+      // supabase.functions.invoke surfaces non-2xx as `error`, but the body
+      // with our real message lives in `data` OR on `error.context.response`.
+      if (error) {
+        let serverMsg: string | undefined = (data as any)?.error;
+        if (!serverMsg) {
+          try {
+            const resp = (error as any)?.context?.response;
+            if (resp && typeof resp.json === 'function') {
+              const body = await resp.json();
+              serverMsg = body?.error;
+            }
+          } catch { /* ignore */ }
+        }
+        throw new Error(serverMsg || error.message || 'AI enrichment απέτυχε');
+      }
       const incomingSuggestions: EnrichSuggestion[] = data?.suggestions || [];
       const incomingLogo: string | undefined = data?.logoUrl;
       if (!incomingSuggestions.length && !incomingLogo) {

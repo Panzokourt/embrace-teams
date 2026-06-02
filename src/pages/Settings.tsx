@@ -1,7 +1,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Settings as SettingsIcon, User, Bell, Palette, Building2, Clock, FolderTree,
-  LayoutGrid, Mail, Upload, Trash2, Brain, Sparkles, GraduationCap, Users, Shield,
+  LayoutGrid, Mail, Upload, Download, Trash2, Brain, Sparkles, GraduationCap, Users, Shield,
   Activity, CreditCard, Briefcase, Database, Plug, GitBranch,
 } from 'lucide-react';
 import Workflows from '@/pages/Workflows';
@@ -22,6 +22,7 @@ import { ProjectFolderTemplatesManager } from '@/components/settings/ProjectFold
 import { EmailAccountSetup } from '@/components/settings/EmailAccountSetup';
 import { DataManagementCard } from '@/components/settings/DataManagementCard';
 import { BulkImportCard } from '@/components/settings/BulkImportCard';
+import { BulkExportSection } from '@/components/settings/sections/BulkExportSection';
 import { PortalUserManager } from '@/components/portal/PortalUserManager';
 import { AIUsageCard } from '@/components/settings/AIUsageCard';
 import AIMemoryCard from '@/components/settings/AIMemoryCard';
@@ -121,6 +122,11 @@ export default function SettingsPage() {
       id: 'import', label: 'Μαζική Εισαγωγή', icon: Upload, group: G.DATA, visible: isAdmin,
       description: 'Εισαγωγή δεδομένων από αρχεία CSV/Excel',
       render: () => <BulkImportCard />,
+    },
+    {
+      id: 'export', label: 'Μαζική Εξαγωγή', icon: Download, group: G.DATA, visible: isAdmin,
+      description: 'Εξαγωγή πελατών, έργων ή tasks σε Excel/CSV',
+      render: () => <BulkExportSection />,
     },
     {
       id: 'data-mgmt', label: 'Διαχείριση Δεδομένων', icon: Trash2, group: G.DATA, visible: isAdmin,

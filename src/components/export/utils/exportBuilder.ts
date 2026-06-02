@@ -75,7 +75,7 @@ async function fetchProjects(companyId: string, clientIds?: string[]) {
 }
 
 async function fetchTasks(companyId: string, clientIds?: string[]) {
-  let q = supabase
+  let q: any = supabase
     .from('tasks')
     .select(
       'title, status, priority, start_date, due_date, estimated_hours, description, assigned_to, project:projects!inner(name, client_id, company_id)'

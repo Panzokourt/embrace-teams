@@ -19,10 +19,14 @@ export interface AIModel {
 
 export const AI_MODELS: AIModel[] = [
   { id: "auto", name: "Auto", provider: "auto", description: "Gemini 3 Flash" },
-  // Claude
-  { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", provider: "anthropic" },
+  // Claude — newest first
+  { id: "claude-opus-4-5-20251101", name: "Claude Opus 4.5", provider: "anthropic", description: "Top reasoning" },
+  { id: "claude-sonnet-4-5-20250929", name: "Claude Sonnet 4.5", provider: "anthropic", description: "Balanced flagship" },
+  { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", provider: "anthropic", description: "Fast & cheap" },
   { id: "claude-opus-4-20250514", name: "Claude Opus 4", provider: "anthropic" },
-  { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 3.5", provider: "anthropic" },
+  { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", provider: "anthropic" },
+  { id: "claude-3-7-sonnet-20250219", name: "Claude Sonnet 3.7", provider: "anthropic" },
+  { id: "claude-3-5-haiku-20241022", name: "Claude Haiku 3.5", provider: "anthropic" },
   // Gemini — newest first
   { id: "google/gemini-3.1-pro-preview", name: "Gemini 3.1 Pro", provider: "google", description: "Latest reasoning" },
   { id: "google/gemini-3.5-flash", name: "Gemini 3.5 Flash", provider: "google", description: "Fast & capable" },

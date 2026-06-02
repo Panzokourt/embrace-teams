@@ -83,6 +83,24 @@ Deno.serve(async (req) => {
       })
     }
 
+    // Verify caller is an admin/owner of the invitation's company
+    const { data: callerRole } = await adminClient
+      .from('user_company_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('company_id', (invitation as any).company_id)
+      .in('role', ['owner', 'super_admin', 'admin', 'manager'])
+      .eq('status', 'active')
+      .maybeSingle()
+
+    if (!callerRole) {
+      console.error(`User ${user.id} not authorized for invitation ${invitation_id}`)
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     // Get inviter name
     const { data: inviterProfile } = await adminClient
       .from('profiles')
@@ -150,7 +168,7 @@ Deno.serve(async (req) => {
     })
   } catch (error: any) {
     console.error('Error in send-invitation:', error.message, error.stack)
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

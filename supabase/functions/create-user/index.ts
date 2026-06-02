@@ -74,6 +74,18 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Role ceiling check: caller cannot assign a role >= their own
+    const roleHierarchy = ['viewer', 'billing', 'standard', 'member', 'manager', 'admin', 'super_admin', 'owner'];
+    const callerLevel = roleHierarchy.indexOf(roleData.role);
+    const requestedRole = role || 'standard';
+    const requestedLevel = roleHierarchy.indexOf(requestedRole);
+    if (callerLevel === -1 || requestedLevel === -1 || requestedLevel >= callerLevel) {
+      return new Response(
+        JSON.stringify({ error: 'Cannot assign a role equal to or higher than your own.' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Validate password strength
     if (password.length < 6) {
       return new Response(

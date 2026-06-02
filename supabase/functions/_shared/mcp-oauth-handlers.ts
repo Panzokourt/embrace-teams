@@ -4,7 +4,7 @@
 // derive URLs from {issuer}/<path> still work).
 
 import { mcpCorsHeaders, adminClient, sha256Hex, randomToken, appBaseUrl } from "./mcp-auth.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const CODE_TTL_SECONDS = 300;
 const ACCESS_TTL_SECONDS = 60 * 60;

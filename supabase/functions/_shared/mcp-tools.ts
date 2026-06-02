@@ -1,7 +1,7 @@
 // Tool registry for the MCP server. Each tool is company+user scoped.
 // Imported by the mcp-server edge function and (optionally) by the secretary agent.
 
-import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import type { McpTokenContext } from "../_shared/mcp-auth.ts";
 
 export interface JsonSchema {

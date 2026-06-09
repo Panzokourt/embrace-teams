@@ -1,6 +1,167 @@
 import { format, isToday, isYesterday, isThisWeek, differenceInDays } from 'date-fns';
 import { el } from 'date-fns/locale';
+import DOMPurify from 'dompurify';
+import {
+  Inbox as InboxIcon,
+  Send,
+  FileEdit,
+  Trash2,
+  AlertOctagon,
+  Star,
+  type LucideIcon,
+} from 'lucide-react';
 import { EmailThread } from '@/hooks/useEmailMessages';
+
+export type FolderKey = 'inbox' | 'sent' | 'drafts' | 'trash' | 'spam' | 'starred';
+
+export interface FolderMeta {
+  key: FolderKey;
+  label: string;
+  icon: LucideIcon;
+  match: (folder: string | null | undefined) => boolean;
+}
+
+const norm = (s: string | null | undefined) => (s || '').toLowerCase();
+
+export const FOLDERS: FolderMeta[] = [
+  {
+    key: 'inbox',
+    label: 'Εισερχόμενα',
+    icon: InboxIcon,
+    match: (f) => {
+      const v = norm(f);
+      return v === '' || v === 'inbox' || v === 'εισερχόμενα';
+    },
+  },
+  {
+    key: 'sent',
+    label: 'Απεσταλμένα',
+    icon: Send,
+    match: (f) => ['sent', 'sentitems', 'sent items', 'απεσταλμένα'].includes(norm(f)),
+  },
+  {
+    key: 'drafts',
+    label: 'Πρόχειρα',
+    icon: FileEdit,
+    match: (f) => ['drafts', 'draft', 'πρόχειρα'].includes(norm(f)),
+  },
+  {
+    key: 'spam',
+    label: 'Ανεπιθύμητα',
+    icon: AlertOctagon,
+    match: (f) => ['spam', 'junk', 'junkemail', 'ανεπιθύμητα'].includes(norm(f)),
+  },
+  {
+    key: 'trash',
+    label: 'Κάδος',
+    icon: Trash2,
+    match: (f) => ['trash', 'bin', 'deleteditems', 'κάδος'].includes(norm(f)),
+  },
+  {
+    key: 'starred',
+    label: 'Με αστερίσκο',
+    icon: Star,
+    match: () => false,
+  },
+];
+
+export function filterThreadsByFolder(threads: EmailThread[], key: FolderKey): EmailThread[] {
+  if (key === 'starred') return threads.filter((t) => t.is_starred);
+  const meta = FOLDERS.find((f) => f.key === key)!;
+  return threads.filter((t) => meta.match(t.last_message?.folder));
+}
+
+export function folderCounts(threads: EmailThread[]): Record<FolderKey, number> {
+  const counts: Record<FolderKey, number> = {
+    inbox: 0, sent: 0, drafts: 0, trash: 0, spam: 0, starred: 0,
+  };
+  for (const t of threads) {
+    if (t.is_starred) counts.starred += 1;
+    for (const m of FOLDERS) {
+      if (m.key === 'starred') continue;
+      if (m.match(t.last_message?.folder)) {
+        if (m.key === 'inbox') counts.inbox += t.unread_count > 0 ? 1 : 0;
+        else counts[m.key] += 1;
+        break;
+      }
+    }
+  }
+  return counts;
+}
+
+// ---------- Linkify plain-text bodies ----------
+const URL_REGEX = /\b((?:https?:\/\/|www\.)[^\s<>"']+[^\s<>"'.,;:!?)\]])/gi;
+
+export function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+export function linkifyText(text: string): string {
+  if (!text) return '';
+  const escaped = escapeHtml(text);
+  return escaped.replace(URL_REGEX, (url) => {
+    const href = url.startsWith('http') ? url : `https://${url}`;
+    const display = url.length > 60 ? url.slice(0, 57) + '…' : url;
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="underline decoration-current/40 hover:decoration-current break-all">${display}</a>`;
+  });
+}
+
+// ---------- HTML email sanitization ----------
+const TRACKER_HINTS = /(track|pixel|beacon|open\?|mailtrack|=open|\/o\/|sensor|gif\?)/i;
+
+export function sanitizeEmailHtml(html: string): string {
+  if (!html) return '';
+  const clean = DOMPurify.sanitize(html, {
+    USE_PROFILES: { html: true },
+    ALLOWED_ATTR: [
+      'href', 'src', 'alt', 'title', 'class', 'style', 'width', 'height',
+      'align', 'valign', 'border', 'cellpadding', 'cellspacing', 'colspan',
+      'rowspan', 'bgcolor', 'color', 'target', 'rel', 'srcset',
+    ],
+    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'meta', 'link'],
+    FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'],
+    ADD_ATTR: ['target'],
+  });
+
+  if (typeof window === 'undefined') return clean;
+
+  const doc = new DOMParser().parseFromString(`<div>${clean}</div>`, 'text/html');
+  const root = doc.body.firstElementChild as HTMLElement | null;
+  if (!root) return clean;
+
+  root.querySelectorAll('img').forEach((img) => {
+    const src = img.getAttribute('src') || '';
+    const w = parseInt(img.getAttribute('width') || '0', 10);
+    const h = parseInt(img.getAttribute('height') || '0', 10);
+    const tiny = (w > 0 && w <= 2) || (h > 0 && h <= 2);
+    const looksLikeTracker = TRACKER_HINTS.test(src);
+    if (tiny || (looksLikeTracker && !img.getAttribute('alt'))) {
+      img.remove();
+      return;
+    }
+    img.setAttribute('loading', 'lazy');
+    img.setAttribute('referrerpolicy', 'no-referrer');
+    img.style.maxWidth = '100%';
+    img.style.height = 'auto';
+  });
+
+  root.querySelectorAll('a[href]').forEach((a) => {
+    a.setAttribute('target', '_blank');
+    a.setAttribute('rel', 'noopener noreferrer');
+  });
+
+  return root.innerHTML;
+}
+
+export function hasMeaningfulHtml(html: string | null | undefined): boolean {
+  if (!html) return false;
+  return /<(table|div|img|a|h[1-6]|ul|ol|blockquote|style|font|center|span|td)\b/i.test(html);
+}
 
 const AVATAR_COLORS = [
   { bg: 'bg-indigo-500', text: 'text-white' },

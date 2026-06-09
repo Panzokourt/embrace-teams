@@ -1,10 +1,18 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { EmailMessage } from '@/hooks/useEmailMessages';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Eye, Paperclip, Download, Check, CheckCheck } from 'lucide-react';
-import { getAvatarColor, getInitials, formatBubbleTime, stripSignature } from './inboxUtils';
+import {
+  getAvatarColor,
+  getInitials,
+  formatBubbleTime,
+  stripSignature,
+  sanitizeEmailHtml,
+  hasMeaningfulHtml,
+  linkifyText,
+} from './inboxUtils';
 
 interface EmailAttachment {
   id: string;
@@ -22,20 +30,6 @@ interface InboxMessageBubbleProps {
   onDownloadAttachment?: (attachment: EmailAttachment) => void;
   showAvatar?: boolean;
   isGroupedWithPrev?: boolean;
-}
-
-function extractImagesFromHtml(html: string | null): string[] {
-  if (!html) return [];
-  const imgs: string[] = [];
-  const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
-  let match;
-  while ((match = imgRegex.exec(html)) !== null) {
-    const src = match[1];
-    if (src.startsWith('cid:')) continue;
-    if (src.includes('tracking') || src.includes('pixel') || src.includes('beacon')) continue;
-    imgs.push(src);
-  }
-  return imgs;
 }
 
 function formatFileSize(bytes: number | null): string {
@@ -56,11 +50,20 @@ export function InboxMessageBubble({
   const [showOriginal, setShowOriginal] = useState(false);
   const senderName = message.from_name || message.from_address || 'Άγνωστος';
   const sentTime = formatBubbleTime(message.sent_at);
-  const rawText = message.body_text || '';
-  const displayText = showOriginal ? rawText : stripSignature(rawText);
-  const images = extractImagesFromHtml(message.body_html);
   const color = getAvatarColor(senderName);
   const showAvatarSlot = !isOutgoing;
+
+  const isRichHtml = hasMeaningfulHtml(message.body_html);
+
+  const sanitizedHtml = useMemo(
+    () => (isRichHtml ? sanitizeEmailHtml(message.body_html || '') : ''),
+    [isRichHtml, message.body_html]
+  );
+
+  const rawText = message.body_text || '';
+  const displayText = showOriginal ? rawText : stripSignature(rawText);
+  const linkifiedText = useMemo(() => linkifyText(displayText), [displayText]);
+  const canToggle = !isRichHtml && rawText && rawText !== displayText;
 
   return (
     <div
@@ -82,21 +85,44 @@ export function InboxMessageBubble({
         </div>
       )}
 
-      <div className={cn('flex flex-col max-w-[72%]', isOutgoing && 'items-end')}>
-        <div className="relative">
-          <div
-            className={cn(
-              'px-3.5 py-2 text-[14px] leading-[1.55] whitespace-pre-wrap break-words shadow-sm',
-              isOutgoing
-                ? 'bg-primary text-primary-foreground rounded-tl-2xl rounded-tr-sm rounded-bl-2xl rounded-br-2xl'
-                : 'bg-card border border-border/60 text-foreground rounded-tl-sm rounded-tr-2xl rounded-bl-2xl rounded-br-2xl',
-              isGroupedWithPrev && (isOutgoing
-                ? 'rounded-tr-2xl'
-                : 'rounded-tl-2xl')
-            )}
-          >
-            {displayText || <span className="italic opacity-70">(κενό μήνυμα)</span>}
-          </div>
+      <div
+        className={cn(
+          'flex flex-col',
+          isRichHtml ? 'max-w-[88%] w-full' : 'max-w-[72%]',
+          isOutgoing && 'items-end'
+        )}
+      >
+        <div className="relative w-full">
+          {isRichHtml ? (
+            <div
+              className={cn(
+                'overflow-hidden rounded-2xl border bg-card text-foreground shadow-sm',
+                isOutgoing ? 'border-primary/30' : 'border-border/60'
+              )}
+            >
+              <div
+                className="email-html-body p-4 text-[14px] leading-[1.55] overflow-x-auto"
+                // Sanitized via DOMPurify in sanitizeEmailHtml
+                dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+              />
+            </div>
+          ) : (
+            <div
+              className={cn(
+                'px-3.5 py-2 text-[14px] leading-[1.55] whitespace-pre-wrap break-words shadow-sm',
+                isOutgoing
+                  ? 'bg-primary text-primary-foreground rounded-tl-2xl rounded-tr-sm rounded-bl-2xl rounded-br-2xl'
+                  : 'bg-card border border-border/60 text-foreground rounded-tl-sm rounded-tr-2xl rounded-bl-2xl rounded-br-2xl',
+                isGroupedWithPrev && (isOutgoing ? 'rounded-tr-2xl' : 'rounded-tl-2xl')
+              )}
+            >
+              {linkifiedText ? (
+                <span dangerouslySetInnerHTML={{ __html: linkifiedText }} />
+              ) : (
+                <span className="italic opacity-70">(κενό μήνυμα)</span>
+              )}
+            </div>
+          )}
 
           {/* Hover reaction bar */}
           <div
@@ -117,22 +143,6 @@ export function InboxMessageBubble({
             ))}
           </div>
         </div>
-
-        {/* Images */}
-        {images.length > 0 && (
-          <div className={cn('flex flex-wrap gap-2 mt-1.5', isOutgoing && 'justify-end')}>
-            {images.slice(0, 4).map((src, i) => (
-              <a key={i} href={src} target="_blank" rel="noopener noreferrer">
-                <img
-                  src={src}
-                  alt=""
-                  className="max-w-[180px] max-h-[140px] rounded-lg border border-border/40 object-cover hover:opacity-80 transition-opacity"
-                  loading="lazy"
-                />
-              </a>
-            ))}
-          </div>
-        )}
 
         {/* Attachments */}
         {attachments && attachments.length > 0 && (
@@ -169,7 +179,7 @@ export function InboxMessageBubble({
               <Check className="h-3 w-3" />
             )
           )}
-          {(message.body_html || rawText !== displayText) && (
+          {canToggle && (
             <Button
               variant="ghost"
               size="sm"
@@ -185,3 +195,4 @@ export function InboxMessageBubble({
     </div>
   );
 }
+

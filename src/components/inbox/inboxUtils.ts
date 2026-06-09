@@ -165,7 +165,7 @@ export function hasMeaningfulHtml(html: string | null | undefined): boolean {
 
 // ---------- Personal vs Bulk classification ----------
 const BULK_SENDER_REGEX = /^(no[-_.]?reply|donotreply|do[-_.]?not[-_.]?reply|notifications?|news|newsletter|marketing|mailer|bounce|updates?|hello|team|support|alerts?|noticias|info|contact|hi)@/i;
-const BULK_HINTS_REGEX = /(list-unsubscribe|unsubscribe|view in browser|view this email in your browser|email preferences|manage preferences|δείτε στο πρόγραμμα περιήγησης|διαγραφή εγγραφής|κατάργηση εγγραφής|απεγγραφή|προτιμήσεις email|you (are )?receiv(ing|ed) this email|©\s?\d{4})/i;
+const BULK_HINTS_REGEX = /(list-unsubscribe|unsubscribe|view in browser|view this email in your browser|email preferences|manage preferences|δείτε στο πρόγραμμα περιήγησης|διαγραφή εγγραφής|κατάργηση εγγραφής|απεγγραφή|προτιμήσεις email|you are receiving this email|you received this email)/i;
 
 export interface ClassifiableMessage {
   from_address?: string | null;
@@ -178,25 +178,14 @@ export function classifyEmail(m: ClassifiableMessage): 'personal' | 'bulk' {
   const text = m.body_text || '';
   const from = (m.from_address || '').toLowerCase();
 
-  // 1. Bulk markers in content
   if (BULK_HINTS_REGEX.test(html) || BULK_HINTS_REGEX.test(text)) return 'bulk';
-
-  // 2. Sender pattern
   if (BULK_SENDER_REGEX.test(from)) return 'bulk';
 
-  // 3. HTML complexity score
-  if (html) {
-    let score = 0;
-    const tableCount = (html.match(/<table\b/gi) || []).length;
+  // HTML-only complexity (only when there's NO plain text alternative)
+  if (html && !text.trim()) {
     const imgCount = (html.match(/<img\b/gi) || []).length;
-    const styleCount = (html.match(/\sstyle\s*=/gi) || []).length;
-    if (tableCount >= 2) score += 2;
-    if (imgCount >= 2) score += 2;
-    if (styleCount >= 10) score += 2;
-    if (html.length > 8000) score += 2;
-    if (/<center\b/i.test(html)) score += 1;
-    if (/background(-color)?\s*:/i.test(html)) score += 1;
-    if (score >= 4) return 'bulk';
+    const tableCount = (html.match(/<table\b/gi) || []).length;
+    if (imgCount >= 3 || tableCount >= 3 || html.length > 15000) return 'bulk';
   }
 
   return 'personal';

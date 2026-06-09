@@ -22,6 +22,7 @@ interface InboxThreadListProps {
   onSync: () => void;
   syncing: boolean;
   onCompose: () => void;
+  folderLabel?: string;
 }
 
 export function InboxThreadList({
@@ -31,6 +32,7 @@ export function InboxThreadList({
   onSync,
   syncing,
   onCompose,
+  folderLabel = 'Messages',
 }: InboxThreadListProps) {
   const [search, setSearch] = useState('');
 
@@ -124,7 +126,7 @@ export function InboxThreadList({
       <div className="px-4 pt-4 pb-3 space-y-3 border-b border-border bg-background/60 backdrop-blur">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-bold tracking-tight">Messages</h2>
+            <h2 className="text-lg font-bold tracking-tight">{folderLabel}</h2>
             {totalUnread > 0 && (
               <span className="inline-flex items-center justify-center min-w-[20px] h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold px-1.5">
                 {totalUnread}

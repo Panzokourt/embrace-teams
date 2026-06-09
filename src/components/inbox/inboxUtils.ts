@@ -186,7 +186,8 @@ export function classifyEmail(m: ClassifiableMessage): 'personal' | 'bulk' {
   if (html && !text.trim()) {
     const imgCount = (html.match(/<img\b/gi) || []).length;
     const tableCount = (html.match(/<table\b/gi) || []).length;
-    if (imgCount >= 3 || tableCount >= 3 || html.length > 15000) return 'bulk';
+    const hasSignatureMarker = /(--|email signature|best regards|regards|με εκτίμηση|φιλικά|ευχαριστώ)/i.test(html);
+    if (!hasSignatureMarker && (tableCount >= 3 || (imgCount >= 6 && tableCount >= 1) || html.length > 15000)) return 'bulk';
   }
 
   return 'personal';

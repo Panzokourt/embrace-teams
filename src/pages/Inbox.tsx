@@ -75,7 +75,7 @@ export default function Inbox() {
             />
           </ResizablePanel>
           <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={70}>
+          <ResizablePanel defaultSize={76}>
             {selectedThread ? (
               <InboxConversation
                 thread={selectedThread}

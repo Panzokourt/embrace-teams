@@ -1,11 +1,10 @@
-import { format } from 'date-fns';
-import { el } from 'date-fns/locale';
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { EmailMessage } from '@/hooks/useEmailMessages';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Eye, Paperclip, Download } from 'lucide-react';
+import { Eye, Paperclip, Download, Check, CheckCheck } from 'lucide-react';
+import { getAvatarColor, getInitials, formatBubbleTime, stripSignature } from './inboxUtils';
 
 interface EmailAttachment {
   id: string;
@@ -21,25 +20,8 @@ interface InboxMessageBubbleProps {
   userEmail: string;
   attachments?: EmailAttachment[];
   onDownloadAttachment?: (attachment: EmailAttachment) => void;
-}
-
-function getInitials(name: string | null): string {
-  if (!name) return '?';
-  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-}
-
-function stripEmailClutter(text: string): string {
-  if (!text) return '';
-  let clean = text;
-  // Strip unsubscribe lines
-  clean = clean.replace(/^.*unsubscribe.*$/gmi, '');
-  // Strip disclaimer/confidentiality
-  clean = clean.replace(/^.*(?:confidential|disclaimer|this email is intended).*$/gmi, '');
-  // Strip address blocks (lines with zip codes etc)
-  clean = clean.replace(/^\s*\d{3,5}\s+\w.*(?:street|ave|blvd|road|rd|st)\b.*$/gmi, '');
-  // Trim excessive blank lines
-  clean = clean.replace(/\n{3,}/g, '\n\n');
-  return clean.trim();
+  showAvatar?: boolean;
+  isGroupedWithPrev?: boolean;
 }
 
 function extractImagesFromHtml(html: string | null): string[] {
@@ -49,7 +31,6 @@ function extractImagesFromHtml(html: string | null): string[] {
   let match;
   while ((match = imgRegex.exec(html)) !== null) {
     const src = match[1];
-    // Skip tracking pixels and tiny images, skip CID references
     if (src.startsWith('cid:')) continue;
     if (src.includes('tracking') || src.includes('pixel') || src.includes('beacon')) continue;
     imgs.push(src);
@@ -64,52 +45,88 @@ function formatFileSize(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function InboxMessageBubble({ message, isOutgoing, userEmail, attachments, onDownloadAttachment }: InboxMessageBubbleProps) {
+export function InboxMessageBubble({
+  message,
+  isOutgoing,
+  attachments,
+  onDownloadAttachment,
+  showAvatar = true,
+  isGroupedWithPrev = false,
+}: InboxMessageBubbleProps) {
   const [showOriginal, setShowOriginal] = useState(false);
   const senderName = message.from_name || message.from_address || 'Άγνωστος';
-  const sentTime = message.sent_at
-    ? format(new Date(message.sent_at), 'dd MMM, HH:mm', { locale: el })
-    : '';
-
+  const sentTime = formatBubbleTime(message.sent_at);
   const rawText = message.body_text || '';
-  const displayText = showOriginal ? rawText : stripEmailClutter(rawText);
+  const displayText = showOriginal ? rawText : stripSignature(rawText);
   const images = extractImagesFromHtml(message.body_html);
+  const color = getAvatarColor(senderName);
+  const showAvatarSlot = !isOutgoing;
 
   return (
-    <div className={cn('flex gap-3', isOutgoing ? 'justify-end' : 'justify-start')}>
-      {!isOutgoing && (
-        <Avatar className="h-8 w-8 shrink-0 mt-1">
-          <AvatarFallback className="bg-primary/10 text-primary text-xs">
-            {getInitials(senderName)}
-          </AvatarFallback>
-        </Avatar>
+    <div
+      className={cn(
+        'group flex gap-2',
+        isOutgoing ? 'justify-end' : 'justify-start',
+        isGroupedWithPrev ? 'mt-1' : 'mt-3'
       )}
-      <div className={cn('space-y-1 max-w-[75%]', isOutgoing && 'text-right')}>
-        <div className={cn('flex items-center gap-2 text-xs text-muted-foreground', isOutgoing && 'justify-end')}>
-          <span className="font-medium">{isOutgoing ? 'Εσείς' : senderName}</span>
-          <span>·</span>
-          <span>{sentTime}</span>
-        </div>
-        <div
-          className={cn(
-            'rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap break-words',
-            isOutgoing
-              ? 'bg-primary text-primary-foreground rounded-tr-md'
-              : 'bg-white dark:bg-card border border-border/40 rounded-tl-md text-foreground'
+    >
+      {showAvatarSlot && (
+        <div className="w-7 shrink-0">
+          {showAvatar && !isGroupedWithPrev && (
+            <Avatar className="h-7 w-7">
+              <AvatarFallback className={cn('text-[10px] font-semibold', color.bg, color.text)}>
+                {getInitials(senderName)}
+              </AvatarFallback>
+            </Avatar>
           )}
-        >
-          {displayText || <span className="italic text-muted-foreground">(κενό μήνυμα)</span>}
+        </div>
+      )}
+
+      <div className={cn('flex flex-col max-w-[72%]', isOutgoing && 'items-end')}>
+        <div className="relative">
+          <div
+            className={cn(
+              'px-3.5 py-2 text-[14px] leading-[1.55] whitespace-pre-wrap break-words shadow-sm',
+              isOutgoing
+                ? 'bg-primary text-primary-foreground rounded-tl-2xl rounded-tr-sm rounded-bl-2xl rounded-br-2xl'
+                : 'bg-card border border-border/60 text-foreground rounded-tl-sm rounded-tr-2xl rounded-bl-2xl rounded-br-2xl',
+              isGroupedWithPrev && (isOutgoing
+                ? 'rounded-tr-2xl'
+                : 'rounded-tl-2xl')
+            )}
+          >
+            {displayText || <span className="italic opacity-70">(κενό μήνυμα)</span>}
+          </div>
+
+          {/* Hover reaction bar */}
+          <div
+            className={cn(
+              'absolute -top-7 hidden group-hover:flex items-center gap-0.5 bg-popover border border-border rounded-full px-1.5 py-0.5 shadow-md z-10',
+              isOutgoing ? 'right-1' : 'left-1'
+            )}
+          >
+            {['👍', '❤️', '😄', '🎯'].map((e) => (
+              <button
+                key={e}
+                className="text-sm hover:scale-125 transition-transform px-0.5"
+                onClick={(ev) => ev.preventDefault()}
+                type="button"
+              >
+                {e}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Images from HTML */}
+        {/* Images */}
         {images.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-2">
-            {images.map((src, i) => (
+          <div className={cn('flex flex-wrap gap-2 mt-1.5', isOutgoing && 'justify-end')}>
+            {images.slice(0, 4).map((src, i) => (
               <a key={i} href={src} target="_blank" rel="noopener noreferrer">
                 <img
                   src={src}
-                  alt={`Image ${i + 1}`}
-                  className="max-w-[200px] max-h-[150px] rounded-lg border border-border/40 object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                  alt=""
+                  className="max-w-[180px] max-h-[140px] rounded-lg border border-border/40 object-cover hover:opacity-80 transition-opacity"
                   loading="lazy"
                 />
               </a>
@@ -117,20 +134,17 @@ export function InboxMessageBubble({ message, isOutgoing, userEmail, attachments
           </div>
         )}
 
-        {/* Attachment chips */}
+        {/* Attachments */}
         {attachments && attachments.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-1.5">
-            {attachments.map(att => (
+          <div className={cn('flex flex-wrap gap-1.5 mt-1.5', isOutgoing && 'justify-end')}>
+            {attachments.map((att) => (
               <button
                 key={att.id}
                 onClick={() => onDownloadAttachment?.(att)}
-                className={cn(
-                  'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs',
-                  'bg-muted hover:bg-muted/80 text-foreground border border-border/40 transition-colors'
-                )}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-muted hover:bg-muted/80 text-foreground border border-border/40 transition-colors"
               >
                 <Paperclip className="h-3 w-3 text-muted-foreground" />
-                <span className="truncate max-w-[120px]">{att.filename}</span>
+                <span className="truncate max-w-[140px]">{att.filename}</span>
                 {att.size_bytes && (
                   <span className="text-muted-foreground">{formatFileSize(att.size_bytes)}</span>
                 )}
@@ -140,17 +154,33 @@ export function InboxMessageBubble({ message, isOutgoing, userEmail, attachments
           </div>
         )}
 
-        {(message.body_html || rawText !== displayText) && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 text-xs text-muted-foreground px-2"
-            onClick={() => setShowOriginal(!showOriginal)}
-          >
-            <Eye className="h-3 w-3 mr-1" />
-            {showOriginal ? 'Απόκρυψη' : 'Εμφάνιση'} πρωτοτύπου
-          </Button>
-        )}
+        {/* Meta row */}
+        <div
+          className={cn(
+            'flex items-center gap-1 mt-1 text-[10.5px] text-muted-foreground',
+            isOutgoing && 'flex-row-reverse'
+          )}
+        >
+          <span>{sentTime}</span>
+          {isOutgoing && (
+            message.is_read ? (
+              <CheckCheck className="h-3 w-3 text-primary" />
+            ) : (
+              <Check className="h-3 w-3" />
+            )
+          )}
+          {(message.body_html || rawText !== displayText) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 text-[10px] text-muted-foreground/80 px-1.5 hover:bg-transparent hover:text-foreground"
+              onClick={() => setShowOriginal(!showOriginal)}
+            >
+              <Eye className="h-2.5 w-2.5 mr-0.5" />
+              {showOriginal ? 'Συμπτυγμένη' : 'Πλήρης'}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

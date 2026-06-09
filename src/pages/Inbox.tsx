@@ -64,7 +64,7 @@ export default function Inbox() {
       {/* Desktop view with resizable panels */}
       <div className="hidden md:flex h-full">
         <ResizablePanelGroup direction="horizontal">
-          <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
+          <ResizablePanel defaultSize={24} minSize={18} maxSize={40}>
             <InboxThreadList
               threads={threads}
               selectedThreadId={selectedThreadId}
@@ -75,7 +75,7 @@ export default function Inbox() {
             />
           </ResizablePanel>
           <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={70}>
+          <ResizablePanel defaultSize={76}>
             {selectedThread ? (
               <InboxConversation
                 thread={selectedThread}

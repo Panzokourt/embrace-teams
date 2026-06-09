@@ -40,7 +40,8 @@ function buildRawEmail(params: {
   const hasAttachments = params.attachments && params.attachments.length > 0;
 
   const lines: string[] = [];
-  lines.push(`From: ${params.fromName ? `"${params.fromName}" <${params.from}>` : params.from}`);
+  const encodeHeader = (s: string) => /[^\x00-\x7F]/.test(s) ? `=?UTF-8?B?${btoa(unescape(encodeURIComponent(s)))}?=` : s;
+  lines.push(`From: ${params.fromName ? `${encodeHeader(params.fromName)} <${params.from}>` : params.from}`);
   lines.push(`To: ${params.to.join(", ")}`);
   if (params.cc.length > 0) lines.push(`Cc: ${params.cc.join(", ")}`);
   lines.push(`Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(params.subject)))}?=`);

@@ -8,10 +8,10 @@ import {
   getAvatarColor,
   getInitials,
   formatBubbleTime,
-  stripSignature,
   sanitizeEmailHtml,
-  hasMeaningfulHtml,
   linkifyText,
+  classifyEmail,
+  extractCleanPersonalText,
 } from './inboxUtils';
 
 interface EmailAttachment {

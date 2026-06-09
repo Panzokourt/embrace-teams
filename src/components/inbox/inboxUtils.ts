@@ -163,6 +163,65 @@ export function hasMeaningfulHtml(html: string | null | undefined): boolean {
   return /<(table|div|img|a|h[1-6]|ul|ol|blockquote|style|font|center|span|td)\b/i.test(html);
 }
 
+// ---------- Personal vs Bulk classification ----------
+const BULK_SENDER_REGEX = /^(no[-_.]?reply|donotreply|do[-_.]?not[-_.]?reply|notifications?|news|newsletter|marketing|mailer|bounce|updates?|hello|team|support|alerts?|noticias|info|contact|hi)@/i;
+const BULK_HINTS_REGEX = /(list-unsubscribe|unsubscribe|view in browser|view this email in your browser|email preferences|manage preferences|δείτε στο πρόγραμμα περιήγησης|διαγραφή εγγραφής|κατάργηση εγγραφής|απεγγραφή|προτιμήσεις email|you (are )?receiv(ing|ed) this email|©\s?\d{4})/i;
+
+export interface ClassifiableMessage {
+  from_address?: string | null;
+  body_html?: string | null;
+  body_text?: string | null;
+}
+
+export function classifyEmail(m: ClassifiableMessage): 'personal' | 'bulk' {
+  const html = m.body_html || '';
+  const text = m.body_text || '';
+  const from = (m.from_address || '').toLowerCase();
+
+  // 1. Bulk markers in content
+  if (BULK_HINTS_REGEX.test(html) || BULK_HINTS_REGEX.test(text)) return 'bulk';
+
+  // 2. Sender pattern
+  if (BULK_SENDER_REGEX.test(from)) return 'bulk';
+
+  // 3. HTML complexity score
+  if (html) {
+    let score = 0;
+    const tableCount = (html.match(/<table\b/gi) || []).length;
+    const imgCount = (html.match(/<img\b/gi) || []).length;
+    const styleCount = (html.match(/\sstyle\s*=/gi) || []).length;
+    if (tableCount >= 2) score += 2;
+    if (imgCount >= 2) score += 2;
+    if (styleCount >= 10) score += 2;
+    if (html.length > 8000) score += 2;
+    if (/<center\b/i.test(html)) score += 1;
+    if (/background(-color)?\s*:/i.test(html)) score += 1;
+    if (score >= 4) return 'bulk';
+  }
+
+  return 'personal';
+}
+
+export function htmlToPlainText(html: string): string {
+  if (!html) return '';
+  if (typeof window === 'undefined') return html.replace(/<[^>]+>/g, ' ');
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  doc.querySelectorAll('style, script, head').forEach((el) => el.remove());
+  // Preserve line breaks
+  doc.querySelectorAll('br').forEach((el) => el.replaceWith('\n'));
+  doc.querySelectorAll('p, div, li, tr, h1, h2, h3, h4, h5, h6').forEach((el) => {
+    el.append('\n');
+  });
+  const text = doc.body?.textContent || '';
+  return text.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+export function extractCleanPersonalText(m: ClassifiableMessage): string {
+  let raw = m.body_text || '';
+  if (!raw && m.body_html) raw = htmlToPlainText(m.body_html);
+  return stripSignature(raw);
+}
+
 const AVATAR_COLORS = [
   { bg: 'bg-indigo-500', text: 'text-white' },
   { bg: 'bg-teal-500', text: 'text-white' },

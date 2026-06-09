@@ -164,11 +164,12 @@ export function hasMeaningfulHtml(html: string | null | undefined): boolean {
 }
 
 // ---------- Personal vs Bulk classification ----------
-const BULK_SENDER_REGEX = /^(no[-_.]?reply|donotreply|do[-_.]?not[-_.]?reply|notifications?|news|newsletter|marketing|mailer|bounce|updates?|hello|team|support|alerts?|noticias|info|contact|hi)@/i;
+const BULK_SENDER_REGEX = /^(no[-_.]?reply|donotreply|do[-_.]?not[-_.]?reply|notifications?|news|newsletter|marketing|mailer|bounce|updates?|alerts?|noticias)@/i;
 const BULK_HINTS_REGEX = /(list-unsubscribe|unsubscribe|view in browser|view this email in your browser|email preferences|manage preferences|δείτε στο πρόγραμμα περιήγησης|διαγραφή εγγραφής|κατάργηση εγγραφής|απεγγραφή|προτιμήσεις email|you are receiving this email|you received this email)/i;
 
 export interface ClassifiableMessage {
   from_address?: string | null;
+  from_name?: string | null;
   body_html?: string | null;
   body_text?: string | null;
 }
@@ -294,7 +295,11 @@ export function stripSignature(body: string | null | undefined): string {
   if (!body) return '';
   let text = body;
   // Cut at common signature delimiters
-  text = text.split(/\n\s*(?:--|__|—{2,})\s*\n/)[0];
+  text = text.split(/(?:^|\n)\s*(?:--|__|—{2,}|–{2,})\s*(?=\n|$)/)[0];
+  // Cut common generated/HTML signature blocks even when the delimiter was lost
+  text = text.replace(/\n\s*(?:create your own\s+)?email signature[\s\S]*$/i, '');
+  text = text.replace(/\n\s*(?:facebook|instagram|linkedin|twitter|x)\b[\s\S]*$/i, '');
+  text = text.replace(/\n\s*\+?[0-9][0-9\s().-]{6,}\s*(?:\||•|·|–|-|\s{2,})[\s\S]*$/i, '');
   // Cut at common closings (case-insensitive, multilingual)
   const closingRegex = /\n\s*(Με εκτίμηση|Ευχαριστώ|Φιλικά|Best regards|Best,|Regards|Cheers|Thanks|Thank you|Sincerely|Sent from my)\b[\s\S]*$/i;
   text = text.replace(closingRegex, '');

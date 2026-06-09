@@ -53,17 +53,19 @@ export function InboxMessageBubble({
   const color = getAvatarColor(senderName);
   const showAvatarSlot = !isOutgoing;
 
-  const isRichHtml = hasMeaningfulHtml(message.body_html);
+  const kind = classifyEmail(message);
+  const isRichHtml = kind === 'bulk' && !!message.body_html;
 
   const sanitizedHtml = useMemo(
     () => (isRichHtml ? sanitizeEmailHtml(message.body_html || '') : ''),
     [isRichHtml, message.body_html]
   );
 
+  const cleanText = useMemo(() => extractCleanPersonalText(message), [message]);
   const rawText = message.body_text || '';
-  const displayText = showOriginal ? rawText : stripSignature(rawText);
+  const displayText = showOriginal ? rawText || cleanText : cleanText;
   const linkifiedText = useMemo(() => linkifyText(displayText), [displayText]);
-  const canToggle = !isRichHtml && rawText && rawText !== displayText;
+  const canToggle = !isRichHtml && rawText && rawText.trim() !== cleanText.trim();
 
   return (
     <div
